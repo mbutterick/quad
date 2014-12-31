@@ -52,7 +52,10 @@
                 b-in))
   (define quality (quad-attr-ref/parameter b world:quality-key))
   (define (wrap-quads qs)
-    (define wrap-proc (if (> quality world:draft-quality) wrap-best wrap-first)) 
+    (define wrap-proc (cond
+                        [(>= quality world:max-quality) wrap-best] 
+                        [(<= quality world:draft-quality) wrap-first]
+                        [else wrap-adaptive])) 
     (wrap-proc qs))
   (log-quad-debug "wrapping lines")
   (log-quad-debug "quality = ~a" quality)
@@ -191,21 +194,21 @@
   (coerce/input? . -> . doc?)  
   (cond
     [(input? x) (load-text-cache-file)
-                (define multipages (input->multipages x)) ; 170
-                (define pages (append-map typeset multipages)) ; 2370
-                (define doc (typeset pages)) ; 370
+                (define multipages (input->multipages x)) ; 125 = timings for jude0
+                (define pages (append-map typeset multipages)) ; 1446
+                (define doc (typeset pages)) ; 250
                 (update-text-cache-file)
                 doc]
-    [(multipage? x) (define multicolumns (multipage->multicolumns x)) ; 77
-                    (define columns (append-map typeset multicolumns)) ; 2420
+    [(multipage? x) (define multicolumns (multipage->multicolumns x)) ; 81
+                    (define columns (append-map typeset multicolumns)) ; 1460
                     (define pages (typeset columns)) ; 0
                     pages]
-    [(multicolumn? x) (define blocks (multicolumn->blocks x)) ; 85
-                      (define lines (append-map typeset blocks)) ; 2422
+    [(multicolumn? x) (define blocks (multicolumn->blocks x)) ; 69
+                      (define lines (append-map typeset blocks)) ; 1363
                       (define columns (typeset lines)) ; 4
                       columns]
     [(lines? x) (map typeset (lines->columns x))] ; 10
-    [(pages? x) (typeset (pages->doc x))] ; 370
+    [(pages? x) (typeset (pages->doc x))] ; 249
     [(columns? x) (map typeset (columns->pages x))] ; 1
     [(block? x) (map typeset (block->lines x))] ; about 2/3 of running time
     [else x]))
@@ -218,8 +221,8 @@
   (require "render.rkt" racket/class profile)
   (require "samples.rkt")
   (activate-logger quad-logger)
-  (parameterize ([world:quality-default world:max-quality]
+  (parameterize ([world:quality-default 50]
                  [world:paper-width-default 412]
                  [world:paper-height-default 600])
-    (define to (begin (time (typeset (jude)))))
+    (define to (begin (time (typeset (jude0)))))
     (time (send (new pdf-renderer%) render-to-file to "foo.pdf"))))

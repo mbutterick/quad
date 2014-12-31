@@ -133,8 +133,8 @@
     (if the-word-break
         (quad (quad-name p) (quad-attrs p) 
               (append (quad-list p) (let ([rendered-wb ((if before-break? 
-                                                          word-break->before-break 
-                                                          word-break->no-break) the-word-break)])
+                                                            word-break->before-break 
+                                                            word-break->no-break) the-word-break)])
                                       (if (> (string-length (word-string rendered-wb)) 0) ; if rendered-wb is "", don't append it
                                           (list rendered-wb)
                                           empty))))
@@ -244,6 +244,10 @@
   (define-values (initial-ps last-p) (split-last ps))
   (snoc (map render-piece initial-ps) (render-piece-before-break last-p)))
 
+
+(define (calc-looseness total-width measure)
+  (round-float (fl/ (fl- measure total-width) measure)))
+
 ;; compose pieces into a finished line.
 ;; take the contents of the rendered pieces and merge them.
 ;; compute looseness for line as a whole.
@@ -271,7 +275,7 @@
     (error 'pieces->line "quad has no measure key: ~a" (first line-quads)))
   
   (define measure (fl (quad-attr-ref (first merged-quads) world:measure-key)))
-  (define looseness (round-float (fl/ (fl- measure (fold-fl+ merged-quad-widths)) measure)))
+  (define looseness (calc-looseness (fold-fl+ merged-quad-widths) measure))
   
   ;; quads->line function hoists common attributes into the line
   (let* ([new-line-quads (map embed-width merged-quads merged-quad-widths)] ; 15% of time
@@ -360,7 +364,7 @@
    (for/flvector ([p (in-list pieces-measured)]) (fl+ (vector-ref p 0) (vector-ref p 2))))) ; first = word length, third = bb length
 
 
-(define (trial-line pieces-rendered-widths pieces-rendered-before-break-widths i j)
+(define (make-trial-line pieces-rendered-widths pieces-rendered-before-break-widths i j)
   (define flvec (flvector-copy pieces-rendered-widths i j))
   (flvector-set! flvec (sub1 (flvector-length flvec)) (flvector-ref pieces-rendered-before-break-widths (sub1 j)))
   flvec)
@@ -415,7 +419,7 @@
                                       (add1 ($penalty-hyphens penalty-up-to-i))))
        
        
-       (define line-width (get-line-width (trial-line pieces-rendered-widths pieces-rendered-before-break-widths i j)))
+       (define line-width (get-line-width (make-trial-line pieces-rendered-widths pieces-rendered-before-break-widths i j)))
        
        ($penalty 
         cumulative-hyphens
@@ -454,6 +458,115 @@
   (log-quad-debug "best-fit breakpoints = ~a" result)
   result)
 
+(require math/statistics)
+(define+provide (adaptive-fit-proc pieces measure)
+  ;((pieces? . -> . width?) . -> . (pieces? measure? . -> . breakpoints?))
+  
+  ;; this is the winning performance strategy: extract the numbers first, then just wrap on those.
+  ;; todo: how to avoid re-measuring pieces later?
+  ;; todo: how to retain information about words per line and hyphen at end?
+  (define-values (pieces-rendered-widths pieces-rendered-before-break-widths)
+    (make-piece-vectors pieces))
+  (define pieces-with-word-space (vector-map (λ(piece) (and (quad-has-attr? piece world:word-break-key) (equal? (quad-attr-ref (quad-attr-ref piece world:word-break-key) 'nb) " "))) pieces))
+  
+  (define-values (folded-bps folded-widths) 
+    (for/fold ([bps '(0)][line-widths empty])([j-1 (in-range (vector-length pieces))])
+      (define line-width (get-line-width (make-trial-line pieces-rendered-widths
+                                                          pieces-rendered-before-break-widths
+                                                          (car bps) (add1 j-1))))
+      (if (fl> line-width (fl* world:allowed-overfull-ratio measure))
+          (values (cons j-1 bps) (cons line-width line-widths))
+          (values bps line-widths))))
+  (define first-fit-bps (cdr (reverse folded-bps)))
+  (define trial-line-widths (reverse folded-widths))
+  (log-quad-debug "adaptive-first-fit breakpoints = ~a" first-fit-bps)
+  
+  
+  (define (fu-formula)
+    (define line-count (add1 (length first-fit-bps)))
+    (cond
+      [(<= line-count 2) 1.0] ; signals that first-fit is always OK with 1 or 2 lines
+      [else ; only measure middle lines. we know bps has at least 2 bps
+       (define looseness-stddev (stddev (map (curryr calc-looseness measure) (drop-right (drop trial-line-widths 1) 1))))         
+       (define piece-count (flvector-length pieces-rendered-widths)) 
+       (define pieces-per-line (fl/ (fl piece-count) (sub1 (fl line-count)))) ; would be more accurate to count only pieces in middle
+       (fl+s 2.2 (fllog (flabs looseness-stddev)) (fl* 0.09 pieces-per-line))])) ; the FU FORMULA
+  
+  (cond
+    [(fl> (fu-formula) 0.0) first-fit-bps]
+    [else
+     
+     ;; don't use struct for penalty, because of read/write overhead
+     (define $penalty vector)
+     (define ($penalty-width x) (vector-ref x 1))
+     (define ($penalty-hyphens x) (vector-ref x 0))
+     ;; Reduce the vector to an integer by treating it as magnitude from origin.
+     ;(define ($penalty->integer v) (sqrt (apply + (map (compose1 (curryr expt 2)) (list ($penalty-width v))))))
+     (define ($penalty->value v) ($penalty-width v))
+     (define initial-value ($penalty 0 0.0))
+     
+     ;(define initial-value 0)
+     (define matrix-value->number identity)
+     
+     
+     (log-quad-debug "~a pieces to wrap = ~v" (vector-length pieces) (vector-map quad->string pieces))
+     (define (penalty i j)
+       (define out-of-bounds-signal ($penalty 0 (fl* -1.0 (fl i)))) ; for ocm
+       (define last-line? (= j (vector-length pieces)))
+       (cond
+         [(or (>= i j) ; implies negative or zero length line 
+              (> j (vector-length pieces))) ; exceeds available pieces
+          out-of-bounds-signal] 
+         [else
+          (define penalty-up-to-i (ocm-min-value ocm i))
+          (define words (fl (vector-count identity (vector-copy pieces-with-word-space i (sub1 j)))))     
+          (define last-piece-to-test (vector-ref pieces (sub1 j)))
+          (define new-hyphen?
+            (and (quad-has-attr? last-piece-to-test world:word-break-key)
+                 (equal? (quad-attr-ref (quad-attr-ref last-piece-to-test world:word-break-key) world:before-break-key) "-")))
+          (define cumulative-hyphens (if (not new-hyphen?) 
+                                         0 
+                                         (add1 ($penalty-hyphens penalty-up-to-i))))
+          
+          
+          (define line-width (get-line-width (make-trial-line pieces-rendered-widths pieces-rendered-before-break-widths i j)))
+          
+          ($penalty 
+           cumulative-hyphens
+           (round-float
+            (fl+s 
+             (if (> cumulative-hyphens world:hyphen-limit)
+                 (fl world:hyphen-penalty)
+                 0.0)
+             (fl world:new-line-penalty) 
+             ($penalty->value penalty-up-to-i)
+             (cond
+               ;; overfull line: huge penalty prevents break; multiplier is essential for monotonicity.
+               ;; multiply by -1 because line-width is longer than measure, thus diff is negative
+               [(fl> line-width (fl* world:allowed-overfull-ratio measure))
+                (fl* (fl- line-width measure) (flexpt 10.0 7.0))] 
+               ;; standard penalty, optionally also applied to last line (by changing operator)
+               [((if world:last-line-can-be-short < <=) j (vector-length pieces)) (fl/ (flexpt (fl- measure line-width) 2.0) (flmax 1.0 words))]
+               ;; only option left is (= j (length pieces)), meaning we're on the last line.
+               ;; 0 penalty means any length is ok.
+               ;[(< (length pieces-to-test) (world:minimum-last-line-pieces)) 50000]
+               [else 0.0]))))]))
+     
+     (define ocm (make-ocm penalty initial-value $penalty->value))
+     
+     ;; starting from last position, ask ocm for position of row minimum (= new-pos)
+     ;; collect this value, and use it as the input next time
+     ;; until you reach first position.    
+     (define first-position 0)
+     (define last-position (vector-length pieces))
+     (define result (let loop ([pos last-position][acc null])
+                      (let ([next-pos (ocm-min-index ocm pos)]) ; first look ahead ...
+                        (if (= next-pos first-position) ; therefore we're done
+                            acc
+                            (loop next-pos (cons next-pos acc))))))
+     
+     (log-quad-debug "best-fit breakpoints = ~a" result)
+     result]))
 
 
 ;; greedy linefitting: find the biggest line that will fit, then set the next
@@ -466,9 +579,9 @@
   
   (define bps 
     (for/fold ([bps '(0)])([j-1 (in-range (vector-length pieces))])
-      (if (fl> (get-line-width (trial-line pieces-rendered-widths
-                                           pieces-rendered-before-break-widths
-                                           (car bps) (add1 j-1))) 
+      (if (fl> (get-line-width (make-trial-line pieces-rendered-widths
+                                                pieces-rendered-before-break-widths
+                                                (car bps) (add1 j-1))) 
                (fl* world:allowed-overfull-ratio measure))
           (cons j-1 bps)
           bps)))
@@ -489,6 +602,12 @@
                            #:measure-quad-proc quad-width 
                            #:compose-line-proc pieces->line
                            #:find-breakpoints-proc best-fit-proc))
+
+(define+provide wrap-adaptive (make-wrap-proc 
+                               #:make-pieces-proc make-pieces
+                               #:measure-quad-proc quad-width 
+                               #:compose-line-proc pieces->line
+                               #:find-breakpoints-proc adaptive-fit-proc))
 
 
 (define (fixed-width? q) (quad-has-attr? q world:width-key))
@@ -539,5 +658,6 @@
   
   (time-repeat trials (let () (wrap-first eqs 54) (void)))
   (time-repeat trials (let ([measure 54]) (wrap-best eqs measure) (void)))
+  (time-repeat trials (let ([measure 54]) (wrap-adaptive eqs measure) (void)))
   )
 
