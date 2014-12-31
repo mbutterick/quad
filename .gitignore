@@ -18,3 +18,5 @@ Icon
 *logger.txt
 *log.txt
 *.pdf
+*.cache
+
