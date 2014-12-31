@@ -16,13 +16,17 @@
                    "Firstlinerhere" (column-break) "Secondlinerhere" (column-break) "Thirdlinerhere"))
 
 
-(define (make-jude jude-text)
-  (define jude-blocks (map (λ(s) (regexp-replace* #rx"\n" s " ")) (string-split (file->string jude-text) "\n\n")))
+(define (make-sample jude-text [line-limit #f])
+  (define sample-string (if line-limit
+                            (let ([lines (file->lines jude-text)])
+                              (string-join (take lines (min line-limit (length lines))) "\n"))
+                            (file->string jude-text)))
+  (define jude-blocks (map (λ(s) (regexp-replace* #rx"\n" s " ")) (string-split sample-string "\n\n")))
   (apply block '(font "Equity Text B" measure 360 leading 14 column-count 1 column-gutter 10 size 11.5 x-align justify x-align-last-line left) (add-between (map (λ(jb) (block #f (box '(width 10)) (optical-kern) jb)) jude-blocks) (block-break))))
 
-(define (jude) (make-jude "texts/jude.txt"))
-(define (jude0) (make-jude "texts/jude0.txt"))
-(define (judebig) (make-jude "texts/judebig.txt"))
-
+(define (jude) (make-sample "texts/jude.txt"))
+(define (jude0) (make-sample "texts/jude0.txt"))
+(define (judebig) (make-sample "texts/judebig.txt"))
+(define (segfault) (make-sample "texts/segfault.txt"))
 
 (define (jude1) (block '(font "Equity Text B" measure 150 leading 14 column-count 4 size 11 x-align justify x-align-last-line left) "this—is—a—test—of—em—dashes—breakable—or—not?"))
