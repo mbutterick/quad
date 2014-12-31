@@ -1,4 +1,5 @@
-## Quad: document processor
+Quad
+----
 
 A document processor written in [Racket](http://racket-lang.org). Not even close to fit for public consumption.
 
