@@ -62,7 +62,7 @@ D. Eppstein, March 2002, significantly revised August 2005
 (define (integers? x) (and (list? x) (andmap integer? x)))
 
 ;; Reduce phase: make number of rows at most equal to number of cols
-(define (reduce row-indices col-indices matrix-proc value->integer)
+(define (reduce row-indices col-indices matrix-proc entry->value)
   ;(vector? vector? procedure? procedure? . -> . vector?)
   (log-ocm-debug "starting reduce phase with")
   (log-ocm-debug "row-indices = ~a" row-indices)
@@ -73,12 +73,12 @@ D. Eppstein, March 2002, significantly revised August 2005
       (cond
         [(and (>= (vector-length stack) 1) 
               (log-ocm-debug "comparing row values at column ~a" (vector-ref col-indices last-stack-idx))
-              (log-ocm-debug "end of row stack (~a) value at column ~a = ~a" (vector-ref stack last-stack-idx) (vector-ref col-indices last-stack-idx) (value->integer (matrix-proc (vector-ref stack last-stack-idx) (vector-ref col-indices last-stack-idx))))
-              (log-ocm-debug "challenger row (~a) value at column ~a = ~a" row-idx (vector-ref col-indices last-stack-idx) (value->integer (matrix-proc row-idx (vector-ref col-indices last-stack-idx))))
-              (> (value->integer (matrix-proc (vector-ref stack last-stack-idx) (vector-ref col-indices last-stack-idx)))
-                 (value->integer (matrix-proc row-idx (vector-ref col-indices last-stack-idx)))))
+              (log-ocm-debug "end of row stack (~a) value at column ~a = ~a" (vector-ref stack last-stack-idx) (vector-ref col-indices last-stack-idx) (entry->value (matrix-proc (vector-ref stack last-stack-idx) (vector-ref col-indices last-stack-idx))))
+              (log-ocm-debug "challenger row (~a) value at column ~a = ~a" row-idx (vector-ref col-indices last-stack-idx) (entry->value (matrix-proc row-idx (vector-ref col-indices last-stack-idx))))
+              (> (entry->value (matrix-proc (vector-ref stack last-stack-idx) (vector-ref col-indices last-stack-idx)))
+                 (entry->value (matrix-proc row-idx (vector-ref col-indices last-stack-idx)))))
          
-         (log-ocm-debug "challenger row (~a) wins with a new minimum ~a, so end of row stack (~a) is removed" row-idx (value->integer (matrix-proc row-idx (vector-ref col-indices last-stack-idx))) (vector-ref stack last-stack-idx))
+         (log-ocm-debug "challenger row (~a) wins with a new minimum ~a, so end of row stack (~a) is removed" row-idx (entry->value (matrix-proc row-idx (vector-ref col-indices last-stack-idx))) (vector-ref stack last-stack-idx))
          (process-stack (vector-drop-right stack 1) row-idx)]
         [else 
          (log-ocm-debug (if (< (vector-length stack) 1) 
@@ -96,7 +96,7 @@ D. Eppstein, March 2002, significantly revised August 2005
   reduced-row-indexes)
 
 
-(define (reduce2 row-indices col-indices matrix-proc value->integer)
+(define (reduce2 row-indices col-indices matrix-proc entry->value)
   (let find-survivors ([rows row-indices][survivors empty])
     (cond 
       [(vector-empty? rows) (list->vector (reverse survivors))]
@@ -108,7 +108,7 @@ D. Eppstein, March 2002, significantly revised August 2005
          [else
           (define index-of-last-survivor (sub1 (length survivors)))
           (define col-head (vector-ref col-indices index-of-last-survivor))
-          (define-syntax-rule (test-function r) (value->integer (matrix-proc r col-head)))
+          (define-syntax-rule (test-function r) (entry->value (matrix-proc r col-head)))
           (cond
             ;; this is the challenge: is the head cell of challenger a new minimum?
             ;; use < not <=, so the recorded winner is the earliest row with the new minimum, not the latest row
@@ -136,7 +136,7 @@ D. Eppstein, March 2002, significantly revised August 2005
 (define-syntax-rule (vector-last v)
   (vector-ref v (sub1 (vector-length v))))
 
-(define (interpolate minima row-indices col-indices matrix-proc value->integer)
+(define (interpolate minima row-indices col-indices matrix-proc entry->value)
   ;(hash? vector? vector? procedure? procedure? . -> . hash?)
   (for ([col-idx (in-range 0 (vector-length col-indices) 2)]) ;; even-col-indices
     (define col (vector-ref col-indices col-idx))
@@ -146,17 +146,17 @@ D. Eppstein, March 2002, significantly revised August 2005
           (: (hash-ref minima (vector-ref col-indices (add1 col-idx))) 'row-idx)))
     
     (define smallest-value-entry
-      (vector-argmin (compose1 value->integer car)
+      (vector-argmin (compose1 entry->value car)
                      (for/vector ([row-idx (in-list (dropf-right (vector->list row-indices) (negate (curry = idx-of-last-row))))])
                        (list (matrix-proc row-idx col) row-idx))))
     
     (! minima col (apply make-minimum smallest-value-entry)))
   minima)
 
-(define (interpolate2 minima row-indices col-indices matrix-proc value->integer)
+(define (interpolate2 minima row-indices col-indices matrix-proc entry->value)
   (define idx-of-last-col (sub1 (vector-length col-indices)))
   (define (smallest-value-entry col idx-of-last-row)
-    (argmin (compose1 value->integer car)
+    (argmin (compose1 entry->value car)
             (for/list ([row-idx (stop-after (in-vector row-indices) (curry = idx-of-last-row))])
               (list (matrix-proc row-idx col) row-idx))))
   
@@ -191,15 +191,15 @@ D. Eppstein, March 2002, significantly revised August 2005
 ;; the keys are col-indices (integers)
 ;; the values are pairs of (value row-index).
 (require rackunit)
-(define (concave-minima row-indices [col-indices null] [matrix-proc (make-caching-proc identity)] [value->integer identity])
+(define (concave-minima row-indices [col-indices null] [matrix-proc (make-caching-proc identity)] [entry->value identity])
   ;((vector?) ((or/c #f vector?) procedure? procedure?) . ->* . hash?)
   (define reduce-proc reduce2)
   (define interpolate-proc interpolate2)
   (if (= 0 (vector-length col-indices)) 
       (make-hash)
-      (let ([row-indices (reduce-proc row-indices col-indices matrix-proc value->integer)])
-        (define odd-column-minima (concave-minima row-indices (vector-odd-elements col-indices) matrix-proc value->integer))
-        (interpolate-proc odd-column-minima row-indices col-indices matrix-proc value->integer))))
+      (let ([row-indices (reduce-proc row-indices col-indices matrix-proc entry->value)])
+        (define odd-column-minima (concave-minima row-indices (vector-odd-elements col-indices) matrix-proc entry->value))
+        (interpolate-proc odd-column-minima row-indices col-indices matrix-proc entry->value))))
 
 
 #|
@@ -255,54 +255,68 @@ In addition, we keep a column index self._tentative, such that
 (define-syntax-rule (! hashtable key value)
   (hash-set! hashtable key value))
 
-(define (make-ocm matrix-proc [initial-value 0][value->integer identity])
+(define-syntax-rule (ocm-ref ocm key)
+  (vector-ref ocm key))
+
+(define-syntax-rule (ocm-set! ocm key value)
+  (vector-set! ocm key value))
+
+(define o:min-values 0)
+(define o:min-row-indices 1)
+(define o:finished 2)
+(define o:matrix-proc 3)
+(define o:entry->value 4)
+(define o:base 5)
+(define o:tentative 6)
+
+(define (make-ocm matrix-proc [initial-value 0][entry->value identity])
   (log-ocm-debug "making new ocm")
-  (define ocm (make-hash))
-  (! ocm 'min-values (vector initial-value))
-  (! ocm 'min-row-indices (vector no-value))
-  (! ocm 'finished 0)
-  (! ocm 'matrix-proc (make-caching-proc matrix-proc))
-  (! ocm 'value->integer value->integer) ; for converting matrix values to an integer
-  (! ocm 'base 0)
-  (! ocm 'tentative 0)
+  (define ocm (make-vector 7))
+  (ocm-set! ocm o:min-values (vector initial-value))
+  (ocm-set! ocm o:min-row-indices (vector no-value))
+  (ocm-set! ocm o:finished 0)
+  (ocm-set! ocm o:matrix-proc (make-caching-proc matrix-proc))
+  (ocm-set! ocm o:entry->value entry->value) ; for converting matrix values to an integer
+  (ocm-set! ocm o:base 0)
+  (ocm-set! ocm o:tentative 0)
   ocm)
 
 
 ;; Return min { Matrix(i,j) | i < j }.
 (define (min-value ocm j)
-  (if (< (: ocm 'finished) j)
+  (if (< (ocm-ref ocm o:finished) j)
       (begin (advance! ocm) (min-value ocm j))
-      (vector-ref (: ocm 'min-values) j)))
+      (vector-ref (ocm-ref ocm o:min-values) j)))
 
 ;; Return argmin { Matrix(i,j) | i < j }.
 (define (min-index ocm j)
-  (if (< (: ocm 'finished) j)     
+  (if (< (ocm-ref ocm o:finished) j)     
       (begin (advance! ocm) (min-index ocm j))
-      (vector-ref (: ocm 'min-row-indices) j)))
+      (vector-ref (ocm-ref ocm o:min-row-indices) j)))
 
 ;; Finish another value,index pair.
 (define (advance! ocm)
-  (define next (add1 (: ocm 'finished)))  
-  (log-ocm-debug "advance! ocm to next = ~a" (add1 (: ocm 'finished)))
+  (define next (add1 (ocm-ref ocm o:finished)))  
+  (log-ocm-debug "advance! ocm to next = ~a" (add1 (ocm-ref ocm o:finished)))
   (cond
     ;; First case: we have already advanced past the previous tentative
     ;; value.  We make a new tentative value by applying ConcaveMinima
     ;; to the largest square submatrix that fits under the base.
-    [(> next (: ocm 'tentative))
-     (log-ocm-debug "advance: first case because next (~a) > tentative (~a)" next (: ocm 'tentative))
-     (define rows (list->vector (range (: ocm 'base) next)))
-     (! ocm 'tentative (+ (: ocm 'finished) (vector-length rows)))
-     (define cols (list->vector (range next (add1 (: ocm 'tentative)))))
-     (define minima (concave-minima rows cols (: ocm 'matrix-proc) (: ocm 'value->integer)))
+    [(> next (ocm-ref ocm o:tentative))
+     (log-ocm-debug "advance: first case because next (~a) > tentative (~a)" next (ocm-ref ocm o:tentative))
+     (define rows (list->vector (range (ocm-ref ocm o:base) next)))
+     (ocm-set! ocm o:tentative (+ (ocm-ref ocm o:finished) (vector-length rows)))
+     (define cols (list->vector (range next (add1 (ocm-ref ocm o:tentative)))))
+     (define minima (concave-minima rows cols (ocm-ref ocm o:matrix-proc) (ocm-ref ocm o:entry->value)))
      (for ([col (in-vector cols)])
        (cond
-         [(>= col (vector-length (: ocm 'min-values)))
-          (! ocm 'min-values (vector-append-item (: ocm 'min-values) (: (: minima col) 'value)))
-          (! ocm 'min-row-indices (vector-append-item (: ocm 'min-row-indices) (: (: minima col) 'row-idx)))]
-         [(< ((: ocm 'value->integer) (: (: minima col) 'value)) ((: ocm 'value->integer) (vector-ref (: ocm 'min-values) col)))
-          (! ocm 'min-values (vector-set (: ocm 'min-values) col (: (: minima col) 'value)))
-          (! ocm 'min-row-indices (vector-set (: ocm 'min-row-indices) col (: (: minima col) 'row-idx)))]))
-     (! ocm 'finished next)]
+         [(>= col (vector-length (ocm-ref ocm o:min-values)))
+          (ocm-set! ocm o:min-values (vector-append-item (ocm-ref ocm o:min-values) (: (: minima col) 'value)))
+          (ocm-set! ocm o:min-row-indices (vector-append-item (ocm-ref ocm o:min-row-indices) (: (: minima col) 'row-idx)))]
+         [(< ((ocm-ref ocm o:entry->value) (: (: minima col) 'value)) ((ocm-ref ocm o:entry->value) (vector-ref (ocm-ref ocm o:min-values) col)))
+          (ocm-set! ocm o:min-values (vector-set (ocm-ref ocm o:min-values) col (: (: minima col) 'value)))
+          (ocm-set! ocm o:min-row-indices (vector-set (ocm-ref ocm o:min-row-indices) col (: (: minima col) 'row-idx)))]))
+     (ocm-set! ocm o:finished next)]
     
     [else
      ;; Second case: the new column minimum is on the diagonal.
@@ -310,23 +324,23 @@ In addition, we keep a column index self._tentative, such that
      ;; so we can clear out all our work from higher rows.
      ;; As in the fourth case, the loss of tentative is
      ;; amortized against the increase in base.
-     (define diag ((: ocm 'matrix-proc) (sub1 next) next))
+     (define diag ((ocm-ref ocm o:matrix-proc) (sub1 next) next))
      (cond
-       [(< ((: ocm 'value->integer) diag) ((: ocm 'value->integer) (vector-ref (: ocm 'min-values) next)))
+       [(< ((ocm-ref ocm o:entry->value) diag) ((ocm-ref ocm o:entry->value) (vector-ref (ocm-ref ocm o:min-values) next)))
         (log-ocm-debug "advance: second case because column minimum is on the diagonal")
-        (! ocm 'min-values (vector-set (: ocm 'min-values) next diag))
-        (! ocm 'min-row-indices (vector-set (: ocm 'min-row-indices) next (sub1 next)))
-        (! ocm 'base (sub1 next))
-        (! ocm 'tentative next)
-        (! ocm 'finished next)]
+        (ocm-set! ocm o:min-values (vector-set (ocm-ref ocm o:min-values) next diag))
+        (ocm-set! ocm o:min-row-indices (vector-set (ocm-ref ocm o:min-row-indices) next (sub1 next)))
+        (ocm-set! ocm o:base (sub1 next))
+        (ocm-set! ocm o:tentative next)
+        (ocm-set! ocm o:finished next)]
        
        ;; Third case: row i-1 does not supply a column minimum in
        ;; any column up to tentative. We simply advance finished
        ;; while maintaining the invariant.
-       [(>= ((: ocm 'value->integer) ((: ocm 'matrix-proc) (sub1 next) (: ocm 'tentative)))
-            ((: ocm 'value->integer) (vector-ref (: ocm 'min-values) (: ocm 'tentative))))
+       [(>= ((ocm-ref ocm o:entry->value) ((ocm-ref ocm o:matrix-proc) (sub1 next) (ocm-ref ocm o:tentative)))
+            ((ocm-ref ocm o:entry->value) (vector-ref (ocm-ref ocm o:min-values) (ocm-ref ocm o:tentative))))
         (log-ocm-debug "advance: third case because row i-1 does not suppply a column minimum")
-        (! ocm 'finished next)]
+        (ocm-set! ocm o:finished next)]
        
        ;; Fourth and final case: a new column minimum at self._tentative.
        ;; This allows us to make progress by incorporating rows
@@ -336,13 +350,13 @@ In addition, we keep a column index self._tentative, such that
        ;; this step) can be amortized against the increase in base.
        [else
         (log-ocm-debug "advance: fourth case because new column minimum")
-        (! ocm 'base (sub1 next))
-        (! ocm 'tentative next)
-        (! ocm 'finished next)])]))
+        (ocm-set! ocm o:base (sub1 next))
+        (ocm-set! ocm o:tentative next)
+        (ocm-set! ocm o:finished next)])]))
 
 (define (print ocm)
-  (displayln (: ocm 'min-values))
-  (displayln (: ocm 'min-row-indices)))
+  (displayln (ocm-ref ocm o:min-values))
+  (displayln (ocm-ref ocm o:min-row-indices)))
 
 (define (smawky? m)
   (define (position-of-minimum xs)
