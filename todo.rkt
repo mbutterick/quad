@@ -1,9 +1,10 @@
 #lang racket/base
 
 ;; todo next
+;; fold first-fit and best-fit into adaptive-fit
+;; pagination: vertical measuring
 ;; segfault on command line?
 ;; adaptive linebreak using fu-formula
-;; pagination: vertical measuring
 ;; use smawk penalty system for pagination too?
 ;; unified model of filling / positioning that works for every quad, recursively
 ;; how to handle constraint failure. At least a good error message.
