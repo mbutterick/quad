@@ -221,7 +221,7 @@
   (require "render.rkt" racket/class profile)
   (require "samples.rkt")
   (activate-logger quad-logger)
-  (parameterize ([world:quality-default 50]
+  (parameterize ([world:quality-default world:adaptive-quality]
                  [world:paper-width-default 412]
                  [world:paper-height-default 600])
     (define to (begin (time (typeset (jude0)))))

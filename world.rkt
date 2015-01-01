@@ -29,6 +29,7 @@
 
 
 (define max-quality 100)
+(define adaptive-quality 50)
 (define draft-quality 20)
 (define-key-and-parameter quality 'quality max-quality)
 
