@@ -1,7 +1,6 @@
 #lang racket/base
 
 ;; todo next
-;; fold first-fit and best-fit into adaptive-fit
 ;; pagination: vertical measuring
 ;; segfault on command line?
 ;; adaptive linebreak using fu-formula
