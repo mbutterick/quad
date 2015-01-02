@@ -135,22 +135,20 @@
 
 ;; make this a macro because qs-in is often huge
 ;; and the macro avoids allocation + garbage collection
-(define-syntax-rule (gather-common-attrs qs-in)
-  (let ([qs qs-in])
-    (and (quad-attrs (car qs))
-         (let ([attr-missing (gensym)])
-           (let loop ([qs (cdr qs)]
-                      [common-attrs (for/list ([kv-pair (in-hash-pairs (quad-attrs (car qs)))] 
-                                               #:unless (member (car kv-pair) cannot-be-common-attrs))  
-                                      kv-pair)])
-             (cond
-               [(empty? common-attrs) #f]
-               [(empty? qs) (flatten common-attrs)]
-               [else (define reference-quad (car qs))
-                     (loop (cdr qs) 
-                           (filter (λ(ca) (let ([v (quad-attr-ref reference-quad (car ca) attr-missing)])
-                                            (equal? v (cdr ca))))
-                                   common-attrs))]))))))
+(define attr-missing (gensym))
+(define (gather-common-attrs qs)
+  (let loop ([qs qs]
+             [common-attrs (if (quad-attrs (car qs))
+                               (for/list ([kv-pair (in-hash-pairs (quad-attrs (car qs)))] 
+                                          #:unless (member (car kv-pair) cannot-be-common-attrs))  
+                                 kv-pair)
+                               empty)])
+    (cond
+      [(empty? common-attrs) #f]
+      [(empty? qs) (flatten common-attrs)]
+      [else (loop (cdr qs) 
+                  (filter (λ(ca) (equal? (quad-attr-ref (car qs) (car ca) attr-missing) (cdr ca)))
+                          common-attrs))])))
 
 
 (define-syntax (define-box-type stx)
