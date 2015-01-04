@@ -1,9 +1,10 @@
 #lang racket/base
-(require "main.rkt" "samples.rkt" "render.rkt" "world.rkt" racket/class)
+(require "main.rkt" "samples.rkt" "render.rkt" "world.rkt" racket/class "logger.rkt")
 
 (module+ main
   (define line-limit (with-handlers ([exn:fail? (λ(exn) #f)])
                        (string->number (vector-ref (current-command-line-arguments) 0))))
+  (activate-logger quad-logger)
   (parameterize ([world:quality-default world:max-quality]
                  [world:paper-width-default 412]
                  [world:paper-height-default 600])

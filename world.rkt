@@ -94,4 +94,4 @@
 (define min-last-lines 2)
 (define default-lines-per-column 36)
 
-(define-parameter logging-level 'info)
+(define-parameter logging-level 'debug)
