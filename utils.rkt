@@ -96,8 +96,7 @@
 ;; flatten quad as above, 
 ;; then dissolve it into individual character quads while copying attributes
 ;; input is often large, so macro allows us to avoid allocation
-(provide split-quad)
-(define-syntax-rule (split-quad q)
+(define+provide (split-quad q)
   ;(quad? . -> . quads?)
   (letrec ([do-explode (λ(x [parent #f])
                          (cond
@@ -105,8 +104,10 @@
                             (if (empty? (quad-list x))
                                 x ; no subelements, so stop here
                                 (map (λ(xi) (do-explode xi x)) (quad-list x)))] ; replace quad with its elements, exploded
-                           [(string? x) (map (λ(xc) (quad 'word (quad-attrs parent) (list xc))) (regexp-match* #px"." x))]))])
+                           [else (map (λ(xc) (quad 'word (quad-attrs parent) (list xc))) (regexp-match* #px"." x))]))])
     (flatten (map do-explode (flatten-quad q)))))
+
+
 
 ;; merge chars into words (and boxes), leave the rest
 ;; if two quads are mergeable types, and have the same attributes,

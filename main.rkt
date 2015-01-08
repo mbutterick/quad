@@ -194,7 +194,7 @@
   (coerce/input? . -> . doc?)  
   (cond
     [(input? x) (load-text-cache-file)
-                (define multipages (input->multipages x)) ; 125 = timings for jude0
+                (define multipages (time (input->multipages x))) ; 125 = timings for jude0
                 (define pages (append-map typeset multipages)) ; 1446
                 (define doc (typeset pages)) ; 250
                 (update-text-cache-file)
