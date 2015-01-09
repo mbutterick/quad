@@ -222,7 +222,7 @@
   (require "samples.rkt")
   (activate-logger quad-logger)
   (parameterize ([world:quality-default world:adaptive-quality]
-                 [world:paper-width-default 412]
-                 [world:paper-height-default 600])
-    (define to (begin (time (typeset (jude0)))))
+                 [world:paper-width-default 600]
+                 [world:paper-height-default 700])
+    (define to (begin (time (typeset (ti5)))))
     (time (send (new pdf-renderer%) render-to-file to "foo.pdf"))))
