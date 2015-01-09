@@ -7,7 +7,15 @@
 
 ;ti
 
-(define (tokenize-quad quad-in)
+;; convert quad into tokenized representation:
+;; 1) vector of atomic tokens
+;; 2) list of (attribute + range of tokens it applies to)
+;; this representation is designed to:
+;; 1) preserve all information in the original quad
+;; 2) be compact / not duplicate information unnecessarily
+;; 3) allow sequential access to the tokens
+;; 4) allow fast computation of token state (i.e., attrs that apply)
+(define (make-tokens-and-attrs quad-in)
   (define-values (all-tokens all-attrs _)
     (let loop ([current-quad quad-in][attr-acc empty][starting-tidx 0])
       (cond
@@ -41,7 +49,7 @@
   (values (list->vector (reverse (flatten all-tokens))) (flatten all-attrs)))
 
 
-(define-values (tokens attrs) (time (tokenize-quad (ti5))))
+(define-values (tokens attrs) (time (make-tokens-and-attrs (ti5))))
 (define current-tokens (make-parameter tokens))
 (define current-token-attrs (make-parameter attrs))
 
