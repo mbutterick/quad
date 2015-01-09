@@ -278,7 +278,7 @@
   ;; quads->line function hoists common attributes into the line
   (let* ([new-line-quads (map embed-width merged-quads merged-quad-widths)] ; 15% of time
          [new-line-quads (map record-ascent new-line-quads)] ; 35% of time
-         [new-line (apply line (quad-attrs (car new-line-quads)) new-line-quads)] 
+         [new-line (quads->line new-line-quads)] 
          [new-line (quad-attr-set new-line world:line-looseness-key looseness)])
     new-line))
 
