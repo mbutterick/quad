@@ -3,58 +3,56 @@
 (require "samples.rkt" "quads.rkt" "utils.rkt")
 
 (define ti (block '(measure 54 leading 18) "Meg is " (box '(foo 42)) " ally."))
+(define tib (block '(measure 240 font "Equity Text B" leading 16 size 13.5 x-align justify x-align-last-line left)  (block #f (block '(weight bold font "Equity Caps B") "Hello") (block-break) (box '(width 15)))))
 
 ;ti
 
-
-(define (tokenize-quad0 q)
-  (define-values (all-tokens last-tidx)
-    (let loop ([q q][starting-tidx 0])
-      (for/fold ([token-list empty][tidx starting-tidx])
-                ([item (in-list (quad-list q))])
-        (cond
-          [(quad? item)
-           (define-values (sub-token-list sub-last-tidx) (loop item tidx))
-           (values (cons sub-token-list token-list) sub-last-tidx)]
-          [(string? item)
-           (define atoms (regexp-match* #rx"." item))
-           (values (cons atoms token-list) (+ tidx (length atoms)))]
-          [else (values (cons item token-list) (+ tidx 1))]))))
-  (values (list->vector (flatten (reverse all-tokens))) last-tidx))
-
-
 (define (tokenize-quad quad-in)
-  (define-values (all-tokens all-attrs last-tidx)
+  (define-values (all-tokens all-attrs _)
     (let loop ([current-quad quad-in][attr-acc empty][starting-tidx 0])
       (cond
-        [(empty? (quad-list current-quad)) ; no subelements, so treat this quad as single token
-         (values (quad (quad-name current-quad) #f empty)
-                 (if (quad-attrs current-quad)
-                     (cons (vector (quad-attrs current-quad) starting-tidx (add1 starting-tidx)) attr-acc)
-                     attr-acc)
-                 (add1 starting-tidx))]
+        [(empty? (quad-list current-quad)); no subelements, so treat this quad as single token
+         (let ([current-quad-attrs (quad-attrs current-quad)]
+               [ending-tidx (add1 starting-tidx)])
+           (values (quad (quad-name current-quad) #f empty)
+                   (if current-quad-attrs
+                       (cons (vector current-quad-attrs starting-tidx ending-tidx) attr-acc)
+                       attr-acc)
+                   ending-tidx))]
         [else ; replace quad with its tokens, exploded
-         (define-values (tokens-from-fold subattrs-from-fold last-tidx-from-fold)
+         (define-values (tokens-from-fold subattrs-from-fold ending-tidx-from-fold)
            (for/fold ([token-acc empty][subattr-acc empty][tidx starting-tidx])
                      ([item (in-list (quad-list current-quad))])
              (cond
                [(quad? item)
                 (define-values (sub-tokens sub-attrs sub-last-tidx) (loop item attr-acc tidx))
                 (values (cons sub-tokens token-acc) (cons sub-attrs subattr-acc) sub-last-tidx)]
-               [(string? item)
-                (define atoms (regexp-match* #rx"." item))
-                (values (cons atoms token-acc) subattr-acc (+ tidx (length atoms)))]
-               [else 
-                (values (cons item token-acc) subattr-acc (+ tidx 1))])))
+               [else ; item is a string of length > 0 (quad contract guarantees this)
+                (define-values (exploded-chars last-idx-of-exploded-chars)
+                  (for/fold ([chars empty][last-idx #f])([(c i) (in-indexed item)])
+                    (values (cons c chars) i))) ; fold manually to get reversed items & length at same time
+                (values (cons exploded-chars token-acc) subattr-acc (+ tidx (add1 last-idx-of-exploded-chars)))])))
          (values tokens-from-fold
-                 (if (quad-attrs current-quad)
-                     (cons (vector (quad-attrs current-quad) starting-tidx last-tidx-from-fold) subattrs-from-fold)
-                     subattrs-from-fold)
-                 last-tidx-from-fold)])))
-  (values (list->vector (flatten (reverse all-tokens))) (flatten (reverse all-attrs))))
+                 (let ([current-quad-attrs (quad-attrs current-quad)])
+                   (if current-quad-attrs
+                       (cons (vector current-quad-attrs starting-tidx ending-tidx-from-fold) subattrs-from-fold)
+                       subattrs-from-fold))
+                 ending-tidx-from-fold)])))
+  (values (list->vector (reverse (flatten all-tokens))) (flatten all-attrs)))
 
 
-(define-values (tokens attrs) (tokenize-quad (ti2)))
-tokens
-attrs
-(filter (λ(idx) (box? (vector-ref tokens idx))) (range (vector-length tokens)))
+(define-values (tokens attrs) (time (tokenize-quad (ti5))))
+(define current-tokens (make-parameter tokens))
+(define current-token-attrs (make-parameter attrs))
+
+;(filter (λ(idx) (box? (vector-ref tokens idx))) (range (vector-length tokens)))
+
+(define (attr-ref-hash a) (vector-ref a 0))
+(define (attr-ref-start a) (vector-ref a 1))
+(define (attr-ref-end a) (vector-ref a 2))
+
+(define (calc-attrs tref)
+  (map attr-ref-hash (filter (λ(attr) (<= (attr-ref-start attr) tref (sub1 (attr-ref-end attr)))) (current-token-attrs))))
+
+(vector-ref tokens 4)
+(time (calc-attrs 4))

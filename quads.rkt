@@ -55,7 +55,7 @@
 (define (quad-name? x) (symbol? x))
 (define (hashable-list? x) (and (list? x) (even? (length x))))
 (define (quad-attrs? x) (or (false? x) (hash? x)))
-(define (quad-list? x) (and (list? x) (andmap (λ(xi) (or (quad? xi) (string? xi))) x)))
+(define (quad-list? x) (and (list? x) (andmap (λ(xi) (or (quad? xi) (and (string? xi) (< 0 (string-length xi))))) x)))
 (define (quads? x) (and (list? x) (andmap quad? x)))
 (define (lists-of-quads? x) (and (list? x) (andmap quads? x)))
 
