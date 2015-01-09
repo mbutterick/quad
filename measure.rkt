@@ -11,6 +11,7 @@
 (define dc (new record-dc%))
 
 (define max-size 1024) ; use fixnum to trigger faster bitshift division
+;; changing max-size invalidates font cache (because it's based on max size, duh)
 
 (define/caching (make-font/caching font weight style)
   (make-font #:size max-size #:style style #:weight weight #:face font))
