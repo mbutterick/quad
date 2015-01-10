@@ -194,7 +194,7 @@
   (coerce/input? . -> . doc?)  
   (cond
     [(input? x) (load-text-cache-file)
-                (define multipages (time (input->multipages x))) ; 125 = timings for jude0
+                (define multipages (input->multipages x)) ; 125 = timings for jude0
                 (define pages (append-map typeset multipages)) ; 1446
                 (define doc (typeset pages)) ; 250
                 (update-text-cache-file)
@@ -221,7 +221,7 @@
   (require "render.rkt" racket/class profile)
   (require "samples.rkt")
   (activate-logger quad-logger)
-  (parameterize ([world:quality-default world:adaptive-quality]
+  (parameterize ([world:quality-default world:draft-quality]
                  [world:paper-width-default 600]
                  [world:paper-height-default 700])
     (define to (begin (time (typeset (jude0)))))
