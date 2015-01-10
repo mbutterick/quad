@@ -1,5 +1,5 @@
 #lang racket/base
-(require racket/list sugar)
+(require racket/list sugar/define)
 (require "samples.rkt" "quads.rkt" "utils.rkt")
 
 (define ti (block '(measure 54 leading 18) "Meg is " (box '(foo 42)) " ally."))
@@ -15,7 +15,7 @@
 ;; 2) be compact / not duplicate information unnecessarily
 ;; 3) allow sequential access to the tokens
 ;; 4) allow fast computation of token state (i.e., attrs that apply)
-(define (make-tokens-and-attrs quad-in)
+(define+provide (make-tokens-and-attrs quad-in)
   (define-values (all-tokens all-attrs _)
     (let loop ([current-quad quad-in][attr-acc empty][starting-tidx 0])
       (cond
@@ -49,9 +49,9 @@
   (values (list->vector (reverse (flatten all-tokens))) (flatten all-attrs)))
 
 
-(define-values (tokens attrs) (time (make-tokens-and-attrs (ti5))))
-(define current-tokens (make-parameter tokens))
-(define current-token-attrs (make-parameter attrs))
+(define-values (tokens attrs) (make-tokens-and-attrs (ti5)))
+(define+provide current-tokens (make-parameter tokens))
+(define+provide current-token-attrs (make-parameter attrs))
 
 ;(filter (λ(idx) (box? (vector-ref tokens idx))) (range (vector-length tokens)))
 
@@ -61,6 +61,3 @@
 
 (define (calc-attrs tref)
   (map attr-ref-hash (filter (λ(attr) (<= (attr-ref-start attr) tref (sub1 (attr-ref-end attr)))) (current-token-attrs))))
-
-(vector-ref tokens 4)
-(time (calc-attrs 4))

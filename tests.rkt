@@ -68,19 +68,19 @@
 (check-equal? (quad-append (box #f "foo") (box #f "bar")) (box #f "foo" (box #f "bar")))
 
 (check-equal? (quad-last-char (box #f (box #f "foo") "food")) "d")
-(check-equal? (quad-last-char (box #f (box #f "foo") "")) "o")
+(check-equal? (quad-last-char (box #f (box #f "foo"))) "o")
 (check-equal? (quad-last-char (box #f "foo")) "o")
 (check-false (quad-last-char (box)))
 
 (check-equal? (quad-first-char (box #f (box #f "foo") "bar")) "f")
-(check-equal? (quad-first-char (box #f "" (box #f "foo") "bar")) "f")
+(check-equal? (quad-first-char (box #f (box #f "foo") "bar")) "f")
 (check-equal? (quad-first-char (box #f "foo")) "f")
 (check-false (quad-first-char (box)))
 
 (check-equal? (quad->string (box '(width 100) "foo")) "foo")
 (check-equal? (quad->string (box '(width 100) "foo" (box '(width 100) "bar"))) "foobar")
 (check-equal? (quad->string (box '(width 100) "foo" (box '(width 100) "bar") "ino")) "foobarino")
-(check-equal? (quad->string (box '(width 100) (box '(width 100)))) "")
+(check-equal? (quad->string (box '(width 100))) "")
 
 
 (check-false (whitespace? (~a #\u00A0)))
@@ -91,3 +91,13 @@
 (define funny-unicode-spaces (map ~a (list #\u2000 #\u2007 #\u2009 #\u200a #\u202f)))
 (check-true (andmap whitespace? funny-unicode-spaces))
 (check-true (andmap whitespace/nbsp? funny-unicode-spaces))
+
+
+(require "experimental.rkt")
+(define ti (block '(measure 54) "Meg is " (box '(foo 42)) " ally."))
+(define-values (tokens attrs) (make-tokens-and-attrs ti))
+(current-tokens tokens)
+(current-token-attrs attrs)
+(check-equal? tokens (vector #\M #\e #\g #\space #\i #\s #\space (box) #\space #\a #\l #\l #\y #\.))
+(check-equal? attrs '(#(#hash((measure . 54)) 0 14) #(#hash((foo . 42)) 7 8)))
+

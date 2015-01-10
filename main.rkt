@@ -224,5 +224,5 @@
   (parameterize ([world:quality-default world:adaptive-quality]
                  [world:paper-width-default 600]
                  [world:paper-height-default 700])
-    (define to (begin (time (typeset (ti5)))))
+    (define to (begin (time (typeset (jude0)))))
     (time (send (new pdf-renderer%) render-to-file to "foo.pdf"))))
