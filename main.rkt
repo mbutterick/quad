@@ -1,6 +1,6 @@
 #lang racket/base
 (require racket/list sugar racket/contract racket/function math/flonum)
-(require "quads.rkt" "utils.rkt" "wrap.rkt" "measure.rkt" "world.rkt" "logger.rkt")
+(require "quads.rkt" "utils.rkt" "wrap.rkt" "measure.rkt" "world.rkt" "logger.rkt" "tokenize.rkt")
 (provide typeset)
 
 (define+provide/contract (input->multipages i)
@@ -213,9 +213,34 @@
     [(block? x) (map typeset (block->lines x))] ; about 2/3 of running time
     [else x]))
 
-(define (para ht . xs)
-  (apply box ht `(,(block-break) ,@xs ,(block-break)))) 
 
+(define-syntax-rule (cons-reverse x y)
+  (cons (reverse x) y))
+
+;; page breaks > column breaks > block breaks > line breaks
+(define/contract (typeset2 x)
+  (coerce/input? . -> . any)
+  (quad->current-tokens x)
+  (define-values (mps mcs mbs b)
+  (for/fold ([multipages empty][multicolumns empty][multiblocks empty][block empty])
+            ([token (in-vector (current-tokens))])
+    (cond
+      [(or (page-break? token) (eof? token)) (values (cons (cons (cons block multiblocks) multicolumns) multipages) empty empty empty)]
+      [(column-break? token) (values multipages (cons (cons block multiblocks) multicolumns) empty empty)]
+      [(block-break? token) (values multipages multicolumns (cons block multiblocks) empty)]
+      [else (values multipages multicolumns multiblocks (cons token block))])))
+  mps)
+
+(define/contract (typeset3 x)
+  (coerce/input? . -> . any)
+  (quad->current-tokens x)
+  (for/last ([token (in-vector (current-tokens))])
+    (for/list ([mp (in-naturals)])
+      (for/list ([mc (in-naturals)] #:break (or (page-break? token) (eof? token)))
+        (for/list ([mb (in-naturals)]  #:break (column-break? token))
+          (for/list ([b (in-naturals)] #:break (block-break? token))
+            (report token)))))))
+        
 
 (module+ main
   (require "render.rkt" racket/class profile)
@@ -224,5 +249,6 @@
   (parameterize ([world:quality-default world:draft-quality]
                  [world:paper-width-default 600]
                  [world:paper-height-default 700])
-    (define to (begin (time (typeset (jude0)))))
-    (time (send (new pdf-renderer%) render-to-file to "foo.pdf"))))
+    (define ti (block '(measure 54 leading 18) "Meg is" (block-break) " ally."))
+    (define j (jude0))
+    (time (typeset2 ti))))
