@@ -10,8 +10,8 @@
                      [(define write-proc (λ(b port mode)
                                            (display (format "(~a)" (string-join (filter-not void? (list
                                                                                                    (~a (quad-name b)) 
-                                                                                                   (if (and (hash? (quad-attrs b)) (> (length (hash-keys (quad-attrs b))) 0)) (~v (flatten (hash->list (quad-attrs b)))) (void))
-                                                                                                   (if (> (length (quad-list b)) 0) (~a (string-join (map ~v (quad-list b)) "")) (void)))) " ")) port)))]
+                                                                                                   (~a (quad-attrs b))
+                                                                                                   (if (> (length (quad-list b)) 0) (~a (string-join (map ~v (quad-list b)) " ")) (void)))) " ")) port)))]
                      #:property prop:sequence (λ(q) (quad-list q)))
 
 
@@ -52,10 +52,11 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (token-ref? x) (integer? x))
 (define (quad-name? x) (symbol? x))
 (define (hashable-list? x) (and (list? x) (even? (length x))))
-(define (quad-attrs? x) (or (false? x) (hash? x)))
-(define (quad-list? x) (and (list? x) (andmap (λ(xi) (or (quad? xi) (and (string? xi) (< 0 (string-length xi))))) x)))
+(define (quad-attrs? x) (or (false? x) (token-ref? x)))
+(define (quad-list? x) (and (list? x) (andmap (λ(xi) (or (quad? xi) (token-ref? xi) (and (string? xi) (< 0 (string-length xi))))) x)))
 (define (quads? x) (and (list? x) (andmap quad? x)))
 (define (lists-of-quads? x) (and (list? x) (andmap quads? x)))
 
@@ -169,7 +170,8 @@
            ;; but don't put a separate contract on struct, because it's superfluous.
            (define/contract (id [attrs #f] . xs)
              (() ((or/c quad-attrs? hashable-list?)) #:rest quad-list? . ->* . id?)
-             (quad 'id (and attrs (if (hash? attrs) attrs (apply hash attrs))) xs))
+             (with-handlers ([exn:fail? (λ(exn) (error 'id "constructor failure with args: ~v ~v" attrs xs))])
+               (quad 'id attrs xs)))
            ;; quad list predicate and list-of-list predicate.
            ;; These are faster than the listof contract combinator.
            (define (ids? x)

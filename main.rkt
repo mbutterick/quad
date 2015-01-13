@@ -45,12 +45,12 @@
             (quad->string line)
             (quad-attr-ref line world:line-looseness-key))))
 (require racket/trace)
-(define+provide/contract (block->lines b-in)
-  (block? . -> . lines?)
-  (define b (if (ormap string? (quad-list b-in))
-                (quads->block (split-quad b-in))
-                b-in))
-  (define quality (quad-attr-ref/parameter b world:quality-key))
+(define+provide/contract (block->lines token-refs)
+  ((listof integer?) . -> . lines?)
+
+  (define quality (report (calc-attrs (car token-refs))))
+  (error 'zam)
+  (define b #f)
   (define (wrap-quads qs)
     (define wrap-proc (cond
                         [(>= quality world:max-quality) wrap-best] 
@@ -214,33 +214,14 @@
     [else x]))
 
 
-(define-syntax-rule (cons-reverse x y)
-  (cons (reverse x) y))
-
 ;; page breaks > column breaks > block breaks > line breaks
-(define/contract (typeset2 x)
+(define/contract (typeset2 q)
   (coerce/input? . -> . any)
-  (quad->current-tokens x)
-  (define-values (mps mcs mbs b)
-  (for/fold ([multipages empty][multicolumns empty][multiblocks empty][block empty])
-            ([token (in-vector (current-tokens))])
-    (cond
-      [(or (page-break? token) (eof? token)) (values (cons (cons (cons block multiblocks) multicolumns) multipages) empty empty empty)]
-      [(column-break? token) (values multipages (cons (cons block multiblocks) multicolumns) empty empty)]
-      [(block-break? token) (values multipages multicolumns (cons block multiblocks) empty)]
-      [else (values multipages multicolumns multiblocks (cons token block))])))
-  mps)
+  (input->current-tokens q)
+  (define mps (current-tokens->multipages))
+  (for* ([mp (in-list (reverse mps))][mc (in-list mp)][b (in-list mc)])
+    (block->lines (report b))))
 
-(define/contract (typeset3 x)
-  (coerce/input? . -> . any)
-  (quad->current-tokens x)
-  (for/last ([token (in-vector (current-tokens))])
-    (for/list ([mp (in-naturals)])
-      (for/list ([mc (in-naturals)] #:break (or (page-break? token) (eof? token)))
-        (for/list ([mb (in-naturals)]  #:break (column-break? token))
-          (for/list ([b (in-naturals)] #:break (block-break? token))
-            (report token)))))))
-        
 
 (module+ main
   (require "render.rkt" racket/class profile)
@@ -249,6 +230,6 @@
   (parameterize ([world:quality-default world:draft-quality]
                  [world:paper-width-default 600]
                  [world:paper-height-default 700])
-    (define ti (block '(measure 54 leading 18) "Meg is" (block-break) " ally."))
+    (define ti (block '(measure 54 quality 0) "Meg is an ally."))
     (define j (jude0))
     (time (typeset2 ti))))

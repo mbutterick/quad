@@ -49,16 +49,22 @@
   (values (list->vector (reverse (cons (current-eof) (flatten all-tokens)))) (flatten all-attrs)))
 
 
-
 (define+provide current-tokens (make-parameter #f))
 (define+provide current-token-attrs (make-parameter #f))
 (define+provide current-eof (make-parameter (gensym)))
 (define+provide (eof? x) (equal? x (current-eof)))
 
-(define+provide (quad->current-tokens q)
+(define+provide (input->current-tokens q)
   (define-values (tokens attrs) (make-tokens-and-attrs q))
   (current-tokens tokens)
   (current-token-attrs attrs))
+
+(define+provide (token-ref i) (vector-ref (current-tokens) i))
+
+(define+provide (print-token-tree x)
+  (cond
+    [(list? x) (map print-token-tree x)]
+    [else (format "~a" (token-ref x))]))
 
 ;(filter (λ(idx) (box? (vector-ref tokens idx))) (range (vector-length tokens)))
 
@@ -66,5 +72,20 @@
 (define (attr-ref-start a) (vector-ref a 1))
 (define (attr-ref-end a) (vector-ref a 2))
 
-(define (calc-attrs tref)
+
+(define-syntax-rule (cons-reverse x y)
+  (cons (reverse x) y))
+
+(define+provide (current-tokens->multipages)
+  (define-values (mps mcs bs b)
+    (for/fold ([multipages empty][multicolumns empty][blocks empty][block-acc empty])
+              ([(token tidx) (in-indexed (current-tokens))])
+      (cond
+        [(or (page-break? token) (eof? token)) (values (cons-reverse (cons-reverse (cons-reverse block-acc blocks) multicolumns) multipages) empty empty empty)]
+        [(column-break? token) (values multipages (cons-reverse (cons-reverse block-acc blocks) multicolumns) empty empty)]
+        [(block-break? token) (values multipages multicolumns (cons-reverse block-acc blocks) empty)]
+        [else (values multipages multicolumns blocks (cons tidx block-acc))])))
+  (reverse mps))
+
+(define+provide (calc-attrs tref)
   (map attr-ref-hash (filter (λ(attr) (<= (attr-ref-start attr) tref (sub1 (attr-ref-end attr)))) (current-token-attrs))))
