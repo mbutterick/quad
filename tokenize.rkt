@@ -19,10 +19,10 @@
   (define-values (all-tokens all-attrs _)
     (let loop ([current-quad quad-in][attr-acc empty][starting-tidx 0])
       (cond
-        [(empty? (quad-list current-quad)); no subelements, so treat this quad as single token
-         (let ([current-quad-attrs (quad-attrs current-quad)]
+        [(empty? (quad-$list current-quad)); no subelements, so treat this quad as single token
+         (let ([current-quad-attrs (quad-$attrs current-quad)]
                [ending-tidx (add1 starting-tidx)])
-           (values (quad (quad-name current-quad) #f empty)
+           (values (quad (quad-$name current-quad) #f empty)
                    (if current-quad-attrs
                        (cons (vector current-quad-attrs starting-tidx ending-tidx) attr-acc)
                        attr-acc)
@@ -30,7 +30,7 @@
         [else ; replace quad with its tokens, exploded
          (define-values (tokens-from-fold subattrs-from-fold ending-tidx-from-fold)
            (for/fold ([token-acc empty][subattr-acc empty][tidx starting-tidx])
-                     ([item (in-list (quad-list current-quad))])
+                     ([item (in-list (quad-$list current-quad))])
              (cond
                [(quad? item)
                 (define-values (sub-tokens sub-attrs sub-last-tidx) (loop item attr-acc tidx))
@@ -41,7 +41,7 @@
                     (values (cons c chars) i))) ; fold manually to get reversed items & length at same time
                 (values (cons exploded-chars token-acc) subattr-acc (+ tidx last-idx-of-exploded-chars 1))])))
          (values tokens-from-fold
-                 (let ([current-quad-attrs (quad-attrs current-quad)])
+                 (let ([current-quad-attrs (quad-$attrs current-quad)])
                    (if current-quad-attrs
                        (cons (vector current-quad-attrs starting-tidx ending-tidx-from-fold) subattrs-from-fold)
                        subattrs-from-fold))
@@ -49,17 +49,12 @@
   (values (list->vector (reverse (cons (current-eof) (flatten all-tokens)))) (flatten all-attrs)))
 
 
-(define+provide current-tokens (make-parameter #f))
-(define+provide current-token-attrs (make-parameter #f))
-(define+provide current-eof (make-parameter (gensym)))
-(define+provide (eof? x) (equal? x (current-eof)))
 
 (define+provide (input->current-tokens q)
   (define-values (tokens attrs) (make-tokens-and-attrs q))
   (current-tokens tokens)
   (current-token-attrs attrs))
 
-(define+provide (token-ref i) (vector-ref (current-tokens) i))
 
 (define+provide (print-token-tree x)
   (cond
@@ -68,9 +63,7 @@
 
 ;(filter (λ(idx) (box? (vector-ref tokens idx))) (range (vector-length tokens)))
 
-(define (attr-ref-hash a) (vector-ref a 0))
-(define (attr-ref-start a) (vector-ref a 1))
-(define (attr-ref-end a) (vector-ref a 2))
+
 
 
 (define-syntax-rule (cons-reverse x y)
@@ -87,5 +80,4 @@
         [else (values multipages multicolumns blocks (cons tidx block-acc))])))
   (reverse mps))
 
-(define+provide (calc-attrs tref)
-  (map attr-ref-hash (filter (λ(attr) (<= (attr-ref-start attr) tref (sub1 (attr-ref-end attr)))) (current-token-attrs))))
+

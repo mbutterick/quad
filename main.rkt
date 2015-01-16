@@ -3,21 +3,6 @@
 (require "quads.rkt" "utils.rkt" "wrap.rkt" "measure.rkt" "world.rkt" "logger.rkt" "tokenize.rkt")
 (provide typeset)
 
-(define+provide/contract (input->multipages i)
-  (input? . -> . multipages?)
-  (define exploded-input (split-quad i))
-  (map quads->multipage (split-on-page-breaks exploded-input)))
-
-
-(define/contract (multipage->multicolumns mp)
-  (multipage? . -> . multicolumns?)
-  (map quads->multicolumn (split-on-column-breaks (quad-list mp))))
-
-
-(define+provide/contract (multicolumn->blocks mc)
-  (multicolumn? . -> . blocks?)
-  ;; segfault happens in next line
-  (map quads->block (split-on-block-breaks (quad-list mc))))
 
 
 (define+provide/contract (merge-adjacent-within q)
@@ -43,14 +28,14 @@
     (format "~a/~a: ~v ~a" idx
             (length lines) 
             (quad->string line)
-            (quad-attr-ref line world:line-looseness-key))))
-(require racket/trace)
-(define+provide/contract (block->lines token-refs)
-  ((listof integer?) . -> . lines?)
+            (quad-attr-ref line world:line-looseness-key))))(require racket/trace)
 
-  (define quality (report (calc-attrs (car token-refs))))
+(define+provide/contract (block->lines b)
+  (block? . -> . lines?)
+  (report b)
+
+  (define quality (report (quad-attr-ref b world:quality-key)))
   (error 'zam)
-  (define b #f)
   (define (wrap-quads qs)
     (define wrap-proc (cond
                         [(>= quality world:max-quality) wrap-best] 
@@ -190,6 +175,7 @@
   result-pages)
 
 
+#|
 (define/contract (typeset x)
   (coerce/input? . -> . doc?)  
   (cond
@@ -212,15 +198,15 @@
     [(columns? x) (map typeset (columns->pages x))] ; 1
     [(block? x) (map typeset (block->lines x))] ; about 2/3 of running time
     [else x]))
-
+|#
 
 ;; page breaks > column breaks > block breaks > line breaks
-(define/contract (typeset2 q)
+(define/contract (typeset q)
   (coerce/input? . -> . any)
   (input->current-tokens q)
   (define mps (current-tokens->multipages))
   (for* ([mp (in-list (reverse mps))][mc (in-list mp)][b (in-list mc)])
-    (block->lines (report b))))
+    (block->lines (apply block (car b) b))))
 
 
 (module+ main
@@ -230,6 +216,6 @@
   (parameterize ([world:quality-default world:draft-quality]
                  [world:paper-width-default 600]
                  [world:paper-height-default 700])
-    (define ti (block '(measure 54 quality 0) "Meg is an ally."))
-    (define j (jude0))
-    (time (typeset2 ti))))
+    (define ti (block '(measure 54 quality 10) "Meg is an ally."))
+    ;(define j (jude0))
+   (time (typeset ti))))

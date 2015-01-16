@@ -5,16 +5,29 @@
 
 ;; struct implementation
 
-(serializable-struct quad (name attrs list) #:transparent
+(serializable-struct quad ($name $attrs $list) #:transparent
                      #:methods gen:custom-write
                      [(define write-proc (λ(b port mode)
                                            (display (format "(~a)" (string-join (filter-not void? (list
                                                                                                    (~a (quad-name b)) 
                                                                                                    (~a (quad-attrs b))
                                                                                                    (if (> (length (quad-list b)) 0) (~a (string-join (map ~v (quad-list b)) " ")) (void)))) " ")) port)))]
-                     #:property prop:sequence (λ(q) (quad-list q)))
+                     #:property prop:sequence (λ(q) (quad-$list q)))
 
+(define (token-ref i) (vector-ref (current-tokens) i))
 
+(define (quad-name q) 
+  (quad-$name (if (token-index? q) 
+               (token-ref q) 
+               q)))
+(define (quad-attrs q)
+  (quad-$attrs (if (token-index? q) 
+               (token-ref q) 
+               q)))
+(define (quad-list q)
+  (quad-$list (if (token-index? q) 
+               (token-ref q) 
+               q)))
 
 ;; vector implementation
 #|
@@ -52,30 +65,46 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (token-ref? x) (integer? x))
+(define (token-index? x) (integer? x))
 (define (quad-name? x) (symbol? x))
 (define (hashable-list? x) (and (list? x) (even? (length x))))
-(define (quad-attrs? x) (or (false? x) (token-ref? x)))
-(define (quad-list? x) (and (list? x) (andmap (λ(xi) (or (quad? xi) (token-ref? xi) (and (string? xi) (< 0 (string-length xi))))) x)))
+(define (quaddish? x) (or (quad? x) (token-index? x)))
+(define (quad-attrs? x) (or (false? x) (hashable-list? x) (token-index? x)))
+(define (quad-list? x) (and (list? x) (andmap (λ(xi) (or (quad? xi) (token-index? xi) (and (string? xi) (< 0 (string-length xi))))) x)))
 (define (quads? x) (and (list? x) (andmap quad? x)))
 (define (lists-of-quads? x) (and (list? x) (andmap quads? x)))
 
 (define quad= equal?)  
 
-(define token? quad?)
-
 (define (quad/c x) (λ(x) (and (quad? x) (symbol? (quad-name x)) (hash? (quad-attrs x)) 
                               (andmap (λ(xi) (or (quad/c xi) (string? xi))) (quad-list x))))) 
+
+(require sugar/cache)
+(define current-tokens (make-parameter #f))
+(define current-token-attrs (make-parameter #f))
+(define current-eof (make-parameter (gensym)))
+(define (eof? x) (equal? x (current-eof)))
+
+(define (attr-ref-hash a) (vector-ref a 0))
+(define (attr-ref-start a) (vector-ref a 1))
+(define (attr-ref-end a) (vector-ref a 2))
+(define/caching (calc-attrs tref)
+  (apply hash (flatten (map attr-ref-hash (filter (λ(attr) (<= (attr-ref-start attr) tref (sub1 (attr-ref-end attr)))) (current-token-attrs))))))
+
+(define (quad-attrs->hash qa)
+  (cond
+    [(token-index? qa) (calc-attrs qa)]
+    [else (apply hash qa)]))
 
 (define quad-attr-ref
   (case-lambda
     [(q key) 
-     (if (quad-attrs q) 
-         (hash-ref (quad-attrs q) key)
+     (if (quad-attrs q)
+         (hash-ref (quad-attrs->hash (quad-attrs q)) key)
          (error 'quad-attr-ref (format "no attrs in quad ~a" q)))]
     [(q key default) 
      (if (quad-attrs q) 
-         (hash-ref (quad-attrs q) key default)
+         (hash-ref (quad-attrs->hash (quad-attrs q)) key default)
          default)]))
 
 (define-syntax (quad-attr-ref/parameter stx)
@@ -163,13 +192,13 @@
        #'(begin
            ;; quad predicate - ok to be relaxed here if we're strict when making the struct
            (define (id? x)
-             (and (quad? x) (equal? (quad-name x) 'id)))
+             (and (quaddish? x) (equal? (quad-name x) 'id)))
            ;; quad constructor
            ;; put contract here rather than on struct, because this is the main interface
            ;; and this contract is more liberal.
            ;; but don't put a separate contract on struct, because it's superfluous.
            (define/contract (id [attrs #f] . xs)
-             (() ((or/c quad-attrs? hashable-list?)) #:rest quad-list? . ->* . id?)
+             (() (quad-attrs?) #:rest quad-list? . ->* . id?)
              (with-handlers ([exn:fail? (λ(exn) (error 'id "constructor failure with args: ~v ~v" attrs xs))])
                (quad 'id attrs xs)))
            ;; quad list predicate and list-of-list predicate.
