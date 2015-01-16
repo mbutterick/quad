@@ -2,7 +2,7 @@
 (require racket/list sugar/define)
 (require "samples.rkt" "quads.rkt" "utils.rkt")
 
-
+(define ti (block '(measure 54 leading 18) "Meg is " (box '(foo 42)) " ally."))
 (define tib (block '(measure 240 font "Equity Text B" leading 16 size 13.5 x-align justify x-align-last-line left)  (block #f (block '(weight bold font "Equity Caps B") "Hello") (block-break) (box '(width 15)))))
 
 ;ti
@@ -39,26 +39,19 @@
                 (define-values (exploded-chars last-idx-of-exploded-chars)
                   (for/fold ([chars empty][last-idx #f])([(c i) (in-indexed item)])
                     (values (cons c chars) i))) ; fold manually to get reversed items & length at same time
-                (values (cons exploded-chars token-acc) subattr-acc (+ tidx last-idx-of-exploded-chars 1))])))
+                (values (cons exploded-chars token-acc) subattr-acc (+ tidx (add1 last-idx-of-exploded-chars)))])))
          (values tokens-from-fold
                  (let ([current-quad-attrs (quad-attrs current-quad)])
                    (if current-quad-attrs
                        (cons (vector current-quad-attrs starting-tidx ending-tidx-from-fold) subattrs-from-fold)
                        subattrs-from-fold))
                  ending-tidx-from-fold)])))
-  (values (list->vector (reverse (cons (current-eof) (flatten all-tokens)))) (flatten all-attrs)))
+  (values (list->vector (reverse (flatten all-tokens))) (flatten all-attrs)))
 
 
-
-(define+provide current-tokens (make-parameter #f))
-(define+provide current-token-attrs (make-parameter #f))
-(define+provide current-eof (make-parameter (gensym)))
-(define+provide (eof? x) (equal? x (current-eof)))
-
-(define+provide (quad->current-tokens q)
-  (define-values (tokens attrs) (make-tokens-and-attrs q))
-  (current-tokens tokens)
-  (current-token-attrs attrs))
+(define-values (tokens attrs) (make-tokens-and-attrs (ti5)))
+(define+provide current-tokens (make-parameter tokens))
+(define+provide current-token-attrs (make-parameter attrs))
 
 ;(filter (λ(idx) (box? (vector-ref tokens idx))) (range (vector-length tokens)))
 
