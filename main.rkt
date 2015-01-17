@@ -4,6 +4,7 @@
 (provide typeset)
 
 (define (input->nested-blocks i)
+  (define-syntax-rule (cons-reverse x y) (cons (reverse x) y))
   (define-values (mps mcs bs b)
     (for/fold ([multipages empty][multicolumns empty][blocks empty][block-acc empty])
               ([q (in-list (split-quad i))])
@@ -180,8 +181,7 @@
 (define current-eof (make-parameter (gensym)))
 (define (eof? x) (equal? x (current-eof)))
 
-(define-syntax-rule (cons-reverse x y)
-  (cons (reverse x) y))
+
 
 (define (quads->lines qs)
   (block->lines (quads->block qs)))
@@ -190,9 +190,9 @@
   (coerce/input? . -> . doc?)  
   (load-text-cache-file)
   (define pages 
-    (append* (for/list ([mp (in-list (input->nested-blocks x))])
-               (columns->pages (append* (for/list ([mc (in-list mp)])
-                                          (lines->columns (apply append (map quads->lines mc)))))))))
+    (append* (for/list ([multipage (in-list (input->nested-blocks x))])
+               (columns->pages (append* (for/list ([multicolumn (in-list multipage)])
+                                          (lines->columns (append* (map quads->lines multicolumn)))))))))
   (define doc (pages->doc pages))
   (update-text-cache-file)
   doc)
@@ -202,7 +202,7 @@
   (require "render.rkt" racket/class profile)
   (require "samples.rkt")
   (activate-logger quad-logger)
-  (parameterize ([world:quality-default world:draft-quality]
+  (parameterize ([world:quality-default world:max-quality]
                  [world:paper-width-default 600]
                  [world:paper-height-default 700])
     (define sample (ti5))

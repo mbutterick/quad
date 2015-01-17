@@ -2,9 +2,7 @@
 
 ;; todo next
 ;; pagination: vertical measuring
-;; segfault on command line?
 ;; adaptive linebreak using fu-formula
-;; use smawk penalty system for pagination too?
 ;; unified model of filling / positioning that works for every quad, recursively
 ;; how to handle constraint failure. At least a good error message.
 ;; imperative line break
@@ -12,5 +10,3 @@
 ;; deal with separating / recombining footnote flow
 ;; deal with page number flags (for toc, index, etc)
 ;; disk cache of previously wrapped lines
-;; fractional point sizes (asked Flatt)
-;; how are opentype features handled (asked Flatt)
