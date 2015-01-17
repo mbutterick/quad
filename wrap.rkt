@@ -58,7 +58,7 @@
                            [else (world:default-word-break-list)])) (quad-list q))]))
 
 (define (make-unbreakable q)
-  (quad-attr-set q world:unbreakable-key #t))
+  (current-token-attrs (cons (list world:unbreakable-key #t) (current-token-attrs))))
 
 ;; take list of atomic quads and gather them into pieces
 ;; a piece is an indivisible chunk of a line.
@@ -70,6 +70,7 @@
   (define-values (breakable-items items-to-make-unbreakable) (split-at-right qs (min world:minimum-last-line-chars (length qs))))
   (define unbreak-qs (append breakable-items (map make-unbreakable items-to-make-unbreakable)))
   (define lists-of-quads (slicef-after unbreak-qs (λ(q) (and (possible-word-break-quad? q) (not (quad-attr-ref q world:unbreakable-key #f))))))
+  (error 'bingh)
   (define-values (first-lists-of-quads last-list-of-quads) (split-last lists-of-quads))
   (define (make-first-pieces qs)
     (let-values ([(first-qs last-q) (split-last qs)])
@@ -310,22 +311,15 @@
   expr)
 
 ;; makes a wrap function by combining component functions.
-(define+provide (make-wrap-proc 
-                 #:make-pieces-proc make-pieces-proc 
-                 #:measure-quad-proc measure-quad-proc
-                 #:compose-line-proc compose-line-proc
-                 #:find-breakpoints-proc find-breakpoints-proc)
-  (λ(qs [measure #f])
-    (let* ([measure (fl+ (fl (or measure (quad-attr-ref/parameter (car qs) world:measure-key))) 0.0)]
-           [qs (if (quad-has-attr? (car qs) world:measure-key)
-                   qs
-                   (map (curryr quad-attr-set world:measure-key measure) qs))])
+(define+provide (make-wrap-proc find-breakpoints-proc)
+  (λ(qs [measure 54.0])
+    (let* ()
       (log-quad-debug "wrapping on measure = ~a" measure)
-      (define pieces (make-pieces-proc qs)) ; 5%
+      (define pieces (make-pieces qs)) ; 5%
       (define bps (report-time 'find-bps (find-breakpoints-proc (list->vector pieces) measure))) ; 50%
       (define broken-pieces (break-at pieces bps)) ; 5%
       ; (report (add1 (length bps)) 'lines-in-paragraph)
-      (report-time 'compose-lines (map (λ(bp) (compose-line-proc bp measure-quad-proc)) broken-pieces))))) ; 50%
+      (report-time 'compose-lines (map (λ(bp) (pieces->line bp quad-width)) broken-pieces))))) ; 50%
 
 (define width? flonum?)
 (define measure? flonum?)
@@ -479,27 +473,11 @@
      result]))
 
 
+(define+provide wrap-first (make-wrap-proc (curryr adaptive-fit-proc #t #f)))
+(define+provide wrap-best (make-wrap-proc (curryr adaptive-fit-proc #f #t)))
+(define+provide wrap-adaptive (make-wrap-proc adaptive-fit-proc))
 
 
-;; wrap proc based on greedy proc
-(define+provide wrap-first (make-wrap-proc 
-                            #:make-pieces-proc make-pieces
-                            #:measure-quad-proc quad-width 
-                            #:compose-line-proc pieces->line
-                            #:find-breakpoints-proc (curryr adaptive-fit-proc #t #f)))
-
-;; wrap proc based on penalty function
-(define+provide wrap-best (make-wrap-proc 
-                           #:make-pieces-proc make-pieces
-                           #:measure-quad-proc quad-width 
-                           #:compose-line-proc pieces->line
-                           #:find-breakpoints-proc (curryr adaptive-fit-proc #f #t)))
-
-(define+provide wrap-adaptive (make-wrap-proc 
-                               #:make-pieces-proc make-pieces
-                               #:measure-quad-proc quad-width 
-                               #:compose-line-proc pieces->line
-                               #:find-breakpoints-proc adaptive-fit-proc))
 
 
 (define (fixed-width? q) (quad-has-attr? q world:width-key))
@@ -537,19 +515,4 @@
       (values (cons (quad-attr-set q world:x-position-key width-so-far) new-quads) (round-float (fl+ (quad-width q) width-so-far)))))
   (quad (quad-name starting-quad) (quad-attrs starting-quad) (reverse new-quads)))
 
-
-
-(module+ main
-  (define eqs (split-quad (block '(x-align center font "Equity Text B" size 10) "Foo-d" (word '(size 13) "og ") "and " (box) " Zu" (word-break '(nb "c" bb "k-")) "kerman's. Instead of a circle, the result is a picture of the code that, if it were used as an expression, would produce a circle. In other words, code is not a function, but instead a new syntactic form for creating pictures; the bit between the opening parenthesis with code is not an expression, but instead manipulated by the code syntactic form. This helps explain what we meant in the previous section when we said that racket provides require and the function-calling syntax. Libraries are not restricted to exporting values, such as functions; they can also define new syntactic forms. In this sense, Racket isn’t exactly a language at all; it’s more of an idea for how to structure a language so that you can extend it or create entirely " (word '(font "Courier" size 5) "lang."))))
-  
-  (define megs (split-quad (block '(size 15) "Meg is an ally.")))
-  
-  (define trials 1)
-  (time-repeat trials (let () (wrap-first megs 36) (void)))
-  (time-repeat trials (let ([measure 36]) (wrap-best megs measure) (void)))
-  
-  (time-repeat trials (let () (wrap-first eqs 54) (void)))
-  (time-repeat trials (let ([measure 54]) (wrap-best eqs measure) (void)))
-  (time-repeat trials (let ([measure 54]) (wrap-adaptive eqs measure) (void)))
-  )
 

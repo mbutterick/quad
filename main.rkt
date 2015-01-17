@@ -32,10 +32,8 @@
 
 (define+provide/contract (block->lines b)
   (block? . -> . lines?)
-  (report b)
 
-  (define quality (report (quad-attr-ref b world:quality-key)))
-  (error 'zam)
+  (define quality (quad-attr-ref b world:quality-key))
   (define (wrap-quads qs)
     (define wrap-proc (cond
                         [(>= quality world:max-quality) wrap-best] 
@@ -45,7 +43,9 @@
   (log-quad-debug "wrapping lines")
   (log-quad-debug "quality = ~a" quality)
   (log-quad-debug "looseness tolerance = ~a" world:line-looseness-tolerance)
+  (report (quad-list b) 'bdam)
   (define wrapped-lines-without-hyphens (wrap-quads (quad-list b))) ; 100/150
+  (error 'zam)
   (log-quad-debug* (log-debug-lines wrapped-lines-without-hyphens))
   (define avg-looseness (average-looseness wrapped-lines-without-hyphens))
   (define gets-hyphenation? (and world:use-hyphenation?
@@ -204,9 +204,10 @@
 (define/contract (typeset q)
   (coerce/input? . -> . any)
   (input->current-tokens q)
+  
   (define mps (current-tokens->multipages))
   (for* ([mp (in-list (reverse mps))][mc (in-list mp)][b (in-list mc)])
-    (block->lines (apply block (car b) b))))
+    (wrap-first b))) ;; temp: shortcut block->lines to test wrapping
 
 
 (module+ main
@@ -216,6 +217,6 @@
   (parameterize ([world:quality-default world:draft-quality]
                  [world:paper-width-default 600]
                  [world:paper-height-default 700])
-    (define ti (block '(measure 54 quality 10) "Meg is an ally."))
+    (define ti (block '(measure 54 quality 10) "Meg is an ally." (block-break) "Meg is an ally."))
     ;(define j (jude0))
    (time (typeset ti))))
