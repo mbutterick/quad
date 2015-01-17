@@ -3,25 +3,18 @@
 (require "quads.rkt" "utils.rkt" "wrap.rkt" "measure.rkt" "world.rkt" "logger.rkt")
 (provide typeset)
 
-(define+provide/contract (input->multipages i)
-  (input? . -> . multipages?)
-  (define exploded-input (split-quad i))
-  (map quads->multipage (split-on-page-breaks exploded-input)))
+(define (input->nested-blocks i)
+  (define-values (mps mcs bs b)
+    (for/fold ([multipages empty][multicolumns empty][blocks empty][block-acc empty])
+              ([q (in-list (split-quad i))])
+      (cond
+        [(page-break? q) (values (cons-reverse (cons-reverse (cons-reverse block-acc blocks) multicolumns) multipages) empty empty empty)]
+        [(column-break? q) (values multipages (cons-reverse (cons-reverse block-acc blocks) multicolumns) empty empty)]
+        [(block-break? q) (values multipages multicolumns (cons-reverse block-acc blocks) empty)]
+        [else (values multipages multicolumns blocks (cons q block-acc))])))
+  (reverse (cons-reverse (cons-reverse (cons-reverse b bs) mcs) mps)))
 
-
-(define/contract (multipage->multicolumns mp)
-  (multipage? . -> . multicolumns?)
-  (map quads->multicolumn (split-on-column-breaks (quad-list mp))))
-
-
-(define+provide/contract (multicolumn->blocks mc)
-  (multicolumn? . -> . blocks?)
-  ;; segfault happens in next line
-  (map quads->block (split-on-block-breaks (quad-list mc))))
-
-
-(define+provide/contract (merge-adjacent-within q)
-  (quad? . -> . quad?)
+(define (merge-adjacent-within q)
   (quad (quad-name q) (quad-attrs q) (join-quads (quad-list q))))
 
 (define (hyphenate-quad-except-last-word q)
@@ -29,8 +22,7 @@
   (define-values (first-quads last-quad) (split-last (quad-list q)))
   (quad (quad-name q) (quad-attrs q) (snoc (map hyphenate-quad first-quads) last-quad)))
 
-(define+provide/contract (average-looseness lines)
-  (lines? . -> . flonum?)
+(define (average-looseness lines)
   (if (<= (length lines) 1)
       0.0
       (let ([lines-to-measure (drop-right lines 1)]) ; exclude last line from looseness calculation
@@ -45,11 +37,7 @@
             (quad->string line)
             (quad-attr-ref line world:line-looseness-key))))
 (require racket/trace)
-(define+provide/contract (block->lines b-in)
-  (block? . -> . lines?)
-  (define b (if (ormap string? (quad-list b-in))
-                (quads->block (split-quad b-in))
-                b-in))
+(define (block->lines b)
   (define quality (quad-attr-ref/parameter b world:quality-key))
   (define (wrap-quads qs)
     (define wrap-proc (cond
@@ -189,29 +177,25 @@
            (reverse cols))))
   result-pages)
 
+(define current-eof (make-parameter (gensym)))
+(define (eof? x) (equal? x (current-eof)))
+
+(define-syntax-rule (cons-reverse x y)
+  (cons (reverse x) y))
+
+(define (quads->lines qs)
+  (block->lines (quads->block qs)))
 
 (define/contract (typeset x)
   (coerce/input? . -> . doc?)  
-  (cond
-    [(input? x) (load-text-cache-file)
-                (define multipages (input->multipages x)) ; 125 = timings for jude0
-                (define pages (append-map typeset multipages)) ; 1446
-                (define doc (typeset pages)) ; 250
-                (update-text-cache-file)
-                doc]
-    [(multipage? x) (define multicolumns (multipage->multicolumns x)) ; 81
-                    (define columns (append-map typeset multicolumns)) ; 1460
-                    (define pages (typeset columns)) ; 0
-                    pages]
-    [(multicolumn? x) (define blocks (multicolumn->blocks x)) ; 69
-                      (define lines (append-map typeset blocks)) ; 1363
-                      (define columns (typeset lines)) ; 4
-                      columns]
-    [(lines? x) (map typeset (lines->columns x))] ; 10
-    [(pages? x) (typeset (pages->doc x))] ; 249
-    [(columns? x) (map typeset (columns->pages x))] ; 1
-    [(block? x) (map typeset (block->lines x))] ; about 2/3 of running time
-    [else x]))
+  (load-text-cache-file)
+  (define pages 
+    (append* (for/list ([mp (in-list (input->nested-blocks x))])
+               (columns->pages (append* (for/list ([mc (in-list mp)])
+                                          (lines->columns (apply append (map quads->lines mc)))))))))
+  (define doc (pages->doc pages))
+  (update-text-cache-file)
+  doc)
 
 (define (para ht . xs)
   (apply box ht `(,(block-break) ,@xs ,(block-break)))) 
@@ -224,5 +208,6 @@
   (parameterize ([world:quality-default world:draft-quality]
                  [world:paper-width-default 600]
                  [world:paper-height-default 700])
-    (define to (begin (time (typeset (jude0)))))
+    (define sample (ti5))
+    (define to (begin (time (typeset sample))))
     (time (send (new pdf-renderer%) render-to-file to "foo.pdf"))))
