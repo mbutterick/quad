@@ -197,9 +197,6 @@
   (update-text-cache-file)
   doc)
 
-(define (para ht . xs)
-  (apply box ht `(,(block-break) ,@xs ,(block-break)))) 
-
 
 (module+ main
   (require "render.rkt" racket/class profile)
