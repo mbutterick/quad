@@ -183,16 +183,13 @@
 
 
 
-(define (quads->lines qs)
+(define (block-quads->lines qs)
   (block->lines (quads->block qs)))
 
 (define/contract (typeset x)
   (coerce/input? . -> . doc?)  
   (load-text-cache-file)
-  (define pages 
-    (append* (for/list ([multipage (in-list (input->nested-blocks x))])
-               (columns->pages (append* (for/list ([multicolumn (in-list multipage)])
-                                          (lines->columns (append* (map quads->lines multicolumn)))))))))
+  (define pages (append-map (λ(mp) (columns->pages (append-map (λ(mc) (lines->columns (append-map block-quads->lines mc))) mp))) (input->nested-blocks x)))
   (define doc (pages->doc pages))
   (update-text-cache-file)
   doc)
@@ -202,7 +199,7 @@
   (require "render.rkt" racket/class profile)
   (require "samples.rkt")
   (activate-logger quad-logger)
-  (parameterize ([world:quality-default world:max-quality]
+  (parameterize ([world:quality-default world:draft-quality]
                  [world:paper-width-default 600]
                  [world:paper-height-default 700])
     (define sample (ti5))
