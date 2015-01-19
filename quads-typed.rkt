@@ -1,62 +1,67 @@
 #lang typed/racket/base
 (require (for-syntax typed/racket/base racket/syntax))
+(require/typed racket/list [flatten ((Listof QuadAttrPair) . -> . (Listof QuadAttrPair))]
+               [empty? ((Listof Any) . -> . Boolean)]
+               )
 
 ;; struct implementation
 
-(struct: quad ([name : Symbol] [attrs : (HashTable Symbol Any)] [list : (Listof quad)]) #:transparent
-  
-  #:property prop:sequence (λ(q) (quad-list q)))
+(define-type QuadAttrKey Symbol)
+(define-type QuadAttrValue Any)
+(define-type QuadAttrs (HashTable QuadAttrKey QuadAttrValue))
+(define-type QuadList (Listof Quad))
+(struct Quad ([attrs : QuadAttrs] [list : QuadList]) #:transparent
+  #:property prop:sequence (λ(q) (Quad-list q)))
+
+(define Quad-attr-ref
+  (case-lambda
+    [([q : Quad] [key : QuadAttrKey]) 
+     (hash-ref (Quad-attrs q) key)]
+    [([q : Quad] [key : QuadAttrKey] [default : QuadAttrValue]) 
+     (hash-ref (Quad-attrs q) key (λ() default))]))
 
 
-
-(define h (quad 'hello #hash((foo . bar)) (list (quad 'hello #hash((foo . bar)) '()))))
-
-(define-syntax (define-box-type stx)
-  (syntax-case stx ()
-    [(_ id) 
-     (with-syntax ([id? (format-id #'id "~a?" #'id)]
-                   [ids? (format-id #'id "~as?" #'id)]
-                   [lists-of-ids? (format-id #'id "list-of-~as?" #'id)]
-                   [quads->id (format-id #'id "quads->~a" #'id)]
-                   [inline/quads->id (format-id #'id "inline/quads->~a" #'id)])
-       #'(begin
-           ;; quad predicate - ok to be relaxed here if we're strict when making the struct
-           (provide id?)
-           (: id? (Any . -> . Boolean))
-           (define (id? x)
-             (and (quad? x) (equal? (quad-name x) 'id)))
-           
-           ;; quad constructor
-           ;; put contract here rather than on struct, because this is the main interface
-           ;; and this contract is more liberal.
-           ;; but don't put a separate contract on struct, because it's superfluous.
-           (define/contract (id [attrs #f] . xs)
-             (() ((or/c quad-attrs? hashable-list?)) #:rest quad-list? . ->* . id?)
-             (quad 'id (and attrs (if (hash? attrs) attrs (apply hash attrs))) xs))))]))
-
-
-(define-box-type hello)
-(define-box-type gbye)
-
-
-#|
-;; make this a macro because qs-in is often huge
-;; and the macro avoids allocation + garbage collection
+(define cannot-be-common-attrs '(width x y page))
 (define attr-missing (gensym))
-(: gather-common-attrs ((Listof quad) . -> . (Listof CommonAttr)))
-(define (gather-common-attrs qs)
-  (let loop : (Listof Commonattr) 
-    ([qs : (Listof quad) qs]
-             [common-attrs : (Listof Commonattr) (if (quad-attrs (car qs))
-                               (for/list ([kv-pair (in-hash-pairs (quad-attrs (car qs)))] 
-                                          #:unless (member (car kv-pair) cannot-be-common-attrs))  
-                                 kv-pair)
-                               empty)])
-    (cond
-      [(empty? common-attrs) #f]
-      [(empty? qs) (flatten common-attrs)]
-      [else (loop (cdr qs) 
-                  (filter (λ(ca) (equal? (quad-attr-ref (car qs) (car ca) attr-missing) (cdr ca)))
-                          common-attrs))])))
-|#
+(define-type QuadAttrPair (Pairof QuadAttrKey QuadAttrValue))
 
+
+(: gather-common-attrs ((Listof Quad) . -> . (Listof QuadAttrPair)))
+(define (gather-common-attrs qs)
+  (: check-cap (QuadAttrPair . -> . Boolean))
+  (define (check-cap cap)
+    (equal? (Quad-attr-ref (car qs) (car cap) attr-missing) (cdr cap)))
+  (let loop 
+    ([qs qs]
+     [common-attr-pairs : (Listof QuadAttrPair) (if (Quad-attrs (car qs))
+                                                    
+                                                    null
+                                                    null)])
+    (cond
+      [(empty? common-attr-pairs) #f]
+      [(empty? qs) (flatten common-attr-pairs)]
+      [else (loop (cdr qs) (filter check-cap common-attr-pairs))])))
+
+
+(define-syntax (define-quad-type stx)
+  (syntax-case stx ()
+    [(_ Id) 
+     (with-syntax (
+                   [Ids? (format-id #'Id "~as?" #'Id)]
+                   [Quads->Id (format-id #'Id "Quads->~a" #'Id)])
+       #'(begin
+           (struct Id Quad ())
+           (define-predicate Ids? (Listof Id))
+           ;; quad converter
+           (: Quads->Id ((Listof Quad) . -> . Id))
+           (define (Quads->Id qs)
+             (Id #hash() '()))
+           ))]))
+
+
+
+
+(define-quad-type Hello)
+(define-quad-type Gbye)
+(define h (Hello #hash((foo . bar)) (list (Hello #hash() '()))))
+(define h2 (Quads->Hello '()))
