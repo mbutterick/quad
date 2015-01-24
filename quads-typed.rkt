@@ -48,6 +48,20 @@
       [else (loop (cdr qs) (filter check-cap common-attr-pairs))])))
 
 
+(: quadattrs ((Listof Any) . -> . QuadAttrs))
+(define (quadattrs xs)
+  (let-values ([(ks vs even?) (for/fold 
+                               ([ks : (Listof Any) null][vs : (Listof Any) null][even? : Boolean #t])
+                               ([x (in-list xs)])
+                                (if even?
+                                    (values (cons x ks) vs #f)
+                                    (values ks (cons x vs) #t)))]) 
+    (when (not even?) (error 'bad-input))
+    (cast (for/hash ([k (in-list ks)][v (in-list vs)])
+      (values k v)) QuadAttrs)))
+
+
+
 (define-syntax (define-quad-type stx)
   (syntax-case stx ()
     [(_ Id) 
@@ -64,9 +78,9 @@
              (Id #hash() '()))
            
            (provide id)
-           (: id ((Listof (U QuadAttrKey QuadAttrValue)) . -> . Id))
-           (define (id [attrs '()])
-             (apply hash attrs))
+           (: id ((Listof Any) . -> . Id))
+           (define (id attrs)
+             (Id (quadattrs attrs) '()))
            ))]))
 
 
