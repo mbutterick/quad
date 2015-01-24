@@ -3,6 +3,8 @@
 (require/typed racket/list [flatten ((Listof QuadAttrPair) . -> . (Listof QuadAttrPair))]
                [empty? ((Listof Any) . -> . Boolean)]
                )
+(require sugar/debug)
+(provide (all-defined-out))
 
 ;; struct implementation
 
@@ -26,7 +28,8 @@
 (define-type QuadAttrPair (Pairof QuadAttrKey QuadAttrValue))
 
 
-(: gather-common-attrs ((Listof Quad) . -> . (Listof QuadAttrPair)))
+(provide gather-common-attrs)
+(: gather-common-attrs ((Listof Quad) . -> . (U False (Listof QuadAttrPair))))
 (define (gather-common-attrs qs)
   (: check-cap (QuadAttrPair . -> . Boolean))
   (define (check-cap cap)
@@ -35,11 +38,13 @@
     ([qs qs]
      [common-attr-pairs : (Listof QuadAttrPair) (if (Quad-attrs (car qs))
                                                     
-                                                    null
+                                                    (for/list ([kv-pair (in-hash-pairs (Quad-attrs (car qs)))] 
+                                                               #:unless (member (car kv-pair) cannot-be-common-attrs))  
+                                                      kv-pair)
                                                     null)])
     (cond
-      [(empty? common-attr-pairs) #f]
-      [(empty? qs) (flatten common-attr-pairs)]
+      [(null? common-attr-pairs) #f]
+      [(null? qs) common-attr-pairs]
       [else (loop (cdr qs) (filter check-cap common-attr-pairs))])))
 
 
@@ -47,6 +52,7 @@
   (syntax-case stx ()
     [(_ Id) 
      (with-syntax (
+                   [id (format-id #'Id "~a" (string->symbol (string-downcase (symbol->string (syntax->datum #'Id)))))]
                    [Ids? (format-id #'Id "~as?" #'Id)]
                    [Quads->Id (format-id #'Id "Quads->~a" #'Id)])
        #'(begin
@@ -56,12 +62,30 @@
            (: Quads->Id ((Listof Quad) . -> . Id))
            (define (Quads->Id qs)
              (Id #hash() '()))
+           
+           (provide id)
+           (: id ((Listof (U QuadAttrKey QuadAttrValue)) . -> . Id))
+           (define (id [attrs '()])
+             (apply hash attrs))
            ))]))
 
 
+(define quad= equal?)
+
+(: quad-has-attr? (Quad QuadAttrKey . -> . Boolean))
+(define (quad-has-attr? q key)
+  (hash-has-key? (Quad-attrs q) key))
 
 
 (define-quad-type Hello)
 (define-quad-type Gbye)
 (define h (Hello #hash((foo . bar)) (list (Hello #hash() '()))))
 (define h2 (Quads->Hello '()))
+(define g (Gbye #hash((foo . bar)) '()))
+(gather-common-attrs (list h g))
+
+(define-quad-type Word)
+(define-quad-type Line)
+(define-quad-type Page)
+(define-quad-type Spacer)
+(define-quad-type Block)
