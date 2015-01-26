@@ -1,9 +1,9 @@
 #lang typed/racket/base
 (require (for-syntax typed/racket/base racket/syntax))
-(require/typed racket/list [flatten ((Listof QuadAttrPair) . -> . (Listof QuadAttrPair))]
-               [empty? ((Listof Any) . -> . Boolean)])
-(require/typed sugar/list [trimf ((Listof Any) Procedure . -> . (Listof Quad))]
-               [filter-split ((Listof Any) Procedure . -> . (Listof (Listof Quad)))])
+(require/typed racket/list [flatten (All (A) ((Listof A) -> (Listof A)))]
+               [empty? (All (A) ((Listof A) -> Boolean))])
+(require/typed sugar/list [trimf (All (A) ((Listof A) (A . -> . Boolean) -> (Listof A)))]
+               [filter-split (All (A) ((Listof A) (A . -> . Boolean) -> (Listof (Listof A))))])
 (require sugar/debug)
 (provide (all-defined-out))
 
@@ -101,15 +101,15 @@
 
 (define-syntax (define-break-type stx)
   (syntax-case stx ()
-    [(_ id) 
-     (with-syntax ([split-on-id-breaks (format-id #'id "split-on-~a-breaks" #'id)]
-                   [id-break (format-id #'id "~a-break" #'id)]
-                   [id-break? (format-id #'id "~a-break?" #'id)]
-                   [multi-id (format-id #'id "multi~a" #'id)]
-                   [multi-id? (format-id #'id "multi~a?" #'id)]
-                   [quads->multi-id (format-id #'id "quads->multi~a" #'id)])
+    [(_ Id) 
+     (with-syntax ([split-on-id-breaks (format-id #'Id "split-on-~a-breaks" (string-downcase (symbol->string (syntax->datum #'Id))))]
+                   [id-break (format-id #'Id "~a-break" #'Id)]
+                   [id-break? (format-id #'Id "~a-break?" #'Id)]
+                   [multi-id (format-id #'Id "multi~a" #'Id)]
+                   [multi-id? (format-id #'Id "multi~a?" #'Id)]
+                   [quads->multi-id (format-id #'Id "quads->multi~a" #'Id)])
        #'(begin
-           (define-quad-type id)
+           (define-quad-type Id)
            (define-quad-type id-break)
            (define-quad-type multi-id)
            ;; breaker
@@ -126,4 +126,5 @@
 
 (define-quad-type Word)
 (define-break-type Block)
-(split-on-Block-breaks (list (word) (block-break) (word)))
+(define-break-type Page)
+(split-on-page-breaks (list (word) (page-break) (word)))
