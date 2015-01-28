@@ -1,5 +1,5 @@
 #lang typed/racket/base
-(require (for-syntax typed/racket/base racket/syntax))
+(require (for-syntax typed/racket/base racket/syntax racket/string))
 (require/typed racket/list [flatten (All (A) ((Listof A) -> (Listof A)))]
                [empty? (All (A) ((Listof A) -> Boolean))])
 (require/typed sugar/list [trimf (All (A) ((Listof A) (A . -> . Boolean) -> (Listof A)))]
@@ -9,20 +9,42 @@
 
 ;; struct implementation
 
-(define-type QuadAttrKey Symbol)
-(define-type QuadAttrValue Any)
-(define-type QuadAttrs (HashTable QuadAttrKey QuadAttrValue))
-(define-type QuadList (Listof (U Quad String)))
-(struct Quad ([attrs : QuadAttrs] [list : QuadList]) #:transparent
-  #:property prop:sequence (λ(q) (Quad-list q)))
+(: hashable-list? (Any . -> . Boolean))
+(define (hashable-list? x) (and (list? x) (even? (length x))))
 
-(define Quad-attr-ref
+(define-type QuadName Symbol)
+(define-predicate QuadName? QuadName)
+
+(define-type QuadAttrKey Symbol)
+(define-predicate QuadAttrKey? QuadAttrKey)
+(define-type QuadAttrValue Any)
+(define-predicate QuadAttrValue? QuadAttrValue)
+(define-type QuadAttrs (HashTable QuadAttrKey QuadAttrValue))
+
+(: quad-attrs? (Any . -> . Boolean))
+(define (quad-attrs? x)
+  (and (hash? x) (andmap QuadAttrKey? (hash-keys x))))
+
+(define-type QuadList (Listof (U Quad String)))
+
+(struct quad ([name : QuadName] [attrs : QuadAttrs] [list : QuadList]) #:transparent
+  #:property prop:sequence (λ(q) (quad-list q)))
+
+(define-type Quad quad)
+(define-predicate Quad? Quad)
+
+(define quad-attr-ref
   (case-lambda
     [([q : Quad] [key : QuadAttrKey]) 
-     (hash-ref (Quad-attrs q) key)]
+     (hash-ref (quad-attrs q) key)]
     [([q : Quad] [key : QuadAttrKey] [default : QuadAttrValue]) 
-     (hash-ref (Quad-attrs q) key (λ() default))]))
+     (hash-ref (quad-attrs q) key (λ() default))]))
 
+(define-syntax (quad-attr-ref/parameter stx)
+  (syntax-case stx ()
+    [(_ q key)
+     (with-syntax ([world:key-default (format-id stx "~a-default" (string-trim (symbol->string (syntax->datum #'key)) "-key"))])
+       #'(quad-attr-ref q key (world:key-default)))]))
 
 (define cannot-be-common-attrs '(width x y page))
 (define attr-missing (gensym))
@@ -34,12 +56,12 @@
 (define (gather-common-attrs qs)
   (: check-cap (QuadAttrPair . -> . Boolean))
   (define (check-cap cap)
-    (equal? (Quad-attr-ref (car qs) (car cap) attr-missing) (cdr cap)))
+    (equal? (quad-attr-ref (car qs) (car cap) attr-missing) (cdr cap)))
   (let loop 
     ([qs qs]
-     [common-attr-pairs : (Listof QuadAttrPair) (if (Quad-attrs (car qs))
+     [common-attr-pairs : (Listof QuadAttrPair) (if (quad-attrs (car qs))
                                                     
-                                                    (for/list ([kv-pair (in-hash-pairs (Quad-attrs (car qs)))] 
+                                                    (for/list ([kv-pair (in-hash-pairs (quad-attrs (car qs)))] 
                                                                #:unless (member (car kv-pair) cannot-be-common-attrs))  
                                                       kv-pair)
                                                     null)])
@@ -47,6 +69,7 @@
       [(null? common-attr-pairs) #f]
       [(null? qs) common-attr-pairs]
       [else (loop (cdr qs) (filter check-cap common-attr-pairs))])))
+
 
 
 (: quadattrs ((Listof Any) . -> . QuadAttrs))
@@ -65,32 +88,32 @@
 
 (define-syntax (define-quad-type stx)
   (syntax-case stx ()
-    [(_ Id) 
-     (with-syntax (
-                   [id (format-id #'Id "~a" (string-downcase (symbol->string (syntax->datum #'Id))))]
-                   [Ids? (format-id #'Id "~as?" #'Id)]
-                   [Quads->Id (format-id #'Id "Quads->~a" #'Id)])
+    [(_ id) 
+     (with-syntax ([id? (format-id #'id "~a?" #'id)]
+                   [Quads->id (format-id #'id "Quads->~a" #'id)])
        #'(begin
-           (struct Id Quad ())
-           (define-predicate Ids? (Listof Id))
            ;; quad converter
-           (: Quads->Id ((Listof Quad) . -> . Id))
-           (define (Quads->Id qs)
-             (Id #hash() '()))
+           (: Quads->id ((Listof Quad) . -> . Quad))
+           (define (Quads->id qs)
+              (apply id (gather-common-attrs qs) qs))
            
-           (provide id)
            (: id (case-> 
-                  (-> Id)
-                  ((Option (Listof Any)) (U String Quad) * . -> . Id)))
+                  (-> Quad)
+                  ((Option (Listof Any)) (U String Quad) * . -> . Quad)))
            (define (id [attrs #f] . xs)
-             (Id (quadattrs (if (list? attrs) attrs '())) (cast xs QuadList)))
+             (quad 'id (quadattrs (if (list? attrs) attrs '())) (cast xs QuadList)))
+           
+           (: id? (Any . -> . Boolean))
+           (define (id? x)
+             (and (quad? x) (equal? (quad-name x) 'id)))
+           
            ))]))
 
 (: whitespace? ((Any) (Boolean) . ->* . Boolean))
 (define (whitespace? x [nbsp? #f])
   ;((any/c)(boolean?) . ->* . coerce/boolean?)
   (cond
-    [(Quad? x) (whitespace? (Quad-list x) nbsp?)]
+    [(quad? x) (whitespace? (quad-list x) nbsp?)]
     [(string? x) (or (and (regexp-match #px"\\p{Zs}" x) ; Zs = unicode whitespace category
                           (or nbsp? (not (regexp-match #px"\u00a0" x)))))] ; 00a0: nbsp
     [(list? x) (and (not (empty? x)) (andmap (λ(x) (whitespace? x nbsp?)) x))] ; andmap returns #t for empty lists
@@ -101,15 +124,15 @@
 
 (define-syntax (define-break-type stx)
   (syntax-case stx ()
-    [(_ Id) 
-     (with-syntax ([split-on-id-breaks (format-id #'Id "split-on-~a-breaks" (string-downcase (symbol->string (syntax->datum #'Id))))]
-                   [id-break (format-id #'Id "~a-break" #'Id)]
-                   [id-break? (format-id #'Id "~a-break?" #'Id)]
-                   [multi-id (format-id #'Id "multi~a" #'Id)]
-                   [multi-id? (format-id #'Id "multi~a?" #'Id)]
-                   [quads->multi-id (format-id #'Id "quads->multi~a" #'Id)])
+    [(_ id) 
+     (with-syntax ([split-on-id-breaks (format-id #'id "split-on-~a-breaks" #'id)]
+                   [id-break (format-id #'id "~a-break" #'id)]
+                   [id-break? (format-id #'id "~a-break?" #'id)]
+                   [multi-id (format-id #'id "multi~a" #'id)]
+                   [multi-id? (format-id #'id "multi~a?" #'id)]
+                   [quads->multi-id (format-id #'id "quads->multi~a" #'id)])
        #'(begin
-           (define-quad-type Id)
+           (define-quad-type id)
            (define-quad-type id-break)
            (define-quad-type multi-id)
            ;; breaker
@@ -122,20 +145,21 @@
 
 (: quad-has-attr? (Quad QuadAttrKey . -> . Boolean))
 (define (quad-has-attr? q key)
-  (hash-has-key? (Quad-attrs q) key))
+  (hash-has-key? (quad-attrs q) key))
 
-(define-quad-type Spacer)
-(define-quad-type Kern)
-(define-quad-type Optical-Kern)
-(define-quad-type Flag)
-(define-quad-type Doc)
-(define-quad-type Input)
-(define-quad-type Piece)
-(define-quad-type Run)
-(define-quad-type Box)
+(define-quad-type spacer)
+(define-quad-type kern)
+(define-quad-type optical-kern)
+(define-quad-type flag)
+(define-quad-type doc)
+(define-quad-type input)
+(define-quad-type piece)
+(define-quad-type run)
+(define-quad-type box)
 
-(define-break-type Word)
-(define-break-type Page)
-(define-break-type Column)
-(define-break-type Block)
-(define-break-type Line)
+
+(define-break-type word)
+(define-break-type page)
+(define-break-type column)
+(define-break-type block)
+(define-break-type line)
