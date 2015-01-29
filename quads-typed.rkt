@@ -7,7 +7,6 @@
 (require sugar/debug)
 (provide (all-defined-out))
 
-;; struct implementation
 
 (: hashable-list? (Any . -> . Boolean))
 (define (hashable-list? x) (and (list? x) (even? (length x))))
