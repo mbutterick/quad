@@ -19,6 +19,8 @@
 (define-type QuadAttrValue Any)
 (define-predicate QuadAttrValue? QuadAttrValue)
 (define-type QuadAttrs (HashTable QuadAttrKey QuadAttrValue))
+(define-type HashableList  (All (A) (Rec duo (U Null (List* QuadAttrKey A duo)))))
+
 
 (: quad-attrs? (Any . -> . Boolean))
 (define (quad-attrs? x)

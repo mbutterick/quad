@@ -16,9 +16,8 @@
 
 ;; push together multiple attr sources into one list of pairs.
 ;; mostly a helper function for the two attr functions below.
-(: join-attrs ((Listof (U Quad QuadAttrs)) . -> . QuadAttrs))
+(: join-attrs ((Listof (U Quad QuadAttrs HashableList)) . -> . QuadAttrs))
 (define (join-attrs quads-or-attrs-or-lists)
-;  (list-of-mergeable-attrs? . -> . pairs?)
   (append-map hash->list (filter-not false? (map (λ(x)
                                                    (cond
                                                      [(quad? x) (quad-attrs x)]
