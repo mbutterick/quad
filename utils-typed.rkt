@@ -13,24 +13,16 @@
 (: pairs? (Any . -> . Boolean))
 (define (pairs? x) (and (list? x) (andmap pair? x)))
 
-
 ;; push together multiple attr sources into one list of pairs.
 ;; mostly a helper function for the two attr functions below.
-(: join-attrs ((Listof (U Quad QuadAttrs HashableList)) . -> . Any)) ;; temp: end with QuadAttrs
+(provide join-attrs)
+(: join-attrs ((Listof (U Quad QuadAttrs HashableList)) . -> . (Listof QuadAttrPair)))
 (define (join-attrs quads-or-attrs-or-lists)
-  (append-map (inst hash->list QuadAttrs HashableList) (filter-not false? (map (λ(x)
+  ((inst append-map QuadAttrPair QuadAttrs) (inst hash->list QuadAttrKey QuadAttrValue) (map (λ(x)
                                                    (cond
                                                      [(quad? x) (quad-attrs x)]
-                                                     [(quad-attrs? x) x]
+                                                     [(quad-attrs? x) (cast x QuadAttrs)]
                                                      [(hashable-list? x) (quadattrs (cast x (Listof Any)))]
-                                                     [else #f])) quads-or-attrs-or-lists))))
+                                                     [else (cast hash QuadAttrs)])) quads-or-attrs-or-lists)))
 
-#|
-(append-map hash->list (filter-not false? (map (λ(x)
-                                                   (cond
-                                                     [(quad? x) (quad-attrs x)]
-                                                     [(quad-attrs? x) x]
-                                                     [(hashable-list? x) (quadattrs x)]
-                                                     [else #f])) quads-or-attrs-or-lists)))
-|#
 
