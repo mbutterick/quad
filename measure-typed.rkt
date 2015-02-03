@@ -48,7 +48,7 @@
                           (make-hash '()))))
 
 
-(define-type mms-type ((String String) (Symbol Symbol) . ->* . (Listof Nonnegative-Flonum)))
+(define-type mms-type ((String String) (Symbol Symbol) . ->* . (List Nonnegative-Flonum Nonnegative-Flonum Nonnegative-Flonum Nonnegative-Flonum)))
 (: measure-max-size mms-type)
 (define measure-max-size 
   (cast (make-caching-proc (λ(text font [weight 'normal] [style 'normal])

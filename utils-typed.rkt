@@ -25,7 +25,7 @@
                                                      [(quad-attrs? x) (cast x QuadAttrs)]
                                                      [(hashable-list? x) (quadattrs (cast x (Listof Any)))]
                                                      [else ;; something that will have no effect on result 
-                                                      (cast hash QuadAttrs)])) quads-or-attrs-or-lists)))
+                                                      (cast (hash) QuadAttrs)])) quads-or-attrs-or-lists)))
 
 
 ;; flatten merges attributes, but applies special logic suitable to flattening
@@ -58,5 +58,29 @@
 (provide merge-attrs)
 (: merge-attrs ((U Quad QuadAttrs HashableList) * . -> . QuadAttrs))
 (define (merge-attrs . quads-or-attrs-or-lists)
-  (cast (for/hash ([kv-pair (in-list (join-attrs quads-or-attrs-or-lists))])
-      (values (car kv-pair) (cdr kv-pair))) QuadAttrs))
+  (for/hash : QuadAttrs ([kv-pair (in-list (join-attrs quads-or-attrs-or-lists))])
+      (values (car kv-pair) (cdr kv-pair))))
+
+
+
+;; pushes attributes down from parent quads to children, 
+;; resulting in a flat list of quads.
+;; input is often large, so macro allows us to avoid allocation
+#|
+(provide flatten-quad)
+(: flatten-quad (Quad . -> . (Listof Quad)))
+(define (flatten-quad q)
+  (flatten
+   (let loop ([x q][parent #f])
+     (cond       
+       [(quad? x)
+        (let ([x-with-parent-attrs (quad (quad-name x) 
+                                         (flatten-attrs parent x) ; child positioned last so it overrides parent attributes 
+                                         (quad-list x))])
+          (if (empty? (quad-list x))
+              x-with-parent-attrs ; no subelements, so stop here
+              (map (λ(xi) (loop xi x-with-parent-attrs)) (quad-list x))))] ; replace quad with its elements
+       [(string? x) (quad (quad-name parent) (quad-attrs parent) (list x))]))))
+
+
+|#
