@@ -59,20 +59,7 @@
   (procedure? quad? . -> . quad?)
   (quad (quad-name q) (quad-attrs q) (map proc (quad-list q))))
 
-;; flatten merges attributes, but applies special logic suitable to flattening
-;; for instance, resolving x and y coordinates.
-(define+provide/contract (flatten-attrs . quads-or-attrs-or-falses)
-  (() #:rest (listof (or/c quad? quad-attrs?)) . ->* . quad-attrs?)
-  (define all-attrs (join-attrs quads-or-attrs-or-falses))
-  (define-values (x-attrs y-attrs other-attrs-reversed)
-    (for/fold ([xas null][yas null][oas null])([attr (in-list all-attrs)])
-      (cond
-        [(equal? (car attr) world:x-position-key) (values (cons attr xas) yas oas)]
-        [(equal? (car attr) world:y-position-key) (values xas (cons attr yas) oas)]
-        [else (values xas yas (cons attr oas))])))
-  (define (make-cartesian-attr key attrs) (if (empty? attrs) empty (cons key (apply + (map cdr attrs)))))
-  (define-values (x-attr y-attr) (apply values (map make-cartesian-attr (list world:x-position-key world:y-position-key) (list x-attrs y-attrs))))
-  (apply hash (flatten (list* x-attr y-attr (reverse other-attrs-reversed)))))
+
 
 
 ;; pushes attributes down from parent quads to children, 

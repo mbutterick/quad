@@ -1,7 +1,6 @@
 #lang typed/racket/base
 (require (for-syntax typed/racket/base racket/syntax racket/string))
-(require/typed racket/list [flatten (All (A) ((Listof A) -> (Listof A)))]
-               [empty? (All (A) ((Listof A) -> Boolean))])
+(require/typed racket/list [empty? (All (A) ((Listof A) -> Boolean))])
 (require/typed sugar/list [trimf (All (A) ((Listof A) (A . -> . Boolean) -> (Listof A)))]
                [filter-split (All (A) ((Listof A) (A . -> . Boolean) -> (Listof (Listof A))))])
 (require sugar/debug)
