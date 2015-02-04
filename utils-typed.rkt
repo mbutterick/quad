@@ -1,5 +1,5 @@
 #lang typed/racket/base
-(require sugar/list)
+(require/typed sugar/list [slice-at ((Listof (U QuadAttrKey QuadAttrValue)) Positive-Integer . -> . (Listof (List QuadAttrKey QuadAttrValue)))])
 (require/typed racket/list [flatten (All (A) (Rec as (U Any (Listof as))) -> (Listof Any))])
 (require (for-syntax racket/syntax racket/base) racket/string (except-in racket/list flatten) sugar/debug racket/bool hyphenate racket/function math/flonum)
 (require "quads-typed.rkt" "world-typed.rkt" "measure-typed.rkt")
@@ -98,6 +98,39 @@
            x ; no subelements, so stop here
            ((inst map (Treeof Quad) QuadListItem) (λ(xi) (do-explode xi x)) (quad-list x)))] ; replace quad with its elements, exploded
       [else ;; it's a string
-       ((inst map (Treeof Quad) QuadListItem) (λ(xc) (quad 'word (quad-attrs parent) (list xc))) (regexp-match* #px"." x))]))
+       ((inst map (Treeof Quad) QuadListItem) (λ(xc) (quad world:split-quad-key (quad-attrs parent) (list xc))) (regexp-match* #px"." x))]))
   (cast (flatten (map do-explode (flatten-quad q))) (Listof Quad)))
 
+
+;; propagate x and y adjustments throughout the tree,
+;; using parent x and y to adjust children, and so on.
+(provide compute-absolute-positions)
+(: compute-absolute-positions (Quad . -> . Quad))
+(define (compute-absolute-positions qli)
+  (define result 
+    (let loop : QuadListItem ([qli : QuadListItem qli][parent-x : Flonum 0.0][parent-y : Flonum 0.0])
+    (cond
+      [(quad? qli) 
+       (define adjusted-x (round-float (+ (cast (quad-attr-ref qli world:x-position-key 0.0) Flonum) parent-x)))
+       (define adjusted-y (round-float (+ (cast (quad-attr-ref qli world:y-position-key 0.0) Flonum) parent-y)))
+       (quad (quad-name qli) (merge-attrs qli (list world:x-position-key adjusted-x world:y-position-key adjusted-y)) ((inst map QuadListItem QuadListItem) (λ(qlii) (loop qlii adjusted-x adjusted-y)) (quad-list qli)))]
+      [else ;; it's a string
+       qli])))
+  (if (string? result)
+      (error 'compute-absolute-positions "got string as result: ~v" result)
+      result))
+
+
+;; functionally update a quad attr. Similar to hash-set
+(provide quad-attr-set)
+(: quad-attr-set (Quad QuadAttrKey QuadAttrValue . -> . Quad)) 
+(define (quad-attr-set q k v)
+  (quad (quad-name q) (merge-attrs (quad-attrs q) (list k v)) (quad-list q)))
+
+
+;; functionally update multiple quad attrs. Similar to hash-set*
+(provide quad-attr-set*)
+(: quad-attr-set* (Quad (U QuadAttrKey QuadAttrValue) * . -> . Quad))
+(define (quad-attr-set* q . kvs)
+  (for/fold ([current-q q])([kv-list (in-list (slice-at kvs 2))])
+    (apply quad-attr-set current-q kv-list)))

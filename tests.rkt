@@ -41,8 +41,6 @@
 
 (check-true (quad= (split-quad b1) b2-exploded))
 
-(let ([world:minimum-last-line-chars 0])
-  (check-equal? (map (compose1 quad-list last quad-list) (make-pieces (split-quad (block #f "Foo-dog and " (box) " mas\u00adsachu.")))) '(("o") ("g") ("d") () ("s") ("."))))
 
 (check-false (quad-has-attr? (box) 'foo))
 (check-true (quad-has-attr? (box '(foo bar)) 'foo))
@@ -101,3 +99,5 @@
 (check-equal? tokens (vector #\M #\e #\g #\space #\i #\s #\space (box) #\space #\a #\l #\l #\y #\.))
 (check-equal? attrs '(#(#hash((measure . 54)) 0 14) #(#hash((foo . 42)) 7 8)))
 
+(let ([world:minimum-last-line-chars 0])
+  (check-equal? (map (compose1 quad-list last quad-list) (make-pieces (split-quad (block #f "Foo-dog and " (box) " mas\u00adsachu.")))) '(("o") ("g") ("d") () ("s") ("."))))

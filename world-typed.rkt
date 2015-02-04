@@ -51,6 +51,8 @@
 (define height-key 'height)
 (define unbreakable-key 'no-break)
 
+(define split-quad-key 'word)
+
 
 (define line-index-key 'line-idx)
 (define total-lines-key 'lines)
