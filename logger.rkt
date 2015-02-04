@@ -13,33 +13,6 @@
     (define-logger name)
     (current-logger remember-cl)))
 
-
-(define levels '(none fatal error warning info debug))
-
-(define/contract (log-level> lev1 lev2)
-  (symbol? symbol? . -> . coerce/boolean?)
-  (member lev1 (cdr (member lev2 levels))))
-
-(define/contract (log-level>= lev1 lev2)
-  (symbol? symbol? . -> . coerce/boolean?)
-  (member lev1 (member lev2 levels)))
-
-(define (log-level< lev1 lev2)
-  (log-level> lev2 lev1))
-
-(define (log-level<= lev1 lev2)
-  (log-level>= lev2 lev1))
-
-
-(module+ test
-  (check-true (log-level< 'none 'error))
-  (check-true (log-level<= 'none 'none))
-  (check-false (log-level< 'none 'none))
-  (check-true (log-level> 'warning 'error))
-  (check-true (log-level>= 'debug 'debug))
-  (check-false (log-level> 'fatal 'debug)))
-
-
 (define-logger quad)
 
 (define-syntax-rule (activate-logger logger)
