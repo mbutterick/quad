@@ -41,8 +41,8 @@
 (check-true (quad-has-attr? (box '(foo bar)) 'foo))
 
 (check-equal? (quad-attr-set (box '(foo bar)) 'foo 'zam) (box '(foo zam)))
-(check-equal? (quad-attr-set (box '()) 'foo 'zam) (box '(foo zam)))
-(check-equal? (quad-attr-set* (box '()) 'foo 'zam 'bar 'boo) (box '(foo zam bar boo)))
+(check-equal? (quad-attr-set (box #f) 'foo 'zam) (box '(foo zam)))
+(check-equal? (quad-attr-set* (box #f) 'foo 'zam 'bar 'boo) (box '(foo zam bar boo)))
 (check-equal? (quad-attr-set* (box '(foo bar)) 'foo 'zam 'bar 'boo) (box '(foo zam bar boo)))
 
 (check-equal? (quad-attr-remove (box '(foo bar zim zam)) 'foo) (box '(zim zam)))
@@ -51,4 +51,10 @@
 (check-equal? (quad-attr-remove* (box #f) 'zim) (box))
 
 
+(check-true (quad-ends-with? (box #f "foo") "foo"))
+(check-false (quad-ends-with? (box #f "foo") "food"))
+(check-false (quad-ends-with? (box #f (box #f "foo")) "food"))
+(check-true (quad-ends-with? (box #f (box #f "foo")) "foo"))
+(check-true (quad-ends-with? (box #f (box #f "foo")) "o"))
+(check-true (quad-ends-with? (box #f (box #f (box #f (box #f (box #f "foo-"))))) "-"))
 

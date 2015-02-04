@@ -1,8 +1,10 @@
 #lang typed/racket/base
 (require (for-syntax typed/racket/base racket/syntax racket/string))
-(require/typed racket/list [empty? (All (A) ((Listof A) -> Boolean))])
+(require/typed racket/list [empty? (All (A) ((Listof A) -> Boolean))]
+               [last ((Listof Any) . -> . Any)])
 (require/typed sugar/list [trimf (All (A) ((Listof A) (A . -> . Boolean) -> (Listof A)))]
                [filter-split (All (A) ((Listof A) (A . -> . Boolean) -> (Listof (Listof A))))])
+(require/typed sugar/string [ends-with? (String String . -> . Boolean)])
 (require sugar/debug)
 (provide (all-defined-out))
 
@@ -36,6 +38,7 @@
 (define-type Quad quad)
 (define-predicate Quad? Quad)
 
+
 (define quad-attr-ref
   (case-lambda
     [([q : Quad] [key : QuadAttrKey]) 
@@ -52,6 +55,18 @@
 (define cannot-be-common-attrs '(width x y page))
 (define attr-missing (gensym))
 (define-type QuadAttrPair (Pairof QuadAttrKey QuadAttrValue))
+
+
+(: quad-ends-with? (Quad String . -> . Boolean))
+(define (quad-ends-with? q str)
+  (cond
+    [(not (empty? (quad-list q)))
+     (define last-item (last (quad-list q)))
+     (cond
+       [(string? last-item) (ends-with? last-item str)]
+       [(quad? last-item) (quad-ends-with? last-item str)]
+       [else #f])]
+    [else #f]))
 
 
 (provide gather-common-attrs)
