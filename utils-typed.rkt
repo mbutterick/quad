@@ -20,12 +20,12 @@
 (: join-attrs ((Listof (U Quad QuadAttrs HashableList)) . -> . (Listof QuadAttrPair)))
 (define (join-attrs quads-or-attrs-or-lists)
   ((inst append-map QuadAttrPair QuadAttrs) (inst hash->list QuadAttrKey QuadAttrValue) (map (λ(x)
-                                                   (cond
-                                                     [(quad? x) (quad-attrs x)]
-                                                     [(quad-attrs? x) (cast x QuadAttrs)]
-                                                     [(hashable-list? x) (quadattrs (cast x (Listof Any)))]
-                                                     [else ;; something that will have no effect on result 
-                                                      (cast (hash) QuadAttrs)])) quads-or-attrs-or-lists)))
+                                                                                               (cond
+                                                                                                 [(quad? x) (quad-attrs x)]
+                                                                                                 [(quad-attrs? x) (cast x QuadAttrs)]
+                                                                                                 [(hashable-list? x) (quadattrs (cast x (Listof Any)))]
+                                                                                                 [else ;; something that will have no effect on result 
+                                                                                                  (cast (hash) QuadAttrs)])) quads-or-attrs-or-lists)))
 
 
 ;; flatten merges attributes, but applies special logic suitable to flattening
@@ -51,7 +51,7 @@
   (define x-attr (make-cartesian-attr world:x-position-key x-attrs))
   (define y-attr (make-cartesian-attr world:y-position-key y-attrs))
   (for/hash : QuadAttrs ([kv-pair (in-list (append x-attr y-attr (reverse other-attrs-reversed)))])
-      (values (car kv-pair) (cdr kv-pair))))
+    (values (car kv-pair) (cdr kv-pair))))
 
 ;; merge concatenates attributes, with later ones overriding earlier.
 ;; most of the work is done by join-attrs.
@@ -59,7 +59,7 @@
 (: merge-attrs ((U Quad QuadAttrs HashableList) * . -> . QuadAttrs))
 (define (merge-attrs . quads-or-attrs-or-lists)
   (for/hash : QuadAttrs ([kv-pair (in-list (join-attrs quads-or-attrs-or-lists))])
-      (values (car kv-pair) (cdr kv-pair))))
+    (values (car kv-pair) (cdr kv-pair))))
 
 
 
@@ -69,17 +69,35 @@
 (: flatten-quad (Quad . -> . (Listof Quad)))
 (define (flatten-quad q)
   (cast (flatten 
-   (let loop : (Treeof Quad)
-     ([x : QuadListItem q][parent : Quad (box)])
-     
-     (cond       
-       [(quad? x)
-        (let ([x-with-parent-attrs (quad (quad-name x) 
-                                         (flatten-attrs parent x) ; child positioned last so it overrides parent attributes 
-                                         (quad-list x))])
-          (if (empty? (quad-list x))
-              x-with-parent-attrs ; no subelements, so stop here
-              ((inst map (Treeof Quad) QuadListItem) (λ(xi) (loop xi x-with-parent-attrs)) (quad-list x))))] ; replace quad with its elements
-       [else ;; it's a string
-        (quad (quad-name parent) (quad-attrs parent) (list x))]))) (Listof Quad)))
+         (let loop : (Treeof Quad)
+           ([x : QuadListItem q][parent : Quad (box)])
+           
+           (cond       
+             [(quad? x)
+              (let ([x-with-parent-attrs (quad (quad-name x) 
+                                               (flatten-attrs parent x) ; child positioned last so it overrides parent attributes 
+                                               (quad-list x))])
+                (if (empty? (quad-list x))
+                    x-with-parent-attrs ; no subelements, so stop here
+                    ((inst map (Treeof Quad) QuadListItem) (λ(xi) (loop xi x-with-parent-attrs)) (quad-list x))))] ; replace quad with its elements
+             [else ;; it's a string
+              (quad (quad-name parent) (quad-attrs parent) (list x))]))) (Listof Quad)))
+
+
+;; flatten quad as above, 
+;; then dissolve it into individual character quads while copying attributes
+;; input is often large, so macro allows us to avoid allocation
+(provide split-quad)
+(: split-quad (Quad . -> . (Listof Quad)))
+(define (split-quad q)
+  (: do-explode ((QuadListItem) (Quad) . ->* . (Treeof Quad)))
+  (define (do-explode x [parent (box)])
+    (cond
+      [(quad? x)
+       (if (empty? (quad-list x))
+           x ; no subelements, so stop here
+           ((inst map (Treeof Quad) QuadListItem) (λ(xi) (do-explode xi x)) (quad-list x)))] ; replace quad with its elements, exploded
+      [else ;; it's a string
+       ((inst map (Treeof Quad) QuadListItem) (λ(xc) (quad 'word (quad-attrs parent) (list xc))) (regexp-match* #px"." x))]))
+  (cast (flatten (map do-explode (flatten-quad q))) (Listof Quad)))
 

@@ -25,5 +25,5 @@
 (define b2-flattened (list (spacer '(x 10.0)) (spacer '(x 25.0)) (spacer '(x 25.0)) (spacer '(x 10.0))))
 
 (check-true (quad= (flatten-quad b2) b2-flattened))
-;(check-true (quad= (split-quad b2) b2-flattened))
+(check-true (quad= (split-quad b2) b2-flattened))
 
