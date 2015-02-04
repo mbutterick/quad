@@ -4,6 +4,7 @@
                [last ((Listof Any) . -> . Any)])
 (require/typed sugar/list [trimf (All (A) ((Listof A) (A . -> . Boolean) -> (Listof A)))]
                [filter-split (All (A) ((Listof A) (A . -> . Boolean) -> (Listof (Listof A))))])
+(require/typed racket/string [string-append* ((Listof String) . -> . String)])
 (require/typed sugar/string [ends-with? (String String . -> . Boolean)])
 (require sugar/debug)
 (provide (all-defined-out))
@@ -73,6 +74,13 @@
   (quad (quad-name q) (quad-attrs q) (append (quad-list q) (list new-item))))
 
 
+(: quad->string (Quad . -> . String))
+(define (quad->string x)
+  (let loop : String ([x : (U Quad String) x])
+    (cond
+      [(quad? x) (string-append* ((inst map String QuadListItem) loop (quad-list x)))]
+      [(string? x) x]
+      [else ""])))
 
 (provide gather-common-attrs)
 (: gather-common-attrs ((Listof Quad) . -> . (U False (Listof QuadAttrPair))))
@@ -105,7 +113,7 @@
                                     (values ks (cons x vs) #t)))]) 
     (when (not even?) (error 'bad-input))
     (cast (for/hash ([k (in-list ks)][v (in-list vs)])
-      (values k v)) QuadAttrs)))
+            (values k v)) QuadAttrs)))
 
 
 
@@ -118,7 +126,7 @@
            ;; quad converter
            (: Quads->id ((Listof Quad) . -> . Quad))
            (define (Quads->id qs)
-              (apply id (gather-common-attrs qs) qs))
+             (apply id (gather-common-attrs qs) qs))
            
            (: id (case-> 
                   (-> Quad)
