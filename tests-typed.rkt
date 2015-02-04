@@ -45,4 +45,10 @@
 (check-equal? (quad-attr-set* (box '()) 'foo 'zam 'bar 'boo) (box '(foo zam bar boo)))
 (check-equal? (quad-attr-set* (box '(foo bar)) 'foo 'zam 'bar 'boo) (box '(foo zam bar boo)))
 
+(check-equal? (quad-attr-remove (box '(foo bar zim zam)) 'foo) (box '(zim zam)))
+(check-equal? (quad-attr-remove (box #f) 'zim) (box))
+(check-equal? (quad-attr-remove* (box '(foo bar zim zam ding dong)) 'foo 'ding) (box '(zim zam)))
+(check-equal? (quad-attr-remove* (box #f) 'zim) (box))
+
+
 

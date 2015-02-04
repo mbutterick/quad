@@ -134,3 +134,18 @@
 (define (quad-attr-set* q . kvs)
   (for/fold ([current-q q])([kv-list (in-list (slice-at kvs 2))])
     (apply quad-attr-set current-q kv-list)))
+
+;; functionally remove a quad attr. Similar to hash-remove
+(provide quad-attr-remove)
+(: quad-attr-remove (Quad QuadAttrKey . -> . Quad))
+(define (quad-attr-remove q k)
+  (if (quad-attrs q)
+      (quad (quad-name q) (hash-remove (quad-attrs q) k) (quad-list q))
+      q))
+
+;; functionally remove multiple quad attrs. Similar to hash-remove*
+(provide quad-attr-remove*)
+(: quad-attr-remove* (Quad QuadAttrKey * . -> . Quad))
+(define (quad-attr-remove* q . ks)
+  (for/fold ([current-q q])([k (in-list ks)])
+    (quad-attr-remove current-q k)))
