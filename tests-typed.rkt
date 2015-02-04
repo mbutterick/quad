@@ -70,3 +70,17 @@
 (check-equal? (quad-first-char (box #f (box #f "foo") "bar")) "f")
 (check-equal? (quad-first-char (box #f "foo")) "f")
 (check-false (quad-first-char (box)))
+
+(check-equal? (quad->string (box '(width 100) "foo")) "foo")
+(check-equal? (quad->string (box '(width 100) "foo" (box '(width 100) "bar"))) "foobar")
+(check-equal? (quad->string (box '(width 100) "foo" (box '(width 100) "bar") "ino")) "foobarino")
+(check-equal? (quad->string (box '(width 100))) "")
+
+(check-false (whitespace? (~a #\u00A0)))
+(check-true (whitespace/nbsp? (~a #\u00A0)))
+(check-true (whitespace/nbsp? (word #f (~a #\u00A0))))
+(check-false (whitespace? (format " ~a " #\u00A0)))
+(check-true (whitespace/nbsp? (format " ~a " #\u00A0)))
+(define funny-unicode-spaces (map ~a (list #\u2000 #\u2007 #\u2009 #\u200a #\u202f)))
+(check-true (andmap whitespace? funny-unicode-spaces))
+(check-true (andmap whitespace/nbsp? funny-unicode-spaces))
