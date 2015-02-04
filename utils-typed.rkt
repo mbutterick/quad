@@ -1,6 +1,6 @@
 #lang typed/racket/base
 (require sugar/list)
-(require/typed racket/list [flatten (All (A) ((Listof A) -> (Listof A)))])
+(require/typed racket/list [flatten (All (A) (Rec as (U Any (Listof as))) -> (Listof Any))])
 (require (for-syntax racket/syntax racket/base) racket/string (except-in racket/list flatten) sugar/debug racket/bool hyphenate racket/function math/flonum)
 (require "quads-typed.rkt" "world-typed.rkt" "measure-typed.rkt")
 
@@ -65,13 +65,13 @@
 
 ;; pushes attributes down from parent quads to children, 
 ;; resulting in a flat list of quads.
-;; input is often large, so macro allows us to avoid allocation
-#|
 (provide flatten-quad)
 (: flatten-quad (Quad . -> . (Listof Quad)))
 (define (flatten-quad q)
-  (flatten
-   (let loop ([x q][parent #f])
+  (cast (flatten 
+   (let loop : (Treeof Quad)
+     ([x : QuadListItem q][parent : Quad (box)])
+     
      (cond       
        [(quad? x)
         (let ([x-with-parent-attrs (quad (quad-name x) 
@@ -79,8 +79,7 @@
                                          (quad-list x))])
           (if (empty? (quad-list x))
               x-with-parent-attrs ; no subelements, so stop here
-              (map (λ(xi) (loop xi x-with-parent-attrs)) (quad-list x))))] ; replace quad with its elements
-       [(string? x) (quad (quad-name parent) (quad-attrs parent) (list x))]))))
+              ((inst map (Treeof Quad) QuadListItem) (λ(xi) (loop xi x-with-parent-attrs)) (quad-list x))))] ; replace quad with its elements
+       [else ;; it's a string
+        (quad (quad-name parent) (quad-attrs parent) (list x))]))) (Listof Quad)))
 
-
-|#

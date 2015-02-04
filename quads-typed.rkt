@@ -26,7 +26,9 @@
 (define (quad-attrs? x)
   (and (hash? x) (andmap QuadAttrKey? (hash-keys x))))
 
-(define-type QuadList (Listof (U Quad String)))
+(define-type QuadListItem (U Quad String))
+(define-type QuadList (Listof QuadListItem))
+(define-type (Treeof A) (Rec as (U A (Listof as))))
 
 (struct quad ([name : QuadName] [attrs : QuadAttrs] [list : QuadList]) #:transparent
   #:property prop:sequence (λ(q) (quad-list q)))
