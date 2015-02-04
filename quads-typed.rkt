@@ -68,6 +68,11 @@
        [else #f])]
     [else #f]))
 
+(: quad-append (Quad QuadListItem . -> . Quad))
+(define (quad-append q new-item)
+  (quad (quad-name q) (quad-attrs q) (append (quad-list q) (list new-item))))
+
+
 
 (provide gather-common-attrs)
 (: gather-common-attrs ((Listof Quad) . -> . (U False (Listof QuadAttrPair))))

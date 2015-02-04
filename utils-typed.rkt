@@ -149,3 +149,28 @@
 (define (quad-attr-remove* q . ks)
   (for/fold ([current-q q])([k (in-list ks)])
     (quad-attr-remove current-q k)))
+
+
+;; the last char of a quad
+(provide quad-last-char)
+(: quad-last-char (Quad . -> . (Option String)))
+(define (quad-last-char q)
+  (define split-qs (split-quad q)) ; split makes it simple, but is it too expensive?
+  (if (or (empty? split-qs) (empty? (quad-list (last split-qs))))
+      #f
+      (let ([result((inst car QuadListItem QuadListItem) (quad-list (last split-qs)))])
+        (if (quad? result)
+            (error 'quad-last-char "last element is not a string: ~v" result)
+            result))))
+
+;; the first char of a quad
+(provide quad-first-char)
+(: quad-first-char (Quad . -> . (Option String)))
+(define (quad-first-char q)
+  (define split-qs (split-quad q)) ; explosion makes it simple, but is it too expensive?
+  (if (or (empty? split-qs) (empty? (quad-list (first split-qs))))
+      #f
+      (let ([result((inst car QuadListItem QuadListItem) (quad-list (first split-qs)))])
+        (if (quad? result)
+            (error 'quad-first-char "first element is not a string: ~v" result)
+            result))))

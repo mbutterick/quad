@@ -58,3 +58,15 @@
 (check-true (quad-ends-with? (box #f (box #f "foo")) "o"))
 (check-true (quad-ends-with? (box #f (box #f (box #f (box #f (box #f "foo-"))))) "-"))
 
+(check-equal? (quad-append (box #f "foo") "bar") (box #f "foo" "bar"))
+(check-equal? (quad-append (box #f "foo") (box #f "bar")) (box #f "foo" (box #f "bar")))
+
+(check-equal? (quad-last-char (box #f (box #f "foo") "food")) "d")
+(check-equal? (quad-last-char (box #f (box #f "foo"))) "o")
+(check-equal? (quad-last-char (box #f "foo")) "o")
+(check-false (quad-last-char (box)))
+
+(check-equal? (quad-first-char (box #f (box #f "foo") "bar")) "f")
+(check-equal? (quad-first-char (box #f (box #f "foo") "bar")) "f")
+(check-equal? (quad-first-char (box #f "foo")) "f")
+(check-false (quad-first-char (box)))
