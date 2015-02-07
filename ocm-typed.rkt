@@ -48,12 +48,12 @@ D. Eppstein, March 2002, significantly revised August 2005
 
 
 (define-syntax-rule (vector-append-item xs value)
-  (vector-append xs (vector value)))
+  ((inst vector-append Any) xs (vector value)))
 
-(define-syntax-rule (vector-set vec idx val)
-  (begin
-    (vector-set! vec idx val)
-    vec))
+(: vector-set (All (a) ((Vectorof a) Integer a -> (Vectorof a))))
+(define (vector-set vec idx val)
+  (vector-set! vec idx val)
+  vec)
 
 (define-syntax-rule (vector-cdr vec)
   (vector-drop vec 1))
@@ -152,14 +152,14 @@ D. Eppstein, March 2002, significantly revised August 2005
     (define col (vector-ref col-indices col-idx))
     (define idx-of-last-row
       (cast (if (= col-idx (sub1 (vector-length col-indices)))
-          (vector-last row-indices)
-          (hash-ref (cast (hash-ref minima (vector-ref col-indices (add1 col-idx))) HashTableTop) 'row-idx)) Index-Type))
+                (vector-last row-indices)
+                (hash-ref (cast (hash-ref minima (vector-ref col-indices (add1 col-idx))) HashTableTop) 'row-idx)) Index-Type))
     
     (define smallest-value-entry
       ((inst vector-argmin Make-Minimum-Input) (λ(x) (entry->value (car x)))
-                     (for/vector : (Vectorof Make-Minimum-Input) 
-                       ([row-idx (in-list ((inst dropf-right Index-Type) (vector->list row-indices) (λ(x) (not (= x idx-of-last-row)))))])
-                       (cons (matrix-proc row-idx col) row-idx))))
+                                               (for/vector : (Vectorof Make-Minimum-Input) 
+                                                 ([row-idx (in-list ((inst dropf-right Index-Type) (vector->list row-indices) (λ(x) (not (= x idx-of-last-row)))))])
+                                                 (cons (matrix-proc row-idx col) row-idx))))
     
     (! minima col (make-minimum smallest-value-entry)))
   minima)
@@ -169,13 +169,13 @@ D. Eppstein, March 2002, significantly revised August 2005
   (define idx-of-last-col (sub1 (vector-length col-indices)))
   (define (smallest-value-entry [col : Index-Type] [idx-of-last-row : Index-Type])
     ((inst argmin Make-Minimum-Input) (λ(x) (entry->value (car x)))
-            (for/list ([row-idx (stop-after (in-vector row-indices) (λ(x) (= idx-of-last-row x)))])
-              (cons (matrix-proc row-idx col) row-idx))))
+                                      (for/list ([row-idx (stop-after (in-vector row-indices) (λ(x) (= idx-of-last-row x)))])
+                                        (cons (matrix-proc row-idx col) row-idx))))
   
   (for ([([col : Index-Type] col-idx) (in-indexed col-indices)] #:when (even? col-idx))
     (define idx-of-last-row (cast (if (= col-idx idx-of-last-col)
-                                (vector-last row-indices)
-                                (hash-ref (cast (hash-ref minima (vector-ref col-indices (add1 col-idx))) HashTableTop) 'row-idx)) Index-Type))   
+                                      (vector-last row-indices)
+                                      (hash-ref (cast (hash-ref minima (vector-ref col-indices (add1 col-idx))) HashTableTop) 'row-idx)) Index-Type))   
     (! minima col (make-minimum (smallest-value-entry col idx-of-last-row))))
   minima)
 
@@ -281,9 +281,8 @@ In addition, we keep a column index self._tentative, such that
 (define-type Index-Type Nonnegative-Integer)
 (define-type Matrix-Proc-Type (Index-Type Index-Type . -> . Any))
 (define-type Entry->Value-Type (Any . -> . Flonum))
-(define-type Indices-Type (Vectorof Index-Type))
 
- 
+
 (define o:min-values 0)
 (define o:min-row-indices 1)
 (define o:finished 2)
@@ -337,11 +336,11 @@ In addition, we keep a column index self._tentative, such that
      (for ([col (in-vector cols)])
        (cond
          [(>= col (vector-length (cast (ocm-ref ocm o:min-values) VectorTop)))
-          (ocm-set! ocm o:min-values (vector-append-item (ocm-ref ocm o:min-values) (@ (cast (@ minima col) HashTableTop) 'value)))
-          (ocm-set! ocm o:min-row-indices (vector-append-item (ocm-ref ocm o:min-row-indices) (@ (@ minima col) 'row-idx)))]
-         [(< ((ocm-ref ocm o:entry->value) (@ (@ minima col) 'value)) ((ocm-ref ocm o:entry->value) (vector-ref (ocm-ref ocm o:min-values) col)))
-          (ocm-set! ocm o:min-values (vector-set (ocm-ref ocm o:min-values) col (@ (@ minima col) 'value)))
-          (ocm-set! ocm o:min-row-indices (vector-set (ocm-ref ocm o:min-row-indices) col (@ (@ minima col) 'row-idx)))]))
+          (ocm-set! ocm o:min-values (vector-append-item (cast (ocm-ref ocm o:min-values) (Vectorof Any)) (@ (cast (@ minima col) HashTableTop) 'value)))
+          (ocm-set! ocm o:min-row-indices (vector-append-item (cast (ocm-ref ocm o:min-row-indices) (Vectorof Any)) (@ (cast (@ minima col) HashTableTop) 'row-idx)))]
+         [(< ((cast (ocm-ref ocm o:entry->value) Entry->Value-Type) (@ (cast (@ minima col) HashTableTop) 'value)) ((cast (ocm-ref ocm o:entry->value) Entry->Value-Type) (vector-ref (cast (ocm-ref ocm o:min-values) VectorTop) col)))
+          (ocm-set! ocm o:min-values ((inst vector-set Index-Type) (cast (ocm-ref ocm o:min-values) (Vectorof Index-Type)) col (cast (@ (cast (@ minima col) HashTableTop) 'value) Index-Type)))
+          (ocm-set! ocm o:min-row-indices ((inst vector-set Index-Type) (cast (ocm-ref ocm o:min-row-indices) (Vectorof Index-Type)) col (cast (@ (cast (@ minima col) HashTableTop) 'row-idx) Index-Type)))]))
      (ocm-set! ocm o:finished next)]
     
     [else
@@ -350,12 +349,12 @@ In addition, we keep a column index self._tentative, such that
      ;; so we can clear out all our work from higher rows.
      ;; As in the fourth case, the loss of tentative is
      ;; amortized against the increase in base.
-     (define diag ((ocm-ref ocm o:matrix-proc) (sub1 next) next))
+     (define diag ((cast (ocm-ref ocm o:matrix-proc) Matrix-Proc-Type) (sub1 next) next))
      (cond
-       [(< ((ocm-ref ocm o:entry->value) diag) ((ocm-ref ocm o:entry->value) (vector-ref (ocm-ref ocm o:min-values) next)))
+       [(< ((cast (ocm-ref ocm o:entry->value) Entry->Value-Type) diag) ((cast (ocm-ref ocm o:entry->value) Entry->Value-Type) (vector-ref (cast (ocm-ref ocm o:min-values) (Vectorof Any)) next)))
         (log-ocm-debug "advance: second case because column minimum is on the diagonal")
-        (ocm-set! ocm o:min-values (vector-set (ocm-ref ocm o:min-values) next diag))
-        (ocm-set! ocm o:min-row-indices (vector-set (ocm-ref ocm o:min-row-indices) next (sub1 next)))
+        (ocm-set! ocm o:min-values (vector-set (cast (ocm-ref ocm o:min-values) (Vectorof Any)) next diag))
+        (ocm-set! ocm o:min-row-indices (vector-set (cast (ocm-ref ocm o:min-row-indices) (Vectorof Any)) next (sub1 next)))
         (ocm-set! ocm o:base (sub1 next))
         (ocm-set! ocm o:tentative next)
         (ocm-set! ocm o:finished next)]
@@ -363,8 +362,8 @@ In addition, we keep a column index self._tentative, such that
        ;; Third case: row i-1 does not supply a column minimum in
        ;; any column up to tentative. We simply advance finished
        ;; while maintaining the invariant.
-       [(>= ((ocm-ref ocm o:entry->value) ((ocm-ref ocm o:matrix-proc) (sub1 next) (ocm-ref ocm o:tentative)))
-            ((ocm-ref ocm o:entry->value) (vector-ref (ocm-ref ocm o:min-values) (ocm-ref ocm o:tentative))))
+       [(>= ((cast (ocm-ref ocm o:entry->value) Entry->Value-Type) ((cast (ocm-ref ocm o:matrix-proc) Matrix-Proc-Type) (sub1 next) (cast (ocm-ref ocm o:tentative) Index-Type)))
+            ((cast (ocm-ref ocm o:entry->value) Entry->Value-Type) (vector-ref (cast (ocm-ref ocm o:min-values) (Vectorof Any)) (cast (ocm-ref ocm o:tentative) Index-Type))))
         (log-ocm-debug "advance: third case because row i-1 does not suppply a column minimum")
         (ocm-set! ocm o:finished next)]
        
@@ -379,3 +378,37 @@ In addition, we keep a column index self._tentative, such that
         (ocm-set! ocm o:base (sub1 next))
         (ocm-set! ocm o:tentative next)
         (ocm-set! ocm o:finished next)])]))
+
+(: print (OCM-Type . -> . Void))
+(define (print ocm)
+  (displayln (ocm-ref ocm o:min-values))
+  (displayln (ocm-ref ocm o:min-row-indices)))
+
+(: smawky? ((Listof (Listof Real)) . -> . Boolean))
+(define (smawky? m)
+  (: position-of-minimum ((Listof Real) . -> . Index-Type)) 
+  (define (position-of-minimum xs)
+    ;; put each element together with its list index
+    (let ([xs : (Listof (Pairof Index-Type Real)) (map (inst cons Index-Type Real) (range (length xs)) xs)]) 
+      ;; find the first one with the min value, and grab the list index
+      (car ((inst argmin (Pairof Index-Type Real)) cdr (filter (λ([x : (Pairof Index-Type Real)]) (not (negative? (cdr x)))) xs)))))
+  ;; tests if penalty matrix is monotone for non-negative values.
+  (define increasing-minima? (apply <= (cast (map position-of-minimum m) (List* Real Real (Listof Real)))))
+  
+  (define monotone? : Boolean
+    (for/and ([ridx (in-range 1 (length m))])
+      (for/and : Boolean ([cidx (in-range (sub1 (length (car m))))])
+        (cast (let* ([prev-row : (Listof Real) ((inst list-ref (Listof Real)) m (sub1 ridx))]
+                     [row : (Listof Real) (list-ref m ridx)]
+                     [a : Real (list-ref prev-row cidx)]
+                     [b : Real (list-ref prev-row (add1 cidx))]
+                     [c : Real (list-ref row cidx)]
+                     [d : Real (list-ref row (add1 cidx))])
+                (if (andmap (λ([x : Real]) (not (negative? x))) (list a b c d)) ;; smawk disregards negative values
+                    (cond
+                      [(< c d) (if (< a b) #t (error (format "Submatrix ~a not monotone in ~a" (list (list a b) (list c d)) m)))]
+                      [(= c d) (if (<= a b) #t (error (format "Submatrix ~a not monotone in ~a" (list (list a b) (list c d)) m)))]
+                      [else #t])
+                    #t)) Boolean))))
+  
+  (and increasing-minima? monotone?))
