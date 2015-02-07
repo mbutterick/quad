@@ -412,3 +412,67 @@ In addition, we keep a column index self._tentative, such that
                     #t)) Boolean))))
   
   (and increasing-minima? monotone?))
+
+
+(module+ test
+  
+  (require rackunit)
+  
+  
+  (define m '((25 42 57 78 90 103 123 142 151)
+              (21 35 48 65 76 85 105 123 130)
+              (13 26 35 51 58 67 86 100 104)
+              (10 20 28 42 48 56 75 86 88)
+              (20 29 33 44 49 55 73 82 80)
+              (13 21 24 35 39 44 59 65 59)
+              (19 25 28 38 42 44 57 61 52)
+              (35 37 40 48 48 49 62 62 49)
+              (37 36 37 42 39 39 51 50 37)
+              (41 39 37 42 35 33 44 43 29)
+              (58 56 54 55 47 41 50 47 29)
+              (66 64 61 61 51 44 52 45 24)
+              (82 76 72 70 56 49 55 46 23)
+              (99 91 83 80 63 56 59 46 20)
+              (124 116 107 100 80 71 72 58 28)
+              (133 125 113 106 86 75 74 59 25)
+              (156 146 131 120 97 84 80 65 31)
+              (178 164 146 135 110 96 92 73 39)))
+  (define m2 (apply map list m))
+  (check-true (smawky? m))
+  (check-true (smawky? m2))
+  ;; proc must return a value even for out-of-bounds i and j
+  (define (simple-proc i j) (with-handlers [(exn:fail? (λ(exn) (* -1 i)))]
+                              (list-ref (list-ref m i) j))) 
+  (define (simple-proc2 i j) (with-handlers [(exn:fail? (λ(exn) (* -1 i)))]
+                               (list-ref (list-ref m2 i) j))) 
+  (check-equal? (simple-proc 0 2) 57) ; 0th row, 2nd col
+  (check-equal? (simple-proc2 2 0) 57) ; flipped
+  (define o (make-ocm simple-proc))
+  (define row-indices (list->vector (range (length m))))
+  (define col-indices (list->vector (range (length (car m)))))
+  (define result (concave-minima row-indices col-indices simple-proc identity))
+  (check-equal?
+   (for/list : (Listof (Pairof Integer Any)) ([j (in-vector col-indices)])
+     (define h (hash-ref result j))
+     (list (hash-ref h 'value) (hash-ref h 'row-idx)))
+   '((10 3) (20 3) (24 5) (35 5) (35 9) (33 9) (44 9) (43 9) (20 13))) ; checked against SMAWK.py
+  (check-equal?
+   (for/list : (Listof (Pairof Integer Any)) ([j (in-vector col-indices)])
+     (list (min-value o j) (min-index o j)))
+   '((0 none) (42 0) (48 1) (51 2) (48 3) (55 4) (59 5) (61 6) (49 7))) ; checked against SMAWK.py
+  
+  (define o2 (make-ocm simple-proc2))
+  (define row-indices2 (list->vector (range (length m2))))
+  (define col-indices2 (list->vector (range (length (car m2)))))
+  (define result2 (concave-minima row-indices2 col-indices2 simple-proc2 identity))
+  (check-equal?
+   (for/list : (Listof (Pairof Integer Any)) ([j (in-vector col-indices2)])
+     (define h (hash-ref result2 j))
+     (list (hash-ref h 'value) (hash-ref h 'row-idx)))
+   '((25 0) (21 0) (13 0) (10 0) (20 0) (13 0) (19 0) (35 0) (36 1) (29 8) (29 8) (24 8) (23 8) (20 8) (28 8) (25 8) (31 8) (39 8))) ; checked against SMAWK.py
+  (check-equal?
+   (for/list : (Listof (Pairof Integer Any)) ([j (in-vector col-indices2)])
+     (list (min-value o2 j) (min-index o2 j)))
+   '((0 none) (21 0) (13 0) (10 0) (20 0) (13 0) (19 0) (35 0) (36 1) (29 8) (-9 9) (-10 10) (-11 11) (-12 12) (-13 13) (-14 14) (-15 15) (-16 16))) ; checked against SMAWK.py
+  
+  )
