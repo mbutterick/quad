@@ -73,7 +73,7 @@
 
 
 
-(define-parameter default-word-break-list  '(nb "" bb "-"))
+(define-parameter default-word-break-list '(nb "" bb "-"))
 
 (define-parameter optical-overhang 0.8)
 

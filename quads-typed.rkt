@@ -130,9 +130,9 @@
            
            (: id (case-> 
                   (-> Quad)
-                  ((Option (Listof Any)) (U String Quad) * . -> . Quad)))
+                  ((Option (U QuadAttrs (Listof Any))) (U String Quad) * . -> . Quad)))
            (define (id [attrs #f] . xs)
-             (quad 'id (quadattrs (if (list? attrs) attrs '())) (cast xs QuadList)))
+             (quad 'id (if (quad-attrs? attrs) (cast attrs QuadAttrs) (quadattrs (if (list? attrs) attrs '()))) (cast xs QuadList)))
            
            (: id? (Any . -> . Boolean))
            (define (id? x)
@@ -190,6 +190,9 @@
 
 
 (define-break-type word)
+(: word-string (Quad . -> . String))
+(define (word-string c) 
+  (cast ((inst car QuadListItem Any) (quad-list c)) String))
 (define-break-type page)
 (define-break-type column)
 (define-break-type block)
