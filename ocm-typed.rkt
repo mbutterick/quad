@@ -1,26 +1,9 @@
 #lang typed/racket/base
 (require (for-syntax racket/base racket/syntax))
-(require/typed sugar/cache [make-caching-proc (Procedure . -> . Procedure)])
-(require racket/list sugar/debug rackunit racket/function racket/vector  "logger-typed.rkt")
+(require racket/list sugar/debug racket/function racket/vector  "logger-typed.rkt")
 (define-logger ocm)
 
-#|
-Totally monotone matrix searching algorithms.
-
-The offline algorithm in ConcaveMinima is from Agarwal, Klawe, Moran,
-Shor, and Wilbur, Geometric applications of a matrix searching algorithm,
-Algorithmica 2, pp. 195-208 (1987).
-
-The online algorithm in OnlineConcaveMinima is from Galil and Park,
-A linear time algorithm for concave one-dimensional dynamic programming,
-manuscript, 1989, which simplifies earlier work on the same problem
-by Wilbur (J. Algorithms 1988) and Eppstein (J. Algorithms 1990).
-
-D. Eppstein, March 2002, significantly revised August 2005
-
-|#
-
-;(provide smawky? make-ocm reduce reduce2 (prefix-out ocm- (combine-out min-value min-index)))
+(provide smawky? Entry->Value-Type Value-Type Index-Type Matrix-Proc-Type make-ocm reduce reduce2 concave-minima (prefix-out ocm- (combine-out min-value min-index)))
 
 (: select-elements ((Listof Any) (Listof Index-Type) . -> . (Listof Any)))
 (define (select-elements xs is)
@@ -180,31 +163,11 @@ D. Eppstein, March 2002, significantly revised August 2005
   minima)
 
 
-
-#|
-    Search for the minimum value in each column of a matrix.
-    The return value is a dictionary mapping ColIndices to pairs
-    (value,rowindex). We break ties in favor of earlier rows.
-    
-    The matrix is defined implicitly as a function, passed
-    as the third argument to this routine, where Matrix(i,j)
-    gives the matrix value at row index i and column index j.
-    The matrix must be concave, that is, satisfy the property
-        Matrix(i,j) > Matrix(i',j) => Matrix(i,j') > Matrix(i',j')
-    for every i<i' and j<j'; that is, in every submatrix of
-    the input matrix, the positions of the column minima
-    must be monotonically nondecreasing.
-    
-    The rows and columns of the matrix are labeled by the indices
-    given in order by the first two arguments. In most applications,
-    these arguments can simply be integer ranges.
-|#
-
 ;; The return value `minima` is a hash:
 ;; the keys are col-indices (integers)
 ;; the values are pairs of (value row-index).
-(: concave-minima (((Vectorof Index-Type)) ((Vectorof Index-Type) Matrix-Proc-Type Entry->Value-Type) . ->* . HashTableTop))
-(define (concave-minima row-indices [col-indices (vector)] [matrix-proc (cast (make-caching-proc identity) Matrix-Proc-Type)] [entry->value (cast identity Entry->Value-Type)])
+(: concave-minima ((Vectorof Index-Type) (Vectorof Index-Type) Matrix-Proc-Type Entry->Value-Type . -> . HashTableTop))
+(define (concave-minima row-indices col-indices matrix-proc entry->value)
   ;((vector?) ((or/c #f vector?) procedure? procedure?) . ->* . hash?)
   (define reduce-proc reduce2)
   (define interpolate-proc interpolate2)
@@ -215,52 +178,6 @@ D. Eppstein, March 2002, significantly revised August 2005
         (interpolate-proc (cast odd-column-minima (HashTable Any Any)) row-indices col-indices matrix-proc entry->value))))
 
 
-#|
-    Online concave minimization algorithm of Galil and Park.
-    
-    OnlineConcaveMinima(Matrix,initial) creates a sequence of pairs
-    (self.value(j),self.index(j)), where
-        self.value(0) = initial,
-        self.value(j) = min { Matrix(i,j) | i < j } for j > 0,
-    and where self.index(j) is the value of j that provides the minimum.
-    Matrix(i,j) must be concave, in the same sense as for ConcaveMinima.
-    
-    We never call Matrix(i,j) until value(i) has already been computed,
-    so that the Matrix function may examine previously computed values.
-    Calling value(i) for an i that has not yet been computed forces
-    the sequence to be continued until the desired index is reached.
-    Calling iter(self) produces a sequence of (value,index) pairs.
-    
-    Matrix(i,j) should always return a value, rather than raising an
-    exception, even for j larger than the range we expect to compute.
-    If j is out of range, a suitable value to return that will not
-    violate concavity is Matrix(i,j) = -i.  It will not work correctly
-    to return a flag value such as None for large j, because the ties
-    formed by the equalities among such flags may violate concavity.
-|#
-
-;; Online Concave Minima object
-;(struct $ocm  (values indices finished matrix-proc base tentative) #:transparent #:mutable)
-
-;; State used by self.value(), self.index(), and iter(self) =
-;; $ocm-values, $ocm-indices, $ocm-finished
-
-#|
-State used by the internal algorithm:
-$ocm-matrix, $ocm-base, $ocm-tentative
-
-We allow self._values to be nonempty for indices > finished,
-keeping invariant that
-(1) self._values[i] = Matrix(self._indices[i], i),
-(2) if the eventual correct value of self.index(i) < base,
-    then self._values[i] is nonempty and correct.
-
-In addition, we keep a column index self._tentative, such that
-(3) if i <= tentative, and the eventual correct value of
-    self.index(i) <= finished, then self._values[i] is correct.
-|#
-
-
 (define no-value 'none)
 
 (define-syntax-rule (@ hashtable key)
@@ -269,20 +186,15 @@ In addition, we keep a column index self._tentative, such that
 (define-syntax-rule (! hashtable key value)
   (hash-set! hashtable key value))
 
-(: ocm-ref (OCM-Type Index-Type . -> . Any)) 
-(define (ocm-ref ocm key)
-  (vector-ref ocm key))
-
-(: ocm-set! (OCM-Type Index-Type Any . -> . Void)) 
-(define (ocm-set! ocm key value)
-  (vector-set! ocm key value))
-
-(define-type OCM-Type (Vector Any Any Any Any Any Any Any))
 (define-type Index-Type Nonnegative-Integer)
-(define-type Matrix-Proc-Type (Index-Type Index-Type . -> . Any))
-(define-type Entry->Value-Type (Any . -> . Flonum))
-
-
+(define-type Value-Type Flonum)
+(define-type Initial-Value-Type Value-Type)
+(define-type No-Value-Type Symbol)
+(define-type Finished-Value-Type Index-Type)
+(define-type Matrix-Proc-Type (Index-Type Index-Type . -> . Value-Type))
+(define-type Entry->Value-Type (Any . -> . Value-Type))
+;(define-type OCM-Type (Vector (Vectorof Value-Type) (Vectorof (U Index-Type No-Value-Type)) Finished-Value-Type Matrix-Proc-Type Entry->Value-Type Index-Type Index-Type))
+(define-type OCM-Type (Vector Any Any Any Any Any Any))
 (define o:min-values 0)
 (define o:min-row-indices 1)
 (define o:finished 2)
@@ -291,57 +203,121 @@ In addition, we keep a column index self._tentative, such that
 (define o:base 5)
 (define o:tentative 6)
 
-(: make-ocm ((Procedure) (Any Procedure) . ->* . OCM-Type))
-(define (make-ocm matrix-proc [initial-value 0][entry->value identity])
+(: ocm-matrix-proc (OCM-Type . -> . Matrix-Proc-Type))
+(define (ocm-matrix-proc o)
+  (cast (vector-ref o o:matrix-proc) Matrix-Proc-Type))
+
+(: ocm-set-matrix-proc (OCM-Type Matrix-Proc-Type . -> . Void))
+(define (ocm-set-matrix-proc o proc)
+  (vector-set! o o:matrix-proc (cast proc Matrix-Proc-Type)))
+
+
+(: ocm-entry->value (OCM-Type . -> . Entry->Value-Type))
+(define (ocm-entry->value o)
+  (cast (vector-ref o o:entry->value) Entry->Value-Type))
+
+(: ocm-set-entry->value (OCM-Type Entry->Value-Type . -> . Void))
+(define (ocm-set-entry->value o proc)
+  (vector-set! o o:entry->value (cast proc Entry->Value-Type)))
+
+(: ocm-finished (OCM-Type . -> . Finished-Value-Type))
+(define (ocm-finished o)
+  (cast (vector-ref o o:finished) Finished-Value-Type))
+
+(: ocm-set-finished (OCM-Type Finished-Value-Type . -> . Void))
+(define (ocm-set-finished o v)
+  (vector-set! o o:finished (cast v Finished-Value-Type)))
+
+(: ocm-tentative (OCM-Type . -> . Index-Type))
+(define (ocm-tentative o)
+  (cast (vector-ref o o:tentative) Index-Type))
+
+(: ocm-set-tentative (OCM-Type Index-Type . -> . Void))
+(define (ocm-set-tentative o v)
+  (vector-set! o o:tentative (cast v Index-Type)))
+
+(: ocm-base (OCM-Type . -> . Index-Type))
+(define (ocm-base o)
+  (cast (vector-ref o o:tentative) Index-Type))
+
+(: ocm-set-base (OCM-Type Index-Type . -> . Void))
+(define (ocm-set-base o v)
+  (vector-set! o o:tentative (cast v Index-Type)))
+
+
+(: ocm-min-values (OCM-Type . -> . (Vectorof Value-Type)))
+(define (ocm-min-values o)
+  (cast (vector-ref o o:min-values) (Vectorof Value-Type)))
+
+(: ocm-set-min-values (OCM-Type (Vectorof Value-Type) . -> . Void))
+(define (ocm-set-min-values o vs)
+  (vector-set! o o:min-values (cast vs (Vectorof Value-Type))))
+
+
+(: ocm-min-row-indices (OCM-Type . -> . (Vectorof (U Index-Type No-Value-Type))))
+(define (ocm-min-row-indices o)
+  (cast (vector-ref o o:min-row-indices) (Vectorof (U Index-Type No-Value-Type))))
+
+(: ocm-set-min-row-indices (OCM-Type (Vectorof (U Index-Type No-Value-Type)) . -> . Void))
+(define (ocm-set-min-row-indices o vs)
+  (vector-set! o o:min-row-indices (cast vs (Vectorof (U Index-Type No-Value-Type)))))
+
+
+
+(: make-ocm ((Matrix-Proc-Type Entry->Value-Type) (Initial-Value-Type) . ->* . OCM-Type))
+(define (make-ocm matrix-proc entry->value [initial-value 0.0])
   (log-ocm-debug "making new ocm")
   (define ocm (cast (make-vector 7) OCM-Type))
-  (ocm-set! ocm o:min-values (vector initial-value))
-  (ocm-set! ocm o:min-row-indices (vector no-value))
-  (ocm-set! ocm o:finished 0)
-  (ocm-set! ocm o:matrix-proc (make-caching-proc matrix-proc))
-  (ocm-set! ocm o:entry->value entry->value) ; for converting matrix values to an integer
-  (ocm-set! ocm o:base 0)
-  (ocm-set! ocm o:tentative 0)
-  (cast ocm OCM-Type))
+  (ocm-set-min-values ocm (vector initial-value))
+  (ocm-set-min-row-indices ocm (vector no-value))
+  (ocm-set-finished ocm 0)
+  (ocm-set-matrix-proc ocm matrix-proc)
+  (ocm-set-entry->value ocm entry->value) ; for converting matrix values to an integer
+  (ocm-set-base ocm 0)
+  (ocm-set-tentative ocm 0)
+  ocm)
 
 ;; Return min { Matrix(i,j) | i < j }.
 (: min-value (OCM-Type Index-Type . -> . Any))
 (define (min-value ocm j)
-  (if (< (cast (ocm-ref ocm o:finished) Real) j)
+  (if (< (cast (ocm-finished ocm) Real) j)
       (begin (advance! ocm) (min-value ocm j))
-      (vector-ref (cast (ocm-ref ocm o:min-values) VectorTop) j)))
+      (vector-ref (ocm-min-values ocm) j)))
 
 ;; Return argmin { Matrix(i,j) | i < j }.
-(: min-index (OCM-Type Index-Type . -> . Index-Type))
+(: min-index (OCM-Type Index-Type . -> . (U Index-Type No-Value-Type)))
 (define (min-index ocm j)
-  (if (< (cast (ocm-ref ocm o:finished) Real) j)     
+  (if (< (cast (ocm-finished ocm) Real) j)     
       (begin (advance! ocm) (min-index ocm j))
-      ((inst vector-ref Index-Type) (cast (ocm-ref ocm o:min-row-indices) (Vectorof Index-Type)) j)))
+      ((inst vector-ref (U Index-Type No-Value-Type)) (ocm-min-row-indices ocm) j)))
 
 ;; Finish another value,index pair.
 (: advance! (OCM-Type . -> . Void))
 (define (advance! ocm)
-  (define next (add1 (cast (ocm-ref ocm o:finished) Index-Type)))  
-  (log-ocm-debug "advance! ocm to next = ~a" (add1 (cast (ocm-ref ocm o:finished) Number)))
+  (define next (add1 (ocm-finished ocm)))  
+  (log-ocm-debug "advance! ocm to next = ~a" (add1 (ocm-finished ocm)))
   (cond
     ;; First case: we have already advanced past the previous tentative
     ;; value.  We make a new tentative value by applying ConcaveMinima
     ;; to the largest square submatrix that fits under the base.
-    [(> next (cast (ocm-ref ocm o:tentative) Real))
-     (log-ocm-debug "advance: first case because next (~a) > tentative (~a)" next (ocm-ref ocm o:tentative))
-     (define rows : (Vectorof Index-Type) (list->vector (range (cast (ocm-ref ocm o:base) Index-Type) next)))
-     (ocm-set! ocm o:tentative (+ (cast (ocm-ref ocm o:finished) Number) (vector-length rows)))
-     (define cols : (Vectorof Index-Type) (list->vector (range next (add1 (cast (ocm-ref ocm o:tentative) Index-Type)))))
-     (define minima (concave-minima rows cols (cast (ocm-ref ocm o:matrix-proc) Matrix-Proc-Type) (cast (ocm-ref ocm o:entry->value) Entry->Value-Type)))
+    [(> next (ocm-tentative ocm))
+     (log-ocm-debug "advance: first case because next (~a) > tentative (~a)" next (ocm-tentative ocm))
+     (define rows : (Vectorof Index-Type) (list->vector (range (ocm-base ocm) next)))
+          (ocm-set-tentative ocm (+ (ocm-finished ocm) (vector-length rows)))
+     (define cols : (Vectorof Index-Type) (list->vector (range next (add1 (ocm-tentative ocm)))))
+     (define minima (concave-minima rows cols (ocm-matrix-proc ocm) (ocm-entry->value ocm)))
+     (error 'stop) 
+     
      (for ([col (in-vector cols)])
        (cond
-         [(>= col (vector-length (cast (ocm-ref ocm o:min-values) VectorTop)))
-          (ocm-set! ocm o:min-values (vector-append-item (cast (ocm-ref ocm o:min-values) (Vectorof Any)) (@ (cast (@ minima col) HashTableTop) 'value)))
-          (ocm-set! ocm o:min-row-indices (vector-append-item (cast (ocm-ref ocm o:min-row-indices) (Vectorof Any)) (@ (cast (@ minima col) HashTableTop) 'row-idx)))]
-         [(< ((cast (ocm-ref ocm o:entry->value) Entry->Value-Type) (@ (cast (@ minima col) HashTableTop) 'value)) ((cast (ocm-ref ocm o:entry->value) Entry->Value-Type) (vector-ref (cast (ocm-ref ocm o:min-values) VectorTop) col)))
-          (ocm-set! ocm o:min-values ((inst vector-set Index-Type) (cast (ocm-ref ocm o:min-values) (Vectorof Index-Type)) col (cast (@ (cast (@ minima col) HashTableTop) 'value) Index-Type)))
-          (ocm-set! ocm o:min-row-indices ((inst vector-set Index-Type) (cast (ocm-ref ocm o:min-row-indices) (Vectorof Index-Type)) col (cast (@ (cast (@ minima col) HashTableTop) 'row-idx) Index-Type)))]))
-     (ocm-set! ocm o:finished next)]
+         [(>= col (vector-length (ocm-min-values ocm)))
+          (ocm-set-min-values ocm (vector-append-item (ocm-min-values ocm) (@ (cast (@ minima col) HashTableTop) 'value)))
+          (ocm-set-min-row-indices ocm (vector-append-item (ocm-min-row-indices ocm) (@ (cast (@ minima col) HashTableTop) 'row-idx)))]
+         [(< ((ocm-entry->value ocm) (@ (cast (@ minima col) HashTableTop) 'value)) ((ocm-entry->value ocm) (vector-ref (ocm-min-values ocm) col)))
+          (ocm-set-min-values ocm ((inst vector-set Index-Type) (ocm-min-values ocm) col (cast (@ (cast (@ minima col) HashTableTop) 'value) Index-Type)))
+          (ocm-set-min-row-indices ocm ((inst vector-set Index-Type) (ocm-min-row-indices ocm) col (cast (@ (cast (@ minima col) HashTableTop) 'row-idx) Index-Type)))]))
+     
+     (ocm-set-finished ocm next)]
     
     [else
      ;; Second case: the new column minimum is on the diagonal.
@@ -349,23 +325,23 @@ In addition, we keep a column index self._tentative, such that
      ;; so we can clear out all our work from higher rows.
      ;; As in the fourth case, the loss of tentative is
      ;; amortized against the increase in base.
-     (define diag ((cast (ocm-ref ocm o:matrix-proc) Matrix-Proc-Type) (sub1 next) next))
+     (define diag ((ocm-matrix-proc ocm) (sub1 next) next))
      (cond
-       [(< ((cast (ocm-ref ocm o:entry->value) Entry->Value-Type) diag) ((cast (ocm-ref ocm o:entry->value) Entry->Value-Type) (vector-ref (cast (ocm-ref ocm o:min-values) (Vectorof Any)) next)))
+       [(< ((ocm-entry->value ocm) diag) ((ocm-entry->value ocm) (vector-ref (ocm-min-values ocm) next)))
         (log-ocm-debug "advance: second case because column minimum is on the diagonal")
-        (ocm-set! ocm o:min-values (vector-set (cast (ocm-ref ocm o:min-values) (Vectorof Any)) next diag))
-        (ocm-set! ocm o:min-row-indices (vector-set (cast (ocm-ref ocm o:min-row-indices) (Vectorof Any)) next (sub1 next)))
-        (ocm-set! ocm o:base (sub1 next))
-        (ocm-set! ocm o:tentative next)
-        (ocm-set! ocm o:finished next)]
+        (ocm-set-min-values ocm (vector-set (ocm-min-values ocm) next diag))
+        (ocm-set-min-row-indices ocm (vector-set (ocm-min-row-indices ocm) next (sub1 next)))
+        (ocm-set-base ocm (sub1 next))
+        (ocm-set-tentative ocm next)
+        (ocm-set-finished ocm next)]
        
        ;; Third case: row i-1 does not supply a column minimum in
        ;; any column up to tentative. We simply advance finished
        ;; while maintaining the invariant.
-       [(>= ((cast (ocm-ref ocm o:entry->value) Entry->Value-Type) ((cast (ocm-ref ocm o:matrix-proc) Matrix-Proc-Type) (sub1 next) (cast (ocm-ref ocm o:tentative) Index-Type)))
-            ((cast (ocm-ref ocm o:entry->value) Entry->Value-Type) (vector-ref (cast (ocm-ref ocm o:min-values) (Vectorof Any)) (cast (ocm-ref ocm o:tentative) Index-Type))))
+       [(>= ((ocm-entry->value ocm) ((ocm-matrix-proc ocm) (sub1 next) (ocm-tentative ocm)))
+            ((ocm-entry->value ocm) (vector-ref (ocm-min-values ocm) (ocm-tentative ocm))))
         (log-ocm-debug "advance: third case because row i-1 does not suppply a column minimum")
-        (ocm-set! ocm o:finished next)]
+        (ocm-set-finished ocm next)]
        
        ;; Fourth and final case: a new column minimum at self._tentative.
        ;; This allows us to make progress by incorporating rows
@@ -375,14 +351,15 @@ In addition, we keep a column index self._tentative, such that
        ;; this step) can be amortized against the increase in base.
        [else
         (log-ocm-debug "advance: fourth case because new column minimum")
-        (ocm-set! ocm o:base (sub1 next))
-        (ocm-set! ocm o:tentative next)
-        (ocm-set! ocm o:finished next)])]))
+        (ocm-set-base ocm (sub1 next))
+        (ocm-set-tentative ocm next)
+        (ocm-set-finished ocm next)])]))
 
 (: print (OCM-Type . -> . Void))
 (define (print ocm)
-  (displayln (ocm-ref ocm o:min-values))
-  (displayln (ocm-ref ocm o:min-row-indices)))
+  (displayln (ocm-min-values ocm))
+  (displayln (ocm-min-row-indices ocm)))
+
 
 (: smawky? ((Listof (Listof Real)) . -> . Boolean))
 (define (smawky? m)
@@ -412,67 +389,3 @@ In addition, we keep a column index self._tentative, such that
                     #t)) Boolean))))
   
   (and increasing-minima? monotone?))
-
-
-(module+ test
-  
-  (require rackunit)
-  
-  
-  (define m '((25 42 57 78 90 103 123 142 151)
-              (21 35 48 65 76 85 105 123 130)
-              (13 26 35 51 58 67 86 100 104)
-              (10 20 28 42 48 56 75 86 88)
-              (20 29 33 44 49 55 73 82 80)
-              (13 21 24 35 39 44 59 65 59)
-              (19 25 28 38 42 44 57 61 52)
-              (35 37 40 48 48 49 62 62 49)
-              (37 36 37 42 39 39 51 50 37)
-              (41 39 37 42 35 33 44 43 29)
-              (58 56 54 55 47 41 50 47 29)
-              (66 64 61 61 51 44 52 45 24)
-              (82 76 72 70 56 49 55 46 23)
-              (99 91 83 80 63 56 59 46 20)
-              (124 116 107 100 80 71 72 58 28)
-              (133 125 113 106 86 75 74 59 25)
-              (156 146 131 120 97 84 80 65 31)
-              (178 164 146 135 110 96 92 73 39)))
-  (define m2 (apply map list m))
-  (check-true (smawky? m))
-  (check-true (smawky? m2))
-  ;; proc must return a value even for out-of-bounds i and j
-  (define (simple-proc i j) (with-handlers [(exn:fail? (λ(exn) (* -1 i)))]
-                              (list-ref (list-ref m i) j))) 
-  (define (simple-proc2 i j) (with-handlers [(exn:fail? (λ(exn) (* -1 i)))]
-                               (list-ref (list-ref m2 i) j))) 
-  (check-equal? (simple-proc 0 2) 57) ; 0th row, 2nd col
-  (check-equal? (simple-proc2 2 0) 57) ; flipped
-  (define o (make-ocm simple-proc))
-  (define row-indices (list->vector (range (length m))))
-  (define col-indices (list->vector (range (length (car m)))))
-  (define result (concave-minima row-indices col-indices simple-proc identity))
-  (check-equal?
-   (for/list : (Listof (Pairof Integer Any)) ([j (in-vector col-indices)])
-     (define h (hash-ref result j))
-     (list (hash-ref h 'value) (hash-ref h 'row-idx)))
-   '((10 3) (20 3) (24 5) (35 5) (35 9) (33 9) (44 9) (43 9) (20 13))) ; checked against SMAWK.py
-  (check-equal?
-   (for/list : (Listof (Pairof Integer Any)) ([j (in-vector col-indices)])
-     (list (min-value o j) (min-index o j)))
-   '((0 none) (42 0) (48 1) (51 2) (48 3) (55 4) (59 5) (61 6) (49 7))) ; checked against SMAWK.py
-  
-  (define o2 (make-ocm simple-proc2))
-  (define row-indices2 (list->vector (range (length m2))))
-  (define col-indices2 (list->vector (range (length (car m2)))))
-  (define result2 (concave-minima row-indices2 col-indices2 simple-proc2 identity))
-  (check-equal?
-   (for/list : (Listof (Pairof Integer Any)) ([j (in-vector col-indices2)])
-     (define h (hash-ref result2 j))
-     (list (hash-ref h 'value) (hash-ref h 'row-idx)))
-   '((25 0) (21 0) (13 0) (10 0) (20 0) (13 0) (19 0) (35 0) (36 1) (29 8) (29 8) (24 8) (23 8) (20 8) (28 8) (25 8) (31 8) (39 8))) ; checked against SMAWK.py
-  (check-equal?
-   (for/list : (Listof (Pairof Integer Any)) ([j (in-vector col-indices2)])
-     (list (min-value o2 j) (min-index o2 j)))
-   '((0 none) (21 0) (13 0) (10 0) (20 0) (13 0) (19 0) (35 0) (36 1) (29 8) (-9 9) (-10 10) (-11 11) (-12 12) (-13 13) (-14 14) (-15 15) (-16 16))) ; checked against SMAWK.py
-  
-  )
