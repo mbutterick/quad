@@ -220,3 +220,48 @@
            (quad-attr-set q world:width-key (fl+ (overhang-width q-left) (overhang-width q-right)))
            q))]
     [else exploded-line-quads]))
+
+
+;; ultimately every line is filled to fit the whole measure.
+;; spacers are used to soak up extra space left over in a line.
+;; depending on where the spacers are inserted, different formatting effects are achieved.
+;; e.g., left / right / centered / justified.
+(define/typed (insert-spacers-in-line line [alignment-override #f])
+  ((Quad) ((Option Symbol)) . ->* . Quad)
+  ;; important principle: avoid peeking into quad-list to get attributes.
+  ;; because non-attributed quads may be added.
+  ;; here, we know that common attributes are hoisted into the line.
+  ;; so rely on line attributes to get horiz alignment.
+  (define key-to-use (if (and (last-line? line) (quad-has-attr? line world:horiz-alignment-last-line-key))
+                         world:horiz-alignment-last-line-key 
+                         world:horiz-alignment-key))
+ 
+  (define horiz-alignment (or alignment-override (quad-attr-ref line key-to-use (world:horiz-alignment-default))))
+  (define default-spacer (spacer))
+  (define-values (before middle after) (case horiz-alignment
+                                         [(left) (values #f #f default-spacer)]
+                                         [(right) (values default-spacer #f #f)]
+                                         [(center) (values default-spacer #f default-spacer)]
+                                         [(justified justify) (values #f default-spacer #f)]
+                                         [else (values #f #f #f)]))
+  
+  (define/typed (copy-with-attrs q attr-source)
+    (Quad Quad . -> . Quad)
+    (define keys-to-ignore '(width)) ; width will be determined during fill routine
+    (define filtered-hash (cast (and (quad-attrs attr-source)
+                               (foldl (λ(k [ht : HashTableTop]) (hash-remove ht k)) (quad-attrs attr-source) keys-to-ignore)) QuadAttrs))
+    (quad (quad-name q) (merge-attrs filtered-hash q) (quad-list q)))
+
+  
+  #|
+  
+   (quad (quad-name line) (quad-attrs line) (flatten (let ([qs : (Listof Quad) (quad-list line)])
+                                                        `(,@(if before (copy-with-attrs before (first qs)) null) 
+                                                          
+                                                          ,@(map (λ(q) (if (and middle (takes-justification-space? q)) 
+                                                                           (let ([interleaver (copy-with-attrs middle q)])
+                                                                             (list interleaver q interleaver)) 
+                                                                           q)) qs) 
+                                                          ,@(if after (copy-with-attrs after (last qs)) null)))))
+|#
+  line)
