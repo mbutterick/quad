@@ -174,3 +174,9 @@
         (if (quad? result)
             (error 'quad-first-char "first element is not a string: ~v" result)
             result))))
+
+
+(provide split-last)
+(define (split-last xs)
+  (let-values ([(first-list last-list) ((inst split-at-right Any) (cast xs (Listof Any)) 1)])
+    (values first-list (car last-list))))

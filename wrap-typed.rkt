@@ -1,6 +1,8 @@
 #lang typed/racket/base
 (require (for-syntax racket/base racket/syntax))
-(require sugar/list sugar/debug racket/list racket/function math/flonum racket/vector math/statistics)
+(require/typed sugar/list [slicef-after ((Listof Quad) (Quad . -> . Boolean) . -> . (Listof (Listof Quad)))]
+               [shift ((Listof Any) (Listof Integer) . -> . (Listof Any))])
+(require math/flonum racket/list)
 (require "ocm-typed.rkt" "quads-typed.rkt" "utils-typed.rkt" "measure-typed.rkt" "world-typed.rkt" "logger-typed.rkt")
 
 
@@ -72,3 +74,149 @@
                            [else (cast (world:default-word-break-list) HashableList)])) (quad-list q))]
     [else #f]))
   (or result (error 'convert-to-word-break "result was a not word break for input:" q)))
+
+(define/typed (make-unbreakable q)
+  (Quad . -> . Quad)
+  (quad-attr-set q world:unbreakable-key #t))
+
+
+;; take list of atomic quads and gather them into pieces
+;; a piece is an indivisible chunk of a line.
+;; meaning, a line can wrap at a piece boundary, but not elsewhere.
+;; hyphenation produces more, smaller pieces, which means more linebreak opportunities
+;; but this also makes wrapping slower.
+(define/typed (make-pieces qs)
+  ((Listof Quad) . -> . (Listof Quad))
+  (define-values (breakable-items items-to-make-unbreakable) (split-at-right qs (min world:minimum-last-line-chars (length qs))))
+  (define unbreak-qs (append breakable-items (map make-unbreakable items-to-make-unbreakable)))
+  (define lists-of-quads (slicef-after unbreak-qs (λ(q) (and (possible-word-break-quad? (cast q Quad)) (not (quad-attr-ref (cast q Quad) world:unbreakable-key #f))))))
+  (define-values (first-lists-of-quads last-list-of-quads) (split-last lists-of-quads))
+  (define (make-first-pieces qs)
+    (let-values ([(first-qs last-q) (split-last qs)])
+      (apply piece (list world:word-break-key (convert-to-word-break (cast last-q Quad))) (cast first-qs QuadList))))
+  (append (map make-first-pieces first-lists-of-quads) 
+          (list (apply piece #f (cast last-list-of-quads QuadList)))))
+
+
+;; extract font attributes from quad, or get default values
+(define/typed (font-attributes-with-defaults q)
+  (Quad . -> . (List Nonnegative-Flonum String Symbol Symbol))
+  (list
+   (cast (let ([size (quad-attr-ref/parameter q world:font-size-key)])
+     (if (exact-integer? size) (fl size) size)) Nonnegative-Flonum)
+   (cast (quad-attr-ref/parameter q world:font-name-key) String)
+   (cast (quad-attr-ref/parameter q world:font-weight-key) Symbol)
+   (cast (quad-attr-ref/parameter q world:font-style-key) Symbol)))
+
+
+;; get the width of a quad.
+;; Try the attr first, and if it's not available, compute the width.
+;; comes in fast or slow versions.
+;; not designed to update the source quad.
+(define/typed (quad-width q)
+  (Quad . -> . Flonum)
+  (cond
+    [(quad-has-attr? q world:width-key) (fl (cast (quad-attr-ref q world:width-key) Real))]
+    [(ormap (λ([pred : (Any . -> . Boolean)]) (pred q)) (list char? run? word? word-break?)) 
+     (apply measure-text (word-string q) 
+            (font-attributes-with-defaults q))]
+    [(line? q) (fl (apply + ((inst map Flonum Quad) quad-width (cast (quad-list q) (Listof Quad)))))]
+    [else 0.0]))
+
+;; get the ascent (distance from top of text to baseline)
+;; used by renderer to align text runs baseline-to-baseline.
+;; consult the attrs, and if not available, compute it.
+;; not designed to update the source quad.
+(define/typed (ascent q)
+  (Quad . -> . Flonum)
+  (or (cast (quad-attr-ref q world:ascent-key #f) Flonum)
+      (cond 
+        [(ormap (λ([pred : (Any . -> . Boolean)]) (pred q)) (list char? run? word? word-break?)) 
+         (apply measure-ascent (word-string q) (font-attributes-with-defaults q))]
+        [else 0.0])))
+
+
+;; convert a piece into its final form, which depends on location.
+;; if a piece appears at the end of a line, it is rendered in "before break" mode.
+;; if a piece appears elsewhere in a line, it is rendered in "no break" mode.
+;; this allows the appearance of a piece to change depending on whether it's at the end.
+;; and thus give correct behavior to trailing word spaces, soft hyphens, etc.
+
+(define/typed (render-piece p [before-break? #f])
+  ((Quad) (Boolean) . ->* . Quad)
+  ;; a piece doesn't necessarily have a word-break item in it.
+  ;; only needs it if the appearance of the piece changes based on location.
+  ;; so words are likely to have a word-break item; boxes not.
+  ;; the word break item contains the different characters needed to finish the piece.
+  (define the-word-break (cast (quad-attr-ref p world:word-break-key #f) Quad))
+  (let ([p (quad-attr-remove p world:word-break-key)]) ; so it doesn't propagate into subquads
+    (if the-word-break
+        (quad (quad-name p) (quad-attrs p) 
+              (append (quad-list p) (let ([rendered-wb ((if before-break? 
+                                                            word-break->before-break 
+                                                            word-break->no-break) the-word-break)])
+                                      (if (> (string-length (word-string rendered-wb)) 0) ; if rendered-wb is "", don't append it
+                                          (list rendered-wb)
+                                          empty))))
+        p)))
+
+
+;; shorthand 
+(define/typed (render-piece-before-break p)
+  (Quad . -> . Quad)
+  (render-piece p #t))
+
+
+;; helper macro to convert quad into word-break.
+;; look up the break character and convert the quad based on what is found.
+(define/typed (render-word-break wb key)
+  (Quad Symbol . -> . Quad)
+  (let ([break-char (quad-attr-ref wb key)])
+    (quad (if (whitespace? break-char) 'word-break 'word)
+          (hash-remove (hash-remove (quad-attrs wb) world:no-break-key) world:before-break-key) (list (cast (quad-attr-ref wb key) Quad)))))
+
+;; uses macro above in no-break mode.
+(define/typed (word-break->no-break wb)
+  (Quad . -> . Quad)
+  (render-word-break wb world:no-break-key))
+
+;; uses macro above in before-break mode.
+(define/typed (word-break->before-break wb)
+  (Quad . -> . Quad)
+  (render-word-break wb world:before-break-key))
+
+;; is this the last line? compare current line-idx to total lines 
+(define/typed (last-line? line)
+  (Quad . -> . Boolean)
+  (define line-idx (cast (quad-attr-ref line world:line-index-key #f) Number))
+  (define lines (cast (quad-attr-ref line world:total-lines-key #f) Number))
+  (and line-idx lines (= (add1 line-idx) lines)))
+
+;; optical kerns are automatically inserted at the beginning and end of a line
+;; (by the pieces->line function)
+;; but may also be found elsewhere, imperatively (e.g., before an indent)
+;; they allow certain characters to hang over the line margin.
+;; optical kerns aren't considered when the line is being composed,
+;; rather they are an adjustment added to a composed line.
+;; the optical kern doesn't have left- or right-handed versions.
+;; it just looks at quads on both sides and kerns them if appropriate.
+;; in practice, only one will likely be used.
+(define/typed (render-optical-kerns exploded-line-quads)
+  ((Listof Quad) . -> . (Listof Quad))
+  (define/typed (overhang-width q)
+    (Quad . -> . Flonum)
+    (if (and (word? q) (member (word-string q) world:hanging-chars))
+        (* -1.0 (world:optical-overhang) (apply measure-text (word-string q) (font-attributes-with-defaults q)))
+        0.0))
+  (cond
+    [(not (empty? exploded-line-quads))
+     ;; after exploding, each quad will have a string with one character.
+     (define shifted-lists (shift exploded-line-quads '(1 0 -1)))
+     (define lefts (cast (first shifted-lists) (Listof Quad)))
+     (define centers (cast (second shifted-lists) (Listof Quad)))
+     (define rights (cast (third shifted-lists) (Listof Quad)))
+     (for/list : (Listof Quad) ([(q-left q q-right) (in-parallel lefts centers rights)])
+       (if (optical-kern? q)
+           (quad-attr-set q world:width-key (fl+ (overhang-width q-left) (overhang-width q-right)))
+           q))]
+    [else exploded-line-quads]))
