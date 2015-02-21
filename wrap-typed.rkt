@@ -245,13 +245,13 @@
   (quad (quad-name line) 
         (quad-attrs line) 
         (cast (flatten (let ([qs (cast (quad-list line) (Listof Quad))])
-                `(,@(cast (if before (copy-with-attrs before (first qs)) null) (Listof Quad))
-                  ,@(map (λ([q : Quad]) (if (and middle (takes-justification-space? q)) 
-                                          (let ([interleaver (copy-with-attrs middle q)])
-                                            (list interleaver q interleaver)) 
-                                          q)) qs) 
-                  ,@(cast (if after (copy-with-attrs after (last qs)) null) (Listof Quad))
-                  ))) QuadList)))
+                         `(,@(cast (if before (copy-with-attrs before (first qs)) null) (Listof Quad))
+                           ,@(map (λ([q : Quad]) (if (and middle (takes-justification-space? q)) 
+                                                     (let ([interleaver (copy-with-attrs middle q)])
+                                                       (list interleaver q interleaver)) 
+                                                     q)) qs) 
+                           ,@(cast (if after (copy-with-attrs after (last qs)) null) (Listof Quad))
+                           ))) QuadList)))
 
 
 ;; installs the width in the quad.
@@ -312,3 +312,12 @@
          [new-line (quads->line new-line-quads)] 
          [new-line (quad-attr-set new-line world:line-looseness-key looseness)])
     new-line))
+
+
+;; a faster line-measuring function used by the wrapping function to test lines.
+(define/typed (measure-potential-line ps)
+  ((Listof Quad) . -> . Flonum)
+  (cast (for*/sum : (U Flonum Zero) 
+    ([rendered-piece (in-list (render-pieces ps))]
+     [piece-quad (in-list (quad-list rendered-piece))])
+    (quad-width (cast piece-quad Quad))) Flonum))
