@@ -180,3 +180,8 @@
 (define (split-last xs)
   (let-values ([(first-list last-list) ((inst split-at-right Any) (cast xs (Listof Any)) 1)])
     (values first-list (car last-list))))
+
+;; like cons, but joins a list to an atom
+(provide snoc)
+(define-syntax-rule (snoc xs x)
+  (append xs (list x)))

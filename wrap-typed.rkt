@@ -263,3 +263,26 @@
                                           q)) qs) 
                   ,@(cast (if after (copy-with-attrs after (last qs)) null) (Listof Quad))
                   ))) QuadList)))
+
+
+;; installs the width in the quad.
+;; this becomes the value reported by quad-width.
+(define/typed (embed-width q w)
+  (Quad Flonum . -> . Quad)
+  (quad-attr-set q world:width-key w))
+
+;; installs the ascent in the quad.
+(define/typed (record-ascent q)
+  (Quad . -> . Quad)
+  (quad-attr-set q world:ascent-key (ascent q)))
+
+;; helper function: doesn't need contract because it's already covered by the callers
+(define/typed (render-pieces ps)
+  ((Listof Quad) . -> . (Listof Quad))
+  (define-values (initial-ps last-p) (split-last ps))
+  (snoc ((inst map Quad Quad) render-piece (cast initial-ps (Listof Quad))) (render-piece-before-break (cast last-p Quad))))
+
+
+(define/typed (calc-looseness total-width measure)
+  (Flonum Flonum . -> . Flonum)
+  (round-float (fl/ (fl- measure total-width) measure)))
