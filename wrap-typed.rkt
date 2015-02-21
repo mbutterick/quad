@@ -2,7 +2,7 @@
 (require (for-syntax racket/base racket/syntax))
 (require/typed sugar/list [slicef-after ((Listof Quad) (Quad . -> . Boolean) . -> . (Listof (Listof Quad)))]
                [shift ((Listof Any) (Listof Integer) . -> . (Listof Any))])
-(require math/flonum (except-in racket/list flatten))
+(require math/flonum (except-in racket/list flatten) racket/vector)
 (require/typed racket/list [flatten (All (A) (Rec as (U Any (Listof as))) -> (Listof Any))])
 (require "ocm-typed.rkt" "quads-typed.rkt" "utils-typed.rkt" "measure-typed.rkt" "world-typed.rkt" "logger-typed.rkt")
 
@@ -321,3 +321,13 @@
     ([rendered-piece (in-list (render-pieces ps))]
      [piece-quad (in-list (quad-list rendered-piece))])
     (quad-width (cast piece-quad Quad))) Flonum))
+
+
+(define/typed (vector-break-at vec bps)
+  ((Vectorof Any) (Listof Nonnegative-Integer) . -> . (Listof (Vectorof Any)))
+  (define-values (vecs _) ;; loop backward
+    (for/fold ([vecs : (Listof (Vectorof Any)) empty][end : Nonnegative-Integer (vector-length vec)])([start (in-list (reverse (cons 0 bps)))])
+      (if (= start end)
+          (values vecs start)
+          (values (cons ((inst vector-copy Any) vec start end) vecs) start))))
+  vecs)
