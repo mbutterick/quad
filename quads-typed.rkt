@@ -10,6 +10,17 @@
 (provide (all-defined-out))
 
 
+(define-syntax (define/typed stx)
+  (syntax-case stx ()
+    [(_ (proc-name arg ... . rest-arg) type-expr body ...)
+     #'(define/typed proc-name type-expr
+         (λ(arg ... . rest-arg) body ...))]
+    [(_ proc-name type-expr body ...)
+     #'(begin
+         (: proc-name type-expr)
+         (define proc-name body ...))]))
+
+
 (: hashable-list? (Any . -> . Boolean))
 (define (hashable-list? x) (and (list? x) (even? (length x))))
 
@@ -121,11 +132,11 @@
   (syntax-case stx ()
     [(_ id) 
      (with-syntax ([id? (format-id #'id "~a?" #'id)]
-                   [Quads->id (format-id #'id "Quads->~a" #'id)])
+                   [quads->id (format-id #'id "quads->~a" #'id)])
        #'(begin
            ;; quad converter
-           (: Quads->id ((Listof Quad) . -> . Quad))
-           (define (Quads->id qs)
+           (: quads->id ((Listof Quad) . -> . Quad))
+           (define (quads->id qs)
              (apply id (gather-common-attrs qs) qs))
            
            (: id (case-> 

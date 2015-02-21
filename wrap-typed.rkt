@@ -6,17 +6,6 @@
 (require/typed racket/list [flatten (All (A) (Rec as (U Any (Listof as))) -> (Listof Any))])
 (require "ocm-typed.rkt" "quads-typed.rkt" "utils-typed.rkt" "measure-typed.rkt" "world-typed.rkt" "logger-typed.rkt")
 
-
-(define-syntax (define/typed stx)
-  (syntax-case stx ()
-    [(_ (proc-name arg ... . rest-arg) type-expr body ...)
-     #'(define/typed proc-name type-expr
-         (λ(arg ... . rest-arg) body ...))]
-    [(_ proc-name type-expr body ...)
-     #'(begin
-         (: proc-name type-expr)
-         (define proc-name body ...))]))
-
 ;; predicate for the soft hyphen
 (define/typed (soft-hyphen? x)
   (String . -> . Boolean)
@@ -286,3 +275,40 @@
 (define/typed (calc-looseness total-width measure)
   (Flonum Flonum . -> . Flonum)
   (round-float (fl/ (fl- measure total-width) measure)))
+
+
+;; compose pieces into a finished line.
+;; take the contents of the rendered pieces and merge them.
+;; compute looseness for line as a whole.
+;; also add ascent to each component quad, which can be different depending on font & size.
+(define/typed (pieces->line ps measure-quad-proc)
+  ((Listof Quad) (Quad . -> . Flonum) . -> . Quad)
+  
+  ;; handle optical kerns here to avoid resplitting and rejoining later.
+  (define rendered-pieces (render-pieces ps))
+  (define split-pieces (map quad-list rendered-pieces))
+  (define line-quads (cast (append* split-pieces) (Listof Quad))) 
+  (define line-quads-maybe-with-opticals 
+    (if world:use-optical-kerns?
+        (render-optical-kerns
+         (let ([my-ok (list (optical-kern (quad-attrs (car line-quads))))]) ; take attrs from line, incl measure
+           (append my-ok line-quads my-ok)))
+        line-quads))
+  (define merged-quads (join-quads line-quads-maybe-with-opticals))
+  (define merged-quad-widths (map measure-quad-proc merged-quads)) ; 10% of function time
+  
+  (log-quad-debug "making pieces into line = ~v" (apply string-append (map quad->string merged-quads)))
+  
+  ;; if measure key isn't present, allow an error, because that's weird
+  (when (not (quad-has-attr? (first line-quads) world:measure-key))
+    (error 'pieces->line "quad has no measure key: ~a" (first line-quads)))
+  
+  (define measure (cast (quad-attr-ref (first merged-quads) world:measure-key) Flonum))
+  (define looseness (calc-looseness (fl (apply + merged-quad-widths)) measure))
+  
+  ;; quads->line function hoists common attributes into the line
+  (let* ([new-line-quads (map embed-width merged-quads merged-quad-widths)] ; 15% of time
+         [new-line-quads (map record-ascent new-line-quads)] ; 35% of time
+         [new-line (quads->line new-line-quads)] 
+         [new-line (quad-attr-set new-line world:line-looseness-key looseness)])
+    new-line))

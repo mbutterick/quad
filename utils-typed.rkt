@@ -102,6 +102,44 @@
   (cast (flatten (map do-explode (flatten-quad q))) (Listof Quad)))
 
 
+;; merge chars into words (and boxes), leave the rest
+;; if two quads are mergeable types, and have the same attributes,
+;; they get merged.
+;; input is often large, so macro allows us to avoid allocation
+(provide join-quads)
+(define/typed (join-quads qs-in)
+  ((Listof Quad) . -> . (Listof Quad))
+  
+  (let ([make-matcher (λ ([base-q : Quad])
+                        (λ([q : Quad])
+                          (and (member (quad-name q) world:mergeable-quad-types) 
+                               (not (whitespace/nbsp? q))
+                               ;; if key doesn't exist, it is compared against the default value.
+                               ;; this way, a nonexistent value will test true against a default value.
+                               (andmap (λ([key : Symbol] default) (equal? (quad-attr-ref base-q key default) (quad-attr-ref q key default)))
+                                       (list world:font-name-key 
+                                             world:font-size-key 
+                                             world:font-weight-key 
+                                             world:font-style-key)
+                                       (list (world:font-name-default) 
+                                             (world:font-size-default) 
+                                             (world:font-weight-default) 
+                                             (world:font-style-default))))))])
+    (let loop ([qs qs-in][acc null])
+      (if (null? qs)
+          (reverse (cast acc (Listof Quad)))
+          (let* ([base-q (first qs)]
+                 [mergeable-and-matches-base? (make-matcher base-q)]) ; make a new predicate function for this quad
+            (cond
+              [(mergeable-and-matches-base? base-q)
+               ;; take as many quads that match, using the predicate function
+               (define-values (matching-qs other-qs) (splitf-at (cdr qs) mergeable-and-matches-base?))
+               (define new-word (word (quad-attrs base-q) (string-append* (cast ((inst append-map QuadListItem Quad) quad-list (cons base-q matching-qs)) (Listof String)))))
+               (loop other-qs (cons new-word acc))]
+              ;; otherwise move on to the next in line
+              [else (loop (cdr qs) (cons base-q acc))]))))))
+
+
 ;; propagate x and y adjustments throughout the tree,
 ;; using parent x and y to adjust children, and so on.
 (provide compute-absolute-positions)
