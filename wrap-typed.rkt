@@ -2,7 +2,8 @@
 (require (for-syntax racket/base racket/syntax))
 (require/typed sugar/list [slicef-after ((Listof Quad) (Quad . -> . Boolean) . -> . (Listof (Listof Quad)))]
                [shift ((Listof Any) (Listof Integer) . -> . (Listof Any))])
-(require math/flonum racket/list)
+(require math/flonum (except-in racket/list flatten))
+(require/typed racket/list [flatten (All (A) (Rec as (U Any (Listof as))) -> (Listof Any))])
 (require "ocm-typed.rkt" "quads-typed.rkt" "utils-typed.rkt" "measure-typed.rkt" "world-typed.rkt" "logger-typed.rkt")
 
 
@@ -59,20 +60,20 @@
   (when (not (possible-word-break-quad? q))
     (error 'convert-to-word-break "input is not a possible word break:" q))
   (define result (cond 
-    [(word-break? q) q]
-    [(word? q)
-     (define str (word-string q)) ; str will be one character long, because we've exploded our input
-     (apply word-break
-            (merge-attrs q ; take q's attributes for formatting purposes
-                         (cond
-                           ;; a space is ordinarily visible, but disappears at the end of a line
-                           [(equal? str " ") (list world:no-break-key " " world:before-break-key "")]
-                           ;; soft hyphen is ordinarily invisible, but appears at the end of a line
-                           [(soft-hyphen? str) (list world:no-break-key "" world:before-break-key "-")]
-                           ;; a visible breakable character is always visible
-                           [(visible-breakable? str) (list world:no-break-key str world:before-break-key str)]
-                           [else (cast (world:default-word-break-list) HashableList)])) (quad-list q))]
-    [else #f]))
+                   [(word-break? q) q]
+                   [(word? q)
+                    (define str (word-string q)) ; str will be one character long, because we've exploded our input
+                    (apply word-break
+                           (merge-attrs q ; take q's attributes for formatting purposes
+                                        (cond
+                                          ;; a space is ordinarily visible, but disappears at the end of a line
+                                          [(equal? str " ") (list world:no-break-key " " world:before-break-key "")]
+                                          ;; soft hyphen is ordinarily invisible, but appears at the end of a line
+                                          [(soft-hyphen? str) (list world:no-break-key "" world:before-break-key "-")]
+                                          ;; a visible breakable character is always visible
+                                          [(visible-breakable? str) (list world:no-break-key str world:before-break-key str)]
+                                          [else (cast (world:default-word-break-list) HashableList)])) (quad-list q))]
+                   [else #f]))
   (or result (error 'convert-to-word-break "result was a not word break for input:" q)))
 
 (define/typed (make-unbreakable q)
@@ -103,7 +104,7 @@
   (Quad . -> . (List Nonnegative-Flonum String Symbol Symbol))
   (list
    (cast (let ([size (quad-attr-ref/parameter q world:font-size-key)])
-     (if (exact-integer? size) (fl size) size)) Nonnegative-Flonum)
+           (if (exact-integer? size) (fl size) size)) Nonnegative-Flonum)
    (cast (quad-attr-ref/parameter q world:font-name-key) String)
    (cast (quad-attr-ref/parameter q world:font-weight-key) Symbol)
    (cast (quad-attr-ref/parameter q world:font-style-key) Symbol)))
@@ -235,7 +236,7 @@
   (define key-to-use (if (and (last-line? line) (quad-has-attr? line world:horiz-alignment-last-line-key))
                          world:horiz-alignment-last-line-key 
                          world:horiz-alignment-key))
- 
+  
   (define horiz-alignment (or alignment-override (quad-attr-ref line key-to-use (world:horiz-alignment-default))))
   (define default-spacer (spacer))
   (define-values (before middle after) (case horiz-alignment
@@ -249,19 +250,16 @@
     (Quad Quad . -> . Quad)
     (define keys-to-ignore '(width)) ; width will be determined during fill routine
     (define filtered-hash (cast (and (quad-attrs attr-source)
-                               (foldl (λ(k [ht : HashTableTop]) (hash-remove ht k)) (quad-attrs attr-source) keys-to-ignore)) QuadAttrs))
+                                     (foldl (λ(k [ht : HashTableTop]) (hash-remove ht k)) (quad-attrs attr-source) keys-to-ignore)) QuadAttrs))
     (quad (quad-name q) (merge-attrs filtered-hash q) (quad-list q)))
-
   
-  #|
-  
-   (quad (quad-name line) (quad-attrs line) (flatten (let ([qs : (Listof Quad) (quad-list line)])
-                                                        `(,@(if before (copy-with-attrs before (first qs)) null) 
-                                                          
-                                                          ,@(map (λ(q) (if (and middle (takes-justification-space? q)) 
-                                                                           (let ([interleaver (copy-with-attrs middle q)])
-                                                                             (list interleaver q interleaver)) 
-                                                                           q)) qs) 
-                                                          ,@(if after (copy-with-attrs after (last qs)) null)))))
-|#
-  line)
+  (quad (quad-name line) 
+        (quad-attrs line) 
+        (cast (flatten (let ([qs (cast (quad-list line) (Listof Quad))])
+                `(,@(cast (if before (copy-with-attrs before (first qs)) null) (Listof Quad))
+                  ,@(map (λ([q : Quad]) (if (and middle (takes-justification-space? q)) 
+                                          (let ([interleaver (copy-with-attrs middle q)])
+                                            (list interleaver q interleaver)) 
+                                          q)) qs) 
+                  ,@(cast (if after (copy-with-attrs after (last qs)) null) (Listof Quad))
+                  ))) QuadList)))
