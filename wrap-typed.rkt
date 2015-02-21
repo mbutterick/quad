@@ -1,7 +1,8 @@
 #lang typed/racket/base
 (require (for-syntax racket/base racket/syntax))
 (require/typed sugar/list [slicef-after ((Listof Quad) (Quad . -> . Boolean) . -> . (Listof (Listof Quad)))]
-               [shift ((Listof Any) (Listof Integer) . -> . (Listof Any))])
+               [shift ((Listof Any) (Listof Integer) . -> . (Listof Any))]
+               [break-at ((Listof Quad) (Listof Nonnegative-Integer) . -> . (Listof (Listof Quad)))])
 (require math/flonum (except-in racket/list flatten) racket/vector)
 (require/typed racket/list [flatten (All (A) (Rec as (U Any (Listof as))) -> (Listof Any))])
 (require "ocm-typed.rkt" "quads-typed.rkt" "utils-typed.rkt" "measure-typed.rkt" "world-typed.rkt" "logger-typed.rkt")
@@ -331,3 +332,23 @@
           (values vecs start)
           (values (cons ((inst vector-copy Any) vec start end) vecs) start))))
   vecs)
+
+
+;; makes a wrap function by combining component functions.
+(define/typed (make-wrap-proc 
+                  make-pieces-proc 
+                  measure-quad-proc
+                  compose-line-proc
+                  find-breakpoints-proc)
+  ((Procedure Procedure Procedure Procedure) () . ->* . Procedure)
+  (λ(qs [measure #f])
+    (let* ([measure (fl+ (fl (or measure (quad-attr-ref/parameter (car qs) world:measure-key))) 0.0)]
+           [qs (if (quad-has-attr? (car qs) world:measure-key)
+                   qs
+                   (map (λ(q) (quad-attr-set q world:measure-key measure)) qs))])
+      (log-quad-debug "wrapping on measure = ~a" measure)
+      (define pieces (make-pieces-proc qs)) ; 5%
+      (define bps (find-breakpoints-proc (list->vector pieces) measure)) ; 50%
+      (define broken-pieces (break-at pieces bps)) ; 5%
+      (map (λ(bp) (compose-line-proc bp measure-quad-proc)) broken-pieces)))) ; 50%
+
