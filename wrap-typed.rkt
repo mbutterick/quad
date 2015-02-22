@@ -352,3 +352,20 @@
       (define broken-pieces (break-at pieces bps)) ; 5%
       (map (λ(bp) (compose-line-proc bp measure-quad-proc)) broken-pieces)))) ; 50%
 
+(define width? flonum?)
+(define measure? flonum?)
+(define (breakpoints? x) (and (list? x) (andmap integer? x)))
+
+(define/typed (install-measurement-keys p)
+  (Quad . -> . Quad)
+  (define basic-width (round-float (apply + ((inst map Flonum Quad) quad-width (cast (quad-list p) (Listof Quad))))))
+  (define p-word-break (cast (quad-attr-ref p world:word-break-key #f) Quad))
+  (define before-break-width (fl+ basic-width (if p-word-break
+                                                  (quad-width (word (quad-attrs p-word-break) (cast (quad-attr-ref p-word-break world:before-break-key) QuadListItem)))
+                                                  0.0)))
+  (define no-break-width (fl+ basic-width (if p-word-break
+                                              (quad-width (word (quad-attrs p-word-break) (cast (quad-attr-ref p-word-break world:no-break-key) QuadListItem)))
+                                              0.0)))
+  (quad-attr-set* p 'bb-width before-break-width 'nb-width no-break-width))
+
+
