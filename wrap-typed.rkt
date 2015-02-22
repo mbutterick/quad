@@ -319,9 +319,9 @@
 (define/typed (measure-potential-line ps)
   ((Listof Quad) . -> . Flonum)
   (cast (for*/sum : (U Flonum Zero) 
-    ([rendered-piece (in-list (render-pieces ps))]
-     [piece-quad (in-list (quad-list rendered-piece))])
-    (quad-width (cast piece-quad Quad))) Flonum))
+          ([rendered-piece (in-list (render-pieces ps))]
+           [piece-quad (in-list (quad-list rendered-piece))])
+          (quad-width (cast piece-quad Quad))) Flonum))
 
 
 (define/typed (vector-break-at vec bps)
@@ -336,10 +336,10 @@
 
 ;; makes a wrap function by combining component functions.
 (define/typed (make-wrap-proc 
-                  make-pieces-proc 
-                  measure-quad-proc
-                  compose-line-proc
-                  find-breakpoints-proc)
+               make-pieces-proc 
+               measure-quad-proc
+               compose-line-proc
+               find-breakpoints-proc)
   ((Procedure Procedure Procedure Procedure) () . ->* . Procedure)
   (λ(qs [measure #f])
     (let* ([measure (fl+ (fl (or measure (quad-attr-ref/parameter (car qs) world:measure-key))) 0.0)]
@@ -369,3 +369,21 @@
   (quad-attr-set* p 'bb-width before-break-width 'nb-width no-break-width))
 
 
+(define/typed (make-piece-vectors pieces)
+  ((Vectorof Quad) . -> . (values (Vectorof Flonum) (Vectorof Flonum))) 
+  (define pieces-measured 
+    (for/list : (Vector Flonum Flonum Flonum) ([p (in-vector pieces)])
+      (define wb (quad-attr-ref p world:word-break-key #f))
+      (vector
+       (apply + (for/list ([q (in-list (quad-list p))])
+                  (define str (quad->string q))
+                  (if (equal? str "")
+                      (fl (quad-attr-ref q world:width-key 0.0))
+                      (apply measure-text (quad->string q) (font-attributes-with-defaults q)))))
+       (if wb (apply measure-text (quad-attr-ref wb world:no-break-key) (font-attributes-with-defaults wb)) 0.0)
+       (if wb (apply measure-text (quad-attr-ref wb world:before-break-key) (font-attributes-with-defaults wb)) 0.0))))
+  (values
+   (for/vector : Flonum ([p (in-list pieces-measured)])
+     (fl+ (vector-ref p 0) (vector-ref p 1))) ; first = word length, second = nb length
+   (for/vector : Flonum ([p (in-list pieces-measured)]) 
+     (fl+ (vector-ref p 0) (vector-ref p 2))))) ; first = word length, third = bb length
