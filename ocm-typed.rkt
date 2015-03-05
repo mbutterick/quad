@@ -3,7 +3,7 @@
 (require racket/list sugar/debug racket/function racket/vector  "logger-typed.rkt")
 (define-logger ocm)
 
-(provide smawky? Entry->Value-Type Value-Type No-Value-Type Index-Type Matrix-Proc-Type make-ocm reduce reduce2 concave-minima (prefix-out ocm- (combine-out min-value min-index)))
+(provide smawky? Entry->Value-Type Value-Type No-Value-Type Index-Type Matrix-Proc-Type make-ocm reduce reduce2 concave-minima (prefix-out ocm- (combine-out min-entry min-value min-index)))
 
 (: select-elements ((Listof Any) (Listof Index-Type) . -> . (Listof Any)))
 (define (select-elements xs is)
@@ -34,7 +34,7 @@
   ((inst vector-append Any) xs (vector value)))
 
 (define-syntax-rule (vector-append-value xs value)
-  ((inst vector-append Value-Type) xs (vector value)))
+  ((inst vector-append Entry-Type) xs (vector value)))
 
 (define-syntax-rule (vector-append-index xs value)
   ((inst vector-append (U Index-Type No-Value-Type)) xs (vector value)))
@@ -194,28 +194,33 @@
   (hash-set! hashtable key value))
 
 (define-type Index-Type Nonnegative-Integer)
+(define-type Entry-Type Any)
 (define-type Value-Type Flonum)
-(define-type Initial-Value-Type Value-Type)
 (define-type No-Value-Type Symbol)
 (define-type Finished-Value-Type Index-Type)
 (define-type Matrix-Proc-Type (Index-Type Index-Type . -> . Value-Type))
-(define-type Entry->Value-Type (Any . -> . Value-Type))
+(define-type Entry->Value-Type (Entry-Type . -> . Value-Type))
 
-(struct $ocm ([min-values : (Vectorof Value-Type)] [min-row-indices : (Vectorof (U Index-Type No-Value-Type))] [finished : Finished-Value-Type] [matrix-proc : Matrix-Proc-Type] [entry->value : Entry->Value-Type] [base : Index-Type] [tentative : Index-Type]) #:transparent #:mutable)
+(struct $ocm ([min-entrys : (Vectorof Entry-Type)] [min-row-indices : (Vectorof (U Index-Type No-Value-Type))] [finished : Finished-Value-Type] [matrix-proc : Matrix-Proc-Type] [entry->value : Entry->Value-Type] [base : Index-Type] [tentative : Index-Type]) #:transparent #:mutable)
 
 (define-type OCM-Type $ocm)
 
-(: make-ocm ((Matrix-Proc-Type Entry->Value-Type) (Initial-Value-Type) . ->* . OCM-Type))
-(define (make-ocm matrix-proc entry->value [initial-value 0.0])
+(: make-ocm ((Matrix-Proc-Type Entry->Value-Type) (Entry-Type) . ->* . OCM-Type))
+(define (make-ocm matrix-proc entry->value [initial-entry 0.0])
   (log-ocm-debug "making new ocm")
-  ($ocm (vector initial-value) (vector no-value) 0 matrix-proc entry->value 0 0)) 
+  ($ocm (vector initial-entry) (vector no-value) 0 matrix-proc entry->value 0 0)) 
 
 ;; Return min { Matrix(i,j) | i < j }.
-(: min-value (OCM-Type Index-Type . -> . Any))
-(define (min-value ocm j)
+(: min-entry (OCM-Type Index-Type . -> . Entry-Type))
+(define (min-entry ocm j)
   (if (< (cast ($ocm-finished ocm) Real) j)
-      (begin (advance! ocm) (min-value ocm j))
-      (vector-ref ($ocm-min-values ocm) j)))
+      (begin (advance! ocm) (min-entry ocm j))
+      (vector-ref ($ocm-min-entrys ocm) j)))
+
+;; same as min-entry, but converts to raw value
+(: min-value (OCM-Type Index-Type . -> . Value-Type))
+(define (min-value ocm j)
+  (($ocm-entry->value ocm) (min-entry ocm j)))
 
 ;; Return argmin { Matrix(i,j) | i < j }.
 (: min-index (OCM-Type Index-Type . -> . (U Index-Type No-Value-Type)))
@@ -242,11 +247,11 @@
      
      (for ([col (in-vector cols)])
        (cond
-         [(>= col (vector-length ($ocm-min-values ocm)))
-          (set-$ocm-min-values! ocm (vector-append-value ($ocm-min-values ocm) (@ (cast (@ minima col) (HashTable Symbol Value-Type)) 'value)))
+         [(>= col (vector-length ($ocm-min-entrys ocm)))
+          (set-$ocm-min-entrys! ocm (vector-append-value ($ocm-min-entrys ocm) (@ (cast (@ minima col) (HashTable Symbol Value-Type)) 'value)))
           (set-$ocm-min-row-indices! ocm (vector-append-index ($ocm-min-row-indices ocm) (@ (cast (@ minima col) (HashTable Symbol Index-Type)) 'row-idx)))]
-         [(< (($ocm-entry->value ocm) (@ (cast (@ minima col) HashTableTop) 'value)) (($ocm-entry->value ocm) (vector-ref ($ocm-min-values ocm) col)))
-          (set-$ocm-min-values! ocm ((inst vector-set Value-Type) ($ocm-min-values ocm) col (cast (@ (cast (@ minima col) HashTableTop) 'value) Value-Type)))
+         [(< (($ocm-entry->value ocm) (@ (cast (@ minima col) HashTableTop) 'value)) (($ocm-entry->value ocm) (vector-ref ($ocm-min-entrys ocm) col)))
+          (set-$ocm-min-entrys! ocm ((inst vector-set Entry-Type) ($ocm-min-entrys ocm) col (cast (@ (cast (@ minima col) HashTableTop) 'value) Value-Type)))
           (set-$ocm-min-row-indices! ocm ((inst vector-set (U Index-Type No-Value-Type)) ($ocm-min-row-indices ocm) col (cast (@ (cast (@ minima col) HashTableTop) 'row-idx) Index-Type)))]))
      
      (set-$ocm-finished! ocm next)]
@@ -259,9 +264,9 @@
      ;; amortized against the increase in base.
      (define diag (($ocm-matrix-proc ocm) (sub1 next) next))
      (cond
-       [(< (($ocm-entry->value ocm) diag) (($ocm-entry->value ocm) (vector-ref ($ocm-min-values ocm) next)))
+       [(< (($ocm-entry->value ocm) diag) (($ocm-entry->value ocm) (vector-ref ($ocm-min-entrys ocm) next)))
         (log-ocm-debug "advance: second case because column minimum is on the diagonal")
-        (set-$ocm-min-values! ocm (vector-set ($ocm-min-values ocm) next diag))
+        (set-$ocm-min-entrys! ocm (vector-set ($ocm-min-entrys ocm) next diag))
         (set-$ocm-min-row-indices! ocm (vector-set ($ocm-min-row-indices ocm) next (sub1 next)))
         (set-$ocm-base! ocm (sub1 next))
         (set-$ocm-tentative! ocm next)
@@ -271,7 +276,7 @@
        ;; any column up to tentative. We simply advance finished
        ;; while maintaining the invariant.
        [(>= (($ocm-entry->value ocm) (($ocm-matrix-proc ocm) (sub1 next) ($ocm-tentative ocm)))
-            (($ocm-entry->value ocm) (vector-ref ($ocm-min-values ocm) ($ocm-tentative ocm))))
+            (($ocm-entry->value ocm) (vector-ref ($ocm-min-entrys ocm) ($ocm-tentative ocm))))
         (log-ocm-debug "advance: third case because row i-1 does not suppply a column minimum")
         (set-$ocm-finished! ocm next)]
        
@@ -289,7 +294,7 @@
 
 (: print (OCM-Type . -> . Void))
 (define (print ocm)
-  (displayln ($ocm-min-values ocm))
+  (displayln ($ocm-min-entrys ocm))
   (displayln ($ocm-min-row-indices ocm)))
 
 
