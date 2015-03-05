@@ -511,3 +511,52 @@
      
      (log-quad-debug "best-fit breakpoints = ~a" result)
      result]))
+
+
+;; wrap proc based on greedy proc
+(define wrap-first (make-wrap-proc  
+                    make-pieces 
+                    quad-width 
+                    pieces->line 
+                    (λ(x y) (adaptive-fit-proc (cast x (Vectorof Quad)) (cast y Flonum) #t #f))))
+
+;; wrap proc based on penalty function
+(define wrap-best (make-wrap-proc
+                   make-pieces
+                   quad-width
+                   pieces->line
+                   (λ(x y) (adaptive-fit-proc (cast x (Vectorof Quad)) (cast y Flonum) #t #f))))
+
+(define wrap-adaptive (make-wrap-proc 
+                       make-pieces
+                       quad-width
+                       pieces->line
+                       adaptive-fit-proc))
+
+
+(define/typed (fixed-width? q) 
+  (Quad . -> . Boolean)
+  (quad-has-attr? q world:width-key))
+
+
+;; build quad out to a given width by distributing excess into spacers
+;; todo: adjust this to work recursively, so that fill operation cascades down
+(define/typed (fill starting-quad [target-width? #f])
+  ((Quad) ((U False Flonum)) . ->* . Quad)
+  (define target-width (fl (or target-width? (cast (quad-attr-ref starting-quad world:measure-key) Flonum)))) 
+  (define subquads (cast (quad-list starting-quad) (Listof Quad)))
+  (define-values (flexible-subquads fixed-subquads) (partition spacer? subquads)) ; only puts fill into spacers.
+  (define width-used (apply + ((inst map Flonum Quad) quad-width fixed-subquads)))
+  (define width-remaining (round-float (- target-width width-used)))
+  (cond
+    ;; check for zero condition because we want to divide by this number
+    ;; if there's no spacers, put one in
+    ;; todo: go in two rounds, once for word spacers, and once for line spacers?
+    ;; or separate the line alignment & word-spacing properties?
+    [(fl= 0.0 (fl (length flexible-subquads))) (fill (insert-spacers-in-line starting-quad (world:horiz-alignment-default)) target-width)]
+    [else (define width-per-flexible-quad (round-float (fl/ width-remaining (fl (length flexible-subquads)))))
+          (define new-quad-list ((inst map Quad Quad) (λ(q) (if (spacer? q)
+                                               (quad-attr-set q world:width-key width-per-flexible-quad)
+                                               q)) subquads))
+          
+          (quad (quad-name starting-quad) (quad-attrs (quad-attr-set starting-quad world:width-key target-width)) new-quad-list)]))
