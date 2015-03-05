@@ -3,7 +3,7 @@
 (require/typed sugar/list [slicef-after ((Listof Quad) (Quad . -> . Boolean) . -> . (Listof (Listof Quad)))]
                [shift ((Listof Any) (Listof Integer) . -> . (Listof Any))]
                [break-at ((Listof Quad) (Listof Nonnegative-Integer) . -> . (Listof (Listof Quad)))])
-(require math/flonum (except-in racket/list flatten) racket/vector)
+(require math/flonum (except-in racket/list flatten) racket/vector math/statistics)
 (require/typed racket/list [flatten (All (A) (Rec as (U Any (Listof as))) -> (Listof Any))])
 (require "ocm-typed.rkt" "quads-typed.rkt" "utils-typed.rkt" "measure-typed.rkt" "world-typed.rkt" "logger-typed.rkt")
 
@@ -376,15 +376,143 @@
       (define wb (cast (quad-attr-ref p world:word-break-key #f) Quad))
       (vector
        (cast (apply + (for/list : (Listof Flonum) ([qli (in-list (quad-list p))])
-                  (define q (cast qli Quad))
-                  (define str (quad->string q))
-                  (if (equal? str "")
-                      (cast (quad-attr-ref q world:width-key 0.0) Flonum)
-                      (apply measure-text (quad->string q) (font-attributes-with-defaults q))))) Flonum)
+                        (define q (cast qli Quad))
+                        (define str (quad->string q))
+                        (if (equal? str "")
+                            (cast (quad-attr-ref q world:width-key 0.0) Flonum)
+                            (apply measure-text (quad->string q) (font-attributes-with-defaults q))))) Flonum)
        (if wb (cast (apply measure-text (cast (quad-attr-ref wb world:no-break-key) String) (font-attributes-with-defaults wb)) Flonum) 0.0)
        (if wb (cast (apply measure-text (cast (quad-attr-ref wb world:before-break-key) String) (font-attributes-with-defaults wb)) Flonum) 0.0))))
-(values
+  (values
    (for/vector : (Vectorof Flonum) ([p (in-list pieces-measured)])
      (fl+ (vector-ref p 0) (vector-ref p 1))) ; first = word length, second = nb length
    (for/vector : (Vectorof Flonum) ([p (in-list pieces-measured)]) 
      (fl+ (vector-ref p 0) (vector-ref p 2))))) ; first = word length, third = bb length
+
+
+(define/typed (make-trial-line pieces-rendered-widths pieces-rendered-before-break-widths i j)
+  ((Vectorof Flonum) (Vectorof Flonum) Nonnegative-Integer Nonnegative-Integer . -> . (Vectorof Flonum))
+  (let ([vec (vector-copy pieces-rendered-widths i j)])
+    (vector-set! vec (sub1 (vector-length vec)) (vector-ref pieces-rendered-before-break-widths (sub1 j)))
+    vec))
+
+(define/typed (get-line-width line)
+  ((Vectorof Flonum) . -> . Flonum)
+  (round-float (apply + (vector->list line))))
+
+
+;; top-level adaptive wrap proc.
+;; first-fit and best-fit are variants.
+(define/typed (adaptive-fit-proc pieces measure [use-first? #t] [use-best? #t])
+  (((Vectorof Quad) Flonum) (Boolean Boolean) . ->* . (Listof Nonnegative-Integer))
+  
+  ;; this is the winning performance strategy: extract the numbers first, then just wrap on those.
+  ;; todo: how to avoid re-measuring pieces later?
+  ;; todo: how to retain information about words per line and hyphen at end?
+  (define-values (pieces-rendered-widths pieces-rendered-before-break-widths)
+    (make-piece-vectors pieces))
+  (define pieces-with-word-space ((inst vector-map Quad Quad) (λ(piece) (cast (and (quad-has-attr? piece world:word-break-key) (equal? (quad-attr-ref (cast (quad-attr-ref piece world:word-break-key) Quad) 'nb) " ")) Quad)) pieces))
+  
+  (define (make-first-fit-bps-and-widths)
+    (define-values (folded-bps folded-widths) 
+      (for/fold ([bps : (Listof Nonnegative-Integer) '(0)][line-widths : (Listof Flonum) empty])([j-1 (in-range (vector-length pieces))])
+        (define line-width (get-line-width (make-trial-line pieces-rendered-widths
+                                                            pieces-rendered-before-break-widths
+                                                            (car bps) (cast (add1 j-1) Nonnegative-Integer))))
+        (if (fl> line-width (fl* world:allowed-overfull-ratio measure))
+            (values (cons (cast j-1 Nonnegative-Integer) bps) (cons line-width line-widths))
+            (values bps line-widths))))
+    (values (cdr (reverse folded-bps)) (reverse folded-widths)))
+  
+  (define (fu-formula)
+    (define line-count (length trial-line-widths))
+    (cond
+      [(<= line-count 2) 1.0] ; signals that first-fit is always OK with 1 or 2 lines
+      [else ; only measure middle lines. we know bps has at least 2 bps
+       (define looseness-stddev (stddev ((inst map Flonum Flonum) (λ(x) (calc-looseness x measure)) (drop-right (drop trial-line-widths 1) 1))))         
+       (define piece-count (vector-length pieces-rendered-widths)) 
+       (define pieces-per-line (fl/ (fl piece-count) (sub1 (fl line-count)))) ; todo: more accurate to count only pieces in middle
+       (apply + (list 2.2 (fllog (flabs (cast looseness-stddev Flonum))) (* 0.09 pieces-per-line)))])) ; the FU FORMULA
+  
+  ;; only buy first-fit-bps if use-first? is true.
+  (define-values (first-fit-bps trial-line-widths) (if use-first? (make-first-fit-bps-and-widths) (values (void) (void))))
+  
+  (cond
+    ;; possible outcomes at this branch:
+    ;; adaptive wrap: use-first and use-best are true, so first-fit-bps will exist, and fu-formula will be used.
+    ;; first-fit wrap: use-first is true but not use-best. So first-fit-bps will be returned regardless.
+    ;; best-fit wrap: use-first is false but use-best is true. So first-fit-bps will be skipped, and move on to best-fit.
+    [(and use-first? (if use-best? (fl> (fu-formula) 0.0) #t))  
+     (log-quad-debug "first-fit breakpoints = ~a" first-fit-bps)
+     first-fit-bps]
+    [else
+     
+     (define $penalty vector) ; don't use struct for penalty, because of read/write overhead
+     (define/typed ($penalty-width x)
+       (VectorTop . -> . Flonum)
+        (cast (vector-ref x 1) Flonum))
+     (define/typed ($penalty-hyphens x)
+       (VectorTop . -> . Nonnegative-Integer)
+       (cast (vector-ref x 0) Nonnegative-Integer))
+     (define/typed ($penalty->value v)
+       Entry->Value-Type
+       ($penalty-width (cast v VectorTop)))
+     (define initial-value ($penalty 0 0.0))
+     
+     (log-quad-debug "~a pieces to wrap = ~v" (vector-length pieces) (vector-map quad->string pieces))
+     
+     (define/typed (penalty i j)
+       Matrix-Proc-Type
+       (cond
+         [(or (>= i j) ; implies negative or zero length line 
+              (> j (vector-length pieces))) ; exceeds available pieces
+          ($penalty 0 (fl* -1.0 (fl i)))] ; ocm out of bounds signal
+         [else
+          (define penalty-up-to-i (ocm-min-value ocm i))
+          (define last-piece-to-test (vector-ref pieces (sub1 j)))
+          (define new-hyphen?
+            (and (quad-has-attr? last-piece-to-test world:word-break-key)
+                 (equal? (quad-attr-ref (quad-attr-ref last-piece-to-test world:word-break-key) world:before-break-key) "-")))
+          (define cumulative-hyphens (if (not new-hyphen?) 
+                                         0 
+                                         (add1 ($penalty-hyphens penalty-up-to-i))))
+          
+          ($penalty 
+           cumulative-hyphens
+           (round-float
+            (apply + 
+                   (if (> cumulative-hyphens world:hyphen-limit)
+                       (fl world:hyphen-penalty)
+                       0.0)
+                   (fl world:new-line-penalty) 
+                   ($penalty->value penalty-up-to-i)
+                   (let ([line-width (get-line-width (make-trial-line pieces-rendered-widths pieces-rendered-before-break-widths i j))])
+                     (cond
+                       ;; overfull line: huge penalty prevents break; multiplier is essential for monotonicity.
+                       ;; multiply by -1 because line-width is longer than measure, thus diff is negative
+                       [(fl> line-width (fl* world:allowed-overfull-ratio measure))
+                        (fl* (fl- line-width measure) (flexpt 10.0 7.0))] 
+                       ;; standard penalty, optionally also applied to last line (by changing operator)
+                       [((if world:last-line-can-be-short < <=) j (vector-length pieces)) 
+                        (define words (fl (vector-count (λ(x) x) (vector-copy pieces-with-word-space i (sub1 j)))))     
+                        (fl/ (flexpt (fl- measure line-width) 2.0) (flmax 1.0 words))]
+                       ;; only option left is (= j (vector-length pieces)), meaning we're on the last line.
+                       ;; 0 penalty means any length is ok.
+                       ;[(< (length pieces-to-test) (world:minimum-last-line-pieces)) 50000]
+                       [else 0.0])))))]))
+     
+     (define ocm : OCM-Type (make-ocm penalty $penalty->value initial-value))
+     
+     ;; starting from last position, ask ocm for position of row minimum (= new-pos)
+     ;; collect this value, and use it as the input next time
+     ;; until you reach first position.    
+     (define first-position 0)
+     (define last-position (vector-length pieces))
+     (define result (let loop : (Listof Nonnegative-Integer) ([pos : Nonnegative-Integer last-position][acc : (Listof Nonnegative-Integer) null])
+                      (let ([next-pos : Nonnegative-Integer (ocm-min-index ocm pos)]) ; first look ahead ...
+                        (if (= next-pos first-position) ; therefore we're done
+                            acc
+                            (loop next-pos (cons next-pos acc))))))
+     
+     (log-quad-debug "best-fit breakpoints = ~a" result)
+     result]))
