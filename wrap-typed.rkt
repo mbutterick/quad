@@ -372,18 +372,19 @@
 (define/typed (make-piece-vectors pieces)
   ((Vectorof Quad) . -> . (values (Vectorof Flonum) (Vectorof Flonum))) 
   (define pieces-measured 
-    (for/list : (Vector Flonum Flonum Flonum) ([p (in-vector pieces)])
-      (define wb (quad-attr-ref p world:word-break-key #f))
+    (for/list : (Listof (Vector Flonum Flonum Flonum)) ([p (in-vector pieces)])
+      (define wb (cast (quad-attr-ref p world:word-break-key #f) Quad))
       (vector
-       (apply + (for/list ([q (in-list (quad-list p))])
+       (cast (apply + (for/list : (Listof Flonum) ([qli (in-list (quad-list p))])
+                  (define q (cast qli Quad))
                   (define str (quad->string q))
                   (if (equal? str "")
-                      (fl (quad-attr-ref q world:width-key 0.0))
-                      (apply measure-text (quad->string q) (font-attributes-with-defaults q)))))
-       (if wb (apply measure-text (quad-attr-ref wb world:no-break-key) (font-attributes-with-defaults wb)) 0.0)
-       (if wb (apply measure-text (quad-attr-ref wb world:before-break-key) (font-attributes-with-defaults wb)) 0.0))))
-  (values
-   (for/vector : Flonum ([p (in-list pieces-measured)])
+                      (cast (quad-attr-ref q world:width-key 0.0) Flonum)
+                      (apply measure-text (quad->string q) (font-attributes-with-defaults q))))) Flonum)
+       (if wb (cast (apply measure-text (cast (quad-attr-ref wb world:no-break-key) String) (font-attributes-with-defaults wb)) Flonum) 0.0)
+       (if wb (cast (apply measure-text (cast (quad-attr-ref wb world:before-break-key) String) (font-attributes-with-defaults wb)) Flonum) 0.0))))
+(values
+   (for/vector : (Vectorof Flonum) ([p (in-list pieces-measured)])
      (fl+ (vector-ref p 0) (vector-ref p 1))) ; first = word length, second = nb length
-   (for/vector : Flonum ([p (in-list pieces-measured)]) 
+   (for/vector : (Vectorof Flonum) ([p (in-list pieces-measured)]) 
      (fl+ (vector-ref p 0) (vector-ref p 2))))) ; first = word length, third = bb length
