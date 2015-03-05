@@ -3,7 +3,7 @@
 (require racket/list sugar/debug racket/function racket/vector  "logger-typed.rkt")
 (define-logger ocm)
 
-(provide smawky? Entry->Value-Type Value-Type No-Value-Type Index-Type Matrix-Proc-Type make-ocm reduce reduce2 concave-minima (prefix-out ocm- (combine-out min-entry min-value min-index)))
+(provide smawky? Entry->Value-Type Value-Type No-Value-Type Entry-Type Index-Type Matrix-Proc-Type OCM-Type make-ocm reduce reduce2 concave-minima (prefix-out ocm- (combine-out min-entry min-value min-index)))
 
 (: select-elements ((Listof Any) (Listof Index-Type) . -> . (Listof Any)))
 (define (select-elements xs is)
@@ -198,7 +198,7 @@
 (define-type Value-Type Flonum)
 (define-type No-Value-Type Symbol)
 (define-type Finished-Value-Type Index-Type)
-(define-type Matrix-Proc-Type (Index-Type Index-Type . -> . Value-Type))
+(define-type Matrix-Proc-Type (Index-Type Index-Type . -> . Entry-Type))
 (define-type Entry->Value-Type (Entry-Type . -> . Value-Type))
 
 (struct $ocm ([min-entrys : (Vectorof Entry-Type)] [min-row-indices : (Vectorof (U Index-Type No-Value-Type))] [finished : Finished-Value-Type] [matrix-proc : Matrix-Proc-Type] [entry->value : Entry->Value-Type] [base : Index-Type] [tentative : Index-Type]) #:transparent #:mutable)
