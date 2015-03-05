@@ -400,6 +400,7 @@
   ((Vectorof Flonum) . -> . Flonum)
   (round-float (apply + (vector->list line))))
 
+(struct $penalty ([hyphens : Nonnegative-Integer][width : Value-Type]) #:transparent #:mutable)
 
 ;; top-level adaptive wrap proc.
 ;; first-fit and best-fit are variants.
@@ -435,7 +436,8 @@
        (apply + (list 2.2 (fllog (flabs (cast looseness-stddev Flonum))) (* 0.09 pieces-per-line)))])) ; the FU FORMULA
   
   ;; only buy first-fit-bps if use-first? is true.
-  (define-values (first-fit-bps trial-line-widths) (if use-first? (make-first-fit-bps-and-widths) (values (void) (void))))
+  ;; use (values '(0) '(0.0)) as void-ish values that will typecheck properly.
+  (define-values (first-fit-bps trial-line-widths) (if use-first? (make-first-fit-bps-and-widths) (values '(0) '(0.0))))
   
   (cond
     ;; possible outcomes at this branch:
@@ -447,16 +449,9 @@
      first-fit-bps]
     [else
      
-     (define $penalty vector) ; don't use struct for penalty, because of read/write overhead
-     (define/typed ($penalty-width x)
-       (VectorTop . -> . Flonum)
-        (cast (vector-ref x 1) Flonum))
-     (define/typed ($penalty-hyphens x)
-       (VectorTop . -> . Nonnegative-Integer)
-       (cast (vector-ref x 0) Nonnegative-Integer))
-     (define/typed ($penalty->value v)
-       Entry->Value-Type
-       ($penalty-width (cast v VectorTop)))
+     (define/typed ($penalty->value x)
+       ($penalty . -> . Value-Type)
+       ($penalty-width x))
      (define initial-value ($penalty 0 0.0))
      
      (log-quad-debug "~a pieces to wrap = ~v" (vector-length pieces) (vector-map quad->string pieces))
@@ -468,11 +463,11 @@
               (> j (vector-length pieces))) ; exceeds available pieces
           ($penalty 0 (fl* -1.0 (fl i)))] ; ocm out of bounds signal
          [else
-          (define penalty-up-to-i (ocm-min-value ocm i))
+          (define penalty-up-to-i (cast (ocm-min-entry ocm i) $penalty))
           (define last-piece-to-test (vector-ref pieces (sub1 j)))
           (define new-hyphen?
             (and (quad-has-attr? last-piece-to-test world:word-break-key)
-                 (equal? (quad-attr-ref (quad-attr-ref last-piece-to-test world:word-break-key) world:before-break-key) "-")))
+                 (equal? (cast (quad-attr-ref (cast (quad-attr-ref last-piece-to-test world:word-break-key) Quad) world:before-break-key) Quad) "-")))
           (define cumulative-hyphens (if (not new-hyphen?) 
                                          0 
                                          (add1 ($penalty-hyphens penalty-up-to-i))))
@@ -480,7 +475,7 @@
           ($penalty 
            cumulative-hyphens
            (round-float
-            (apply + 
+            (apply + (list
                    (if (> cumulative-hyphens world:hyphen-limit)
                        (fl world:hyphen-penalty)
                        0.0)
@@ -499,9 +494,9 @@
                        ;; only option left is (= j (vector-length pieces)), meaning we're on the last line.
                        ;; 0 penalty means any length is ok.
                        ;[(< (length pieces-to-test) (world:minimum-last-line-pieces)) 50000]
-                       [else 0.0])))))]))
+                       [else 0.0]))))))]))
      
-     (define ocm : OCM-Type (make-ocm penalty $penalty->value initial-value))
+     (define ocm : OCM-Type (make-ocm penalty (cast $penalty->value Entry->Value-Type) initial-value))
      
      ;; starting from last position, ask ocm for position of row minimum (= new-pos)
      ;; collect this value, and use it as the input next time
@@ -509,7 +504,7 @@
      (define first-position 0)
      (define last-position (vector-length pieces))
      (define result (let loop : (Listof Nonnegative-Integer) ([pos : Nonnegative-Integer last-position][acc : (Listof Nonnegative-Integer) null])
-                      (let ([next-pos : Nonnegative-Integer (ocm-min-index ocm pos)]) ; first look ahead ...
+                      (let ([next-pos (cast (ocm-min-index ocm pos) Nonnegative-Integer)]) ; first look ahead ...
                         (if (= next-pos first-position) ; therefore we're done
                             acc
                             (loop next-pos (cons next-pos acc))))))
