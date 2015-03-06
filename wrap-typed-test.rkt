@@ -76,9 +76,8 @@
 ;; meaning, a line can wrap at a piece boundary, but not elsewhere.
 ;; hyphenation produces more, smaller pieces, which means more linebreak opportunities
 ;; but this also makes wrapping slower.
-(define-type Make-Pieces-Type ((Listof Quad) . -> . (Listof Quad)))
 (define/typed (make-pieces qs)
-  Make-Pieces-Type
+  ((Listof Quad) . -> . (Listof Quad))
   (define-values (breakable-items items-to-make-unbreakable) (split-at-right qs (min world:minimum-last-line-chars (length qs))))
   (define unbreak-qs (append breakable-items (map make-unbreakable items-to-make-unbreakable)))
   (define lists-of-quads (slicef-after unbreak-qs (λ(q) (and (possible-word-break-quad? (cast q Quad)) (not (quad-attr-ref (cast q Quad) world:unbreakable-key #f))))))
@@ -105,9 +104,8 @@
 ;; Try the attr first, and if it's not available, compute the width.
 ;; comes in fast or slow versions.
 ;; not designed to update the source quad.
-(define-type Measure-Quad-Type (Quad . -> . Flonum))
 (define/typed (quad-width q)
-  Measure-Quad-Type
+  (Quad . -> . Flonum)
   (cond
     [(quad-has-attr? q world:width-key) (fl (cast (quad-attr-ref q world:width-key) Real))]
     [(ormap (λ([pred : (Any . -> . Boolean)]) (pred q)) (list char? run? word? word-break?)) 
@@ -284,9 +282,8 @@
 ;; take the contents of the rendered pieces and merge them.
 ;; compute looseness for line as a whole.
 ;; also add ascent to each component quad, which can be different depending on font & size.
-(define-type Compose-Line-Type ((Listof Quad) (Quad . -> . Flonum) . -> . Quad))
 (define/typed (pieces->line ps measure-quad-proc)
-  Compose-Line-Type
+  ((Listof Quad) (Quad . -> . Flonum) . -> . Quad)
   
   ;; handle optical kerns here to avoid resplitting and rejoining later.
   (define rendered-pieces (render-pieces ps))
@@ -338,24 +335,22 @@
 
 
 ;; makes a wrap function by combining component functions.
-(define-type Wrap-Proc-Type (((Listof Quad)) (Flonum) . ->* . (Listof Quad)))
 (define/typed (make-wrap-proc 
                make-pieces-proc 
                measure-quad-proc
                compose-line-proc
                find-breakpoints-proc)
-  ((Make-Pieces-Type Measure-Quad-Type Compose-Line-Type Find-Breakpoints-Type) () . ->* . Wrap-Proc-Type)
+  ((Procedure Procedure Procedure Procedure) () . ->* . Procedure)
   (λ(qs [measure #f])
-    (let* ([measure : Flonum (fl+ (cast (or measure (quad-attr-ref/parameter (car qs) world:measure-key)) Flonum) 0.0)]
-           [qs : (Listof Quad) (if (quad-has-attr? (car qs) world:measure-key)
+    (let* ([measure (fl+ (fl (or measure (quad-attr-ref/parameter (car qs) world:measure-key))) 0.0)]
+           [qs (if (quad-has-attr? (car qs) world:measure-key)
                    qs
-                   ((inst map Quad Quad) (λ(q) (quad-attr-set q world:measure-key measure)) qs))])
+                   (map (λ(q) (quad-attr-set q world:measure-key measure)) qs))])
       (log-quad-debug "wrapping on measure = ~a" measure)
-      (define pieces : (Listof Quad) (make-pieces-proc qs)) ; 5%
-      (define bps : (Listof Nonnegative-Integer) (find-breakpoints-proc (list->vector pieces) measure)) ; 50%
-      (define broken-pieces : (Listof (Listof Quad)) (break-at pieces bps)) ; 5%
-      #; (define-type Compose-Line-Type ((Listof Quad) (Quad . -> . Flonum) . -> . Quad))
-      ((inst map Quad (Listof Quad)) (λ(broken-piece) (compose-line-proc broken-piece measure-quad-proc)) broken-pieces)))) ; 50%
+      (define pieces (make-pieces-proc qs)) ; 5%
+      (define bps (find-breakpoints-proc (list->vector pieces) measure)) ; 50%
+      (define broken-pieces (break-at pieces bps)) ; 5%
+      (map (λ(bp) (compose-line-proc bp measure-quad-proc)) broken-pieces)))) ; 50%
 
 (define width? flonum?)
 (define measure? flonum?)
@@ -409,7 +404,6 @@
 
 ;; top-level adaptive wrap proc.
 ;; first-fit and best-fit are variants.
-(define-type Find-Breakpoints-Type ((Vectorof Quad) Flonum . -> . (Listof Nonnegative-Integer)))
 (define/typed (adaptive-fit-proc pieces measure [use-first? #t] [use-best? #t])
   (((Vectorof Quad) Flonum) (Boolean Boolean) . ->* . (Listof Nonnegative-Integer))
   
@@ -520,7 +514,6 @@
 
 
 ;; wrap proc based on greedy proc
-(provide wrap-first) 
 (define wrap-first (make-wrap-proc  
                     make-pieces 
                     quad-width 
@@ -528,14 +521,12 @@
                     (λ(x y) (adaptive-fit-proc (cast x (Vectorof Quad)) (cast y Flonum) #t #f))))
 
 ;; wrap proc based on penalty function
-(provide wrap-best)
 (define wrap-best (make-wrap-proc
                    make-pieces
                    quad-width
                    pieces->line
                    (λ(x y) (adaptive-fit-proc (cast x (Vectorof Quad)) (cast y Flonum) #t #f))))
 
-(provide wrap-adaptive)
 (define wrap-adaptive (make-wrap-proc 
                        make-pieces
                        quad-width
@@ -582,4 +573,18 @@
   (quad (quad-name starting-quad) (quad-attrs starting-quad) (reverse new-quads)))
 
 
+
+(module+ main
+  (define eqs (split-quad (block '(x-align center font "Equity Text B" size 10) "Foo-d" (word '(size 13) "og ") "and " (box) " Zu" (word-break '(nb "c" bb "k-")) "kerman's. Instead of a circle, the result is a picture of the code that, if it were used as an expression, would produce a circle. In other words, code is not a function, but instead a new syntactic form for creating pictures; the bit between the opening parenthesis with code is not an expression, but instead manipulated by the code syntactic form. This helps explain what we meant in the previous section when we said that racket provides require and the function-calling syntax. Libraries are not restricted to exporting values, such as functions; they can also define new syntactic forms. In this sense, Racket isn’t exactly a language at all; it’s more of an idea for how to structure a language so that you can extend it or create entirely " (word '(font "Courier" size 5) "lang."))))
+  
+  (define megs (split-quad (block '(size 15) "Meg is an ally.")))
+  
+  (define trials 1)
+#;  (time-repeat trials (let () (wrap-first megs 36) (void)))
+#;  (time-repeat trials (let ([measure 36]) (wrap-best megs measure) (void)))
+  
+#;  (time-repeat trials (let () (wrap-first eqs 54) (void)))
+#;  (time-repeat trials (let ([measure 54]) (wrap-best eqs measure) (void)))
+ #; (time-repeat trials (let ([measure 54]) (wrap-adaptive eqs measure) (void)))
+  )
 
