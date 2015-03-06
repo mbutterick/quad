@@ -1,6 +1,8 @@
 #lang typed/racket/base
 (require typed/racket/class)
-(require/typed racket/draw [record-dc%  (Class (init-field))]
+(require/typed racket/draw 
+               [record-dc%  (Class (init-field) 
+                                   (get-text-extent (String (Instance (Class (init-field))) Any . -> . (values Nonnegative-Real Nonnegative-Real Nonnegative-Real Nonnegative-Real))))]
                [make-font ((#:size Nonnegative-Flonum) (#:style Symbol) (#:weight Symbol) (#:face String) . -> . (Instance (Class (init-field))))])
 (require/typed sugar/cache [make-caching-proc (Procedure . -> . Procedure)])
 (require/typed racket/serialize [serialize (Any . -> . Any)]
@@ -48,15 +50,22 @@
                           (make-hash '()))))
 
 
-(define-type mms-type ((String String) (Symbol Symbol) . ->* . (List Nonnegative-Flonum Nonnegative-Flonum Nonnegative-Flonum Nonnegative-Flonum)))
-(: measure-max-size mms-type)
-(define measure-max-size 
-  (cast (make-caching-proc (λ(text font [weight 'normal] [style 'normal])
-                       ;((string? string?) (symbol? symbol?) . ->* . number?)
-                       (define font-instance (hash-ref! (current-font-cache) (list font weight style) (λ() (make-font #:size max-size #:style style #:weight weight #:face font))))
-                       ;; 'combine' boolean only makes a difference for two or more chars
-                       (hash-ref! (current-text-cache) (list text font weight style) (λ() (current-text-cache-changed? #t)
-                                                                                       (values->list (send dc get-text-extent text font-instance (>= (string-length text) 1))))))) mms-type))
+(define-type Measurement-Result-Type (List Nonnegative-Flonum Nonnegative-Flonum Nonnegative-Flonum Nonnegative-Flonum))
+(define-type MMS-Type ((String String) (Symbol Symbol) . ->* . Measurement-Result-Type))
+
+(: measure-max-size-base MMS-Type)
+(define (measure-max-size-base text font [weight 'normal] [style 'normal])
+  (define font-instance (cast (hash-ref! (current-font-cache) (list font weight style) (λ() (make-font #:size max-size #:style style #:weight weight #:face font))) (Instance (Class (init-field)))))
+  ;; 'combine' boolean only makes a difference for two or more chars
+  (send dc get-text-extent text font-instance (>= (string-length text) 1))
+  (cast (hash-ref! (current-text-cache) (list text font weight style) (λ() #;(current-text-cache-changed? #t)
+                                                                        (values->list (send dc get-text-extent text font-instance (>= (string-length text) 1))))) Measurement-Result-Type))
+
+(define measure-cache ((inst make-hash (List String String Symbol Symbol) Measurement-Result-Type)))
+
+(: measure-max-size MMS-Type)
+(define (measure-max-size text font [weight 'normal] [style 'normal])
+  (hash-ref! measure-cache (list text font weight style) (λ () (measure-max-size-base text font weight style))))
 
 
 
@@ -87,3 +96,4 @@
   ;; Native function only accepts integers, so get max-size and scale down to size needed.
   (define raw-baseline-distance (measure-ascent-max-size text font weight style))
   (cast (round-float (/ (* (exact->inexact raw-baseline-distance) (exact->inexact size)) max-size)) Nonnegative-Flonum))
+
