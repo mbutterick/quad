@@ -21,8 +21,12 @@
          (define proc-name body ...))]))
 
 
+(define-syntax-rule (even-members xs)
+  (for/list : (Listof Any) ([(x i) (in-indexed xs)] #:when (even? i))
+    x))
+
 (: hashable-list? (Any . -> . Boolean))
-(define (hashable-list? x) (and (list? x) (even? (length x))))
+(define (hashable-list? x) (and (list? x) (even? (length x)) (andmap symbol? (even-members x))))
 
 (define-type QuadName Symbol)
 (define-predicate QuadName? QuadName)
@@ -122,7 +126,7 @@
                                 (if even?
                                     (values (cons x ks) vs #f)
                                     (values ks (cons x vs) #t)))]) 
-    (when (not even?) (error 'bad-input))
+    (when (not even?) (error 'quadattrs "odd number of elements in ~a" xs))
     (cast (for/hash ([k (in-list ks)][v (in-list vs)])
             (values k v)) QuadAttrs)))
 
@@ -141,9 +145,15 @@
            
            (: id (case-> 
                   (-> Quad)
-                  ((Option (U QuadAttrs (Listof Any))) (U String Quad) * . -> . Quad)))
+                  ((U QuadAttrs (Listof Any) False) (U String Quad) * . -> . Quad)))
            (define (id [attrs #f] . xs)
-             (quad 'id (if (quad-attrs? attrs) (cast attrs QuadAttrs) (quadattrs (if (list? attrs) attrs '()))) (cast xs QuadList)))
+             (quad 'id (cond 
+                         [(quad-attrs? attrs) (cast attrs QuadAttrs)]
+                         [(list? attrs)
+                          (if (hashable-list? attrs)
+                              (quadattrs attrs)
+                              (error 'id "got non-hashable list ~a" attrs))]
+                         [else (quadattrs '())]) (cast xs QuadList)))
            
            (: id? (Any . -> . Boolean))
            (define (id? x)
@@ -208,3 +218,7 @@
 (define-break-type column)
 (define-break-type block)
 (define-break-type line)
+
+;; todo next: debug this test case 
+(define qas (quadattrs '(measure 36.0)))
+(quads->line (list (word qas "Meg")))

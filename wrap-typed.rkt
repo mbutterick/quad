@@ -122,7 +122,9 @@
 ;; not designed to update the source quad.
 (define/typed (ascent q)
   (Quad . -> . Flonum)
-  (or (cast (quad-attr-ref q world:ascent-key #f) Flonum)
+  (define ascent-value-or-false (quad-attr-ref q world:ascent-key #f))
+  (if ascent-value-or-false
+      (cast ascent-value-or-false Flonum)
       (cond 
         [(ormap (λ([pred : (Any . -> . Boolean)]) (pred q)) (list char? run? word? word-break?)) 
          (apply measure-ascent (word-string q) (font-attributes-with-defaults q))]
@@ -166,7 +168,7 @@
   (Quad Symbol . -> . Quad)
   (let ([break-char (quad-attr-ref wb key)])
     (quad (if (whitespace? break-char) 'word-break 'word)
-          (hash-remove (hash-remove (quad-attrs wb) world:no-break-key) world:before-break-key) (list (cast (quad-attr-ref wb key) Quad)))))
+          (hash-remove (hash-remove (quad-attrs wb) world:no-break-key) world:before-break-key) (list (cast (quad-attr-ref wb key) String)))))
 
 ;; uses macro above in no-break mode.
 (define/typed (word-break->no-break wb)
@@ -197,17 +199,17 @@
 (define/typed (render-optical-kerns exploded-line-quads)
   ((Listof Quad) . -> . (Listof Quad))
   (define/typed (overhang-width q)
-    (Quad . -> . Flonum)
-    (if (and (word? q) (member (word-string q) world:hanging-chars))
-        (* -1.0 (world:optical-overhang) (apply measure-text (word-string q) (font-attributes-with-defaults q)))
+    ((U Quad False) . -> . Flonum)
+    (if (and (word? q) (member (word-string (cast q Quad)) world:hanging-chars))
+        (* -1.0 (world:optical-overhang) (apply measure-text (word-string (cast q Quad)) (font-attributes-with-defaults (cast q Quad))))
         0.0))
   (cond
     [(not (empty? exploded-line-quads))
      ;; after exploding, each quad will have a string with one character.
      (define shifted-lists (shift exploded-line-quads '(1 0 -1)))
-     (define lefts (cast (first shifted-lists) (Listof Quad)))
-     (define centers (cast (second shifted-lists) (Listof Quad)))
-     (define rights (cast (third shifted-lists) (Listof Quad)))
+     (define lefts (cast (first shifted-lists) (Listof (U Quad False)))) ;; need False in type because shift fills with #f
+     (define centers (cast (second shifted-lists) (Listof Quad))) ;; don't need False because shift is 0 (no fill)
+     (define rights (cast (third shifted-lists) (Listof (U Quad False)))) ;; need False in type because shift fills with #f
      (for/list : (Listof Quad) ([(q-left q q-right) (in-parallel lefts centers rights)])
        (if (optical-kern? q)
            (quad-attr-set q world:width-key (fl+ (overhang-width q-left) (overhang-width q-right)))
@@ -348,8 +350,8 @@
   (λ(qs [measure #f])
     (let* ([measure : Flonum (fl+ (cast (or measure (quad-attr-ref/parameter (car qs) world:measure-key)) Flonum) 0.0)]
            [qs : (Listof Quad) (if (quad-has-attr? (car qs) world:measure-key)
-                   qs
-                   ((inst map Quad Quad) (λ(q) (quad-attr-set q world:measure-key measure)) qs))])
+                                   qs
+                                   ((inst map Quad Quad) (λ(q) (quad-attr-set q world:measure-key measure)) qs))])
       (log-quad-debug "wrapping on measure = ~a" measure)
       (define pieces : (Listof Quad) (make-pieces-proc qs)) ; 5%
       (define bps : (Listof Nonnegative-Integer) (find-breakpoints-proc (list->vector pieces) measure)) ; 50%
@@ -373,12 +375,12 @@
                                               0.0)))
   (quad-attr-set* p 'bb-width before-break-width 'nb-width no-break-width))
 
-
+(require sugar/debug)
 (define/typed (make-piece-vectors pieces)
   ((Vectorof Quad) . -> . (values (Vectorof Flonum) (Vectorof Flonum))) 
   (define pieces-measured 
     (for/list : (Listof (Vector Flonum Flonum Flonum)) ([p (in-vector pieces)])
-      (define wb (cast (quad-attr-ref p world:word-break-key #f) Quad))
+      (define wb (cast (quad-attr-ref p world:word-break-key #f) (U Quad False)))
       (vector
        (cast (apply + (for/list : (Listof Flonum) ([qli (in-list (quad-list p))])
                         (define q (cast qli Quad))
@@ -418,7 +420,7 @@
   ;; todo: how to retain information about words per line and hyphen at end?
   (define-values (pieces-rendered-widths pieces-rendered-before-break-widths)
     (make-piece-vectors pieces))
-  (define pieces-with-word-space ((inst vector-map Quad Quad) (λ(piece) (cast (and (quad-has-attr? piece world:word-break-key) (equal? (quad-attr-ref (cast (quad-attr-ref piece world:word-break-key) Quad) 'nb) " ")) Quad)) pieces))
+  (define pieces-with-word-space ((inst vector-map Boolean Quad) (λ(piece) (and (quad-has-attr? piece world:word-break-key) (equal? (quad-attr-ref (cast (quad-attr-ref piece world:word-break-key) Quad) 'nb) " "))) pieces))
   
   (define (make-first-fit-bps-and-widths)
     (define-values (folded-bps folded-widths) 
@@ -482,25 +484,25 @@
            cumulative-hyphens
            (round-float
             (apply + (list
-                   (if (> cumulative-hyphens world:hyphen-limit)
-                       (fl world:hyphen-penalty)
-                       0.0)
-                   (fl world:new-line-penalty) 
-                   ($penalty->value penalty-up-to-i)
-                   (let ([line-width (get-line-width (make-trial-line pieces-rendered-widths pieces-rendered-before-break-widths i j))])
-                     (cond
-                       ;; overfull line: huge penalty prevents break; multiplier is essential for monotonicity.
-                       ;; multiply by -1 because line-width is longer than measure, thus diff is negative
-                       [(fl> line-width (fl* world:allowed-overfull-ratio measure))
-                        (fl* (fl- line-width measure) (flexpt 10.0 7.0))] 
-                       ;; standard penalty, optionally also applied to last line (by changing operator)
-                       [((if world:last-line-can-be-short < <=) j (vector-length pieces)) 
-                        (define words (fl (vector-count (λ(x) x) (vector-copy pieces-with-word-space i (sub1 j)))))     
-                        (fl/ (flexpt (fl- measure line-width) 2.0) (flmax 1.0 words))]
-                       ;; only option left is (= j (vector-length pieces)), meaning we're on the last line.
-                       ;; 0 penalty means any length is ok.
-                       ;[(< (length pieces-to-test) (world:minimum-last-line-pieces)) 50000]
-                       [else 0.0]))))))]))
+                      (if (> cumulative-hyphens world:hyphen-limit)
+                          (fl world:hyphen-penalty)
+                          0.0)
+                      (fl world:new-line-penalty) 
+                      ($penalty->value penalty-up-to-i)
+                      (let ([line-width (get-line-width (make-trial-line pieces-rendered-widths pieces-rendered-before-break-widths i j))])
+                        (cond
+                          ;; overfull line: huge penalty prevents break; multiplier is essential for monotonicity.
+                          ;; multiply by -1 because line-width is longer than measure, thus diff is negative
+                          [(fl> line-width (fl* world:allowed-overfull-ratio measure))
+                           (fl* (fl- line-width measure) (flexpt 10.0 7.0))] 
+                          ;; standard penalty, optionally also applied to last line (by changing operator)
+                          [((if world:last-line-can-be-short < <=) j (vector-length pieces)) 
+                           (define words (fl (vector-count (λ(x) x) (vector-copy pieces-with-word-space i (sub1 j)))))     
+                           (fl/ (flexpt (fl- measure line-width) 2.0) (flmax 1.0 words))]
+                          ;; only option left is (= j (vector-length pieces)), meaning we're on the last line.
+                          ;; 0 penalty means any length is ok.
+                          ;[(< (length pieces-to-test) (world:minimum-last-line-pieces)) 50000]
+                          [else 0.0]))))))]))
      
      (define ocm : OCM-Type (make-ocm penalty (cast $penalty->value Entry->Value-Type) initial-value))
      
@@ -565,8 +567,8 @@
     [(fl= 0.0 (fl (length flexible-subquads))) (fill (insert-spacers-in-line starting-quad (world:horiz-alignment-default)) target-width)]
     [else (define width-per-flexible-quad (round-float (fl/ width-remaining (fl (length flexible-subquads)))))
           (define new-quad-list ((inst map Quad Quad) (λ(q) (if (spacer? q)
-                                               (quad-attr-set q world:width-key width-per-flexible-quad)
-                                               q)) subquads))
+                                                                (quad-attr-set q world:width-key width-per-flexible-quad)
+                                                                q)) subquads))
           
           (quad (quad-name starting-quad) (quad-attrs (quad-attr-set starting-quad world:width-key target-width)) new-quad-list)]))
 
@@ -583,3 +585,8 @@
 
 
 
+;(define eqs (split-quad (block '(x-align center font "Equity Text B" size 10) "Foo-d" (word '(size 13) "og ") "and " (box) " Zu" (word-break '(nb "c" bb "k-")) "kerman's. Instead of a circle, the result is a picture of the code that, if it were used as an expression, would produce a circle. In other words, code is not a function, but instead a new syntactic form for creating pictures; the bit between the opening parenthesis with code is not an expression, but instead manipulated by the code syntactic form. This helps explain what we meant in the previous section when we said that racket provides require and the function-calling syntax. Libraries are not restricted to exporting values, such as functions; they can also define new syntactic forms. In this sense, Racket isn’t exactly a language at all; it’s more of an idea for how to structure a language so that you can extend it or create entirely " (word '(font "Courier" size 5) "lang."))))
+
+(activate-logger quad-logger)
+(define megs (split-quad (block '(size 15) "Meg is an ally.")))
+(wrap-first megs 36.0)

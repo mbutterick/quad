@@ -50,7 +50,7 @@
                           (make-hash '()))))
 
 
-(define-type Measurement-Result-Type (List Nonnegative-Flonum Nonnegative-Flonum Nonnegative-Flonum Nonnegative-Flonum))
+(define-type Measurement-Result-Type (List Nonnegative-Real Nonnegative-Real Nonnegative-Real Nonnegative-Real))
 (define-type MMS-Type ((String String) (Symbol Symbol) . ->* . Measurement-Result-Type))
 
 (: measure-max-size-base MMS-Type)
@@ -96,4 +96,3 @@
   ;; Native function only accepts integers, so get max-size and scale down to size needed.
   (define raw-baseline-distance (measure-ascent-max-size text font weight style))
   (cast (round-float (/ (* (exact->inexact raw-baseline-distance) (exact->inexact size)) max-size)) Nonnegative-Flonum))
-

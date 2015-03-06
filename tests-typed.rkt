@@ -1,5 +1,5 @@
 #lang racket/base
-(require "utils-typed.rkt" "quads-typed.rkt" "world-typed.rkt" racket/list racket/format)
+(require "utils-typed.rkt" "quads-typed.rkt" "world-typed.rkt" "measure-typed.rkt" racket/list racket/format)
 (require rackunit)
 
 (check-equal? (join-attrs (list (box '(width 10.0)) (quad-attrs (box '(x 10.0))) (list 'width 20.0))) 
@@ -84,3 +84,5 @@
 (define funny-unicode-spaces (map ~a (list #\u2000 #\u2007 #\u2009 #\u200a #\u202f)))
 (check-true (andmap whitespace? funny-unicode-spaces))
 (check-true (andmap whitespace/nbsp? funny-unicode-spaces))
+
+(check-equal? (measure-text "foobar" 10.0 "Courier") 36.0059)
