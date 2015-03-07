@@ -26,13 +26,16 @@
         [else (values multipages multicolumns blocks (cons q block-acc))])))
   (reverse (cons-reverse (cons-reverse ((inst cons-reverse Quad Block-Type) b bs) mcs) mps)))
 
-
+(provide merge-adjacent-within)
 (define/typed (merge-adjacent-within q)
   (Quad . -> . Quad)
   (quad (quad-name q) (quad-attrs q) (join-quads (cast (quad-list q) (Listof Quad)))))
 
+(provide hyphenate-quad-except-last-word)
 (define/typed (hyphenate-quad-except-last-word q)
   (Quad . -> . Quad)
   (log-quad-debug "last word will not be hyphenated")
-  (define-values (first-quads last-quad) (split-last (quad-list q)))
-  (quad (quad-name q) (quad-attrs q) (snoc (map hyphenate-quad first-quads) last-quad)))
+  (define-values (first-quads last-quad) ((inst split-last QuadListItem) (quad-list q)))
+  (quad (quad-name q) (quad-attrs q) (snoc ((inst map QuadListItem QuadListItem) hyphenate-quad first-quads) last-quad)))
+
+
