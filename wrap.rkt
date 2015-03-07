@@ -547,6 +547,10 @@
   (define measure 40.0)
   (map quad->string (wrap-first megs measure))
   (map quad->string (wrap-best megs measure))
+  
+  (set! measure 200.0)
+(time (map quad->string (wrap-first eqs measure)))
+(time (map quad->string (wrap-best eqs measure)))
   #|  
   (define trials 1)
   (time-repeat trials (let () (wrap-first megs 36) (void)))

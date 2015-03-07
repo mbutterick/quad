@@ -48,38 +48,38 @@
 
 
 (check-equal?
- (for/list : (Listof (List (U Index-Type Value-Type) (U Index-Type Value-Type))) ([j (in-vector col-indices)])
-   (define h (cast (hash-ref result j) (HashTable Symbol (U Index-Type Value-Type))))
-   (list (hash-ref h 'value) (hash-ref h 'row-idx)))
+ (for/list : (Listof (List (U Index-Type Entry-Type) (U Index-Type Entry-Type))) ([j (in-vector col-indices)])
+   (define h (cast (hash-ref result j) (HashTable Symbol (U Index-Type Entry-Type))))
+   (list (hash-ref h minima-payload-key) (hash-ref h minima-idx-key)))
  '((10.0 3) (20.0 3) (24.0 5) (35.0 5) (35.0 9) (33.0 9) (44.0 9) (43.0 9) (20.0 13))) ; checked against SMAWK.py
 
 (check-equal?
- (for/list : (Listof (List Value-Type Index-Type)) ([j (in-vector col-indices)])
+ (for/list : (Listof (List Entry-Type Index-Type)) ([j (in-vector col-indices)])
    (define h (cast (hash-ref result j) (HashTable Symbol Any)))
-   (list (cast (hash-ref h 'value) Value-Type) (cast (hash-ref h 'row-idx) Index-Type)))
+   (list (cast (hash-ref h minima-payload-key) Entry-Type) (cast (hash-ref h minima-idx-key) Index-Type)))
  '((10.0 3) (20.0 3) (24.0 5) (35.0 5) (35.0 9) (33.0 9) (44.0 9) (43.0 9) (20.0 13))) ; checked against SMAWK.py
 
 
 
 (define o (make-ocm simple-proc simple-entry->value))
 
-  (check-equal?
-   (for/list : (Listof (List Value-Type (U Index-Type No-Value-Type))) ([j (in-vector col-indices)])
-     (list (cast (ocm-min-value o j) Value-Type) (ocm-min-index o j)))
-   '((0.0 none) (42.0 0) (48.0 1) (51.0 2) (48.0 3) (55.0 4) (59.0 5) (61.0 6) (49.0 7))) ; checked against SMAWK.py
+(check-equal?
+ (for/list : (Listof (List Entry-Type (U Index-Type No-Value-Type))) ([j (in-vector col-indices)])
+   (list (cast (ocm-min-entry o j) Entry-Type) (ocm-min-index o j)))
+ '((0.0 none) (42.0 0) (48.0 1) (51.0 2) (48.0 3) (55.0 4) (59.0 5) (61.0 6) (49.0 7))) ; checked against SMAWK.py
 
 
-  (define row-indices2 (cast (list->vector (range (length m2))) (Vectorof Index-Type)))
-  (define col-indices2 (cast (list->vector (range (length (car m2)))) (Vectorof Index-Type)))
-  (define result2 (concave-minima row-indices2 col-indices2 simple-proc2 simple-entry->value))
-  (check-equal?
-   (for/list : (Listof (List Value-Type Index-Type)) ([j (in-vector col-indices2)])
-     (define h (cast (hash-ref result2 j) (HashTable Symbol (U Index-Type Value-Type))))
-     (list (cast (hash-ref h 'value) Value-Type) (cast (hash-ref h 'row-idx) Index-Type)))
-   '((25.0 0) (21.0 0) (13.0 0) (10.0 0) (20.0 0) (13.0 0) (19.0 0) (35.0 0) (36.0 1) (29.0 8) (29.0 8) (24.0 8) (23.0 8) (20.0 8) (28.0 8) (25.0 8) (31.0 8) (39.0 8))) ; checked against SMAWK.py
+(define row-indices2 (cast (list->vector (range (length m2))) (Vectorof Index-Type)))
+(define col-indices2 (cast (list->vector (range (length (car m2)))) (Vectorof Index-Type)))
+(define result2 (concave-minima row-indices2 col-indices2 simple-proc2 simple-entry->value))
+(check-equal?
+ (for/list : (Listof (List Entry-Type Index-Type)) ([j (in-vector col-indices2)])
+   (define h (cast (hash-ref result2 j) (HashTable Symbol (U Index-Type Entry-Type))))
+   (list (cast (hash-ref h minima-payload-key) Entry-Type) (cast (hash-ref h minima-idx-key) Index-Type)))
+ '((25.0 0) (21.0 0) (13.0 0) (10.0 0) (20.0 0) (13.0 0) (19.0 0) (35.0 0) (36.0 1) (29.0 8) (29.0 8) (24.0 8) (23.0 8) (20.0 8) (28.0 8) (25.0 8) (31.0 8) (39.0 8))) ; checked against SMAWK.py
 
 (define o2 (make-ocm simple-proc2 simple-entry->value))
-  (check-equal?
-   (for/list : (Listof (List Value-Type (U Index-Type No-Value-Type))) ([j (in-vector col-indices2)])
-     (list (cast (ocm-min-value o2 j) Value-Type) (ocm-min-index o2 j)))
-   '((0.0 none) (21.0 0) (13.0 0) (10.0 0) (20.0 0) (13.0 0) (19.0 0) (35.0 0) (36.0 1) (29.0 8) (-9.0 9) (-10.0 10) (-11.0 11) (-12.0 12) (-13.0 13) (-14.0 14) (-15.0 15) (-16.0 16))) ; checked against SMAWK.py
+(check-equal?
+ (for/list : (Listof (List Entry-Type (U Index-Type No-Value-Type))) ([j (in-vector col-indices2)])
+   (list (cast (ocm-min-entry o2 j) Entry-Type) (ocm-min-index o2 j)))
+ '((0.0 none) (21.0 0) (13.0 0) (10.0 0) (20.0 0) (13.0 0) (19.0 0) (35.0 0) (36.0 1) (29.0 8) (-9.0 9) (-10.0 10) (-11.0 11) (-12.0 12) (-13.0 13) (-14.0 14) (-15.0 15) (-16.0 16))) ; checked against SMAWK.py
