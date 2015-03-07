@@ -1,8 +1,14 @@
 #lang typed/racket/base
 (require/typed sugar/list [slice-at ((Listof (U QuadAttrKey QuadAttrValue)) Positive-Integer . -> . (Listof (List QuadAttrKey QuadAttrValue)))])
 (require/typed racket/list [flatten (All (A) (Rec as (U Any (Listof as))) -> (Listof Any))])
-(require (for-syntax racket/syntax racket/base) racket/string (except-in racket/list flatten) sugar/debug racket/bool hyphenate racket/function math/flonum)
+(require/typed hyphenate [hyphenate (String #:min-length Nonnegative-Integer #:min-left-length Nonnegative-Integer #:min-right-length Nonnegative-Integer . -> . String)])
+(require (for-syntax racket/syntax racket/base) racket/string (except-in racket/list flatten) sugar/debug racket/bool racket/function math/flonum)
 (require "quads-typed.rkt" "world-typed.rkt" "measure-typed.rkt")
+
+(provide quad-map)
+(define/typed (quad-map proc q)
+  ((QuadListItem . -> . QuadListItem) Quad . -> . Quad)
+  (quad (quad-name q) (quad-attrs q) (map proc (quad-list q))))
 
 
 ;; predicate for use below
@@ -214,9 +220,23 @@
             result))))
 
 
+;; recursively hyphenate strings in a quad
+(provide hyphenate-quad)
+(define/typed (hyphenate-quad x)
+  (QuadListItem . -> . QuadListItem)
+  (cond
+    [(quad? x) (quad-map hyphenate-quad x)]
+    [(string? x) (hyphenate x
+                            #:min-length 6	 	 	 	 
+                            #:min-left-length 3	 	 	 	 
+                            #:min-right-length 3)]
+    [else x]))
+
+;; just because it comes up a lot
 (provide split-last)
-(define (split-last xs)
-  (let-values ([(first-list last-list) ((inst split-at-right Any) (cast xs (Listof Any)) 1)])
+(define/typed (split-last xs)
+  (All (A) ((Listof A) -> (values (Listof A) A)))
+  (let-values ([(first-list last-list) ((inst split-at-right A) xs 1)])
     (values first-list (car last-list))))
 
 ;; like cons, but joins a list to an atom
