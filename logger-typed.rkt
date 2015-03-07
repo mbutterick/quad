@@ -40,7 +40,8 @@
     (log-quad-debug "~a = ~a" 'x x)
     x))
 
-(define-syntax-rule (log-quad-debug* xs)
+(: log-quad-debug* ((Listof String) . -> . Void))
+(define (log-quad-debug* xs)
   (when (equal? (world:logging-level) 'debug)
-    (map (λ(x) (log-quad-debug x)) xs)))
+    ((inst for-each String) (λ(x) (log-quad-debug x)) xs)))
 

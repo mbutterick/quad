@@ -45,3 +45,51 @@
       0.0
       (let ([lines-to-measure (drop-right lines 1)]) ; exclude last line from looseness calculation
         (round-float (/ (foldl fl+ 0.0 ((inst map Flonum Quad) (λ(line) (cast (quad-attr-ref line world:line-looseness-key 0.0) Flonum)) lines-to-measure)) (- (fl (length lines)) 1.0))))))
+
+
+(provide log-debug-lines)
+(define/typed (log-debug-lines lines)
+  ((Listof Quad) . -> . (Listof String)) 
+  (log-quad-debug "line report:")
+  (for/list : (Listof String) ([(line idx) (in-indexed lines)])
+    (format "~a/~a: ~v ~a" idx
+            (length lines) 
+            (quad->string line)
+            (quad-attr-ref line world:line-looseness-key))))
+
+
+(provide block->lines)
+(define/typed (block->lines b)
+  (Quad . -> . (Listof Quad)) ;; todo: introduce a Quad subtype where quad-list is guaranteed to be all Quads (no strings)
+  (define quality (cast (quad-attr-ref/parameter b world:quality-key) Real))
+  (define/typed (wrap-quads qs)
+    ((Listof Quad) . -> . (Listof Quad))
+    (define wrap-proc (cond
+                        [(>= quality world:max-quality) wrap-best] 
+                        [(<= quality world:draft-quality) wrap-first]
+                        [else wrap-adaptive])) 
+    (wrap-proc qs))
+  (log-quad-debug "wrapping lines")
+  (log-quad-debug "quality = ~a" quality)
+  (log-quad-debug "looseness tolerance = ~a" world:line-looseness-tolerance)
+  (define wrapped-lines-without-hyphens (wrap-quads (cast (quad-list b) (Listof Quad)))) ; 100/150
+  (log-quad-debug* (log-debug-lines wrapped-lines-without-hyphens))
+  (define avg-looseness (average-looseness wrapped-lines-without-hyphens))
+  (define gets-hyphenation? (and world:use-hyphenation?
+                                 (fl> avg-looseness world:line-looseness-tolerance)))
+  (log-quad-debug "average looseness = ~a" avg-looseness)
+  (log-quad-debug (if gets-hyphenation? "hyphenating" "no hyphenation needed"))
+  
+  (define wrapped-lines (if gets-hyphenation?
+                            (wrap-quads (split-quad (cast ((if world:allow-hyphenated-last-word-in-paragraph
+                                                         hyphenate-quad
+                                                         hyphenate-quad-except-last-word) (merge-adjacent-within b)) Quad)))
+                            wrapped-lines-without-hyphens))
+  
+  (when gets-hyphenation? (log-quad-debug* (log-debug-lines wrapped-lines)))
+  
+  
+  (log-quad-debug "final looseness = ~a" (average-looseness wrapped-lines))
+  (map insert-spacers-in-line
+       (for/list : (Listof Quad) ([line-idx (in-naturals)][line (in-list wrapped-lines)])
+         (quad-attr-set* line 'line-idx line-idx 'lines (length wrapped-lines)))))

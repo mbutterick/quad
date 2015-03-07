@@ -222,6 +222,7 @@
 ;; spacers are used to soak up extra space left over in a line.
 ;; depending on where the spacers are inserted, different formatting effects are achieved.
 ;; e.g., left / right / centered / justified.
+(provide insert-spacers-in-line)
 (define/typed (insert-spacers-in-line line [alignment-override #f])
   ((Quad) ((Option Symbol)) . ->* . Quad)
   ;; important principle: avoid peeking into quad-list to get attributes.

@@ -14,7 +14,7 @@
            (define name-key keyname)
            (define-parameter name-default val)))]))
 
-(define-key-and-parameter measure 'measure 300)
+(define-key-and-parameter measure 'measure 300.0)
 
 
 (define-key-and-parameter font-size 'size 13)

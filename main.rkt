@@ -37,6 +37,8 @@
             (length lines) 
             (quad->string line)
             (quad-attr-ref line world:line-looseness-key))))
+
+
 (require racket/trace)
 (define (block->lines b)
   (define quality (quad-attr-ref/parameter b world:quality-key))

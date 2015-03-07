@@ -20,3 +20,10 @@
 (check-equal? (average-looseness (list al-test-line)) 0.0) ; default value for one line
 (check-equal? (average-looseness (list al-test-line al-test-line2)) 42.0) ; last line excluded by default
 (check-equal? (average-looseness (list al-test-line al-test-line2 al-test-line)) 36.0) ; last line excluded by default
+
+
+(check-equal? (log-debug-lines (list (line (list world:line-looseness-key 42.0) (word #f "bar")))) '("0/1: \"bar\" 42.0"))
+
+
+;; todo next: debug this line
+(block->lines (block #f (word '(measure 50.0) "Meg is an ally.")))
