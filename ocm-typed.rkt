@@ -33,7 +33,7 @@
 (define-syntax-rule (vector-append-item xs value)
   ((inst vector-append Any) xs (vector value)))
 
-(define-syntax-rule (vector-append-value xs value)
+(define-syntax-rule (vector-append-entry xs value)
   ((inst vector-append Entry-Type) xs (vector value)))
 
 (define-syntax-rule (vector-append-index xs value)
@@ -248,7 +248,7 @@
      (for ([col (in-vector cols)])
        (cond
          [(>= col (vector-length ($ocm-min-entrys ocm)))
-          (set-$ocm-min-entrys! ocm (vector-append-value ($ocm-min-entrys ocm) (@ (cast (@ minima col) (HashTable Symbol Value-Type)) 'value)))
+          (set-$ocm-min-entrys! ocm (vector-append-entry ($ocm-min-entrys ocm) (@ (cast (@ minima col) (HashTable Symbol Entry-Type)) 'value)))
           (set-$ocm-min-row-indices! ocm (vector-append-index ($ocm-min-row-indices ocm) (@ (cast (@ minima col) (HashTable Symbol Index-Type)) 'row-idx)))]
          [(< (($ocm-entry->value ocm) (@ (cast (@ minima col) HashTableTop) 'value)) (($ocm-entry->value ocm) (vector-ref ($ocm-min-entrys ocm) col)))
           (set-$ocm-min-entrys! ocm ((inst vector-set Entry-Type) ($ocm-min-entrys ocm) col (cast (@ (cast (@ minima col) HashTableTop) 'value) Value-Type)))

@@ -1,7 +1,8 @@
 #lang typed/racket/base
 (require (for-syntax typed/racket/base racket/syntax racket/string))
 (require/typed racket/list [empty? (All (A) ((Listof A) -> Boolean))]
-               [last ((Listof Any) . -> . Any)])
+               [last ((Listof Any) . -> . Any)]
+               [flatten ((Listof Any) . -> . (Listof Any))])
 (require/typed sugar/list [trimf (All (A) ((Listof A) (A . -> . Boolean) -> (Listof A)))]
                [filter-split (All (A) ((Listof A) (A . -> . Boolean) -> (Listof (Listof A))))])
 (require/typed racket/string [string-append* ((Listof String) . -> . String)])
@@ -98,7 +99,7 @@
       [else ""])))
 
 (provide gather-common-attrs)
-(: gather-common-attrs ((Listof Quad) . -> . (U False (Listof QuadAttrPair))))
+(: gather-common-attrs ((Listof Quad) . -> . (U False HashableList)))
 (define (gather-common-attrs qs)
   (: check-cap (QuadAttrPair . -> . Boolean))
   (define (check-cap cap)
@@ -113,7 +114,8 @@
                                                     null)])
     (cond
       [(null? common-attr-pairs) #f]
-      [(null? qs) common-attr-pairs]
+      [(null? qs) (cast (flatten common-attr-pairs) HashableList)] ;; flatten + cast needed because this output gets used by quadattrs
+      ;; todo: reconsider type interface between output of this function and input to quadattrs
       [else (loop (cdr qs) (filter check-cap common-attr-pairs))])))
 
 
@@ -219,6 +221,3 @@
 (define-break-type block)
 (define-break-type line)
 
-;; todo next: debug this test case 
-(define qas (quadattrs '(measure 36.0)))
-(quads->line (list (word qas "Meg")))

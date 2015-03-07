@@ -143,7 +143,7 @@
   ;; only needs it if the appearance of the piece changes based on location.
   ;; so words are likely to have a word-break item; boxes not.
   ;; the word break item contains the different characters needed to finish the piece.
-  (define the-word-break (cast (quad-attr-ref p world:word-break-key #f) Quad))
+  (define the-word-break (cast (quad-attr-ref p world:word-break-key #f) (Option Quad)))
   (let ([p (quad-attr-remove p world:word-break-key)]) ; so it doesn't propagate into subquads
     (if the-word-break
         (quad (quad-name p) (quad-attrs p) 
@@ -475,7 +475,7 @@
           (define last-piece-to-test (vector-ref pieces (sub1 j)))
           (define new-hyphen?
             (and (quad-has-attr? last-piece-to-test world:word-break-key)
-                 (equal? (cast (quad-attr-ref (cast (quad-attr-ref last-piece-to-test world:word-break-key) Quad) world:before-break-key) Quad) "-")))
+                 (equal? (cast (quad-attr-ref (cast (quad-attr-ref last-piece-to-test world:word-break-key) Quad) world:before-break-key) String) "-")))
           (define cumulative-hyphens (if (not new-hyphen?) 
                                          0 
                                          (add1 ($penalty-hyphens penalty-up-to-i))))
@@ -535,7 +535,7 @@
                    make-pieces
                    quad-width
                    pieces->line
-                   (λ(x y) (adaptive-fit-proc (cast x (Vectorof Quad)) (cast y Flonum) #t #f))))
+                   (λ(x y) (adaptive-fit-proc (cast x (Vectorof Quad)) (cast y Flonum) #f #t))))
 
 (provide wrap-adaptive)
 (define wrap-adaptive (make-wrap-proc 
@@ -587,6 +587,8 @@
 
 ;(define eqs (split-quad (block '(x-align center font "Equity Text B" size 10) "Foo-d" (word '(size 13) "og ") "and " (box) " Zu" (word-break '(nb "c" bb "k-")) "kerman's. Instead of a circle, the result is a picture of the code that, if it were used as an expression, would produce a circle. In other words, code is not a function, but instead a new syntactic form for creating pictures; the bit between the opening parenthesis with code is not an expression, but instead manipulated by the code syntactic form. This helps explain what we meant in the previous section when we said that racket provides require and the function-calling syntax. Libraries are not restricted to exporting values, such as functions; they can also define new syntactic forms. In this sense, Racket isn’t exactly a language at all; it’s more of an idea for how to structure a language so that you can extend it or create entirely " (word '(font "Courier" size 5) "lang."))))
 
+(define megs (split-quad (block '(size 10 font "Courier") "Meg is an ally.")))
 (activate-logger quad-logger)
-(define megs (split-quad (block '(size 15) "Meg is an ally.")))
-(wrap-first megs 36.0)
+(define measure 40.0)
+(map quad->string (wrap-first megs measure))
+(map quad->string (wrap-best megs measure))
