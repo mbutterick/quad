@@ -583,16 +583,3 @@
       (values (cons (quad-attr-set q world:x-position-key width-so-far) new-quads) (round-float (fl+ (quad-width q) width-so-far)))))
   (quad (quad-name starting-quad) (quad-attrs starting-quad) (reverse new-quads)))
 
-
-
-(define eqs (split-quad (block '(x-align center font "Equity Text B" size 10) "Foo-d" (word '(size 13) "og ") "and " (box) " Zu" (word-break '(nb "c" bb "k-")) "kerman's. Instead of a circle, the result is a picture of the code that, if it were used as an expression, would produce a circle. In other words, code is not a function, but instead a new syntactic form for creating pictures; the bit between the opening parenthesis with code is not an expression, but instead manipulated by the code syntactic form. This helps explain what we meant in the previous section when we said that racket provides require and the function-calling syntax. Libraries are not restricted to exporting values, such as functions; they can also define new syntactic forms. In this sense, Racket isn’t exactly a language at all; it’s more of an idea for how to structure a language so that you can extend it or create entirely " (word '(font "Courier" size 5) "lang."))))
-
-(define megs (split-quad (block '(size 10 font "Courier") "Meg is an ally.")))
-(activate-logger quad-logger)
-(define measure 40.0)
-(map quad->string (wrap-first megs measure))
-(map quad->string (wrap-best megs measure))
-
-  (set! measure 200.0)
-(time (map quad->string (wrap-first eqs measure)))
-(time (map quad->string (wrap-best eqs measure)))
