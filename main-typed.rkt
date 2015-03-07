@@ -1,5 +1,5 @@
 #lang typed/racket/base
-(require racket/list)
+(require racket/list math/flonum)
 (require "quads-typed.rkt" "utils-typed.rkt" "wrap-typed.rkt" "measure-typed.rkt" "world-typed.rkt" "logger-typed.rkt")
 
 (define-type Block-Type (Listof Quad))
@@ -38,4 +38,10 @@
   (define-values (first-quads last-quad) ((inst split-last QuadListItem) (quad-list q)))
   (quad (quad-name q) (quad-attrs q) (snoc ((inst map QuadListItem QuadListItem) hyphenate-quad first-quads) last-quad)))
 
-
+(provide average-looseness)
+(define/typed (average-looseness lines)
+  ((Listof Quad) . -> . Flonum)
+  (if (<= (length lines) 1)
+      0.0
+      (let ([lines-to-measure (drop-right lines 1)]) ; exclude last line from looseness calculation
+        (round-float (/ (foldl fl+ 0.0 ((inst map Flonum Quad) (λ(line) (cast (quad-attr-ref line world:line-looseness-key 0.0) Flonum)) lines-to-measure)) (- (fl (length lines)) 1.0))))))
