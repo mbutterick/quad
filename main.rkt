@@ -80,9 +80,7 @@
     (quad (quad-name p) (merge-attrs (quad-attrs p) `(page ,i)) (quad-list p))))
 
 (define+provide/contract (pages->doc ps)
-  (pages? . -> . doc?)
-  (map quad-attrs (quad-list (first ps)))
-  
+  (pages? . -> . doc?)  
   ;; todo: resolve xrefs and other last-minute tasks
   ;; todo: generalize computation of widths and heights, recursively
   (define (columns-mapper page)

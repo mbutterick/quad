@@ -21,6 +21,20 @@
          (: proc-name type-expr)
          (define proc-name body ...))]))
 
+(define-syntax (define/typed+provide stx)
+  (syntax-case stx ()
+    [(_ (proc-name arg ... . rest-arg) type-expr body ...)
+     #'(begin
+         (provide proc-name)
+         (define/typed proc-name type-expr
+           (λ(arg ... . rest-arg) body ...)))]
+    [(_ proc-name type-expr body ...)
+     #'(begin
+         (provide proc-name)
+         (begin
+         (: proc-name type-expr)
+         (define proc-name body ...)))]))
+
 
 (define-syntax-rule (even-members xs)
   (for/list : (Listof Any) ([(x i) (in-indexed xs)] #:when (even? i))
@@ -98,9 +112,8 @@
       [(string? x) x]
       [else ""])))
 
-(provide gather-common-attrs)
-(: gather-common-attrs ((Listof Quad) . -> . (U False HashableList)))
-(define (gather-common-attrs qs)
+(define/typed+provide (gather-common-attrs qs)
+  ((Listof Quad) . -> . (U False HashableList))
   (: check-cap (QuadAttrPair . -> . Boolean))
   (define (check-cap cap)
     (equal? (quad-attr-ref (car qs) (car cap) attr-missing) (cdr cap)))

@@ -23,7 +23,3 @@
 
 
 (check-equal? (log-debug-lines (list (line (list world:line-looseness-key 42.0) (word #f "bar")))) '("0/1: \"bar\" 42.0"))
-
-
-;; todo next: debug this line
-(block->lines (block #f (word '(measure 50.0) "Meg is an ally.")))

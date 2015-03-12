@@ -222,8 +222,7 @@
 ;; spacers are used to soak up extra space left over in a line.
 ;; depending on where the spacers are inserted, different formatting effects are achieved.
 ;; e.g., left / right / centered / justified.
-(provide insert-spacers-in-line)
-(define/typed (insert-spacers-in-line line [alignment-override #f])
+(define/typed+provide (insert-spacers-in-line line [alignment-override #f])
   ((Quad) ((Option Symbol)) . ->* . Quad)
   ;; important principle: avoid peeking into quad-list to get attributes.
   ;; because non-attributed quads may be added.
@@ -252,12 +251,14 @@
   (quad (quad-name line) 
         (quad-attrs line) 
         (cast (flatten (let ([qs (cast (quad-list line) (Listof Quad))])
-                         `(,@(cast (if before (copy-with-attrs before (first qs)) null) (Listof Quad))
+                         ;; (first qs) is a single quad, but wrap it in a list to make it spliceable
+                         `(,@(cast (if before (list (copy-with-attrs before (first qs))) null) (Listof Quad))
                            ,@(map (λ([q : Quad]) (if (and middle (takes-justification-space? q)) 
                                                      (let ([interleaver (copy-with-attrs middle q)])
                                                        (list interleaver q interleaver)) 
                                                      q)) qs) 
-                           ,@(cast (if after (copy-with-attrs after (last qs)) null) (Listof Quad))
+                         ;; (last qs) is a single quad, but wrap it in a list to make it spliceable
+                           ,@(cast (if after (list (copy-with-attrs after (last qs))) null) (Listof Quad))
                            ))) QuadList)))
 
 
@@ -524,23 +525,25 @@
 
 
 ;; wrap proc based on greedy proc
-(provide wrap-first) 
-(define wrap-first (make-wrap-proc  
+(define-syntax-rule (define+provide name expr ...)
+  (begin 
+    (provide name)
+    (define name expr ...)))
+
+(define+provide wrap-first (make-wrap-proc  
                     make-pieces 
                     quad-width 
                     pieces->line 
                     (λ(x y) (adaptive-fit-proc (cast x (Vectorof Quad)) (cast y Flonum) #t #f))))
 
 ;; wrap proc based on penalty function
-(provide wrap-best)
-(define wrap-best (make-wrap-proc
+(define+provide wrap-best (make-wrap-proc
                    make-pieces
                    quad-width
                    pieces->line
-                   (λ(x y) (adaptive-fit-proc (cast x (Vectorof Quad)) (cast y Flonum) #f #t))))
+                   (λ(x y) (adaptive-fit-proc (cast x (Vectorof Quad)) (cast y Flonum) #f #t)))) ; note difference in boolean args
 
-(provide wrap-adaptive)
-(define wrap-adaptive (make-wrap-proc 
+(define+provide wrap-adaptive (make-wrap-proc 
                        make-pieces
                        quad-width
                        pieces->line
@@ -554,8 +557,8 @@
 
 ;; build quad out to a given width by distributing excess into spacers
 ;; todo: adjust this to work recursively, so that fill operation cascades down
-(define/typed (fill starting-quad [target-width? #f])
-  ((Quad) ((U False Flonum)) . ->* . Quad)
+(define/typed+provide (fill starting-quad [target-width? #f])
+  ((Quad) ((Option Flonum)) . ->* . Quad)
   (define target-width (fl (or target-width? (cast (quad-attr-ref starting-quad world:measure-key) Flonum)))) 
   (define subquads (cast (quad-list starting-quad) (Listof Quad)))
   (define-values (flexible-subquads fixed-subquads) (partition spacer? subquads)) ; only puts fill into spacers.
@@ -577,7 +580,7 @@
 
 ;; add x positions to a list of fixed-width quads
 ;; todo: adjust this to work recursively, so that positioning operation cascades down
-(define/typed (add-horiz-positions starting-quad)
+(define/typed+provide (add-horiz-positions starting-quad)
   (Quad . -> . Quad)
   (define-values (new-quads final-width)
     (for/fold ([new-quads : (Listof Quad) empty][width-so-far : Flonum 0.0])([qi (in-list (quad-list starting-quad))])
