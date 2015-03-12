@@ -39,7 +39,7 @@
 
 
 (define-key-and-parameter paper-width 'paper-width (* 8.5 72))
-(define-key-and-parameter paper-height 'paper-height (* 11 72))
+(define-key-and-parameter paper-height 'paper-height (* 11.0 72))
 
 (define line-looseness-key 'looseness)
 (define width-key 'width)

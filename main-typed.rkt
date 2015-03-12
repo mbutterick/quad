@@ -199,11 +199,33 @@
   (define width-of-printed-area (+ (* columns-per-page column-width) (* (sub1 columns-per-page) column-gutter)))
   (define result-pages
     ((inst map Quad (Listof Quad)) (λ(cols) (quads->page cols)) 
-         (for/list : (Listof (Listof Quad)) ([page-cols (in-list (slice-at cols columns-per-page))])
-           (define-values (last-x cols)
-             (for/fold ([current-x : Flonum (/ (- (world:paper-width-default) width-of-printed-area) 2.0)]
-                        [cols : (Listof Quad) empty]) 
-                       ([col (in-list page-cols)][idx (in-naturals)])
-               (values (+ current-x column-width column-gutter) (cons (cast (quad-attr-set* col 'x current-x 'y 40 world:column-index-key idx) Quad) cols))))
-           (reverse cols))))
+                                   (for/list : (Listof (Listof Quad)) ([page-cols (in-list (slice-at cols columns-per-page))])
+                                     (define-values (last-x cols)
+                                       (for/fold ([current-x : Flonum (/ (- (world:paper-width-default) width-of-printed-area) 2.0)]
+                                                  [cols : (Listof Quad) empty]) 
+                                                 ([col (in-list page-cols)][idx (in-naturals)])
+                                         (values (+ current-x column-width column-gutter) (cons (cast (quad-attr-set* col 'x current-x 'y 40 world:column-index-key idx) Quad) cols))))
+                                     (reverse cols))))
   result-pages)
+
+(define current-eof (make-parameter (gensym)))
+(define (eof? x) (equal? x (current-eof)))
+
+(define/typed (block-quads->lines qs)
+  ((Listof Quad) . -> . (Listof Quad))
+  (block->lines (quads->block qs)))
+
+(define/typed (typeset x)
+  (Quad . -> . Quad) ; (coerce/input? . -> . doc?)
+  (load-text-cache-file)
+  (define pages (append* (for/list : (Listof (Listof Quad)) ([multipage (in-list (input->nested-blocks x))])
+                           (columns->pages (append* (for/list : (Listof (Listof Quad)) ([multicolumn (in-list multipage)])
+                                                      (lines->columns (append* (for/list : (Listof (Listof Quad)) ([block-quads (in-list multicolumn)])
+                                                                                 (block-quads->lines block-quads))))))))))
+  (define doc (pages->doc pages))
+  (update-text-cache-file)
+  doc)
+
+
+
+
