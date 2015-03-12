@@ -80,7 +80,6 @@
                                                                hyphenate-quad
                                                                hyphenate-quad-except-last-word) (merge-adjacent-within b)) Quad)))
                             wrapped-lines-without-hyphens))
-  
   (when gets-hyphenation? (log-quad-debug* (log-debug-lines wrapped-lines)))
   
   
@@ -204,7 +203,7 @@
                                        (for/fold ([current-x : Flonum (/ (- (world:paper-width-default) width-of-printed-area) 2.0)]
                                                   [cols : (Listof Quad) empty]) 
                                                  ([col (in-list page-cols)][idx (in-naturals)])
-                                         (values (+ current-x column-width column-gutter) (cons (cast (quad-attr-set* col 'x current-x 'y 40 world:column-index-key idx) Quad) cols))))
+                                         (values (+ current-x column-width column-gutter) (cons (cast (quad-attr-set* col 'x current-x 'y 40.0 world:column-index-key idx) Quad) cols))))
                                      (reverse cols))))
   result-pages)
 
@@ -215,7 +214,7 @@
   ((Listof Quad) . -> . (Listof Quad))
   (block->lines (quads->block qs)))
 
-(define/typed (typeset x)
+(define/typed+provide (typeset x)
   (Quad . -> . Quad) ; (coerce/input? . -> . doc?)
   (load-text-cache-file)
   (define pages (append* (for/list : (Listof (Listof Quad)) ([multipage (in-list (input->nested-blocks x))])

@@ -385,12 +385,13 @@
     (for/list : (Listof (Vector Flonum Flonum Flonum)) ([p (in-vector pieces)])
       (define wb (cast (quad-attr-ref p world:word-break-key #f) (U Quad False)))
       (vector
-       (cast (apply + (for/list : (Listof Flonum) ([qli (in-list (quad-list p))])
+       ;; throw in 0.0 in case for/list returns empty
+       (apply + 0.0 (for/list : (Listof Flonum) ([qli (in-list (quad-list p))])
                         (define q (cast qli Quad))
                         (define str (quad->string q))
                         (if (equal? str "")
                             (cast (quad-attr-ref q world:width-key 0.0) Flonum)
-                            (apply measure-text (quad->string q) (font-attributes-with-defaults q))))) Flonum)
+                            (apply measure-text (quad->string q) (font-attributes-with-defaults q)))))
        (if wb (cast (apply measure-text (cast (quad-attr-ref wb world:no-break-key) String) (font-attributes-with-defaults wb)) Flonum) 0.0)
        (if wb (cast (apply measure-text (cast (quad-attr-ref wb world:before-break-key) String) (font-attributes-with-defaults wb)) Flonum) 0.0))))
   (values

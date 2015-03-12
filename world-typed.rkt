@@ -25,7 +25,7 @@
 (define-key-and-parameter font-background 'background "none")
 
 (define-key-and-parameter column-count 'column-count 2)
-(define-key-and-parameter column-gutter 'column-gutter 30)
+(define-key-and-parameter column-gutter 'column-gutter 30.0)
 
 
 (define max-quality 100)
