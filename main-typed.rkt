@@ -1,5 +1,6 @@
 #lang typed/racket/base
 (require racket/list math/flonum)
+(require/typed sugar/list [slice-at ((Listof Quad) Positive-Integer . -> . (Listof (Listof Quad)))])
 (require "quads-typed.rkt" "utils-typed.rkt" "wrap-typed.rkt" "measure-typed.rkt" "world-typed.rkt" "logger-typed.rkt")
 
 (define-type Block-Type (Listof Quad))
@@ -184,3 +185,25 @@
       (send prob reset)
       (values (cons (quad-attr-set (quads->column lines-to-take) world:column-index-key col-idx) columns) lines-to-leave)))
   (reverse columns))
+
+
+(define/typed+provide (columns->pages cols)
+  ((Listof Quad) . -> . (Listof Quad)) ; (columns? . -> . pages?)
+  (define columns-per-page (cast (quad-attr-ref/parameter (car cols) world:column-count-key) Positive-Integer))
+  (define column-gutter (cast (quad-attr-ref/parameter (car cols) world:column-gutter-key) Flonum))
+  ;; don't use default value here. If the col doesn't have a measure key, 
+  ;; it deserves to be an error, because that means the line was composed incorrectly.
+  (when (not (quad-has-attr? (car cols) world:measure-key))
+    (error 'columns->pages "column attrs contain no measure key: ~a ~a" (quad-attrs (car cols)) (quad-car (car cols))))
+  (define column-width (cast (quad-attr-ref (car cols) world:measure-key) Flonum))
+  (define width-of-printed-area (+ (* columns-per-page column-width) (* (sub1 columns-per-page) column-gutter)))
+  (define result-pages
+    ((inst map Quad (Listof Quad)) (λ(cols) (quads->page cols)) 
+         (for/list : (Listof (Listof Quad)) ([page-cols (in-list (slice-at cols columns-per-page))])
+           (define-values (last-x cols)
+             (for/fold ([current-x : Flonum (/ (- (world:paper-width-default) width-of-printed-area) 2.0)]
+                        [cols : (Listof Quad) empty]) 
+                       ([col (in-list page-cols)][idx (in-naturals)])
+               (values (+ current-x column-width column-gutter) (cons (cast (quad-attr-set* col 'x current-x 'y 40 world:column-index-key idx) Quad) cols))))
+           (reverse cols))))
+  result-pages)

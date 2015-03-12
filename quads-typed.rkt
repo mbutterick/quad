@@ -210,6 +210,20 @@
 
 (define quad= equal?)
 
+
+(define-syntax (define-quad-list-function stx)
+  (syntax-case stx ()
+    [(_ proc)
+     (with-syntax ([quad-proc (format-id stx "quad-~a" #'proc)])
+       #'(define/typed (quad-proc q)
+           (Quad . -> . Any)
+           (proc (quad-list q))))]))
+
+#;(define-quad-list-function first)
+(define-quad-list-function car)
+(define-quad-list-function cdr)
+#;(define-quad-list-function last)
+
 (: quad-has-attr? (Quad QuadAttrKey . -> . Boolean))
 (define (quad-has-attr? q key)
   (hash-has-key? (quad-attrs q) key))
