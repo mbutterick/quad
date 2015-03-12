@@ -76,8 +76,8 @@
   
   (define wrapped-lines (if gets-hyphenation?
                             (wrap-quads (split-quad (cast ((if world:allow-hyphenated-last-word-in-paragraph
-                                                         hyphenate-quad
-                                                         hyphenate-quad-except-last-word) (merge-adjacent-within b)) Quad)))
+                                                               hyphenate-quad
+                                                               hyphenate-quad-except-last-word) (merge-adjacent-within b)) Quad)))
                             wrapped-lines-without-hyphens))
   
   (when gets-hyphenation? (log-quad-debug* (log-debug-lines wrapped-lines)))
@@ -107,20 +107,24 @@
 (require racket/class)
 (require/typed csp
                [problem%  (Class (init-field) 
-                                   (get-solution (-> HashTableTop)))])
+                                 (reset (-> Void))
+                                 (get-solution (-> HashTableTop))
+                                 (get-solutions (-> (Listof (HashTable String Integer))))
+                                 (add-variable (Any (Listof Any) . -> . Void))
+                                 (add-constraint (Procedure (Listof Any) . -> . Void)))])
 (define/typed+provide (lines->columns lines)
   ((Listof Quad) . -> . (Listof Quad)) ; (lines? . -> . columns?)
   (define prob (new problem%))
-  #;(define max-column-lines world:default-lines-per-column)
+  (define max-column-lines world:default-lines-per-column)
   (define-values (columns ignored-return-value)
     (for/fold ([columns : (Listof Quad) empty][lines-remaining : (Listof Quad) lines])
               ([col-idx : Nonnegative-Integer (stop-before (in-naturals) (λ(x) (empty? lines-remaining)))])
-      #;(log-quad-info "making column ~a" (add1 col-idx))
+      (log-quad-info "making column ~a" (add1 col-idx))
       ;; domain constraint is best way to simplify csp, because it limits the search space.
       ;; search from largest possible value to smallest.
       ;; largest possible is the minimum of the max column lines, or 
       ;; the number of lines left (modulo minimum page lines) ...
-      #;(define viable-column-range
+      (define viable-column-range
         (range (min max-column-lines (max 
                                       (length lines-remaining)
                                       (- (length lines-remaining) world:minimum-lines-per-column)))
@@ -128,52 +132,55 @@
                ;; (sub1 insures that range is inclusive of last value.)
                (sub1 (min 1 world:minimum-lines-per-column)) -1))
       
-      #;(log-quad-debug "viable number of lines for this column to start =\n~a" viable-column-range)
-      #;(send prob add-variable "column-lines" viable-column-range)
+      (log-quad-debug "viable number of lines for this column to start =\n~a" viable-column-range)
+      (send prob add-variable "column-lines" viable-column-range)
       
       
       ;; greediness constraint: leave enough lines for next page, or take all
-      #;(define (greediness-constraint pl)
+      (define/typed (greediness-constraint pl)
+        (Index . -> . Boolean)
         (define leftover (- (length lines-remaining) pl))
         (or (= leftover 0) (>= leftover world:minimum-lines-per-column)))
-      #;(send prob add-constraint greediness-constraint '("column-lines"))
+      (send prob add-constraint greediness-constraint '("column-lines"))
       
-      #;(log-quad-debug "viable number of lines after greediness constraint =\n~a" (map (λ(x) (hash-ref x "column-lines")) (send prob get-solutions)))
+      (log-quad-debug "viable number of lines after greediness constraint =\n~a" ((inst map Integer (HashTable String Integer)) (λ(x) (hash-ref x "column-lines")) (send prob get-solutions)))
       
       ;; last lines constraint: don't take page that will end with too few lines of last paragraph.
-      #;(define (last-lines-constraint pl) 
-        (define last-line-of-page (list-ref lines-remaining (sub1 pl)))
-        (define lines-in-this-paragraph (quad-attr-ref last-line-of-page world:total-lines-key))
-        (define line-index-of-last-line (quad-attr-ref last-line-of-page world:line-index-key))
+      (define/typed (last-lines-constraint pl)
+        (Index . -> . Boolean)
+        (define last-line-of-page ((inst list-ref Quad) lines-remaining (sub1 pl)))
+        (define lines-in-this-paragraph (cast (quad-attr-ref last-line-of-page world:total-lines-key) Index))
+        (define line-index-of-last-line (cast (quad-attr-ref last-line-of-page world:line-index-key) Index))
         (define (paragraph-too-short-to-meet-constraint?)
           (< lines-in-this-paragraph world:min-last-lines))
         (or (paragraph-too-short-to-meet-constraint?)
             (>= (add1 line-index-of-last-line) world:min-last-lines)))
-      #;(send prob add-constraint last-lines-constraint '("column-lines"))
+      (send prob add-constraint last-lines-constraint '("column-lines"))
       
-      #;(log-quad-debug "viable number of lines after last-lines constraint =\n~a" (map (λ(x) (hash-ref x "column-lines")) (send prob get-solutions)))
+      (log-quad-debug "viable number of lines after last-lines constraint =\n~a" ((inst map Integer (HashTable String Integer)) (λ(x) (hash-ref x "column-lines")) (send prob get-solutions)))
       
       ;; first lines constraint: don't take page that will leave too few lines at top of next page
-      #;(define (first-lines-constraint pl lines-remaining)
+      (define/typed (first-lines-constraint pl lines-remaining)
+        (Index (Listof Quad) . -> . Boolean)
         (define last-line-of-page (list-ref lines-remaining (sub1 pl)))
-        (define lines-in-this-paragraph (quad-attr-ref last-line-of-page world:total-lines-key))
-        (define line-index-of-last-line (quad-attr-ref last-line-of-page world:line-index-key))
+        (define lines-in-this-paragraph (cast (quad-attr-ref last-line-of-page world:total-lines-key) Integer))
+        (define line-index-of-last-line (cast (quad-attr-ref last-line-of-page world:line-index-key) Integer))
         (define lines-that-will-remain (- lines-in-this-paragraph (add1 line-index-of-last-line)))
         (define (paragraph-too-short-to-meet-constraint?)
           (< lines-in-this-paragraph world:min-first-lines))
         (or (paragraph-too-short-to-meet-constraint?)
             (= 0 lines-that-will-remain) ; ok to use all lines ...
             (>= lines-that-will-remain world:min-first-lines))) ; but if any remain, must be minimum number.
-      #;(send prob add-constraint (λ(x) (first-lines-constraint x lines-remaining)) '("column-lines"))
+      (send prob add-constraint (λ(x) (first-lines-constraint (cast x Index) lines-remaining)) '("column-lines"))
       
-      #;(log-quad-debug "viable number of lines after first-lines constraint =\n~a" (map (λ(x) (hash-ref x "column-lines")) (send prob get-solutions)))
+      (log-quad-debug "viable number of lines after first-lines constraint =\n~a" ((inst map Integer (HashTable String Integer)) (λ(x) (hash-ref x "column-lines")) (send prob get-solutions)))
       
       
       (define s (send prob get-solution))
       (define how-many-lines-to-take (cast (hash-ref s "column-lines") Positive-Index))
       (define-values (lines-to-take lines-to-leave) (split-at lines-remaining how-many-lines-to-take))
-      #;(log-quad-debug "taking ~a lines for column ~a:" how-many-lines-to-take (add1 col-idx))
-      #;(map (λ(idx line) (log-quad-debug "~a:~a ~v" (add1 col-idx) (add1 idx) (quad->string line))) (range how-many-lines-to-take) lines-to-take)
-      #;(send prob reset)
+      (log-quad-debug "taking ~a lines for column ~a:" how-many-lines-to-take (add1 col-idx))
+      (map (λ([idx : Number] [line : Quad]) (log-quad-debug "~a:~a ~v" (add1 col-idx) (add1 idx) (quad->string line))) (range how-many-lines-to-take) lines-to-take)
+      (send prob reset)
       (values (cons (quad-attr-set (quads->column lines-to-take) world:column-index-key col-idx) columns) lines-to-leave)))
   (reverse columns))
