@@ -8,5 +8,4 @@
                [world:paper-height-default 700.0])
   (define sample (ti5))
   (define to (begin (time (typeset sample))))
-  to
 #;  (time (send (new pdf-renderer%) render-to-file to "foo.pdf")))

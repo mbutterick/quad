@@ -111,7 +111,7 @@
                                  (get-solution (-> HashTableTop))
                                  (get-solutions (-> (Listof (HashTable String Integer))))
                                  (add-variable (Any (Listof Any) . -> . Void))
-                                 (add-constraint (Procedure (Listof Any) . -> . Void)))])
+                                 (add-constraint ((Index . -> . Boolean) (Listof Any) . -> . Void)))])
 (define/typed+provide (lines->columns lines)
   ((Listof Quad) . -> . (Listof Quad)) ; (lines? . -> . columns?)
   (define prob (new problem%))
