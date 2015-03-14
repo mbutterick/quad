@@ -8,7 +8,7 @@
 (require/typed racket/serialize [serialize (Any . -> . Any)]
                [deserialize (Any . -> . (HashTable Any Any))])
 (require math/flonum racket/list (only-in sugar/list values->list) racket/file)
-(provide measure-text measure-ascent round-float update-text-cache-file load-text-cache-file)
+(provide measure-text measure-ascent round-float update-text-cache-file load-text-cache-file make-font/caching)
 
 (define precision 4.0)
 (define base (flexpt 10.0 precision))
