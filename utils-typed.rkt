@@ -13,7 +13,7 @@
 ;; predicate for use below
 (: list-of-mergeable-attrs? (Any . -> . Boolean))
 (define (list-of-mergeable-attrs? xs)
-  (and (list? xs) (andmap (λ(x) (or (quad? x) (quad-attrs? x) (hashable-list? x))) xs)))
+  (and (list? xs) (andmap (λ(x) (or (quad? x) (quad-attrs? x) (HashableList? x))) xs)))
 
 ;; faster than (listof pair?)
 (: pairs? (Any . -> . Boolean))
@@ -27,7 +27,7 @@
                                                                                                (cond
                                                                                                  [(quad? x) (quad-attrs x)]
                                                                                                  [(quad-attrs? x) (cast x QuadAttrs)]
-                                                                                                 [(hashable-list? x) (quadattrs (cast x (Listof Any)))]
+                                                                                                 [(HashableList? x) (quadattrs (cast x (Listof Any)))]
                                                                                                  [else ;; something that will have no effect on result 
                                                                                                   (cast (hash) QuadAttrs)])) quads-or-attrs-or-lists)))
 

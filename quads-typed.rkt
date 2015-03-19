@@ -32,16 +32,14 @@
      #'(begin
          (provide proc-name)
          (begin
-         (: proc-name type-expr)
-         (define proc-name body ...)))]))
+           (: proc-name type-expr)
+           (define proc-name body ...)))]))
 
 
 (define-syntax-rule (even-members xs)
   (for/list : (Listof Any) ([(x i) (in-indexed xs)] #:when (even? i))
     x))
 
-(: hashable-list? (Any . -> . Boolean))
-(define (hashable-list? x) (and (list? x) (even? (length x)) (andmap symbol? (even-members x))))
 
 (define-type QuadName Symbol)
 (define-predicate QuadName? QuadName)
@@ -52,6 +50,7 @@
 (define-predicate QuadAttrValue? QuadAttrValue)
 (define-type QuadAttrs (HashTable QuadAttrKey QuadAttrValue))
 (define-type HashableList  (Rec duo (U Null (List* QuadAttrKey Any duo))))
+(provide HashableList?)
 (define-predicate HashableList? HashableList)
 
 
@@ -63,8 +62,7 @@
 (define-type QuadList (Listof QuadListItem))
 (define-type (Treeof A) (Rec as (U A (Listof as))))
 
-(struct quad ([name : QuadName] [attrs : QuadAttrs] [list : QuadList]) #:transparent
-  #:property prop:sequence (λ(q) (quad-list q)))
+(struct quad ([name : QuadName] [attrs : QuadAttrs] [list : QuadList]) #:transparent)
 
 (define-type Quad quad)
 (define-predicate Quad? Quad)
@@ -107,29 +105,32 @@
 (: quad->string (Quad . -> . String))
 (define (quad->string x)
   (let loop : String ([x : (U Quad String) x])
-    (cond
-      [(quad? x) (string-append* ((inst map String QuadListItem) loop (quad-list x)))]
+    (cond 
       [(string? x) x]
-      [else ""])))
+      ;; else branch relies on fact that x is either Quad or String
+      [else (string-append* ((inst map String QuadListItem) loop (quad-list x)))])))
 
 (define/typed+provide (gather-common-attrs qs)
   ((Listof Quad) . -> . (Option HashableList))
   (: check-cap (Quad QuadAttrPair . -> . Boolean))
   (define (check-cap q cap) ; cap = candidate-attr-pair
     (equal? (quad-attr-ref q (car cap) attr-missing) (cdr cap)))
-  (let loop 
-    ([qs qs]
-     ;; start with the set of pairs in the first quad, then filter it down
-     [candidate-attr-pairs : (Listof QuadAttrPair) (if (quad-attrs (car qs))
-                                                    (for/list ([kv-pair (in-hash-pairs (quad-attrs (car qs)))] 
-                                                               #:unless (member (car kv-pair) cannot-be-common-attrs))  
-                                                      kv-pair)
-                                                    null)])
-    (cond
-      [(null? candidate-attr-pairs) #f] ; ran out of possible pairs, so return #f
-      [(null? qs) (cast (flatten candidate-attr-pairs) HashableList)] ; ran out of quads, so return common-attr-pairs
-      ;; todo: reconsider type interface between output of this function and input to quadattrs
-      [else (loop (cdr qs) (filter (λ([cap : QuadAttrPair]) (check-cap (car qs) cap)) candidate-attr-pairs))])))
+  (and (not (null? qs))
+       (let loop 
+         ([qs qs]
+          ;; start with the set of pairs in the first quad, then filter it down
+          [candidate-attr-pairs : (Listof QuadAttrPair) (let ([first-attrs (quad-attrs (car qs))])
+                                                          (if first-attrs
+                                                              (for/fold ([kvps null]) ([k (in-list (hash-keys first-attrs))])  
+                                                                (if (member k cannot-be-common-attrs)
+                                                                    kvps
+                                                                    (cons (cons k (hash-ref first-attrs k)) kvps)))
+                                                              null))])
+         (cond
+           [(null? candidate-attr-pairs) #f] ; ran out of possible pairs, so return #f
+           [(null? qs) (cast (flatten candidate-attr-pairs) HashableList)] ; ran out of quads, so return common-attr-pairs
+           ;; todo: reconsider type interface between output of this function and input to quadattrs
+           [else (loop (cdr qs) (filter (λ([cap : QuadAttrPair]) (check-cap (car qs) cap)) candidate-attr-pairs))]))))
 
 (: quadattrs ((Listof Any) . -> . QuadAttrs))
 (define (quadattrs xs)
@@ -163,7 +164,7 @@
              (quad 'id (cond 
                          [(quad-attrs? attrs) (cast attrs QuadAttrs)]
                          [(list? attrs)
-                          (if (hashable-list? attrs)
+                          (if (HashableList? attrs)
                               (quadattrs attrs)
                               (error 'id "got non-hashable list ~a" attrs))]
                          [else (quadattrs '())]) (cast xs QuadList)))
