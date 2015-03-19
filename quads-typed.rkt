@@ -113,25 +113,23 @@
       [else ""])))
 
 (define/typed+provide (gather-common-attrs qs)
-  ((Listof Quad) . -> . (U False HashableList))
-  (: check-cap (QuadAttrPair . -> . Boolean))
-  (define (check-cap cap)
-    (equal? (quad-attr-ref (car qs) (car cap) attr-missing) (cdr cap)))
+  ((Listof Quad) . -> . (Option HashableList))
+  (: check-cap (Quad QuadAttrPair . -> . Boolean))
+  (define (check-cap q cap) ; cap = candidate-attr-pair
+    (equal? (quad-attr-ref q (car cap) attr-missing) (cdr cap)))
   (let loop 
     ([qs qs]
-     [common-attr-pairs : (Listof QuadAttrPair) (if (quad-attrs (car qs))
-                                                    
+     ;; start with the set of pairs in the first quad, then filter it down
+     [candidate-attr-pairs : (Listof QuadAttrPair) (if (quad-attrs (car qs))
                                                     (for/list ([kv-pair (in-hash-pairs (quad-attrs (car qs)))] 
                                                                #:unless (member (car kv-pair) cannot-be-common-attrs))  
                                                       kv-pair)
                                                     null)])
     (cond
-      [(null? common-attr-pairs) #f]
-      [(null? qs) (cast (flatten common-attr-pairs) HashableList)] ;; flatten + cast needed because this output gets used by quadattrs
+      [(null? candidate-attr-pairs) #f] ; ran out of possible pairs, so return #f
+      [(null? qs) (cast (flatten candidate-attr-pairs) HashableList)] ; ran out of quads, so return common-attr-pairs
       ;; todo: reconsider type interface between output of this function and input to quadattrs
-      [else (loop (cdr qs) (filter check-cap common-attr-pairs))])))
-
-
+      [else (loop (cdr qs) (filter (λ([cap : QuadAttrPair]) (check-cap (car qs) cap)) candidate-attr-pairs))])))
 
 (: quadattrs ((Listof Any) . -> . QuadAttrs))
 (define (quadattrs xs)
