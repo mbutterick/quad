@@ -37,11 +37,11 @@
   (quad (quad-name q) (quad-attrs q) (snoc ((inst map QuadListItem QuadListItem) hyphenate-quad first-quads) last-quad)))
 
 (define/typed+provide (average-looseness lines)
-  ((Listof Quad) . -> . Flonum)
+  ((Listof Quad) . -> . Float)
   (if (<= (length lines) 1)
       0.0
       (let ([lines-to-measure (drop-right lines 1)]) ; exclude last line from looseness calculation
-        (round-float (/ (foldl fl+ 0.0 ((inst map Flonum Quad) (λ(line) (cast (quad-attr-ref line world:line-looseness-key 0.0) Flonum)) lines-to-measure)) (- (fl (length lines)) 1.0))))))
+        (round-float (/ (foldl fl+ 0.0 ((inst map Float Quad) (λ(line) (cast (quad-attr-ref line world:line-looseness-key 0.0) Float)) lines-to-measure)) (- (fl (length lines)) 1.0))))))
 
 
 (define/typed+provide (log-debug-lines lines)
@@ -189,18 +189,18 @@
 (define/typed+provide (columns->pages cols)
   ((Listof Quad) . -> . (Listof Quad)) ; (columns? . -> . pages?)
   (define columns-per-page (cast (quad-attr-ref/parameter (car cols) world:column-count-key) Positive-Integer))
-  (define column-gutter (cast (quad-attr-ref/parameter (car cols) world:column-gutter-key) Flonum))
+  (define column-gutter (cast (quad-attr-ref/parameter (car cols) world:column-gutter-key) Float))
   ;; don't use default value here. If the col doesn't have a measure key, 
   ;; it deserves to be an error, because that means the line was composed incorrectly.
   (when (not (quad-has-attr? (car cols) world:measure-key))
     (error 'columns->pages "column attrs contain no measure key: ~a ~a" (quad-attrs (car cols)) (quad-car (car cols))))
-  (define column-width (cast (quad-attr-ref (car cols) world:measure-key) Flonum))
+  (define column-width (cast (quad-attr-ref (car cols) world:measure-key) Float))
   (define width-of-printed-area (+ (* columns-per-page column-width) (* (sub1 columns-per-page) column-gutter)))
   (define result-pages
     ((inst map Quad (Listof Quad)) (λ(cols) (quads->page cols)) 
                                    (for/list : (Listof (Listof Quad)) ([page-cols (in-list (slice-at cols columns-per-page))])
                                      (define-values (last-x cols)
-                                       (for/fold ([current-x : Flonum (/ (- (world:paper-width-default) width-of-printed-area) 2.0)]
+                                       (for/fold ([current-x : Float (/ (- (world:paper-width-default) width-of-printed-area) 2.0)]
                                                   [cols : (Listof Quad) empty]) 
                                                  ([col (in-list page-cols)][idx (in-naturals)])
                                          (values (+ current-x column-width column-gutter) (cons (cast (quad-attr-set* col 'x current-x 'y 40.0 world:column-index-key idx) Quad) cols))))

@@ -50,7 +50,7 @@
   (define (make-cartesian-attr key attrs) 
     (if (empty? attrs) 
         empty 
-        (list (cons key (apply + (cast ((inst map QuadAttrValue QuadAttrPair) cdr attrs) (Listof Flonum)))))))
+        (list (cons key (apply + (cast ((inst map QuadAttrValue QuadAttrPair) cdr attrs) (Listof Float)))))))
   (define x-attr (make-cartesian-attr world:x-position-key x-attrs))
   (define y-attr (make-cartesian-attr world:y-position-key y-attrs))
   (for/hash : QuadAttrs ([kv-pair (in-list (append x-attr y-attr (reverse other-attrs-reversed)))])
@@ -144,11 +144,11 @@
 (define/typed+provide (compute-absolute-positions qli)
   (Quad . -> . Quad)
   (define result 
-    (let loop : QuadListItem ([qli : QuadListItem qli][parent-x : Flonum 0.0][parent-y : Flonum 0.0])
+    (let loop : QuadListItem ([qli : QuadListItem qli][parent-x : Float 0.0][parent-y : Float 0.0])
     (cond
       [(quad? qli) 
-       (define adjusted-x (round-float (+ (cast (quad-attr-ref qli world:x-position-key 0.0) Flonum) parent-x)))
-       (define adjusted-y (round-float (+ (cast (quad-attr-ref qli world:y-position-key 0.0) Flonum) parent-y)))
+       (define adjusted-x (round-float (+ (cast (quad-attr-ref qli world:x-position-key 0.0) Float) parent-x)))
+       (define adjusted-y (round-float (+ (cast (quad-attr-ref qli world:y-position-key 0.0) Float) parent-y)))
        (quad (quad-name qli) (merge-attrs qli (list world:x-position-key adjusted-x world:y-position-key adjusted-y)) ((inst map QuadListItem QuadListItem) (λ(qlii) (loop qlii adjusted-x adjusted-y)) (quad-list qli)))]
       [else ;; it's a string
        qli])))
@@ -216,14 +216,14 @@
   (quad-has-attr? q world:height-key))
 
 (define/typed+provide (quad-height q)
-  (Quad . -> . Flonum)
-  (cast (quad-attr-ref q world:height-key 0.0) Flonum))
+  (Quad . -> . Float)
+  (cast (quad-attr-ref q world:height-key 0.0) Float))
 
 ;; use heights to compute vertical positions
 (define/typed+provide (add-vert-positions starting-quad)
   (Quad . -> . Quad)
   (define-values (new-quads final-height)
-    (for/fold ([new-quads : (Listof Quad) empty][height-so-far : Flonum 0.0])([q (in-list (cast (quad-list starting-quad) (Listof Quad)))])
+    (for/fold ([new-quads : (Listof Quad) empty][height-so-far : Float 0.0])([q (in-list (cast (quad-list starting-quad) (Listof Quad)))])
       (values (cons (quad-attr-set q world:y-position-key height-so-far) new-quads) 
               (round-float (+ height-so-far (quad-height q))))))
   (quad (quad-name starting-quad) (quad-attrs starting-quad) (reverse new-quads)))

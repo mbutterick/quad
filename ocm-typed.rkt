@@ -199,7 +199,7 @@
 
 (define-type Index-Type Nonnegative-Integer)
 (define-type Entry-Type Any)
-(define-type Value-Type Flonum)
+(define-type Value-Type Float)
 (define-type No-Value-Type Symbol)
 (define-type Finished-Value-Type Index-Type)
 (define-type Matrix-Proc-Type (Index-Type Index-Type . -> . Entry-Type))

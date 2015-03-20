@@ -8,7 +8,7 @@
                                               (find-color (String . -> . (Option (Instance (Class)))))))]
                [pdf-dc% (Class (init [interactive Boolean][use-paper-bbox Boolean][as-eps Boolean]
                                      [output Output-Port]
-                                     [width Flonum][height Flonum])
+                                     [width Float][height Float])
                                (start-doc (String . -> . Void))
                                (set-pen (String Real Symbol . -> . Void))
                                (set-brush (String Symbol . -> . Void))
@@ -16,12 +16,12 @@
                                (set-text-foreground ((Instance (Class)) . -> . Void))
                                (set-text-background ((Instance (Class)) . -> . Void))
                                (set-text-mode (Symbol . -> . Void))
-                               (draw-text (String Flonum Flonum Boolean . -> . Void))
+                               (draw-text (String Float Float Boolean . -> . Void))
                                (start-page (-> Void))
                                (end-page (-> Void))
                                (end-doc (-> Void)))]
-               [make-font ((#:size Nonnegative-Flonum) (#:style Symbol) (#:weight Symbol) (#:face String) . -> . (Instance (Class (init-field))))])
-(require/typed sugar/cache [make-caching-proc ((String Nonnegative-Flonum Symbol Symbol -> (Instance (Class))) . -> . (String Nonnegative-Flonum Symbol Symbol -> (Instance (Class))))])
+               [make-font ((#:size Nonnegative-Float) (#:style Symbol) (#:weight Symbol) (#:face String) . -> . (Instance (Class (init-field))))])
+(require/typed sugar/cache [make-caching-proc ((String Nonnegative-Float Symbol Symbol -> (Instance (Class))) . -> . (String Nonnegative-Float Symbol Symbol -> (Instance (Class))))])
 (require "utils-typed.rkt" "quads-typed.rkt" "world-typed.rkt")
 
 (define abstract-renderer%
@@ -100,7 +100,7 @@
     
     (define/override (render-word w)
       (define word-font (cast (quad-attr-ref/parameter w world:font-name-key) String))
-      (define word-size (cast (quad-attr-ref/parameter w world:font-size-key) Nonnegative-Flonum))
+      (define word-size (cast (quad-attr-ref/parameter w world:font-size-key) Nonnegative-Float))
       (define word-style (cast (quad-attr-ref/parameter w world:font-style-key) Symbol))
       (define word-weight (cast (quad-attr-ref/parameter w world:font-weight-key) Symbol))
       (define word-color (cast (quad-attr-ref/parameter w world:font-color-key) String))
@@ -115,10 +115,10 @@
           (send dc set-text-mode 'transparent))
       
       (define word-text (cast (quad-car w) String))
-      (send dc draw-text word-text (cast (quad-attr-ref w world:x-position-key) Flonum) 
+      (send dc draw-text word-text (cast (quad-attr-ref w world:x-position-key) Float) 
             ;; we want to align by baseline rather than top of box
             ;; thus, subtract ascent from y to put baseline at the y coordinate
-            (- (cast (quad-attr-ref w world:y-position-key) Flonum) (cast (quad-attr-ref w world:ascent-key 0) Flonum)) #t))
+            (- (cast (quad-attr-ref w world:y-position-key) Float) (cast (quad-attr-ref w world:ascent-key 0) Float)) #t))
     
     (define/override (render-page elements)
       (send dc start-page)

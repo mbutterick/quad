@@ -93,10 +93,10 @@
 
 ;; extract font attributes from quad, or get default values
 (define/typed (font-attributes-with-defaults q)
-  (Quad . -> . (List Nonnegative-Flonum String Symbol Symbol))
+  (Quad . -> . (List Nonnegative-Float String Symbol Symbol))
   (list
    (cast (let ([size (quad-attr-ref/parameter q world:font-size-key)])
-           (if (exact-integer? size) (fl size) size)) Nonnegative-Flonum)
+           (if (exact-integer? size) (fl size) size)) Nonnegative-Float)
    (cast (quad-attr-ref/parameter q world:font-name-key) String)
    (cast (quad-attr-ref/parameter q world:font-weight-key) Symbol)
    (cast (quad-attr-ref/parameter q world:font-style-key) Symbol)))
@@ -106,7 +106,7 @@
 ;; Try the attr first, and if it's not available, compute the width.
 ;; comes in fast or slow versions.
 ;; not designed to update the source quad.
-(define-type Measure-Quad-Type (Quad . -> . Flonum))
+(define-type Measure-Quad-Type (Quad . -> . Float))
 (define/typed (quad-width q)
   Measure-Quad-Type
   (cond
@@ -114,7 +114,7 @@
     [(ormap (λ([pred : (Any . -> . Boolean)]) (pred q)) (list char? run? word? word-break?)) 
      (apply measure-text (word-string q) 
             (font-attributes-with-defaults q))]
-    [(line? q) (fl (apply + ((inst map Flonum Quad) quad-width (cast (quad-list q) (Listof Quad)))))]
+    [(line? q) (fl (apply + ((inst map Float Quad) quad-width (cast (quad-list q) (Listof Quad)))))]
     [else 0.0]))
 
 ;; get the ascent (distance from top of text to baseline)
@@ -122,10 +122,10 @@
 ;; consult the attrs, and if not available, compute it.
 ;; not designed to update the source quad.
 (define/typed (ascent q)
-  (Quad . -> . Flonum)
+  (Quad . -> . Float)
   (define ascent-value-or-false (quad-attr-ref q world:ascent-key #f))
   (if ascent-value-or-false
-      (cast ascent-value-or-false Flonum)
+      (cast ascent-value-or-false Float)
       (cond 
         [(ormap (λ([pred : (Any . -> . Boolean)]) (pred q)) (list char? run? word? word-break?)) 
          (apply measure-ascent (word-string q) (font-attributes-with-defaults q))]
@@ -200,7 +200,7 @@
 (define/typed (render-optical-kerns exploded-line-quads)
   ((Listof Quad) . -> . (Listof Quad))
   (define/typed (overhang-width q)
-    ((U Quad False) . -> . Flonum)
+    ((U Quad False) . -> . Float)
     (if (and (word? q) (member (word-string (cast q Quad)) world:hanging-chars))
         (* -1.0 (world:optical-overhang) (apply measure-text (word-string (cast q Quad)) (font-attributes-with-defaults (cast q Quad))))
         0.0))
@@ -265,7 +265,7 @@
 ;; installs the width in the quad.
 ;; this becomes the value reported by quad-width.
 (define/typed (embed-width q w)
-  (Quad Flonum . -> . Quad)
+  (Quad Float . -> . Quad)
   (quad-attr-set q world:width-key w))
 
 ;; installs the ascent in the quad.
@@ -281,7 +281,7 @@
 
 
 (define/typed (calc-looseness total-width measure)
-  (Flonum Flonum . -> . Flonum)
+  (Float Float . -> . Float)
   (round-float (fl/ (fl- measure total-width) measure)))
 
 
@@ -289,7 +289,7 @@
 ;; take the contents of the rendered pieces and merge them.
 ;; compute looseness for line as a whole.
 ;; also add ascent to each component quad, which can be different depending on font & size.
-(define-type Compose-Line-Type ((Listof Quad) (Quad . -> . Flonum) . -> . Quad))
+(define-type Compose-Line-Type ((Listof Quad) (Quad . -> . Float) . -> . Quad))
 (define/typed (pieces->line ps measure-quad-proc)
   Compose-Line-Type
   
@@ -312,7 +312,7 @@
   (when (not (quad-has-attr? (first line-quads) world:measure-key))
     (error 'pieces->line "quad has no measure key: ~a" (first line-quads)))
   
-  (define measure (cast (quad-attr-ref (first merged-quads) world:measure-key) Flonum))
+  (define measure (cast (quad-attr-ref (first merged-quads) world:measure-key) Float))
   (define looseness (calc-looseness (fl (apply + merged-quad-widths)) measure))
   
   ;; quads->line function hoists common attributes into the line
@@ -325,11 +325,11 @@
 
 ;; a faster line-measuring function used by the wrapping function to test lines.
 (define/typed (measure-potential-line ps)
-  ((Listof Quad) . -> . Flonum)
-  (cast (for*/sum : (U Flonum Zero) 
+  ((Listof Quad) . -> . Float)
+  (cast (for*/sum : (U Float Zero) 
           ([rendered-piece (in-list (render-pieces ps))]
            [piece-quad (in-list (quad-list rendered-piece))])
-          (quad-width (cast piece-quad Quad))) Flonum))
+          (quad-width (cast piece-quad Quad))) Float))
 
 
 (define/typed (vector-break-at vec bps)
@@ -343,7 +343,7 @@
 
 
 ;; makes a wrap function by combining component functions.
-(define-type Wrap-Proc-Type (((Listof Quad)) (Flonum) . ->* . (Listof Quad)))
+(define-type Wrap-Proc-Type (((Listof Quad)) (Float) . ->* . (Listof Quad)))
 (define/typed (make-wrap-proc 
                make-pieces-proc 
                measure-quad-proc
@@ -351,7 +351,7 @@
                find-breakpoints-proc)
   ((Make-Pieces-Type Measure-Quad-Type Compose-Line-Type Find-Breakpoints-Type) () . ->* . Wrap-Proc-Type)
   (λ(qs [measure #f])
-    (let* ([measure : Flonum (fl+ (cast (or measure (quad-attr-ref/parameter (car qs) world:measure-key)) Flonum) 0.0)]
+    (let* ([measure : Float (fl+ (cast (or measure (quad-attr-ref/parameter (car qs) world:measure-key)) Float) 0.0)]
            [qs : (Listof Quad) (if (quad-has-attr? (car qs) world:measure-key)
                                    qs
                                    ((inst map Quad Quad) (λ(q) (quad-attr-set q world:measure-key measure)) qs))])
@@ -359,7 +359,7 @@
       (define pieces : (Listof Quad) (make-pieces-proc qs)) ; 5%
       (define bps : (Listof Nonnegative-Integer) (find-breakpoints-proc (list->vector pieces) measure)) ; 50%
       (define broken-pieces : (Listof (Listof Quad)) (break-at pieces bps)) ; 5%
-      #; (define-type Compose-Line-Type ((Listof Quad) (Quad . -> . Flonum) . -> . Quad))
+      #; (define-type Compose-Line-Type ((Listof Quad) (Quad . -> . Float) . -> . Quad))
       ((inst map Quad (Listof Quad)) (λ(broken-piece) (compose-line-proc broken-piece measure-quad-proc)) broken-pieces)))) ; 50%
 
 (define width? flonum?)
@@ -368,7 +368,7 @@
 
 (define/typed (install-measurement-keys p)
   (Quad . -> . Quad)
-  (define basic-width (round-float (apply + ((inst map Flonum Quad) quad-width (cast (quad-list p) (Listof Quad))))))
+  (define basic-width (round-float (apply + ((inst map Float Quad) quad-width (cast (quad-list p) (Listof Quad))))))
   (define p-word-break (cast (quad-attr-ref p world:word-break-key #f) Quad))
   (define before-break-width (fl+ basic-width (if p-word-break
                                                   (quad-width (word (quad-attrs p-word-break) (cast (quad-attr-ref p-word-break world:before-break-key) QuadListItem)))
@@ -380,44 +380,44 @@
 
 (require sugar/debug)
 (define/typed (make-piece-vectors pieces)
-  ((Vectorof Quad) . -> . (values (Vectorof Flonum) (Vectorof Flonum))) 
+  ((Vectorof Quad) . -> . (values (Vectorof Float) (Vectorof Float))) 
   (define pieces-measured 
-    (for/list : (Listof (Vector Flonum Flonum Flonum)) ([p (in-vector pieces)])
+    (for/list : (Listof (Vector Float Float Float)) ([p (in-vector pieces)])
       (define wb (cast (quad-attr-ref p world:word-break-key #f) (U Quad False)))
       (vector
        ;; throw in 0.0 in case for/list returns empty
-       (apply + 0.0 (for/list : (Listof Flonum) ([qli (in-list (quad-list p))])
+       (apply + 0.0 (for/list : (Listof Float) ([qli (in-list (quad-list p))])
                         (define q (cast qli Quad))
                         (define str (quad->string q))
                         (if (equal? str "")
-                            (cast (quad-attr-ref q world:width-key 0.0) Flonum)
+                            (cast (quad-attr-ref q world:width-key 0.0) Float)
                             (apply measure-text (quad->string q) (font-attributes-with-defaults q)))))
-       (if wb (cast (apply measure-text (cast (quad-attr-ref wb world:no-break-key) String) (font-attributes-with-defaults wb)) Flonum) 0.0)
-       (if wb (cast (apply measure-text (cast (quad-attr-ref wb world:before-break-key) String) (font-attributes-with-defaults wb)) Flonum) 0.0))))
+       (if wb (cast (apply measure-text (cast (quad-attr-ref wb world:no-break-key) String) (font-attributes-with-defaults wb)) Float) 0.0)
+       (if wb (cast (apply measure-text (cast (quad-attr-ref wb world:before-break-key) String) (font-attributes-with-defaults wb)) Float) 0.0))))
   (values
-   (for/vector : (Vectorof Flonum) ([p (in-list pieces-measured)])
+   (for/vector : (Vectorof Float) ([p (in-list pieces-measured)])
      (fl+ (vector-ref p 0) (vector-ref p 1))) ; first = word length, second = nb length
-   (for/vector : (Vectorof Flonum) ([p (in-list pieces-measured)]) 
+   (for/vector : (Vectorof Float) ([p (in-list pieces-measured)]) 
      (fl+ (vector-ref p 0) (vector-ref p 2))))) ; first = word length, third = bb length
 
 
 (define/typed (make-trial-line pieces-rendered-widths pieces-rendered-before-break-widths i j)
-  ((Vectorof Flonum) (Vectorof Flonum) Nonnegative-Integer Nonnegative-Integer . -> . (Vectorof Flonum))
+  ((Vectorof Float) (Vectorof Float) Nonnegative-Integer Nonnegative-Integer . -> . (Vectorof Float))
   (let ([vec (vector-copy pieces-rendered-widths i j)])
     (vector-set! vec (sub1 (vector-length vec)) (vector-ref pieces-rendered-before-break-widths (sub1 j)))
     vec))
 
 (define/typed (get-line-width line)
-  ((Vectorof Flonum) . -> . Flonum)
+  ((Vectorof Float) . -> . Float)
   (round-float (apply + (vector->list line))))
 
 (struct $penalty ([hyphens : Nonnegative-Integer][width : Value-Type]) #:transparent #:mutable)
 
 ;; top-level adaptive wrap proc.
 ;; first-fit and best-fit are variants.
-(define-type Find-Breakpoints-Type ((Vectorof Quad) Flonum . -> . (Listof Nonnegative-Integer)))
+(define-type Find-Breakpoints-Type ((Vectorof Quad) Float . -> . (Listof Nonnegative-Integer)))
 (define/typed (adaptive-fit-proc pieces measure [use-first? #t] [use-best? #t])
-  (((Vectorof Quad) Flonum) (Boolean Boolean) . ->* . (Listof Nonnegative-Integer))
+  (((Vectorof Quad) Float) (Boolean Boolean) . ->* . (Listof Nonnegative-Integer))
   
   ;; this is the winning performance strategy: extract the numbers first, then just wrap on those.
   ;; todo: how to avoid re-measuring pieces later?
@@ -428,7 +428,7 @@
   
   (define (make-first-fit-bps-and-widths)
     (define-values (folded-bps folded-widths) 
-      (for/fold ([bps : (Listof Nonnegative-Integer) '(0)][line-widths : (Listof Flonum) empty])([j-1 (in-range (vector-length pieces))])
+      (for/fold ([bps : (Listof Nonnegative-Integer) '(0)][line-widths : (Listof Float) empty])([j-1 (in-range (vector-length pieces))])
         (define line-width (get-line-width (make-trial-line pieces-rendered-widths
                                                             pieces-rendered-before-break-widths
                                                             (car bps) (cast (add1 j-1) Nonnegative-Integer))))
@@ -442,10 +442,10 @@
     (cond
       [(<= line-count 2) 1.0] ; signals that first-fit is always OK with 1 or 2 lines
       [else ; only measure middle lines. we know bps has at least 2 bps
-       (define looseness-stddev (stddev ((inst map Flonum Flonum) (λ(x) (calc-looseness x measure)) (drop-right (drop trial-line-widths 1) 1))))         
+       (define looseness-stddev (stddev ((inst map Float Float) (λ(x) (calc-looseness x measure)) (drop-right (drop trial-line-widths 1) 1))))         
        (define piece-count (vector-length pieces-rendered-widths)) 
        (define pieces-per-line (fl/ (fl piece-count) (sub1 (fl line-count)))) ; todo: more accurate to count only pieces in middle
-       (apply + (list 2.2 (fllog (flabs (cast looseness-stddev Flonum))) (* 0.09 pieces-per-line)))])) ; the FU FORMULA
+       (apply + (list 2.2 (fllog (flabs (cast looseness-stddev Float))) (* 0.09 pieces-per-line)))])) ; the FU FORMULA
   
   ;; only buy first-fit-bps if use-first? is true.
   ;; use (values '(0) '(0.0)) as void-ish values that will typecheck properly.
@@ -535,14 +535,14 @@
                     make-pieces 
                     quad-width 
                     pieces->line 
-                    (λ(x y) (adaptive-fit-proc (cast x (Vectorof Quad)) (cast y Flonum) #t #f))))
+                    (λ(x y) (adaptive-fit-proc (cast x (Vectorof Quad)) (cast y Float) #t #f))))
 
 ;; wrap proc based on penalty function
 (define+provide wrap-best (make-wrap-proc
                    make-pieces
                    quad-width
                    pieces->line
-                   (λ(x y) (adaptive-fit-proc (cast x (Vectorof Quad)) (cast y Flonum) #f #t)))) ; note difference in boolean args
+                   (λ(x y) (adaptive-fit-proc (cast x (Vectorof Quad)) (cast y Float) #f #t)))) ; note difference in boolean args
 
 (define+provide wrap-adaptive (make-wrap-proc 
                        make-pieces
@@ -559,11 +559,11 @@
 ;; build quad out to a given width by distributing excess into spacers
 ;; todo: adjust this to work recursively, so that fill operation cascades down
 (define/typed+provide (fill starting-quad [target-width? #f])
-  ((Quad) ((Option Flonum)) . ->* . Quad)
-  (define target-width (fl (or target-width? (cast (quad-attr-ref starting-quad world:measure-key) Flonum)))) 
+  ((Quad) ((Option Float)) . ->* . Quad)
+  (define target-width (fl (or target-width? (cast (quad-attr-ref starting-quad world:measure-key) Float)))) 
   (define subquads (cast (quad-list starting-quad) (Listof Quad)))
   (define-values (flexible-subquads fixed-subquads) (partition spacer? subquads)) ; only puts fill into spacers.
-  (define width-used (apply + ((inst map Flonum Quad) quad-width fixed-subquads)))
+  (define width-used (apply + ((inst map Float Quad) quad-width fixed-subquads)))
   (define width-remaining (round-float (- target-width width-used)))
   (cond
     ;; check for zero condition because we want to divide by this number
@@ -584,7 +584,7 @@
 (define/typed+provide (add-horiz-positions starting-quad)
   (Quad . -> . Quad)
   (define-values (new-quads final-width)
-    (for/fold ([new-quads : (Listof Quad) empty][width-so-far : Flonum 0.0])([qi (in-list (quad-list starting-quad))])
+    (for/fold ([new-quads : (Listof Quad) empty][width-so-far : Float 0.0])([qi (in-list (quad-list starting-quad))])
       (define q (cast qi Quad))
       (values (cons (quad-attr-set q world:x-position-key width-so-far) new-quads) (round-float (fl+ (quad-width q) width-so-far)))))
   (quad (quad-name starting-quad) (quad-attrs starting-quad) (reverse new-quads)))
