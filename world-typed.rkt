@@ -1,5 +1,5 @@
 #lang typed/racket/base
-(require (for-syntax racket/base racket/syntax))
+(require (for-syntax typed/racket/base racket/syntax))
 (provide (prefix-out world: (all-defined-out)))
 
 (define-syntax-rule (define-parameter name val)
@@ -96,4 +96,5 @@
 (define min-last-lines 2)
 (define default-lines-per-column 36)
 
-(define-parameter logging-level 'debug) ;; usually 'debug for dev. change to 'info for less
+(: logging-level (Parameterof Log-Level))
+(define logging-level (make-parameter 'debug))  ;; usually 'debug for dev. change to 'info for less
