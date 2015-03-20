@@ -3,7 +3,7 @@
 (require/typed racket/draw 
                [record-dc%  (Class (init-field) 
                                    (get-text-extent (String (Instance (Class (init-field))) Any . -> . (values Nonnegative-Real Nonnegative-Real Nonnegative-Real Nonnegative-Real))))]
-               [make-font ((#:size Nonnegative-Flonum) (#:style Symbol) (#:weight Symbol) (#:face String) . -> . (Instance (Class (init-field))))])
+               [make-font ((#:size Nonnegative-Float) (#:style Symbol) (#:weight Symbol) (#:face String) . -> . (Instance (Class (init-field))))])
 (require/typed sugar/cache [make-caching-proc (Procedure . -> . Procedure)])
 (require/typed racket/serialize [serialize (Any . -> . Any)]
                [deserialize (Any . -> . (HashTable Any Any))])
@@ -79,20 +79,20 @@
 (define-syntax-rule (measure-text-max-size text font weight style)
   (width (measure-max-size text font weight style)))
 
-(: measure-text ((String Nonnegative-Flonum String) (Symbol Symbol) . ->* . Nonnegative-Flonum))
+(: measure-text ((String Nonnegative-Float String) (Symbol Symbol) . ->* . Nonnegative-Float))
 (define (measure-text text size font [weight 'normal] [style 'normal])
   ;; Native function only accepts integers, so get max-size and scale down to size needed.
   (define raw-measure (measure-text-max-size text font weight style))
-  (cast (round-float (/ (* (exact->inexact raw-measure) (exact->inexact size)) max-size)) Nonnegative-Flonum))
+  (cast (round-float (/ (* (exact->inexact raw-measure) (exact->inexact size)) max-size)) Nonnegative-Float))
 
 
 (define-syntax-rule (measure-ascent-max-size text font weight style)
   (let ([result-list (measure-max-size text font weight style)])
     (- (height result-list) (descent result-list))))
 
-(: measure-ascent ((String Nonnegative-Flonum String) (Symbol Symbol) . ->* . Nonnegative-Flonum))
+(: measure-ascent ((String Nonnegative-Float String) (Symbol Symbol) . ->* . Nonnegative-Float))
 (define (measure-ascent text size font [weight 'normal] [style 'normal])
   ;  ((string? flonum? string?) (symbol? symbol?) . ->* . flonum?)
   ;; Native function only accepts integers, so get max-size and scale down to size needed.
   (define raw-baseline-distance (measure-ascent-max-size text font weight style))
-  (cast (round-float (/ (* (exact->inexact raw-baseline-distance) (exact->inexact size)) max-size)) Nonnegative-Flonum))
+  (cast (round-float (/ (* (exact->inexact raw-baseline-distance) (exact->inexact size)) max-size)) Nonnegative-Float))
