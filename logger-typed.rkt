@@ -1,9 +1,6 @@
-#lang typed/racket/base
-(require (for-syntax racket/base))
-(require/typed "world-typed.rkt" [world:logging-level (Parameterof Log-Level)])
-(require/typed racket/date [current-date (-> Any)]
-               [date->string ((Any) (Any) . ->* . String)])
-(require racket/match)
+#lang typed/racket
+(require (for-syntax typed/racket/base))
+(require typed/racket/date "world-typed.rkt")
 (provide (all-defined-out))
 
 (define-syntax-rule (define-orphan-logger name)
