@@ -18,7 +18,6 @@
 (define b1-flattened (list (box '(x 10.0) "1st") (box '(x 10.0 foo bar) "2nd") (box '(x 10.0) "3rd")))
 
 (define b3 (box #f (word) (line) (page)))
-(check-true (sequence? b3))
 
 (check-true (quad= (flatten-quad b1) b1-flattened))
 
