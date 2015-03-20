@@ -1,5 +1,6 @@
 #lang typed/racket/base
-(require typed/racket/class)
+(require (for-syntax typed/racket/base ))
+(require typed/racket/class math/flonum racket/list racket/file)
 (require/typed racket/draw 
                [record-dc%  (Class (init-field) 
                                    (get-text-extent (String (Instance (Class (init-field))) Any . -> . (values Nonnegative-Real Nonnegative-Real Nonnegative-Real Nonnegative-Real))))]
@@ -7,7 +8,6 @@
 (require/typed sugar/cache [make-caching-proc (Procedure . -> . Procedure)])
 (require/typed racket/serialize [serialize (Any . -> . Any)]
                [deserialize (Any . -> . (HashTable Any Any))])
-(require math/flonum racket/list (only-in sugar/list values->list) racket/file)
 (provide measure-text measure-ascent round-float update-text-cache-file load-text-cache-file make-font/caching)
 
 (define precision 4.0)
@@ -16,6 +16,9 @@
 (define-syntax-rule (round-float x)
   (fl/ (flround (fl* base (fl x))) base))
 
+(define-syntax (values->list stx)
+  (syntax-case stx ()
+    [(_ values-expr) #'(call-with-values (λ () values-expr) list)]))
 
 (define dc (new record-dc%))
 
