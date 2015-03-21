@@ -42,12 +42,13 @@
 (define current-text-cache-changed? : (Parameterof Boolean) (make-parameter #f))
 (define current-font-cache (make-parameter ((inst make-hash (List String Symbol Symbol) (Instance (Class (init-field)))) '())))
 
-
+(: update-text-cache-file (-> Void))
 (define (update-text-cache-file)
   (when (current-text-cache-changed?)
     (write-to-file (serialize (current-text-cache)) (get-cache-file-path) #:exists 'replace)
     (current-text-cache-changed? #f)))
 
+(:  load-text-cache-file (-> Void))
 (define (load-text-cache-file) 
   (define cache-file-path (get-cache-file-path))
   (current-text-cache (if (file-exists? cache-file-path)
@@ -59,14 +60,23 @@
 (define mrt? (make-predicate Measurement-Result-Type))
 (define-type MMS-Type ((String String) (Symbol Symbol) . ->* . Measurement-Result-Type))
 
-(: measure-max-size-base MMS-Type)
-(define (measure-max-size-base text font [weight 'normal] [style 'normal])
-  (define font-instance (hash-ref! (current-font-cache) (list font weight style) (λ() (make-font #:size max-size #:style style #:weight weight #:face font))))
-  ;; 'combine' boolean only makes a difference for two or more chars, so use (>= (string-length text) 1) for speed
-  ((inst hash-ref! (List String String Symbol Symbol) Measurement-Result-Type) (current-text-cache) (list text font weight style) (λ() (current-text-cache-changed? #t)
-                                                                        (define-values (width height descent extra) (send dc get-text-extent text font-instance (>= (string-length text) 1)))
-                                                                  (list (fl width) (fl height) (fl descent) (fl extra)))))
+(: measure-max-size-base (String String Symbol Symbol . -> . Measurement-Result-Type))
+(define (measure-max-size-base text font weight style)
+  (: hash-updater (-> Measurement-Result-Type))
+  (define (hash-updater) 
+    (current-text-cache-changed? #t)
+    (define font-instance (hash-ref! (current-font-cache) (list font weight style) (λ() (make-font #:size max-size #:style style #:weight weight #:face font))))
+    ;; 'combine' boolean only makes a difference for two or more chars, so use (>= (string-length text) 1) for speed
+    (define-values (width height descent extra) (send dc get-text-extent text font-instance (>= (string-length text) 1)))
+    ;; avoid `map` here because it requires a cast to ensure the type
+    ;; this seems like a bug in TR: doesn't recognize (List Float Float Float Float) as subtype of (Listof Float)
+    (list (fl width) (fl height) (fl descent) (fl extra)))
+  ((inst hash-ref! (List String String Symbol Symbol) Measurement-Result-Type) (current-text-cache) (list text font weight style) hash-updater))
 
+
+;; todo: why did I add this measure-cache? It helps performance, but why?
+;; see https://github.com/mbutterick/quad/commit/294c5b59a3d94afd53a0d9f46202dca38bee256e
+;; oh: because I couldn't yet make it work with define/caching
 (define measure-cache ((inst make-hash (List String String Symbol Symbol) Measurement-Result-Type)))
 
 (: measure-max-size MMS-Type)
