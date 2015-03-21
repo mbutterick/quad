@@ -93,9 +93,11 @@
     
     (inherit render-element)
     
-    (define make-font/caching
-      (make-caching-proc (λ (font size style weight)
-                           (make-font #:face font #:size size #:style style #:weight weight))))
+    
+    (define font-cache ((inst make-hash (List String Nonnegative-Flonum Symbol Symbol) (Instance (Class (init-field)))) '()))
+    (: get-cached-font (String Nonnegative-Flonum Symbol Symbol . -> .  (Instance (Class (init-field)))))
+    (define (get-cached-font font size style weight)
+      (hash-ref! font-cache (list font size style weight) (λ () (make-font #:face font #:size size #:style style #:weight weight))))
     
     
     (define/override (render-word w)
@@ -105,7 +107,7 @@
       (define word-weight (cast (quad-attr-ref/parameter w world:font-weight-key) Symbol))
       (define word-color (cast (quad-attr-ref/parameter w world:font-color-key) String))
       (define word-background (cast (quad-attr-ref/parameter w world:font-background-key) String))
-      (send dc set-font (make-font/caching word-font word-size word-style word-weight))
+      (send dc set-font (get-cached-font word-font word-size word-style word-weight))
       (define foreground-color (send the-color-database find-color word-color))
       (when foreground-color
         (send dc set-text-foreground foreground-color))
