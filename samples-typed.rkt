@@ -24,7 +24,7 @@
           (string-join (take lines (min line-limit (length lines))) "\n"))
         (file->string jude-text)))
   (define jude-blocks ((inst map String String) (λ(s) (regexp-replace* #rx"\n" s " ")) (string-split sample-string "\n\n")))
-  (apply block '(font "Equity Text B" measure 360.0 leading 14.0 column-count 1 column-gutter 10.0 size 11.5 x-align justify x-align-last-line left) (add-between (map (λ([jb : String]) (block #f (box '(width 10)) (optical-kern) jb)) (filter (λ([jb : String]) (< 0 (string-length jb))) jude-blocks)) (block-break))))
+  (apply block '(font "Equity Text B" measure 360.0 leading 14.0 column-count 1 column-gutter 10.0 size 11.5 x-align justify x-align-last-line left) (add-between (map (λ([jb : String]) (block #f (box '(width 10.0)) (optical-kern) jb)) (filter (λ([jb : String]) (< 0 (string-length jb))) jude-blocks)) (block-break))))
 
 (define (jude) (make-sample "texts/jude.txt"))
 (define (jude0) (make-sample "texts/jude0.txt"))
