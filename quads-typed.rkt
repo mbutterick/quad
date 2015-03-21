@@ -2,7 +2,7 @@
 (require (for-syntax typed/racket/base racket/syntax racket/string))
 (require/typed racket/list [empty? (All (A) ((Listof A) -> Boolean))]
                [last ((Listof Any) . -> . Any)]
-               [flatten ((Listof Any) . -> . (Listof Any))])
+               [flatten ((Listof QuadAttrPair) . -> . HashableList)])
 (require/typed sugar/list [trimf (All (A) ((Listof A) (A . -> . Boolean) -> (Listof A)))]
                [filter-split (All (A) ((Listof A) (A . -> . Boolean) -> (Listof (Listof A))))])
 (require/typed racket/string [string-append* ((Listof String) . -> . String)])
@@ -128,21 +128,21 @@
                                                               null))])
          (cond
            [(null? candidate-attr-pairs) #f] ; ran out of possible pairs, so return #f
-           [(null? qs) (cast (flatten candidate-attr-pairs) HashableList)] ; ran out of quads, so return common-attr-pairs
+           [(null? qs) (flatten candidate-attr-pairs)] ; ran out of quads, so return common-attr-pairs
            ;; todo: reconsider type interface between output of this function and input to quadattrs
            [else (loop (cdr qs) (filter (λ([cap : QuadAttrPair]) (check-cap (car qs) cap)) candidate-attr-pairs))]))))
 
 (: quadattrs ((Listof Any) . -> . QuadAttrs))
 (define (quadattrs xs)
   (let-values ([(ks vs even?) (for/fold 
-                               ([ks : (Listof Any) null][vs : (Listof Any) null][even? : Boolean #t])
+                               ([ks : (Listof QuadAttrKey) null][vs : (Listof QuadAttrValue) null][even? : Boolean #t])
                                ([x (in-list xs)])
                                 (if even?
-                                    (values (cons x ks) vs #f)
-                                    (values ks (cons x vs) #t)))]) 
+                                    (values (cons (cast x QuadAttrKey) ks) vs #f)
+                                    (values ks (cons (cast x QuadAttrValue) vs) #t)))]) 
     (when (not even?) (error 'quadattrs "odd number of elements in ~a" xs))
-    (cast (for/hash ([k (in-list ks)][v (in-list vs)])
-            (values k v)) QuadAttrs)))
+    (for/hash : QuadAttrs ([k (in-list ks)][v (in-list vs)])
+      (values k v))))
 
 
 
