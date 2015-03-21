@@ -1,10 +1,10 @@
 #lang typed/racket/base
-(require "main-typed.rkt" "logger-typed.rkt" "world-typed.rkt" "samples-typed.rkt" "quads-typed.rkt")
+(require "main-typed.rkt" "logger-typed.rkt" "world-typed.rkt" "samples-typed.rkt")
 
-(require/typed contract-profile
+#;(require/typed contract-profile
                 [contract-profile-thunk ((-> Any) . -> . Quad)])
 
-(require "render-typed.rkt" racket/class optimization-coach)
+(require "render-typed.rkt" typed/racket/class)
 (activate-logger quad-logger)
 
 (parameterize ([world:quality-default world:draft-quality]

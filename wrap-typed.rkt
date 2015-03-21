@@ -93,10 +93,10 @@
 
 ;; extract font attributes from quad, or get default values
 (define/typed (font-attributes-with-defaults q)
-  (Quad . -> . (List Nonnegative-Float String Symbol Symbol))
+  (Quad . -> . (List Positive-Float String Symbol Symbol))
   (list
    (cast (let ([size (quad-attr-ref/parameter q world:font-size-key)])
-           (if (exact-integer? size) (fl size) size)) Nonnegative-Float)
+           (if (exact-integer? size) (fl size) size)) Positive-Float)
    (cast (quad-attr-ref/parameter q world:font-name-key) String)
    (cast (quad-attr-ref/parameter q world:font-weight-key) Symbol)
    (cast (quad-attr-ref/parameter q world:font-style-key) Symbol)))
@@ -257,7 +257,7 @@
                                                      (let ([interleaver (copy-with-attrs middle q)])
                                                        (list interleaver q interleaver)) 
                                                      q)) qs) 
-                         ;; (last qs) is a single quad, but wrap it in a list to make it spliceable
+                           ;; (last qs) is a single quad, but wrap it in a list to make it spliceable
                            ,@(cast (if after (list (copy-with-attrs after (last qs))) null) (Listof Quad))
                            ))) QuadList)))
 
@@ -368,7 +368,8 @@
 
 (define/typed (install-measurement-keys p)
   (Quad . -> . Quad)
-  (define basic-width (round-float (apply + ((inst map Float Quad) quad-width (cast (quad-list p) (Listof Quad))))))
+  (define basic-width (round-float 
+                       (foldl + 0.0 ((inst map Float Quad) quad-width (cast (quad-list p) (Listof Quad))))))
   (define p-word-break (cast (quad-attr-ref p world:word-break-key #f) Quad))
   (define before-break-width (fl+ basic-width (if p-word-break
                                                   (quad-width (word (quad-attrs p-word-break) (cast (quad-attr-ref p-word-break world:before-break-key) QuadListItem)))
@@ -387,11 +388,11 @@
       (vector
        ;; throw in 0.0 in case for/list returns empty
        (apply + 0.0 (for/list : (Listof Float) ([qli (in-list (quad-list p))])
-                        (define q (cast qli Quad))
-                        (define str (quad->string q))
-                        (if (equal? str "")
-                            (cast (quad-attr-ref q world:width-key 0.0) Float)
-                            (apply measure-text (quad->string q) (font-attributes-with-defaults q)))))
+                      (define q (cast qli Quad))
+                      (define str (quad->string q))
+                      (if (equal? str "")
+                          (cast (quad-attr-ref q world:width-key 0.0) Float)
+                          (apply measure-text (quad->string q) (font-attributes-with-defaults q)))))
        (if wb (cast (apply measure-text (cast (quad-attr-ref wb world:no-break-key) String) (font-attributes-with-defaults wb)) Float) 0.0)
        (if wb (cast (apply measure-text (cast (quad-attr-ref wb world:before-break-key) String) (font-attributes-with-defaults wb)) Float) 0.0))))
   (values
@@ -409,7 +410,7 @@
 
 (define/typed (get-line-width line)
   ((Vectorof Float) . -> . Float)
-  (round-float (apply + (vector->list line))))
+  (round-float (foldl + 0.0 (vector->list line))))
 
 (struct $penalty ([hyphens : Nonnegative-Integer][width : Value-Type]) #:transparent #:mutable)
 
@@ -532,23 +533,23 @@
     (define name expr ...)))
 
 (define+provide wrap-first (make-wrap-proc  
-                    make-pieces 
-                    quad-width 
-                    pieces->line 
-                    (λ(x y) (adaptive-fit-proc (cast x (Vectorof Quad)) (cast y Float) #t #f))))
+                            make-pieces 
+                            quad-width 
+                            pieces->line 
+                            (λ(x y) (adaptive-fit-proc (cast x (Vectorof Quad)) (cast y Float) #t #f))))
 
 ;; wrap proc based on penalty function
 (define+provide wrap-best (make-wrap-proc
-                   make-pieces
-                   quad-width
-                   pieces->line
-                   (λ(x y) (adaptive-fit-proc (cast x (Vectorof Quad)) (cast y Float) #f #t)))) ; note difference in boolean args
+                           make-pieces
+                           quad-width
+                           pieces->line
+                           (λ(x y) (adaptive-fit-proc (cast x (Vectorof Quad)) (cast y Float) #f #t)))) ; note difference in boolean args
 
 (define+provide wrap-adaptive (make-wrap-proc 
-                       make-pieces
-                       quad-width
-                       pieces->line
-                       adaptive-fit-proc))
+                               make-pieces
+                               quad-width
+                               pieces->line
+                               adaptive-fit-proc))
 
 
 (define/typed (fixed-width? q) 
