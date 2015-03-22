@@ -71,7 +71,6 @@
 (define-type Quad quad)
 (define-predicate Quad? Quad)
 
-
 (define quad-attr-ref
   (case-lambda
     [([q : Quad] [key : QuadAttrKey]) 
@@ -136,8 +135,10 @@
            ;; todo: reconsider type interface between output of this function and input to quadattrs
            [else (loop (cdr qs) (filter (λ([cap : QuadAttrPair]) (check-cap (car qs) cap)) candidate-attr-pairs))]))))
 
-(define/typed (quadattrs xs)
-  ((Listof (U QuadAttrKey QuadAttrValue)) . -> . QuadAttrs)
+(define/typed (make-quadattrs xs)
+  ;; no point typing the input as (U QuadAttrKey QuadAttrValue) 
+  ;; because QuadAttrValue is Any, so that's the same as plain Any
+  ((Listof Any) . -> . QuadAttrs)
   (let-values ([(ks vs even?) (for/fold 
                                ([ks : (Listof QuadAttrKey) null][vs : (Listof QuadAttrValue) null][even? : Boolean #t])
                                ([x (in-list xs)])
@@ -155,6 +156,7 @@
   (syntax-case stx ()
     [(_ id) 
      (with-syntax ([id? (format-id #'id "~a?" #'id)]
+                   [IdQuad (format-id #'id "~aQuad" (string-titlecase (symbol->string (syntax->datum #'id))))]
                    [quads->id (format-id #'id "quads->~a" #'id)])
        #'(begin
            ;; quad converter
@@ -162,21 +164,22 @@
              ((Listof Quad) . -> . Quad)
              (apply id (gather-common-attrs qs) qs))
            
+           ;; v1 of quad maker
            #;(define/typed (id [attrs #f] . xs)
-             (case-> 
-              (-> Quad)
-              (((U False QuadAttrs HashableList)) #:rest QuadListItem . ->* . Quad))
-             (quad 'id (cond 
-                         ;; need this cast because no predicate can be made for QuadAttrs
-                         [(quad-attrs? attrs) (cast attrs QuadAttrs)]
-                         [(list? attrs)
-                          (if (HashableList? attrs)
-                              (quadattrs attrs)
-                              (error 'id "got non-hashable list ~a" attrs))]
-                         [else (quadattrs '())]) (assert xs QuadList?)))
+               (case-> 
+                (-> Quad)
+                (((U False QuadAttrs HashableList)) #:rest QuadListItem . ->* . Quad))
+               (quad 'id (cond 
+                           ;; need this cast because no predicate can be made for QuadAttrs
+                           [(quad-attrs? attrs) (cast attrs QuadAttrs)]
+                           [(list? attrs)
+                            (if (HashableList? attrs)
+                                (quadattrs attrs)
+                                (error 'id "got non-hashable list ~a" attrs))]
+                           [else (quadattrs '())]) (assert xs QuadList?)))
            
-           ;; much slower than version above ... why?
-           (define/typed id
+           ;; v2: much slower than v1 ... why?
+           #;(define/typed id
                (case->
                 (((U False QuadAttrs HashableList)) #:rest QuadListItem . ->* . Quad)
                 (-> Quad))
@@ -187,13 +190,24 @@
                                     (quadattrs attrs)
                                     attrs)
                                 (quadattrs null)) xs)]
-                 [else (displayln "making quado") (quad 'id (quadattrs null) null)]))
+                 [() (quad 'id (quadattrs null) null)]))
+           
+           (struct IdQuad quad () #:transparent)
+           
+           ;; version 3
+           ;; dummy kw arg is needed to typecheck correctly
+           (define/typed (id [attrs #f] #:zzz [zzz 0] . xs)
+             (() ((U False QuadAttrs HashableList) #:zzz Zero) #:rest QuadListItem . ->* . Quad)
+             (IdQuad 'id (if attrs
+                           (if (list? attrs)
+                               (make-quadattrs attrs)
+                               attrs)
+                           (make-quadattrs null)) xs))
+           
            
            (: id? (Any . -> . Boolean))
            (define (id? x)
-             (and (quad? x) (equal? (quad-name x) 'id)))
-           
-           ))]))
+             (and (quad? x) (equal? (quad-name x) 'id)))))]))
 
 (define/typed (whitespace? x [nbsp? #f])
   ((Any) (Boolean) . ->* . Boolean)  
@@ -250,7 +264,6 @@
 
 (define-quad-type box)
 
-(begin
 (define-quad-type spacer)
 (define-quad-type kern)
 (define-quad-type optical-kern)
@@ -271,5 +284,5 @@
 (define-break-type page)
 (define-break-type column)
 (define-break-type block)
-(define-break-type line))
+(define-break-type line)
 
