@@ -1,7 +1,9 @@
 #lang typed/racket/base
 (require (for-syntax typed/racket/base racket/syntax racket/string))
-(require/typed racket/list [empty? (All (A) ((Listof A) -> Boolean))]
-               [last ((Listof Any) . -> . Any)]
+(require "lib-typed.rkt")
+;; note to self: a require/typed function with proper typing
+;; is faster than a generic function + type assertion at location of call
+(require/typed racket/list 
                [flatten ((Listof QuadAttrPair) . -> . HashableList)])
 (require/typed sugar/list [trimf (All (A) ((Listof A) (A . -> . Boolean) -> (Listof A)))]
                [filter-split (All (A) ((Listof A) (A . -> . Boolean) -> (Listof (Listof A))))])
@@ -49,17 +51,19 @@
 (define-type QuadAttrValue Any)
 (define-predicate QuadAttrValue? QuadAttrValue)
 (define-type QuadAttrs (HashTable QuadAttrKey QuadAttrValue))
+;;(define-predicate QuadAttrs? QuadAttrs) ;; won't work because it generates a chaperone contract
 (define-type HashableList  (Rec duo (U Null (List* QuadAttrKey Any duo))))
 (provide HashableList?)
 (define-predicate HashableList? HashableList)
-
 
 (: quad-attrs? (Any . -> . Boolean))
 (define (quad-attrs? x)
   (and (hash? x) (andmap QuadAttrKey? (hash-keys x))))
 
 (define-type QuadListItem (U Quad String))
+(define-predicate QuadListItem? QuadListItem)
 (define-type QuadList (Listof QuadListItem))
+(define-predicate QuadList? QuadList)
 (define-type (Treeof A) (Rec as (U A (Listof as))))
 
 (struct quad ([name : QuadName] [attrs : QuadAttrs] [list : QuadList]) #:transparent)
@@ -90,7 +94,7 @@
 (define (quad-ends-with? q str)
   (cond
     [(not (empty? (quad-list q)))
-     (define last-item (last (quad-list q)))
+     (define last-item (list-ref (quad-list q) (length (quad-list q))))
      (cond
        [(string? last-item) (ends-with? last-item str)]
        [(quad? last-item) (quad-ends-with? last-item str)]
@@ -132,12 +136,13 @@
            ;; todo: reconsider type interface between output of this function and input to quadattrs
            [else (loop (cdr qs) (filter (λ([cap : QuadAttrPair]) (check-cap (car qs) cap)) candidate-attr-pairs))]))))
 
-(: quadattrs ((Listof Any) . -> . QuadAttrs))
-(define (quadattrs xs)
+(define/typed (quadattrs xs)
+  ((Listof (U QuadAttrKey QuadAttrValue)) . -> . QuadAttrs)
   (let-values ([(ks vs even?) (for/fold 
                                ([ks : (Listof QuadAttrKey) null][vs : (Listof QuadAttrValue) null][even? : Boolean #t])
                                ([x (in-list xs)])
                                 (if even?
+                                    ;; todo: how to avoid cast here by using HashableList typing?
                                     (values (cons (cast x QuadAttrKey) ks) vs #f)
                                     (values ks (cons (cast x QuadAttrValue) vs) #t)))]) 
     (when (not even?) (error 'quadattrs "odd number of elements in ~a" xs))
@@ -153,21 +158,36 @@
                    [quads->id (format-id #'id "quads->~a" #'id)])
        #'(begin
            ;; quad converter
-           (: quads->id ((Listof Quad) . -> . Quad))
-           (define (quads->id qs)
+           (define/typed (quads->id qs)
+             ((Listof Quad) . -> . Quad)
              (apply id (gather-common-attrs qs) qs))
            
-           (: id (case-> 
-                  (-> Quad)
-                  ((U QuadAttrs (Listof Any) False) (U String Quad) * . -> . Quad)))
-           (define (id [attrs #f] . xs)
+           #;(define/typed (id [attrs #f] . xs)
+             (case-> 
+              (-> Quad)
+              (((U False QuadAttrs HashableList)) #:rest QuadListItem . ->* . Quad))
              (quad 'id (cond 
+                         ;; need this cast because no predicate can be made for QuadAttrs
                          [(quad-attrs? attrs) (cast attrs QuadAttrs)]
                          [(list? attrs)
                           (if (HashableList? attrs)
                               (quadattrs attrs)
                               (error 'id "got non-hashable list ~a" attrs))]
-                         [else (quadattrs '())]) (cast xs QuadList)))
+                         [else (quadattrs '())]) (assert xs QuadList?)))
+           
+           ;; much slower than version above ... why?
+           (define/typed id
+               (case->
+                (((U False QuadAttrs HashableList)) #:rest QuadListItem . ->* . Quad)
+                (-> Quad))
+               (case-lambda
+                 [(attrs . xs)
+                  (quad 'id (if attrs
+                                (if (list? attrs)
+                                    (quadattrs attrs)
+                                    attrs)
+                                (quadattrs null)) xs)]
+                 [else (displayln "making quado") (quad 'id (quadattrs null) null)]))
            
            (: id? (Any . -> . Boolean))
            (define (id? x)
@@ -175,9 +195,8 @@
            
            ))]))
 
-(: whitespace? ((Any) (Boolean) . ->* . Boolean))
-(define (whitespace? x [nbsp? #f])
-  ;((any/c)(boolean?) . ->* . coerce/boolean?)
+(define/typed (whitespace? x [nbsp? #f])
+  ((Any) (Boolean) . ->* . Boolean)  
   (cond
     [(quad? x) (whitespace? (quad-list x) nbsp?)]
     [(string? x) (or (and (regexp-match #px"\\p{Zs}" x) ; Zs = unicode whitespace category
@@ -210,23 +229,28 @@
 (define quad= equal?)
 
 
-(define-syntax (define-quad-list-function stx)
-  (syntax-case stx ()
-    [(_ proc)
-     (with-syntax ([quad-proc (format-id stx "quad-~a" #'proc)])
-       #'(define/typed (quad-proc q)
-           (Quad . -> . Any)
-           (proc (quad-list q))))]))
+(define/typed (quad-car q)
+  (Quad . -> . QuadListItem)
+  (define ql (quad-list q))
+  (if (not (empty? ql))
+      ((inst car QuadListItem QuadList) ql)
+      (error 'quad-car "quad-list empty")))
 
-#;(define-quad-list-function first)
-(define-quad-list-function car)
-(define-quad-list-function cdr)
-#;(define-quad-list-function last)
+(define/typed (quad-cdr q)
+  (Quad . -> . QuadList)
+  (define ql (quad-list q))
+  (if (not (empty? ql))
+      ((inst cdr QuadListItem QuadList) ql)
+      (error 'quad-car "quad-list empty")))
 
 (: quad-has-attr? (Quad QuadAttrKey . -> . Boolean))
 (define (quad-has-attr? q key)
   (hash-has-key? (quad-attrs q) key))
 
+
+(define-quad-type box)
+
+(begin
 (define-quad-type spacer)
 (define-quad-type kern)
 (define-quad-type optical-kern)
@@ -235,15 +259,17 @@
 (define-quad-type input)
 (define-quad-type piece)
 (define-quad-type run)
-(define-quad-type box)
 
 
 (define-break-type word)
-(: word-string (Quad . -> . String))
-(define (word-string c) 
-  (cast ((inst car QuadListItem Any) (quad-list c)) String))
+(define/typed (word-string c) 
+  (Quad . -> . String)
+  (define ql (quad-list c))
+  (if (and (not (null? ql)) (string? (car ql)))
+      (car ql)
+      ""))
 (define-break-type page)
 (define-break-type column)
 (define-break-type block)
-(define-break-type line)
+(define-break-type line))
 
