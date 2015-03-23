@@ -199,14 +199,14 @@
            (define/typed (id [attrs #f] #:zzz [zzz 0] . xs)
              (() ((U False QuadAttrs HashableList) #:zzz Zero) #:rest QuadListItem . ->* . Quad)
              (IdQuad 'id (if attrs
-                           (if (list? attrs)
-                               (make-quadattrs attrs)
-                               attrs)
-                           (make-quadattrs null)) xs))
+                             (if (list? attrs)
+                                 (make-quadattrs attrs)
+                                 attrs)
+                             (make-quadattrs null)) xs))
            
            
-           (: id? (Any . -> . Boolean))
-           (define (id? x)
+           (define/typed (id? x)
+             (Any . -> . Boolean)
              (and (quad? x) (equal? (quad-name x) 'id)))))]))
 
 (define/typed (whitespace? x [nbsp? #f])
