@@ -27,7 +27,7 @@
                                                                                                (cond
                                                                                                  [(quad? x) (quad-attrs x)]
                                                                                                  [(quad-attrs? x) (cast x QuadAttrs)]
-                                                                                                 [(HashableList? x) (quadattrs (cast x (Listof Any)))]
+                                                                                                 [(HashableList? x) (make-quadattrs (cast x (Listof Any)))]
                                                                                                  [else ;; something that will have no effect on result 
                                                                                                   (cast (hash) QuadAttrs)])) quads-or-attrs-or-lists)))
 
@@ -124,16 +124,20 @@
                                              (world:font-size-default) 
                                              (world:font-weight-default) 
                                              (world:font-style-default))))))])
-    (let loop ([qs qs-in][acc null])
+    (let loop ([qs : (Listof Quad) qs-in][acc : (Listof Quad) null])
       (if (null? qs)
-          (reverse (cast acc (Listof Quad)))
+          (reverse acc)
           (let* ([base-q (first qs)]
                  [mergeable-and-matches-base? (make-matcher base-q)]) ; make a new predicate function for this quad
             (cond
               [(mergeable-and-matches-base? base-q)
                ;; take as many quads that match, using the predicate function
                (define-values (matching-qs other-qs) (splitf-at (cdr qs) mergeable-and-matches-base?))
-               (define new-word (word (quad-attrs base-q) (string-append* (cast ((inst append-map QuadListItem Quad) quad-list (cons base-q matching-qs)) (Listof String)))))
+               (define new-word-strings (append-map quad-list (cons base-q matching-qs)))
+               (define new-word 
+                 (if (andmap string? new-word-strings)
+                  (word (quad-attrs base-q) (string-append* new-word-strings))
+                  (error 'join-quads "expected string")))
                (loop other-qs (cons new-word acc))]
               ;; otherwise move on to the next in line
               [else (loop (cdr qs) (cons base-q acc))]))))))
