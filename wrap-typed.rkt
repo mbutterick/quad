@@ -27,7 +27,8 @@
   (Any . -> . Boolean)
   (cond
     [(string? x) (or (visible-breakable? x) (invisible-breakable? x))]
-    [(word? x) (breakable? (word-string (cast x Quad)))]
+    ;; word? should have a filter that returns a Quad type, then the Quad? check will be unnecessary
+    [(and (Quad? x) (word? x)) (breakable? (word-string x))]
     [else #f]))
 
 ;; used by insert-spacers to determine which characters 
@@ -124,8 +125,8 @@
 (define/typed (ascent q)
   (Quad . -> . Float)
   (define ascent-value-or-false (quad-attr-ref q world:ascent-key #f))
-  (if ascent-value-or-false
-      (cast ascent-value-or-false Float)
+  (if (and ascent-value-or-false (flonum? ascent-value-or-false))
+      ascent-value-or-false
       (cond 
         [(ormap (λ([pred : (Any . -> . Boolean)]) (pred q)) (list char? run? word? word-break?)) 
          (apply measure-ascent (word-string q) (font-attributes-with-defaults q))]
@@ -296,13 +297,16 @@
   ;; handle optical kerns here to avoid resplitting and rejoining later.
   (define rendered-pieces (render-pieces ps))
   (define split-pieces (map quad-list rendered-pieces))
-  (define line-quads (cast (append* split-pieces) (Listof Quad))) 
+  (define line-quads (let ([result (append* split-pieces)])
+                             (if (andmap Quad? result)
+                                 result
+                                 (error 'line-quads "bad result")))) 
   (define line-quads-maybe-with-opticals 
-    (if world:use-optical-kerns?
-        (render-optical-kerns
-         (let ([my-ok (list (optical-kern (quad-attrs (car line-quads))))]) ; take attrs from line, incl measure
-           (append my-ok line-quads my-ok)))
-        line-quads))
+    (if (and world:use-optical-kerns? (> (length line-quads) 0))
+              (render-optical-kerns
+               (let ([my-ok (list (optical-kern (quad-attrs (car line-quads))))]) ; take attrs from line, incl measure
+                 (append my-ok line-quads my-ok)))
+              line-quads))
   (define merged-quads (join-quads line-quads-maybe-with-opticals))
   (define merged-quad-widths (map measure-quad-proc merged-quads)) ; 10% of function time
   
@@ -312,12 +316,15 @@
   (when (not (quad-has-attr? (first line-quads) world:measure-key))
     (error 'pieces->line "quad has no measure key: ~a" (first line-quads)))
   
-  (define measure (cast (quad-attr-ref (first merged-quads) world:measure-key) Float))
-  (define looseness (calc-looseness (fl (apply + merged-quad-widths)) measure))
+  (define measure (let ([val (quad-attr-ref (first merged-quads) world:measure-key)])
+                          (if (flonum? val)
+                              val
+                              (error "got bad value for measure"))))
+  (define looseness (calc-looseness (foldl fl+ 0.0 merged-quad-widths) measure))
   
   ;; quads->line function hoists common attributes into the line
-  (let* ([new-line-quads (map embed-width merged-quads merged-quad-widths)] ; 15% of time
-         [new-line-quads (map record-ascent new-line-quads)] ; 35% of time
+  (let* ([new-line-quads (map embed-width merged-quads merged-quad-widths)] 
+         [new-line-quads (map record-ascent new-line-quads)] 
          [new-line (quads->line new-line-quads)] 
          [new-line (quad-attr-set new-line world:line-looseness-key looseness)])
     new-line))
@@ -356,11 +363,11 @@
                                    qs
                                    ((inst map Quad Quad) (λ(q) (quad-attr-set q world:measure-key measure)) qs))])
       (log-quad-debug "wrapping on measure = ~a" measure)
-      (define pieces : (Listof Quad) (make-pieces-proc qs)) ; 5%
-      (define bps : (Listof Nonnegative-Integer) (find-breakpoints-proc (list->vector pieces) measure)) ; 50%
-      (define broken-pieces : (Listof (Listof Quad)) (break-at pieces bps)) ; 5%
+      (define pieces : (Listof Quad) (make-pieces-proc qs)) 
+      (define bps : (Listof Nonnegative-Integer) (find-breakpoints-proc (list->vector pieces) measure)) 
+      (define broken-pieces : (Listof (Listof Quad)) (break-at pieces bps)) 
       #; (define-type Compose-Line-Type ((Listof Quad) (Quad . -> . Float) . -> . Quad))
-      ((inst map Quad (Listof Quad)) (λ(broken-piece) (compose-line-proc broken-piece measure-quad-proc)) broken-pieces)))) ; 50%
+      (map (λ([broken-piece : (Listof Quad)]) (compose-line-proc broken-piece measure-quad-proc)) broken-pieces)))) ; 80% of runtime
 
 (define width? flonum?)
 (define measure? flonum?)
