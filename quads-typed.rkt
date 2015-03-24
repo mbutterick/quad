@@ -68,11 +68,11 @@
 
 
 ;; funky implementation
-(define-type+predicate Quad (List QuadName QuadAttrs (Listof (U String Quad))))
+(define-type+predicate Quad (Pairof QuadName (Pairof QuadAttrs (Listof (U String Quad)))))
 (define-predicate quad? Quad)
 (define/typed (quad name attrs items)
   (QuadName QuadAttrs QuadList . -> . Quad)
-  (list name attrs items))
+  `(,name ,attrs ,@items))
 
 (define-type+predicate QuadSet (List QuadName QuadAttrs (Listof Quad)))
 
@@ -92,16 +92,19 @@
 
 (define/typed (quad-list q)
   (Quad . -> . QuadList)
-  (caddr q))
+  (cddr q))
 
-(define-type Thunker (-> Any))
-(define-predicate Thunker? Thunker)
 
-(define/typed (quad-attr-ref q-or-qas key [default (λ () (error 'key-not-found))])
-    (((U Quad QuadAttrs) QuadAttrKey) ((U Thunker QuadAttrValue)) . ->* . QuadAttrValue)
-     (define qaps (if (quad? q-or-qas) (quad-attrs q-or-qas) q-or-qas))
-     (define result (ormap (λ([qap : QuadAttr]) (and (equal? key (car qap)) (cdr qap))) qaps))
-     (or result (if (Thunker? default) (default) default)))
+
+(define/typed (quad-attr-ref q-or-qas key [default attr-missing])
+  (((U Quad QuadAttrs) QuadAttrKey) (QuadAttrValue) . ->* . QuadAttrValue)
+  (define qas (if (quad? q-or-qas) (quad-attrs q-or-qas) q-or-qas))
+  (define qa-result (memf (λ([qap : QuadAttr]) (equal? key (car qap))) qas))
+  (if qa-result
+      ;; car beacause result of memf is a list tail; cadr because second element in pair
+      (cadr (car qa-result))
+      (if (not (equal? default attr-missing)) default (error 'key-not-found))))
+
 
 (define-syntax (quad-attr-ref/parameter stx)
   (syntax-case stx ()
@@ -109,9 +112,9 @@
      (with-syntax ([world:key-default (format-id stx "~a-default" (string-trim (symbol->string (syntax->datum #'key)) "-key"))])
        #'(quad-attr-ref q key (world:key-default)))]))
 
+
 (define cannot-be-common-attrs '(width x y page))
 (define attr-missing (gensym))
-
 
 (: quad-ends-with? (Quad String . -> . Boolean))
 (define (quad-ends-with? q str)
@@ -147,12 +150,12 @@
          ([qs qs]
           ;; start with the set of pairs in the first quad, then filter it down
           [candidate-attr-pairs : (Listof QuadAttr) (let ([first-attrs (quad-attrs (car qs))])
-                                                          (if first-attrs
-                                                              (for/fold ([kvps : QuadAttrs null]) ([k (in-list (quad-attr-keys first-attrs))])  
-                                                                (if (member k cannot-be-common-attrs)
-                                                                    kvps
-                                                                    (cons (list k (quad-attr-ref first-attrs k)) kvps)))
-                                                              null))])
+                                                      (if first-attrs
+                                                          (for/fold ([kvps : QuadAttrs null]) ([k (in-list (quad-attr-keys first-attrs))])  
+                                                            (if (member k cannot-be-common-attrs)
+                                                                kvps
+                                                                (cons (list k (quad-attr-ref first-attrs k)) kvps)))
+                                                          null))])
          (cond
            [(null? candidate-attr-pairs) #f] ; ran out of possible pairs, so return #f
            [(null? qs) (flatten candidate-attr-pairs)] ; ran out of quads, so return common-attr-pairs
@@ -168,7 +171,7 @@
                                ([x (in-list xs)])
                                 (if (and even? (QuadAttrKey? x))
                                     (values (cons x ks) vs #f)
-                                    (values ks (cons x vs) #t)))]) 
+                                    (values ks (cons (assert x QuadAttrValue?) vs) #t)))]) 
     (when (not even?) (error 'quadattrs "odd number of elements in ~a" xs))
     (for/list : QuadAttrs ([k (in-list ks)][v (in-list vs)])
       (list k v))))
@@ -188,51 +191,15 @@
              ((Listof Quad) . -> . Quad)
              (apply id (gather-common-attrs qs) qs))
            
-           ;; v1 of quad maker
-           #;(define/typed (id [attrs #f] . xs)
-               (case-> 
-                (-> Quad)
-                (((U False QuadAttrs HashableList)) #:rest QuadListItem . ->* . Quad))
-               (quad 'id (cond 
-                           ;; need this cast because no predicate can be made for QuadAttrs
-                           [(quad-attrs? attrs) (cast attrs QuadAttrs)]
-                           [(list? attrs)
-                            (if (HashableList? attrs)
-                                (quadattrs attrs)
-                                (error 'id "got non-hashable list ~a" attrs))]
-                           [else (quadattrs '())]) (assert xs QuadList?)))
-           
-           ;; v2: much slower than v1 ... why?
-           #;(define/typed id
-               (case->
-                (((U False QuadAttrs HashableList)) #:rest QuadListItem . ->* . Quad)
-                (-> Quad))
-               (case-lambda
-                 [(attrs . xs)
-                  (quad 'id (if attrs
-                                (if (list? attrs)
-                                    (quadattrs attrs)
-                                    attrs)
-                                (quadattrs null)) xs)]
-                 [() (quad 'id (quadattrs null) null)]))
-           
-           ;; IdQuad subtype
            (define-type IdQuad (List 'id QuadAttrs QuadList))
            (define-predicate IdQuad? IdQuad)
            (define id? IdQuad?)
            
-           ;; version 3
-           ;; dummy kw arg is needed to typecheck correctly
-           (define/typed (id [attrs #f] #:zzz [zzz 0] . xs)
-             (() ((U False QuadAttrs HashableList) #:zzz Zero) #:rest QuadListItem . ->* . Quad)
-             (quad 'id (if attrs
-                           (if (list? attrs)
-                               (make-quadattrs attrs)
-                               attrs)
-                           (make-quadattrs null)) xs))
-           
-           
-           ))]))
+           (define/typed (id [attrs '()] #:zzz [zzz 0] . xs)
+             (() (QuadAttrs #:zzz Zero) #:rest QuadListItem . ->* . Quad)
+             (quad 'id (if (list? attrs)
+                           (make-quadattrs attrs)
+                           attrs) xs))))]))
 
 (define/typed (whitespace? x [nbsp? #f])
   ((Any) (Boolean) . ->* . Boolean)  
