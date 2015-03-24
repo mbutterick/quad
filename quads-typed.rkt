@@ -4,7 +4,7 @@
 ;; note to self: a require/typed function with proper typing
 ;; is faster than a generic function + type assertion at location of call
 (require/typed racket/list 
-               [flatten ((Listof QuadAttr) . -> . HashableList)])
+               [flatten ((Listof QuadAttr) . -> . QuadAttrs)])
 (require/typed sugar/list [trimf (All (A) ((Listof A) (A . -> . Boolean) -> (Listof A)))]
                [filter-split (All (A) ((Listof A) (A . -> . Boolean) -> (Listof (Listof A))))])
 (require/typed racket/string [string-append* ((Listof String) . -> . String)])
@@ -68,7 +68,10 @@
 
 
 ;; funky implementation
-(define-type+predicate Quad (Pairof QuadName (Pairof QuadAttrs (Listof (U String Quad)))))
+;; Quad-Recursive works around a bug in the optimizer
+;; see https://github.com/racket/typed-racket/issues/60
+(define-type Quad-Recursive (List* QuadName QuadAttrs (Listof (U String Quad-Recursive))))
+(define-type+predicate Quad (List* QuadName QuadAttrs (Listof (U String Quad-Recursive))))
 (define-predicate quad? Quad)
 (define/typed (quad name attrs items)
   (QuadName QuadAttrs QuadList . -> . Quad)
@@ -82,7 +85,7 @@
 
 (define/typed (quad-attrs q)
   (Quad . -> . QuadAttrs)
-  (cadr q))
+  (car (cdr q)))
 
 (define/typed (quad-attr-keys qas)
   (QuadAttrs . -> . (Listof QuadAttrKey))
@@ -92,17 +95,18 @@
 
 (define/typed (quad-list q)
   (Quad . -> . QuadList)
-  (cddr q))
-
+  (cdr (cdr q)))
 
 
 (define/typed (quad-attr-ref q-or-qas key [default attr-missing])
   (((U Quad QuadAttrs) QuadAttrKey) (QuadAttrValue) . ->* . QuadAttrValue)
   (define qas (if (quad? q-or-qas) (quad-attrs q-or-qas) q-or-qas))
   (define qa-result (memf (λ([qap : QuadAttr]) (equal? key (car qap))) qas))
-  (if qa-result
+  ;; empty check shouldn't be necessary but the memf return type is lax: #f or (Listof A)
+  ;; really it should be #f or (List* A (Listof A))
+  (if (and qa-result (not (empty? qa-result))) 
       ;; car beacause result of memf is a list tail; cadr because second element in pair
-      (cadr (car qa-result))
+      (car (cdr (car qa-result)))
       (if (not (equal? default attr-missing)) default (error 'key-not-found))))
 
 
@@ -141,26 +145,27 @@
       [else (string-append* ((inst map String QuadListItem) loop (quad-list x)))])))
 
 (define/typed+provide (gather-common-attrs qs)
-  ((Listof Quad) . -> . (Option HashableList))
+  ((Listof Quad) . -> . QuadAttrs)
   (: check-cap (Quad QuadAttr . -> . Boolean))
   (define (check-cap q cap) ; cap = candidate-attr-pair
     (equal? (quad-attr-ref q (car cap) attr-missing) (cdr cap)))
-  (and (not (null? qs))
-       (let loop 
-         ([qs qs]
-          ;; start with the set of pairs in the first quad, then filter it down
-          [candidate-attr-pairs : (Listof QuadAttr) (let ([first-attrs (quad-attrs (car qs))])
-                                                      (if first-attrs
-                                                          (for/fold ([kvps : QuadAttrs null]) ([k (in-list (quad-attr-keys first-attrs))])  
-                                                            (if (member k cannot-be-common-attrs)
-                                                                kvps
-                                                                (cons (list k (quad-attr-ref first-attrs k)) kvps)))
-                                                          null))])
-         (cond
-           [(null? candidate-attr-pairs) #f] ; ran out of possible pairs, so return #f
-           [(null? qs) (flatten candidate-attr-pairs)] ; ran out of quads, so return common-attr-pairs
-           ;; todo: reconsider type interface between output of this function and input to quadattrs
-           [else (loop (cdr qs) (filter (λ([cap : QuadAttr]) (check-cap (car qs) cap)) candidate-attr-pairs))]))))
+  (if (null? qs)
+      qs
+      (let loop 
+        ([qs qs]
+         ;; start with the set of pairs in the first quad, then filter it down
+         [candidate-attr-pairs : (Listof QuadAttr) (let ([first-attrs (quad-attrs (car qs))])
+                                                     (if first-attrs
+                                                         (for/fold ([kvps : QuadAttrs null]) ([k (in-list (quad-attr-keys first-attrs))])  
+                                                           (if (member k cannot-be-common-attrs)
+                                                               kvps
+                                                               (cons (list k (quad-attr-ref first-attrs k)) kvps)))
+                                                         null))])
+        (cond
+          [(null? candidate-attr-pairs) null] ; ran out of possible pairs, so return #f
+          [(null? qs) (flatten candidate-attr-pairs)] ; ran out of quads, so return common-attr-pairs
+          ;; todo: reconsider type interface between output of this function and input to quadattrs
+          [else (loop (cdr qs) (filter (λ([cap : QuadAttr]) (check-cap (car qs) cap)) candidate-attr-pairs))]))))
 
 (define/typed (make-quadattrs xs)
   ;; no point typing the input as (U QuadAttrKey QuadAttrValue) 
@@ -191,15 +196,15 @@
              ((Listof Quad) . -> . Quad)
              (apply id (gather-common-attrs qs) qs))
            
-           (define-type IdQuad (List 'id QuadAttrs QuadList))
+           (define-type IdQuad (List* 'id QuadAttrs (Listof (U String Quad))))
            (define-predicate IdQuad? IdQuad)
            (define id? IdQuad?)
            
            (define/typed (id [attrs '()] #:zzz [zzz 0] . xs)
              (() (QuadAttrs #:zzz Zero) #:rest QuadListItem . ->* . Quad)
-             (quad 'id (if (list? attrs)
-                           (make-quadattrs attrs)
-                           attrs) xs))))]))
+             (quad 'id (if (QuadAttrs? attrs)
+                           attrs
+                           (make-quadattrs attrs)) xs))))]))
 
 (define/typed (whitespace? x [nbsp? #f])
   ((Any) (Boolean) . ->* . Boolean)  
@@ -256,7 +261,7 @@
 
 (define-quad-type box)
 
-#|
+
 (define-quad-type spacer)
 (define-quad-type kern)
 (define-quad-type optical-kern)
@@ -278,4 +283,4 @@
 (define-break-type column)
 (define-break-type block)
 (define-break-type line)
-|#
+
