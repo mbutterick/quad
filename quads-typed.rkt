@@ -171,10 +171,9 @@
   (let-values ([(ks vs even?) (for/fold 
                                ([ks : (Listof QuadAttrKey) null][vs : (Listof QuadAttrValue) null][even? : Boolean #t])
                                ([x (in-list xs)])
-                                (if even?
-                                    ;; todo: how to avoid cast here by using HashableList typing?
-                                    (values (cons (cast x QuadAttrKey) ks) vs #f)
-                                    (values ks (cons (cast x QuadAttrValue) vs) #t)))]) 
+                                (if (and even? (QuadAttrKey? x))
+                                    (values (cons x ks) vs #f)
+                                    (values ks (cons x vs) #t)))]) 
     (when (not even?) (error 'quadattrs "odd number of elements in ~a" xs))
     (for/hash : QuadAttrs ([k (in-list ks)][v (in-list vs)])
       (values k v))))
