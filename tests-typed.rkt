@@ -85,4 +85,4 @@
 (check-true (andmap whitespace? funny-unicode-spaces))
 (check-true (andmap whitespace/nbsp? funny-unicode-spaces))
 
-(check-equal? (measure-text "foobar" 10.0 "Courier") 36.0059)
+(check-equal? (measure-text "foobar" 10.0 "Courier" 'normal 'normal) 36.0059)
