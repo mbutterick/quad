@@ -72,8 +72,8 @@
 ;; funky implementation
 ;; Quad-Recursive works around a bug in the optimizer
 ;; see https://github.com/racket/typed-racket/issues/60
-(define-type Quad-Recursive (List* QuadName QuadAttrs (Listof (U String Quad-Recursive))))
-(define-type+predicate Quad (List* QuadName QuadAttrs (Listof (U String Quad-Recursive))))
+(define-type QuadTop (List* QuadName QuadAttrs (Listof (U String QuadTop))))
+(define-type+predicate Quad (List* QuadName QuadAttrs (Listof (U String QuadTop))))
 (define-predicate quad? Quad)
 (define/typed (quad name attrs items)
   (QuadName QuadAttrs QuadList . -> . Quad)
@@ -210,12 +210,12 @@
              ((Listof Quad) . -> . Quad)
              (apply id (gather-common-attrs qs) qs))
            
-           (define-type IdQuad (List* 'id QuadAttrs (Listof (U String Quad))))
+           (define-type IdQuad (List* 'id QuadAttrs (Listof (U String QuadTop))))
            (define-predicate IdQuad? IdQuad)
            (define id? IdQuad?)
            
            (define/typed (id [attrs '()] #:zzz [zzz 0] . xs)
-             (() (QuadAttrs #:zzz Zero) #:rest QuadListItem . ->* . Quad)
+             (() ((U QuadAttrs HashableList) #:zzz Zero) #:rest QuadListItem . ->* . Quad)
              (quad 'id (if (QuadAttrs? attrs)
                            attrs
                            (make-quadattrs attrs)) xs))))]))
