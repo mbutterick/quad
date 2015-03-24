@@ -1,6 +1,6 @@
 #lang typed/racket/base
 (require/typed sugar/list [slice-at ((Listof (U QuadAttrKey QuadAttrValue)) Positive-Integer . -> . (Listof (List QuadAttrKey QuadAttrValue)))])
-(require/typed racket/list [flatten (All (A) (Rec as (U Any (Listof as))) -> (Listof Any))])
+(require/typed racket/list [flatten ((Rec as (U Quad (Listof as))) . -> . (Listof Quad))])
 (require/typed hyphenate [hyphenate (String #:min-length Nonnegative-Integer #:min-left-length Nonnegative-Integer #:min-right-length Nonnegative-Integer . -> . String)])
 (require (for-syntax racket/syntax racket/base) racket/string (except-in racket/list flatten) sugar/debug racket/bool racket/function math/flonum)
 (require "quads-typed.rkt" "world-typed.rkt" "measure-typed.rkt")
@@ -26,10 +26,11 @@
   ((inst append-map QuadAttrPair QuadAttrs) (inst hash->list QuadAttrKey QuadAttrValue) (map (λ(x)
                                                                                                (cond
                                                                                                  [(quad? x) (quad-attrs x)]
+                                                                                                 ;; need cast because no predicate for QuadAttrs
                                                                                                  [(quad-attrs? x) (cast x QuadAttrs)]
-                                                                                                 [(HashableList? x) (make-quadattrs (cast x (Listof Any)))]
+                                                                                                 [(HashableList? x) (make-quadattrs x)]
                                                                                                  [else ;; something that will have no effect on result 
-                                                                                                  (cast (hash) QuadAttrs)])) quads-or-attrs-or-lists)))
+                                                                                                  (make-quadattrs '())])) quads-or-attrs-or-lists)))
 
 
 ;; flatten merges attributes, but applies special logic suitable to flattening
@@ -71,7 +72,7 @@
 ;; resulting in a flat list of quads.
 (define/typed+provide (flatten-quad q)
   (Quad . -> . (Listof Quad))
-  (cast (flatten 
+  (flatten 
          (let loop : (Treeof Quad)
            ([x : QuadListItem q][parent : Quad (box)])
            
@@ -84,7 +85,7 @@
                     x-with-parent-attrs ; no subelements, so stop here
                     ((inst map (Treeof Quad) QuadListItem) (λ(xi) (loop xi x-with-parent-attrs)) (quad-list x))))] ; replace quad with its elements
              [else ;; it's a string
-              (quad (quad-name parent) (quad-attrs parent) (list x))]))) (Listof Quad)))
+              (quad (quad-name parent) (quad-attrs parent) (list x))]))))
 
 
 ;; flatten quad as above, 
@@ -101,7 +102,7 @@
            ((inst map (Treeof Quad) QuadListItem) (λ(xi) (do-explode xi x)) (quad-list x)))] ; replace quad with its elements, exploded
       [else ;; it's a string
        ((inst map (Treeof Quad) QuadListItem) (λ(xc) (quad world:split-quad-key (quad-attrs parent) (list xc))) (regexp-match* #px"." x))]))
-  (cast (flatten (map do-explode (flatten-quad q))) (Listof Quad)))
+  (flatten (map do-explode (flatten-quad q))))
 
 
 ;; merge chars into words (and boxes), leave the rest
@@ -153,8 +154,8 @@
     (let loop : QuadListItem ([qli : QuadListItem qli][parent-x : Float 0.0][parent-y : Float 0.0])
     (cond
       [(quad? qli) 
-       (define adjusted-x (round-float (+ (cast (quad-attr-ref qli world:x-position-key 0.0) Float) parent-x)))
-       (define adjusted-y (round-float (+ (cast (quad-attr-ref qli world:y-position-key 0.0) Float) parent-y)))
+       (define adjusted-x (round-float (+ (assert (quad-attr-ref qli world:x-position-key 0.0) flonum?) parent-x)))
+       (define adjusted-y (round-float (+ (assert (quad-attr-ref qli world:y-position-key 0.0) flonum?) parent-y)))
        (quad (quad-name qli) (merge-attrs qli (list world:x-position-key adjusted-x world:y-position-key adjusted-y)) ((inst map QuadListItem QuadListItem) (λ(qlii) (loop qlii adjusted-x adjusted-y)) (quad-list qli)))]
       [else ;; it's a string
        qli])))
@@ -223,13 +224,15 @@
 
 (define/typed+provide (quad-height q)
   (Quad . -> . Float)
-  (cast (quad-attr-ref q world:height-key 0.0) Float))
+  (assert (quad-attr-ref q world:height-key 0.0) flonum?))
 
 ;; use heights to compute vertical positions
 (define/typed+provide (add-vert-positions starting-quad)
   (Quad . -> . Quad)
   (define-values (new-quads final-height)
-    (for/fold ([new-quads : (Listof Quad) empty][height-so-far : Float 0.0])([q (in-list (cast (quad-list starting-quad) (Listof Quad)))])
+    (for/fold ([new-quads : (Listof Quad) empty][height-so-far : Float 0.0])
+              ([q (in-list (quad-list starting-quad))])
+      (assert q quad?)
       (values (cons (quad-attr-set q world:y-position-key height-so-far) new-quads) 
               (round-float (+ height-so-far (quad-height q))))))
   (quad (quad-name starting-quad) (quad-attrs starting-quad) (reverse new-quads)))
