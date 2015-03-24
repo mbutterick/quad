@@ -34,23 +34,25 @@
 
 ;; flatten merges attributes, but applies special logic suitable to flattening
 ;; for instance, resolving x and y coordinates.
+(define-type QuadAttrFloatPair (Pairof QuadAttrKey Float))
+
 (define/typed+provide (flatten-attrs . quads-or-attrs-or-falses)
   ((U Quad QuadAttrs) * . -> . QuadAttrs)
   (define all-attrs (join-attrs quads-or-attrs-or-falses))
   (define-values (x-attrs y-attrs other-attrs-reversed)
-    (for/fold ([xas : (Listof QuadAttrPair) null]
-               [yas : (Listof QuadAttrPair) null]
+    (for/fold ([xas : (Listof QuadAttrFloatPair) null]
+               [yas : (Listof QuadAttrFloatPair) null]
                [oas : (Listof QuadAttrPair) null])
               ([attr (in-list all-attrs)])
       (cond
-        [(equal? (car attr) world:x-position-key) (values (cons attr xas) yas oas)]
-        [(equal? (car attr) world:y-position-key) (values xas (cons attr yas) oas)]
+        [(and (equal? (car attr) world:x-position-key) (flonum? (cdr attr))) (values (cons attr xas) yas oas)]
+        [(and (equal? (car attr) world:y-position-key) (flonum? (cdr attr))) (values xas (cons attr yas) oas)]
         [else (values xas yas (cons attr oas))])))
-  (: make-cartesian-attr (QuadAttrKey (Listof QuadAttrPair) . -> . (Listof QuadAttrPair)))
+  (: make-cartesian-attr (QuadAttrKey (Listof QuadAttrFloatPair) . -> . (Listof QuadAttrFloatPair)))
   (define (make-cartesian-attr key attrs) 
     (if (empty? attrs) 
         empty 
-        (list (cons key (apply + (cast ((inst map QuadAttrValue QuadAttrPair) cdr attrs) (Listof Float)))))))
+        (list (cons (ann key QuadAttrKey) (foldl fl+ 0.0 ((inst map Float QuadAttrFloatPair) cdr attrs))))))
   (define x-attr (make-cartesian-attr world:x-position-key x-attrs))
   (define y-attr (make-cartesian-attr world:y-position-key y-attrs))
   (for/hash : QuadAttrs ([kv-pair (in-list (append x-attr y-attr (reverse other-attrs-reversed)))])

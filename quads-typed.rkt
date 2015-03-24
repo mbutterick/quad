@@ -37,24 +37,27 @@
            (: proc-name type-expr)
            (define proc-name body ...)))]))
 
+(define-syntax (define-type+predicate stx)
+  (syntax-case stx ()
+    [(_ id basetype)
+     (with-syntax ([id? (format-id stx "~a?" #'id)])
+       #'(begin
+           (define-type id basetype)
+           (define-predicate id? id)))]))
 
 (define-syntax-rule (even-members xs)
   (for/list : (Listof Any) ([(x i) (in-indexed xs)] #:when (even? i))
     x))
 
 
-(define-type QuadName Symbol)
-(define-predicate QuadName? QuadName)
+(define-type+predicate QuadName Symbol)
 
-(define-type QuadAttrKey Symbol)
-(define-predicate QuadAttrKey? QuadAttrKey)
-(define-type QuadAttrValue Any)
-(define-predicate QuadAttrValue? QuadAttrValue)
+(define-type+predicate QuadAttrKey Symbol)
+(define-type+predicate QuadAttrValue Any)
 (define-type QuadAttrs (HashTable QuadAttrKey QuadAttrValue))
 ;;(define-predicate QuadAttrs? QuadAttrs) ;; won't work because it generates a chaperone contract
-(define-type HashableList  (Rec duo (U Null (List* QuadAttrKey Any duo))))
+(define-type+predicate HashableList  (Rec duo (U Null (List* QuadAttrKey Any duo))))
 (provide HashableList?)
-(define-predicate HashableList? HashableList)
 
 (: quad-attrs? (Any . -> . Boolean))
 (define (quad-attrs? x)
@@ -67,9 +70,33 @@
 (define-type (Treeof A) (Rec as (U A (Listof as))))
 
 (struct quad ([name : QuadName] [attrs : QuadAttrs] [list : QuadList]) #:transparent)
-
 (define-type Quad quad)
 (define-predicate Quad? Quad)
+
+
+#|
+;; vector implementation
+
+(define-type Quad (List QuadName QuadAttrs QuadList))
+(define quad? Quad?)
+
+(define/typed (quad name attrs list)
+  (QuadName QuadAttrs QuadList . -> . Quad)
+  `(,name ,attrs ,list))
+
+(define/typed (quad-name q)
+  (Quad . -> . QuadName)
+  (car q))
+
+(define/typed (quad-attrs q)
+  (Quad . -> . QuadAttrs)
+  (cadr q))
+
+(define/typed (quad-list q)
+  (Quad . -> . QuadList)
+  (caddr q))
+|#
+
 
 (define quad-attr-ref
   (case-lambda
