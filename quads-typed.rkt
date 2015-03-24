@@ -37,6 +37,11 @@
            (: proc-name type-expr)
            (define proc-name body ...)))]))
 
+
+(define-syntax-rule (even-members xs)
+  (for/list : (Listof Any) ([(x i) (in-indexed xs)] #:when (even? i))
+    x))
+
 (define-syntax (define-type+predicate stx)
   (syntax-case stx ()
     [(_ id basetype)
@@ -45,34 +50,30 @@
            (define-type id basetype)
            (define-predicate id? id)))]))
 
-(define-syntax-rule (even-members xs)
-  (for/list : (Listof Any) ([(x i) (in-indexed xs)] #:when (even? i))
-    x))
-
-
-(define-type+predicate QuadName Symbol)
-
+(define-type QuadName Symbol)
 (define-type+predicate QuadAttrKey Symbol)
-(define-type+predicate QuadAttrValue Any)
+(define-type QuadAttrValue Any)
 (define-type QuadAttrs (HashTable QuadAttrKey QuadAttrValue))
 ;;(define-predicate QuadAttrs? QuadAttrs) ;; won't work because it generates a chaperone contract
-(define-type+predicate HashableList  (Rec duo (U Null (List* QuadAttrKey Any duo))))
 (provide HashableList?)
+(define-type+predicate HashableList  (Rec duo (U Null (List* QuadAttrKey Any duo))))
 
 (: quad-attrs? (Any . -> . Boolean))
 (define (quad-attrs? x)
   (and (hash? x) (andmap QuadAttrKey? (hash-keys x))))
 
-(define-type QuadListItem (U Quad String))
-(define-predicate QuadListItem? QuadListItem)
+(define-type+predicate QuadListItem (U String Quad))
 (define-type QuadList (Listof QuadListItem))
-(define-predicate QuadList? QuadList)
 (define-type (Treeof A) (Rec as (U A (Listof as))))
 
+;; struct implementation
+
+
+
 (struct quad ([name : QuadName] [attrs : QuadAttrs] [list : QuadList]) #:transparent)
+
 (define-type Quad quad)
 (define-predicate Quad? Quad)
-
 
 #|
 ;; vector implementation
@@ -98,6 +99,7 @@
 |#
 
 
+
 (define quad-attr-ref
   (case-lambda
     [([q : Quad] [key : QuadAttrKey]) 
@@ -120,7 +122,7 @@
 (define (quad-ends-with? q str)
   (cond
     [(not (empty? (quad-list q)))
-     (define last-item (list-ref (quad-list q) (length (quad-list q))))
+     (define last-item (list-ref (quad-list q) (sub1 (length (quad-list q)))))
      (cond
        [(string? last-item) (ends-with? last-item str)]
        [(quad? last-item) (quad-ends-with? last-item str)]
@@ -184,6 +186,7 @@
     [(_ id) 
      (with-syntax ([id? (format-id #'id "~a?" #'id)]
                    [IdQuad (format-id #'id "~aQuad" (string-titlecase (symbol->string (syntax->datum #'id))))]
+                   [IdQuad? (format-id #'id "~aQuad?" (string-titlecase (symbol->string (syntax->datum #'id))))]
                    [quads->id (format-id #'id "quads->~a" #'id)])
        #'(begin
            ;; quad converter
@@ -219,22 +222,24 @@
                                 (quadattrs null)) xs)]
                  [() (quad 'id (quadattrs null) null)]))
            
-           (struct IdQuad quad () #:transparent)
+           ;; IdQuad struct subtype
+           #;(struct IdQuad Quad () #:transparent)
            
            ;; version 3
            ;; dummy kw arg is needed to typecheck correctly
            (define/typed (id [attrs #f] #:zzz [zzz 0] . xs)
              (() ((U False QuadAttrs HashableList) #:zzz Zero) #:rest QuadListItem . ->* . Quad)
-             (IdQuad 'id (if attrs
-                             (if (list? attrs)
-                                 (make-quadattrs attrs)
-                                 attrs)
-                             (make-quadattrs null)) xs))
+             (quad 'id (if attrs
+                           (if (list? attrs)
+                               (make-quadattrs attrs)
+                               attrs)
+                           (make-quadattrs null)) xs))
            
            
            (define/typed (id? x)
              (Any . -> . Boolean)
-             (and (quad? x) (equal? (quad-name x) 'id)))))]))
+             (and (quad? x) (equal? (quad-name x) 'id)))
+           ))]))
 
 (define/typed (whitespace? x [nbsp? #f])
   ((Any) (Boolean) . ->* . Boolean)  
@@ -291,6 +296,7 @@
 
 (define-quad-type box)
 
+
 (define-quad-type spacer)
 (define-quad-type kern)
 (define-quad-type optical-kern)
@@ -312,4 +318,3 @@
 (define-break-type column)
 (define-break-type block)
 (define-break-type line)
-
