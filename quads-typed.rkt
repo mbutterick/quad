@@ -53,7 +53,9 @@
 (define-type+predicate QuadName Symbol)
 (define-type+predicate QuadAttrKey Symbol)
 (define-type+predicate QuadAttrValue (U Float Index String Symbol))
-(define-type+predicate QuadAttr (List QuadAttrKey QuadAttrValue))
+;; QuadAttr could be a list, but that would take twice as many cons cells.
+;; try the economical approach.
+(define-type+predicate QuadAttr (Pairof QuadAttrKey QuadAttrValue))
 (define-type+predicate QuadAttrs (Listof QuadAttr))
 (provide HashableList?)
 (define-type+predicate HashableList  (Rec duo (U Null (List* QuadAttrKey Any duo))))
@@ -87,6 +89,18 @@
   (Quad . -> . QuadAttrs)
   (car (cdr q)))
 
+(define/typed (make-quadattr k v)
+  (QuadAttrKey QuadAttrValue . -> . QuadAttr)
+  (cons k v))
+
+(define/typed (quadattr-key qa)
+  (QuadAttr . -> . QuadAttrKey)
+  (car qa))
+
+(define/typed (quadattr-value qa)
+  (QuadAttr . -> . QuadAttrValue)
+  (cdr qa))
+
 (define/typed (quad-attr-keys qas)
   (QuadAttrs . -> . (Listof QuadAttrKey))
   (if (empty? qas)
@@ -106,7 +120,7 @@
   ;; really it should be #f or (List* A (Listof A))
   (if (and qa-result (not (empty? qa-result))) 
       ;; car beacause result of memf is a list tail; cadr because second element in pair
-      (car (cdr (car qa-result)))
+      (quadattr-value (car qa-result))
       (if (not (equal? default attr-missing)) default (error 'key-not-found))))
 
 
@@ -159,7 +173,7 @@
                                                          (for/fold ([kvps : QuadAttrs null]) ([k (in-list (quad-attr-keys first-attrs))])  
                                                            (if (member k cannot-be-common-attrs)
                                                                kvps
-                                                               (cons (list k (quad-attr-ref first-attrs k)) kvps)))
+                                                               (cons (make-quadattr k (quad-attr-ref first-attrs k)) kvps)))
                                                          null))])
         (cond
           [(null? candidate-attr-pairs) null] ; ran out of possible pairs, so return #f
@@ -179,7 +193,7 @@
                                     (values ks (cons (assert x QuadAttrValue?) vs) #t)))]) 
     (when (not even?) (error 'quadattrs "odd number of elements in ~a" xs))
     (for/list : QuadAttrs ([k (in-list ks)][v (in-list vs)])
-      (list k v))))
+      (make-quadattr k v))))
 
 
 
