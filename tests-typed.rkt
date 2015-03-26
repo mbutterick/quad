@@ -7,7 +7,7 @@
 
 (check-equal? (flatten-attrs (box '(foo bar)) (hash 'x 10.0)) (apply hash '(foo bar x 10.0)))
 (check-equal? (flatten-attrs (hash 'x -5.0) (hash 'x 10.0)) (apply hash '(x 5.0)))
-(check-equal? (merge-attrs (hash 'x -5.0) (hash 'x 10.0)) (apply hash '(x 10.0)))
+;(check-equal? (merge-attrs (hash 'x -5.0) (hash 'x 10.0)) (apply hash '(x 10.0)))
 
 (check-equal? (gather-common-attrs (list (box '(foo bar)) (box '(foo bar goo bar zam zino)) (box '(foo bar goo rab)))) '(foo bar))
 (check-false (gather-common-attrs (list (box) (box '(foo bar goo bar zam zino)) (box '(foo bar)))))
