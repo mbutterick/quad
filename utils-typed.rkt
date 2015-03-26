@@ -108,14 +108,14 @@
                                ;; if key doesn't exist, it is compared against the default value.
                                ;; this way, a nonexistent value will test true against a default value.
                                (andmap (λ([key : QuadAttrKey] [default : QuadAttrValue]) (equal? (quad-attr-ref base-q key default) (quad-attr-ref q key default)))
-                                       (list world:font-name-key 
+                                       (ann (list world:font-name-key 
                                              world:font-size-key 
                                              world:font-weight-key 
-                                             world:font-style-key)
-                                       (list (world:font-name-default) 
+                                             world:font-style-key) (Listof QuadAttrKey))
+                                       (ann (list (world:font-name-default) 
                                              (world:font-size-default) 
                                              (world:font-weight-default) 
-                                             (world:font-style-default))))))])
+                                             (world:font-style-default)) (Listof QuadAttrValue))))))])
     (let loop ([qs : (Listof Quad) qs-in][acc : (Listof Quad) null])
       (if (null? qs)
           (reverse acc)
@@ -145,7 +145,7 @@
         [(quad? qli) 
          (define adjusted-x (round-float (+ (assert (quad-attr-ref qli world:x-position-key 0.0) flonum?) parent-x)))
          (define adjusted-y (round-float (+ (assert (quad-attr-ref qli world:y-position-key 0.0) flonum?) parent-y)))
-         (quad (quad-name qli) (join-attrs qli (list world:x-position-key adjusted-x world:y-position-key adjusted-y)) ((inst map QuadListItem QuadListItem) (λ(qlii) (loop qlii adjusted-x adjusted-y)) (quad-list qli)))]
+         (quad (quad-name qli) (join-attrs (list qli (list world:x-position-key adjusted-x world:y-position-key adjusted-y))) ((inst map QuadListItem QuadListItem) (λ(qlii) (loop qlii adjusted-x adjusted-y)) (quad-list qli)))]
         [else ;; it's a string
          qli])))
   (if (string? result)
@@ -156,7 +156,7 @@
 ;; functionally update a quad attr. Similar to hash-set
 (define/typed+provide (quad-attr-set q k v)
   (Quad QuadAttrKey QuadAttrValue . -> . Quad)
-  (quad (quad-name q) (join-attrs (quad-attrs q) (list k v)) (quad-list q)))
+  (quad (quad-name q) (join-attrs (list (quad-attrs q) (list (cons k v)))) (quad-list q)))
 
 
 ;; functionally update multiple quad attrs. Similar to hash-set*
@@ -169,7 +169,7 @@
 (define/typed+provide (quad-attr-remove q k)
   (Quad QuadAttrKey . -> . Quad)
   (if (quad-attrs q)
-      (quad (quad-name q) (hash-remove (quad-attrs q) k) (quad-list q))
+      (quad (quad-name q) (filter (λ(qa) (equal? (car q) k)) (quad-attrs q)) (quad-list q))
       q))
 
 ;; functionally remove multiple quad attrs. Similar to hash-remove*
