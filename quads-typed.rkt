@@ -52,17 +52,14 @@
 
 (define-type+predicate QuadName Symbol)
 (define-type+predicate QuadAttrKey Symbol)
-(define-type+predicate QuadAttrValue (U Float Index String Symbol))
+(define-type+predicate QuadAttrValue (U Float Index String Symbol Boolean))
 ;; QuadAttr could be a list, but that would take twice as many cons cells.
 ;; try the economical approach.
 (define-type+predicate QuadAttr (Pairof QuadAttrKey QuadAttrValue))
 (define-type+predicate QuadAttrs (Listof QuadAttr))
-(provide HashableList?)
 (define-type+predicate HashableList  (Rec duo (U Null (List* QuadAttrKey Any duo))))
 
-(: quad-attrs? (Any . -> . Boolean))
-(define (quad-attrs? x)
-  (and (hash? x) (andmap QuadAttrKey? (hash-keys x))))
+(define quad-attrs? QuadAttrs?)
 
 (define-type QuadListItem (U String Quad))
 (define-type QuadList (Listof QuadListItem))
@@ -70,10 +67,7 @@
 
 
 ;; funky implementation
-;; Quad-Recursive works around a bug in the optimizer
-;; see https://github.com/racket/typed-racket/issues/60
-(define-type QuadTop (List* QuadName QuadAttrs (Listof (U String QuadTop))))
-(define-type+predicate Quad (List* QuadName QuadAttrs (Listof (U String QuadTop))))
+(define-type+predicate Quad (List* QuadName QuadAttrs (Listof (U String Quad))))
 (define-predicate quad? Quad)
 (define/typed (quad name attrs items)
   (QuadName QuadAttrs QuadList . -> . Quad)
@@ -201,6 +195,8 @@
   (syntax-case stx ()
     [(_ id) 
      (with-syntax ([id? (format-id #'id "~a?" #'id)]
+              ;;     [id-integer (string->number (symbol->string (gensym "")))]
+                   [idsym (format-id #'id "~asym" #'id)]
                    [IdQuad (format-id #'id "~aQuad" (string-titlecase (symbol->string (syntax->datum #'id))))]
                    [IdQuad? (format-id #'id "~aQuad?" (string-titlecase (symbol->string (syntax->datum #'id))))]
                    [quads->id (format-id #'id "quads->~a" #'id)])
@@ -209,8 +205,9 @@
            (define/typed (quads->id qs)
              ((Listof Quad) . -> . Quad)
              (apply id (gather-common-attrs qs) qs))
-           
-           (define-type IdQuad (List* 'id QuadAttrs (Listof (U String QuadTop))))
+
+        ;;   (define-type IdInteger id-integer) ; for experimental quad names (= faster, smaller fixnum names)
+           (define-type IdQuad (List* 'id QuadAttrs (Listof (U String Quad))))
            (define-predicate IdQuad? IdQuad)
            (define id? IdQuad?)
            

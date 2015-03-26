@@ -21,16 +21,14 @@
 
 ;; push together multiple attr sources into one list of pairs.
 ;; mostly a helper function for the two attr functions below.
+(define-type JoinableTypes (U Quad QuadAttrs HashableList)) 
 (define/typed+provide (join-attrs quads-or-attrs-or-lists)
-  ((Listof (U Quad QuadAttrs HashableList)) . -> . (Listof QuadAttrPair))
-  ((inst append-map QuadAttrPair QuadAttrs) (inst hash->list QuadAttrKey QuadAttrValue) (map (λ(x)
-                                                                                               (cond
-                                                                                                 [(quad? x) (quad-attrs x)]
-                                                                                                 ;; need cast because no predicate for QuadAttrs
-                                                                                                 [(quad-attrs? x) (cast x QuadAttrs)]
-                                                                                                 [(HashableList? x) (make-quadattrs x)]
-                                                                                                 [else ;; something that will have no effect on result 
-                                                                                                  (make-quadattrs '())])) quads-or-attrs-or-lists)))
+  ((Listof JoinableTypes) . -> . QuadAttrs)
+  (append-map (λ([x : JoinableTypes])
+                (cond
+                  [(quad? x) (quad-attrs x)]
+                  [(quad-attrs? x) x]
+                  [else (make-quadattrs x)])) quads-or-attrs-or-lists))
 
 
 ;; flatten merges attributes, but applies special logic suitable to flattening
@@ -43,7 +41,7 @@
   (define-values (x-attrs y-attrs other-attrs-reversed)
     (for/fold ([xas : (Listof QuadAttrFloatPair) null]
                [yas : (Listof QuadAttrFloatPair) null]
-               [oas : (Listof QuadAttrPair) null])
+               [oas : (Listof QuadAttr) null])
               ([attr (in-list all-attrs)])
       (cond
         [(and (equal? (car attr) world:x-position-key) (flonum? (cdr attr))) (values (cons attr xas) yas oas)]
@@ -56,16 +54,7 @@
         (list (cons (ann key QuadAttrKey) (foldl fl+ 0.0 ((inst map Float QuadAttrFloatPair) cdr attrs))))))
   (define x-attr (make-cartesian-attr world:x-position-key x-attrs))
   (define y-attr (make-cartesian-attr world:y-position-key y-attrs))
-  (for/hash : QuadAttrs ([kv-pair (in-list (append x-attr y-attr (reverse other-attrs-reversed)))])
-    (values (car kv-pair) (cdr kv-pair))))
-
-;; merge concatenates attributes, with later ones overriding earlier.
-;; most of the work is done by join-attrs.
-(define/typed+provide (merge-attrs . quads-or-attrs-or-lists)
-  ((U Quad QuadAttrs HashableList) * . -> . QuadAttrs)
-  (for/hash : QuadAttrs ([kv-pair (in-list (join-attrs quads-or-attrs-or-lists))])
-    (values (car kv-pair) (cdr kv-pair))))
-
+  (append x-attr y-attr (reverse other-attrs-reversed)))
 
 
 ;; pushes attributes down from parent quads to children, 
@@ -73,19 +62,19 @@
 (define/typed+provide (flatten-quad q)
   (Quad . -> . (Listof Quad))
   (flatten 
-         (let loop : (Treeof Quad)
-           ([x : QuadListItem q][parent : Quad (box)])
-           
-           (cond       
-             [(quad? x)
-              (let ([x-with-parent-attrs (quad (quad-name x) 
-                                               (flatten-attrs parent x) ; child positioned last so it overrides parent attributes 
-                                               (quad-list x))])
-                (if (empty? (quad-list x))
-                    x-with-parent-attrs ; no subelements, so stop here
-                    ((inst map (Treeof Quad) QuadListItem) (λ(xi) (loop xi x-with-parent-attrs)) (quad-list x))))] ; replace quad with its elements
-             [else ;; it's a string
-              (quad (quad-name parent) (quad-attrs parent) (list x))]))))
+   (let loop : (Treeof Quad)
+     ([x : QuadListItem q][parent : Quad (box)])
+     
+     (cond       
+       [(quad? x)
+        (let ([x-with-parent-attrs (quad (quad-name x) 
+                                         (flatten-attrs parent x) ; child positioned last so it overrides parent attributes 
+                                         (quad-list x))])
+          (if (empty? (quad-list x))
+              x-with-parent-attrs ; no subelements, so stop here
+              ((inst map (Treeof Quad) QuadListItem) (λ(xi) (loop xi x-with-parent-attrs)) (quad-list x))))] ; replace quad with its elements
+       [else ;; it's a string
+        (quad (quad-name parent) (quad-attrs parent) (list x))]))))
 
 
 ;; flatten quad as above, 
@@ -118,7 +107,7 @@
                                (not (whitespace/nbsp? q))
                                ;; if key doesn't exist, it is compared against the default value.
                                ;; this way, a nonexistent value will test true against a default value.
-                               (andmap (λ([key : Symbol] default) (equal? (quad-attr-ref base-q key default) (quad-attr-ref q key default)))
+                               (andmap (λ([key : QuadAttrKey] [default : QuadAttrValue]) (equal? (quad-attr-ref base-q key default) (quad-attr-ref q key default)))
                                        (list world:font-name-key 
                                              world:font-size-key 
                                              world:font-weight-key 
@@ -139,8 +128,8 @@
                (define new-word-strings (append-map quad-list (cons base-q matching-qs)))
                (define new-word 
                  (if (andmap string? new-word-strings)
-                  (word (quad-attrs base-q) (string-append* new-word-strings))
-                  (error 'join-quads "expected string")))
+                     (word (quad-attrs base-q) (string-append* new-word-strings))
+                     (error 'join-quads "expected string")))
                (loop other-qs (cons new-word acc))]
               ;; otherwise move on to the next in line
               [else (loop (cdr qs) (cons base-q acc))]))))))
@@ -152,13 +141,13 @@
   (Quad . -> . Quad)
   (define result 
     (let loop : QuadListItem ([qli : QuadListItem qli][parent-x : Float 0.0][parent-y : Float 0.0])
-    (cond
-      [(quad? qli) 
-       (define adjusted-x (round-float (+ (assert (quad-attr-ref qli world:x-position-key 0.0) flonum?) parent-x)))
-       (define adjusted-y (round-float (+ (assert (quad-attr-ref qli world:y-position-key 0.0) flonum?) parent-y)))
-       (quad (quad-name qli) (merge-attrs qli (list world:x-position-key adjusted-x world:y-position-key adjusted-y)) ((inst map QuadListItem QuadListItem) (λ(qlii) (loop qlii adjusted-x adjusted-y)) (quad-list qli)))]
-      [else ;; it's a string
-       qli])))
+      (cond
+        [(quad? qli) 
+         (define adjusted-x (round-float (+ (assert (quad-attr-ref qli world:x-position-key 0.0) flonum?) parent-x)))
+         (define adjusted-y (round-float (+ (assert (quad-attr-ref qli world:y-position-key 0.0) flonum?) parent-y)))
+         (quad (quad-name qli) (join-attrs qli (list world:x-position-key adjusted-x world:y-position-key adjusted-y)) ((inst map QuadListItem QuadListItem) (λ(qlii) (loop qlii adjusted-x adjusted-y)) (quad-list qli)))]
+        [else ;; it's a string
+         qli])))
   (if (string? result)
       (error 'compute-absolute-positions "got string as result: ~v" result)
       result))
@@ -167,7 +156,7 @@
 ;; functionally update a quad attr. Similar to hash-set
 (define/typed+provide (quad-attr-set q k v)
   (Quad QuadAttrKey QuadAttrValue . -> . Quad)
-  (quad (quad-name q) (merge-attrs (quad-attrs q) (list k v)) (quad-list q)))
+  (quad (quad-name q) (join-attrs (quad-attrs q) (list k v)) (quad-list q)))
 
 
 ;; functionally update multiple quad attrs. Similar to hash-set*
