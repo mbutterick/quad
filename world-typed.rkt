@@ -17,7 +17,7 @@
 (define-key-and-parameter measure 'measure 300.0)
 
 
-(define-key-and-parameter font-size 'size 13)
+(define-key-and-parameter font-size 'size 13.0)
 (define-key-and-parameter font-name 'font "Triplicate T4")
 (define-key-and-parameter font-weight 'weight 'normal)
 (define-key-and-parameter font-style 'style 'normal)
