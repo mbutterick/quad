@@ -1,14 +1,13 @@
 #lang typed/racket/base
 (require (for-syntax typed/racket/base))
-(require typed/racket/class math/flonum racket/list racket/file)
-(require/typed racket/draw 
-               [record-dc%  (Class (init-field) 
-                                   (get-text-extent (String (Instance (Class (init-field))) Any . -> . (values Nonnegative-Real Nonnegative-Real Nonnegative-Real Nonnegative-Real))))]
-               [make-font ((#:size Nonnegative-Float) (#:style Symbol) (#:weight Symbol) (#:face String) . -> . (Instance (Class (init-field))))])
+(require typed/racket/class math/flonum racket/list racket/file typed/racket/draw)
+
 (require/typed racket/serialize [serialize (Any . -> . Any)]
                [deserialize (Any . -> . (HashTable (List String String Symbol Symbol) Measurement-Result-Type))])
 (provide measure-text measure-ascent round-float update-text-cache-file load-text-cache-file)
 
+
+(define-type Font-Name String)
 (define precision 4.0)
 (define base (expt 10.0 precision))
 (define max-size 1024.0)
@@ -16,7 +15,7 @@
 (define-type Measurement-Result-Type (List Float Float Float Float))
 (define mrt? (make-predicate Measurement-Result-Type))
 (define current-text-cache (make-parameter ((inst make-hash (List String String Symbol Symbol) Measurement-Result-Type) '())))
-(define current-font-cache (make-parameter ((inst make-hash (List String Symbol Symbol) (Instance (Class (init-field)))) '())))
+(define current-font-cache (make-parameter ((inst make-hash (List Font-Name Font-Weight Font-Style) (Instance Font%)) '())))
 
 
 (: round-float (Float . -> . Float))
@@ -42,12 +41,12 @@
                           ((inst make-hash (List String String Symbol Symbol) Measurement-Result-Type) '()))))
 
 
-(: get-cached-font (String Symbol Symbol . -> . (Instance (Class (init-field)))))
+(: get-cached-font (Font-Name Font-Weight Font-Style . -> . (Instance Font%)))
 (define (get-cached-font font weight style)
   (hash-ref! (current-font-cache) (list font weight style) (λ() (make-font #:size max-size #:style style #:weight weight #:face font))))
 
 
-(: measure-max-size ((String String) (Symbol Symbol) . ->* . Measurement-Result-Type))
+(: measure-max-size ((String Font-Name) (Font-Weight Font-Style) . ->* . Measurement-Result-Type))
 (define (measure-max-size text font [weight 'normal] [style 'normal])
   (: hash-updater (-> Measurement-Result-Type))
   (define (hash-updater) 
@@ -67,14 +66,14 @@
 
 
 ;; works by taking max size and scaling it down. Allows caching of results.
-(: measure-text (String Positive-Float String Symbol Symbol . -> . Float))
+(: measure-text (String Positive-Float String Font-Weight Font-Style . -> . Float))
 (define (measure-text text size font weight style)
   (define raw-width (width (measure-max-size text font weight style)))
   (round-float (/ (* raw-width size) max-size)))
 
 
 ;; works by taking max size and scaling it down. Allows caching of results.
-(: measure-ascent ((String Positive-Float String) (Symbol Symbol) . ->* . Float))
+(: measure-ascent ((String Positive-Float String) (Font-Weight Font-Style) . ->* . Float))
 (define (measure-ascent text size font [weight 'normal] [style 'normal])
   (define result-list : Measurement-Result-Type (measure-max-size text font weight style))
   (define raw-baseline-distance (- (height result-list) (descent result-list)))

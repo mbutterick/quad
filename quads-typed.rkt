@@ -110,9 +110,7 @@
   (((U Quad QuadAttrs) QuadAttrKey) (QuadAttrValue) . ->* . QuadAttrValue)
   (define qas (if (quad? q-or-qas) (quad-attrs q-or-qas) q-or-qas))
   (define qa-result (memf (λ([qap : QuadAttr]) (equal? key (car qap))) qas))
-  ;; empty check shouldn't be necessary but the memf return type is lax: #f or (Listof A)
-  ;; really it should be #f or (List* A (Listof A))
-  (if (and qa-result (not (empty? qa-result))) 
+  (if qa-result 
       ;; car beacause result of memf is a list tail; cadr because second element in pair
       (quadattr-value (car qa-result))
       (if (not (equal? default attr-missing)) default (error 'key-not-found))))
@@ -164,14 +162,14 @@
          ;; start with the set of pairs in the first quad, then filter it down
          [candidate-attr-pairs : (Listof QuadAttr) (let ([first-attrs (quad-attrs (car qs))])
                                                      (if first-attrs
-                                                         (for/fold ([kvps : QuadAttrs null]) ([k (in-list (quad-attr-keys first-attrs))])  
-                                                           (if (member k cannot-be-common-attrs)
+                                                         (for/fold ([kvps : QuadAttrs null]) ([qa (in-list first-attrs)])  
+                                                           (if (member (car qa) cannot-be-common-attrs)
                                                                kvps
-                                                               (cons (make-quadattr k (quad-attr-ref first-attrs k)) kvps)))
+                                                               (cons qa kvps)))
                                                          null))])
         (cond
           [(null? candidate-attr-pairs) null] ; ran out of possible pairs, so return #f
-          [(null? qs) (flatten candidate-attr-pairs)] ; ran out of quads, so return common-attr-pairs
+          [(null? qs) candidate-attr-pairs] ; ran out of quads, so return common-attr-pairs
           ;; todo: reconsider type interface between output of this function and input to quadattrs
           [else (loop (cdr qs) (filter (λ([cap : QuadAttr]) (check-cap (car qs) cap)) candidate-attr-pairs))]))))
 
@@ -186,8 +184,10 @@
                                     (values (cons x ks) vs #f)
                                     (values ks (cons (assert x QuadAttrValue?) vs) #t)))]) 
     (when (not even?) (error 'quadattrs "odd number of elements in ~a" xs))
-    (for/list : QuadAttrs ([k (in-list ks)][v (in-list vs)])
-      (make-quadattr k v))))
+    ;; use for/fold rather than for/list to impliedly reverse the list
+    ;; (having been reversed once above, this puts it back in order)
+    (for/fold ([qas : QuadAttrs null])([k (in-list ks)][v (in-list vs)])
+      (cons (make-quadattr k v) qas))))
 
 
 
