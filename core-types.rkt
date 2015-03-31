@@ -47,9 +47,9 @@
 (define-type JoinableType (U Quad QuadAttrs HashableList)) 
 
 
-(define-type QuadListItem (U String Quad))
+(define-type+predicate QuadListItem (U String Quad))
 (define-type+predicate QuadList (Listof QuadListItem))
-(define-type GroupQuadListItem Quad)
+(define-type+predicate GroupQuadListItem Quad)
 (define-type+predicate GroupQuadList (Listof GroupQuadListItem))
 (define-type (Treeof A) (Rec as (U A (Listof as))))
 
@@ -73,4 +73,6 @@
 (define-predicate Font-Weight? Font-Weight)
 (define-predicate Font-Style? Font-Style)
 
-(define-predicate Index? Index) 
+(define-predicate Index? Index)
+
+(define-type+predicate Breakpoint Nonnegative-Integer)

@@ -243,5 +243,5 @@
 
 (define-break-type page #t)
 (define-break-type column #t)
-(define-break-type block #t)
+(define-break-type block)
 (define-break-type line #t)

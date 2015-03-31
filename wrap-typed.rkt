@@ -150,12 +150,12 @@
   (let ([p (apply piece (attr-delete (quad-attrs p) world:word-break-key) (quad-list p))]) ; so it doesn't propagate into subquads
     (if the-word-break
         (apply piece (quad-attrs p) 
-              (append (quad-list p) (let ([rendered-wb ((if before-break? 
-                                                            word-break->before-break 
-                                                            word-break->no-break) the-word-break)])
-                                      (if (> (string-length (word-string rendered-wb)) 0) ; if rendered-wb is "", don't append it
-                                          (list rendered-wb)
-                                          empty))))
+               (append (quad-list p) (let ([rendered-wb ((if before-break? 
+                                                             word-break->before-break 
+                                                             word-break->no-break) the-word-break)])
+                                       (if (> (string-length (word-string rendered-wb)) 0) ; if rendered-wb is "", don't append it
+                                           (list rendered-wb)
+                                           empty))))
         p)))
 
 
@@ -250,13 +250,13 @@
     (quad (quad-name q) (merge-attrs (or filtered-attrs null) q) (quad-list q)))
   
   (apply line (quad-attrs line-in) 
-        (flatten-quadtree (let ([qs (quad-list line-in)])
-                            (list (if before (copy-with-attrs before (first qs)) null)
-                                  (map (λ([q : Quad]) (if (and middle (takes-justification-space? q)) 
-                                                          (let ([interleaver (copy-with-attrs middle q)])
-                                                            (list interleaver q interleaver)) 
-                                                          (list q))) qs)
-                                  (if after (copy-with-attrs after (last qs)) null))))))
+         (flatten-quadtree (let ([qs (quad-list line-in)])
+                             (list (if before (copy-with-attrs before (first qs)) null)
+                                   (map (λ([q : Quad]) (if (and middle (takes-justification-space? q)) 
+                                                           (let ([interleaver (copy-with-attrs middle q)])
+                                                             (list interleaver q interleaver)) 
+                                                           (list q))) qs)
+                                   (if after (copy-with-attrs after (last qs)) null))))))
 
 
 ;; installs the width in the quad.
@@ -329,10 +329,7 @@
 ;; a faster line-measuring function used by the wrapping function to test lines.
 (define/typed (measure-potential-line ps)
   ((Listof PieceQuad) . -> . Float)
-  (cast (for*/sum : (U Float Zero) 
-          ([rendered-piece (in-list (render-pieces ps))]
-           [piece-quad (in-list (quad-list rendered-piece))])
-          (quad-width (cast piece-quad Quad))) Float))
+  (foldl fl+ 0.0 (append-map (λ([rp : PieceQuad]) (map quad-width (quad-list rp))) (render-pieces ps))))
 
 
 (define/typed (vector-break-at vec bps)
@@ -346,7 +343,7 @@
 
 
 ;; makes a wrap function by combining component functions.
-(define-type Wrap-Proc-Type (((Listof Quad)) (Float) . ->* . (Listof Quad)))
+(define-type Wrap-Proc-Type (((Listof Quad)) (Float) . ->* . (Listof LineQuad)))
 (define/typed (make-wrap-proc 
                make-pieces-proc 
                measure-quad-proc
@@ -354,50 +351,48 @@
                find-breakpoints-proc)
   ((Make-Pieces-Type Measure-Quad-Type Compose-Line-Type Find-Breakpoints-Type) () . ->* . Wrap-Proc-Type)
   (λ(qs [measure #f])
-    (let* ([measure : Float (fl+ (cast (or measure (quad-attr-ref/parameter (car qs) world:measure-key)) Float) 0.0)]
-           [qs : (Listof Quad) (if (quad-has-attr? (car qs) world:measure-key)
+    (let* ([measure (or measure (assert (quad-attr-ref/parameter (car qs) world:measure-key) flonum?))]
+           [qs (if (quad-has-attr? (car qs) world:measure-key)
                                    qs
                                    ((inst map Quad Quad) (λ(q) (quad-attr-set q world:measure-key measure)) qs))])
       (log-quad-debug "wrapping on measure = ~a" measure)
-      (define pieces : (Listof PieceQuad) (make-pieces-proc qs)) 
-      (define bps : (Listof Nonnegative-Integer) (find-breakpoints-proc (list->vector pieces) measure)) 
-      (define broken-pieces : (Listof (Listof PieceQuad)) (break-at pieces bps)) 
-      #; (define-type Compose-Line-Type ((Listof Quad) (Quad . -> . Float) . -> . Quad))
-      (map (λ([broken-piece : (Listof PieceQuad)]) (compose-line-proc broken-piece measure-quad-proc)) broken-pieces)))) ; 80% of runtime
+      (define pieces (make-pieces-proc qs)) 
+      (define bps (find-breakpoints-proc (list->vector pieces) measure)) 
+      (define broken-pieces (break-at pieces bps)) 
+      (map (λ([broken-piece : (Listof PieceQuad)]) (compose-line-proc broken-piece measure-quad-proc)) broken-pieces))))
 
 (define width? flonum?)
 (define measure? flonum?)
 (define (breakpoints? x) (and (list? x) (andmap integer? x)))
 
 (define/typed (install-measurement-keys p)
-  (Quad . -> . Quad)
-  (define basic-width (round-float 
-                       (foldl + 0.0 ((inst map Float Quad) quad-width (cast (quad-list p) (Listof Quad))))))
-  (define p-word-break (cast (quad-attr-ref p world:word-break-key #f) Quad))
+  (GroupQuad . -> . Quad)
+  (define basic-width (round-float
+                       (foldl fl+ 0.0 (map quad-width (quad-list p)))))
+  (define p-word-break (assert (quad-attr-ref p world:word-break-key #f) quad?))
   (define before-break-width (fl+ basic-width (if p-word-break
-                                                  (quad-width (word (quad-attrs p-word-break) (cast (quad-attr-ref p-word-break world:before-break-key) QuadListItem)))
+                                                  (quad-width (word (quad-attrs p-word-break) (assert (quad-attr-ref p-word-break world:before-break-key) QuadListItem?)))
                                                   0.0)))
   (define no-break-width (fl+ basic-width (if p-word-break
-                                              (quad-width (word (quad-attrs p-word-break) (cast (quad-attr-ref p-word-break world:no-break-key) QuadListItem)))
+                                              (quad-width (word (quad-attrs p-word-break) (assert (quad-attr-ref p-word-break world:no-break-key) QuadListItem?)))
                                               0.0)))
   (quad-attr-set* p (list 'bb-width before-break-width 'nb-width no-break-width)))
 
 (require sugar/debug)
 (define/typed (make-piece-vectors pieces)
-  ((Vectorof Quad) . -> . (values (Vectorof Float) (Vectorof Float))) 
+  ((Vectorof PieceQuad) . -> . (values (Vectorof Float) (Vectorof Float))) 
   (define pieces-measured 
     (for/list : (Listof (Vector Float Float Float)) ([p (in-vector pieces)])
-      (define wb (cast (quad-attr-ref p world:word-break-key #f) (U Quad False)))
+      (define wb (assert (quad-attr-ref p world:word-break-key #f) (λ(wb) (or (false? wb) (quad? wb)))))
       (vector
        ;; throw in 0.0 in case for/list returns empty
-       (apply + 0.0 (for/list : (Listof Float) ([qli (in-list (quad-list p))])
-                      (define q (cast qli Quad))
+       (foldl fl+ 0.0 (for/list : (Listof Float) ([q (in-list (quad-list p))])
                       (define str (quad->string q))
                       (if (equal? str "")
-                          (cast (quad-attr-ref q world:width-key 0.0) Float)
+                          (assert (quad-attr-ref q world:width-key 0.0) flonum?)
                           (apply measure-text (quad->string q) (font-attributes-with-defaults q)))))
-       (if wb (cast (apply measure-text (cast (quad-attr-ref wb world:no-break-key) String) (font-attributes-with-defaults wb)) Float) 0.0)
-       (if wb (cast (apply measure-text (cast (quad-attr-ref wb world:before-break-key) String) (font-attributes-with-defaults wb)) Float) 0.0))))
+       (if wb (apply measure-text (assert (quad-attr-ref wb world:no-break-key) string?) (font-attributes-with-defaults wb)) 0.0)
+       (if wb (apply measure-text (assert (quad-attr-ref wb world:before-break-key) string?) (font-attributes-with-defaults wb)) 0.0))))
   (values
    (for/vector : (Vectorof Float) ([p (in-list pieces-measured)])
      (fl+ (vector-ref p 0) (vector-ref p 1))) ; first = word length, second = nb length
@@ -406,7 +401,7 @@
 
 
 (define/typed (make-trial-line pieces-rendered-widths pieces-rendered-before-break-widths i j)
-  ((Vectorof Float) (Vectorof Float) Nonnegative-Integer Nonnegative-Integer . -> . (Vectorof Float))
+  ((Vectorof Float) (Vectorof Float) Breakpoint Breakpoint . -> . (Vectorof Float))
   (let ([vec (vector-copy pieces-rendered-widths i j)])
     (vector-set! vec (sub1 (vector-length vec)) (vector-ref pieces-rendered-before-break-widths (sub1 j)))
     vec))
@@ -415,29 +410,29 @@
   ((Vectorof Float) . -> . Float)
   (round-float (foldl + 0.0 (vector->list line))))
 
-(struct $penalty ([hyphens : Nonnegative-Integer][width : Value-Type]) #:transparent #:mutable)
+(struct $penalty ([hyphens : Nonnegative-Integer][width : Value-Type]) #:transparent)
 
 ;; top-level adaptive wrap proc.
 ;; first-fit and best-fit are variants.
-(define-type Find-Breakpoints-Type ((Vectorof Quad) Float . -> . (Listof Nonnegative-Integer)))
+(define-type Find-Breakpoints-Type ((Vectorof PieceQuad) Float . -> . (Listof Breakpoint)))
 (define/typed (adaptive-fit-proc pieces measure [use-first? #t] [use-best? #t])
-  (((Vectorof Quad) Float) (Boolean Boolean) . ->* . (Listof Nonnegative-Integer))
+  (((Vectorof PieceQuad) Float) (Boolean Boolean) . ->* . (Listof Nonnegative-Integer))
   
   ;; this is the winning performance strategy: extract the numbers first, then just wrap on those.
   ;; todo: how to avoid re-measuring pieces later?
   ;; todo: how to retain information about words per line and hyphen at end?
   (define-values (pieces-rendered-widths pieces-rendered-before-break-widths)
     (make-piece-vectors pieces))
-  (define pieces-with-word-space ((inst vector-map Boolean Quad) (λ(piece) (and (quad-has-attr? piece world:word-break-key) (equal? (quad-attr-ref (cast (quad-attr-ref piece world:word-break-key) Quad) 'nb) " "))) pieces))
+  (define pieces-with-word-space (vector-map (λ([piece : PieceQuad]) (and (quad-has-attr? piece world:word-break-key) (equal? (quad-attr-ref (assert (quad-attr-ref piece world:word-break-key) quad?) 'nb) " "))) pieces))
   
   (define (make-first-fit-bps-and-widths)
     (define-values (folded-bps folded-widths) 
-      (for/fold ([bps : (Listof Nonnegative-Integer) '(0)][line-widths : (Listof Float) empty])([j-1 (in-range (vector-length pieces))])
+      (for/fold ([bps : (Listof Breakpoint) '(0)][line-widths : (Listof Float) empty])([j-1 : Breakpoint (in-range (vector-length pieces))])
         (define line-width (get-line-width (make-trial-line pieces-rendered-widths
                                                             pieces-rendered-before-break-widths
-                                                            (car bps) (cast (add1 j-1) Nonnegative-Integer))))
+                                                            (car bps) (add1 j-1))))
         (if (fl> line-width (fl* world:allowed-overfull-ratio measure))
-            (values (cons (cast j-1 Nonnegative-Integer) bps) (cons line-width line-widths))
+            (values (cons j-1 bps) (cons line-width line-widths))
             (values bps line-widths))))
     (values (cdr (reverse folded-bps)) (reverse folded-widths)))
   
@@ -446,10 +441,10 @@
     (cond
       [(<= line-count 2) 1.0] ; signals that first-fit is always OK with 1 or 2 lines
       [else ; only measure middle lines. we know bps has at least 2 bps
-       (define looseness-stddev (stddev ((inst map Float Float) (λ(x) (calc-looseness x measure)) (drop-right (drop trial-line-widths 1) 1))))         
+       (define looseness-stddev (fl (stddev ((inst map Float Float) (λ(x) (calc-looseness x measure)) (drop-right (drop trial-line-widths 1) 1)))))         
        (define piece-count (vector-length pieces-rendered-widths)) 
-       (define pieces-per-line (fl/ (fl piece-count) (sub1 (fl line-count)))) ; todo: more accurate to count only pieces in middle
-       (apply + (list 2.2 (fllog (flabs (cast looseness-stddev Float))) (* 0.09 pieces-per-line)))])) ; the FU FORMULA
+       (define pieces-per-line (/ piece-count (sub1 line-count))) ; todo: more accurate to count only pieces in middle
+       (foldl fl+ 0.0 (list 2.2 (fllog (flabs looseness-stddev)) (fl* 0.09 (fl pieces-per-line))))])) ; the FU FORMULA
   
   ;; only buy first-fit-bps if use-first? is true.
   ;; use (values '(0) '(0.0)) as void-ish values that will typecheck properly.
@@ -479,11 +474,11 @@
               (> j (vector-length pieces))) ; exceeds available pieces
           ($penalty 0 (fl* -1.0 (fl i)))] ; ocm out of bounds signal
          [else
-          (define penalty-up-to-i (cast (ocm-min-entry ocm i) $penalty))
+          (define penalty-up-to-i (assert (ocm-min-entry ocm i) $penalty?))
           (define last-piece-to-test (vector-ref pieces (sub1 j)))
           (define new-hyphen?
             (and (quad-has-attr? last-piece-to-test world:word-break-key)
-                 (equal? (cast (quad-attr-ref (cast (quad-attr-ref last-piece-to-test world:word-break-key) Quad) world:before-break-key) String) "-")))
+                 (equal? (assert (quad-attr-ref (assert (quad-attr-ref last-piece-to-test world:word-break-key) quad?) world:before-break-key) string?) "-")))
           (define cumulative-hyphens (if (not new-hyphen?) 
                                          0 
                                          (add1 ($penalty-hyphens penalty-up-to-i))))
@@ -511,7 +506,7 @@
                           ;; 0 penalty means any length is ok.
                           ;[(< (length pieces-to-test) (world:minimum-last-line-pieces)) 50000]
                           [else 0.0]))))))]))
-     
+
      (define ocm : OCM-Type (make-ocm penalty (cast $penalty->value Entry->Value-Type) initial-value))
      
      ;; starting from last position, ask ocm for position of row minimum (= new-pos)
@@ -519,8 +514,8 @@
      ;; until you reach first position.    
      (define first-position 0)
      (define last-position (vector-length pieces))
-     (define result (let loop : (Listof Nonnegative-Integer) ([pos : Nonnegative-Integer last-position][acc : (Listof Nonnegative-Integer) null])
-                      (let ([next-pos (cast (ocm-min-index ocm pos) Nonnegative-Integer)]) ; first look ahead ...
+     (define result (let loop : (Listof Breakpoint) ([pos : Breakpoint last-position][acc : (Listof Breakpoint) null])
+                      (let ([next-pos (assert (ocm-min-index ocm pos) Breakpoint?)]) ; first look ahead ...
                         (if (= next-pos first-position) ; therefore we're done
                             acc
                             (loop next-pos (cons next-pos acc))))))
@@ -539,14 +534,14 @@
                             make-pieces 
                             quad-width 
                             pieces->line 
-                            (λ(x y) (adaptive-fit-proc (cast x (Vectorof Quad)) (cast y Float) #t #f))))
+                            (λ([x : (Vectorof PieceQuad)] [y : Float]) (adaptive-fit-proc x y #t #f))))
 
 ;; wrap proc based on penalty function
 (define+provide wrap-best (make-wrap-proc
                            make-pieces
                            quad-width
                            pieces->line
-                           (λ(x y) (adaptive-fit-proc (cast x (Vectorof Quad)) (cast y Float) #f #t)))) ; note difference in boolean args
+                           (λ([x : (Vectorof PieceQuad)] [y : Float]) (adaptive-fit-proc x y #f #t)))) ; note difference in boolean args
 
 (define+provide wrap-adaptive (make-wrap-proc 
                                make-pieces
@@ -565,8 +560,8 @@
 ;; and broaden type from just LineQuad
 (define/typed+provide (fill starting-quad [target-width? #f])
   ((LineQuad) ((Option Float)) . ->* . LineQuad)
-  (define target-width (fl (or target-width? (cast (quad-attr-ref starting-quad world:measure-key) Float)))) 
-  (define subquads (cast (quad-list starting-quad) (Listof Quad)))
+  (define target-width (or target-width? (assert (quad-attr-ref starting-quad world:measure-key) flonum?))) 
+  (define subquads (quad-list starting-quad))
   (define-values (flexible-subquads fixed-subquads) (partition spacer? subquads)) ; only puts fill into spacers.
   (define width-used (apply + ((inst map Float Quad) quad-width fixed-subquads)))
   (define width-remaining (round-float (- target-width width-used)))
@@ -587,10 +582,9 @@
 ;; add x positions to a list of fixed-width quads
 ;; todo: adjust this to work recursively, so that positioning operation cascades down
 (define/typed+provide (add-horiz-positions starting-quad)
-  (Quad . -> . Quad)
+  (GroupQuad . -> . GroupQuad)
   (define-values (new-quads final-width)
-    (for/fold ([new-quads : (Listof Quad) empty][width-so-far : Float 0.0])([qi (in-list (quad-list starting-quad))])
-      (define q (cast qi Quad))
+    (for/fold ([new-quads : (Listof Quad) empty][width-so-far : Float 0.0])([q (in-list (quad-list starting-quad))])
       (values (cons (quad-attr-set q world:x-position-key width-so-far) new-quads) (round-float (fl+ (quad-width q) width-so-far)))))
   (quad (quad-name starting-quad) (quad-attrs starting-quad) (reverse new-quads)))
 
