@@ -66,7 +66,7 @@
 ;; ordinary flatten won't work because a quad is a bare list,
 ;; and flatten will go too far.
 ;; this version adds a check for quadness to the flattener.
-(define/typed (flatten-quadtree quad-tree)
+(define/typed+provide (flatten-quadtree quad-tree)
   ((Treeof Quad) . -> . (Listof Quad))
   (let loop ([sexp quad-tree][acc : (Listof Quad) null])
     (cond [(null? sexp) acc]
@@ -171,25 +171,43 @@
       result))
 
 
+;; these helper functions isolate the generic functionality.
+;; problem with quad-attr-set and other Quad->Quad functions
+;; is that they strip out type.
+;; whereas these "surgical" alternatives can be used when preserving type is essential
+(define/typed+provide (attr-change qas kvs)
+  (QuadAttrs HashableList . -> . QuadAttrs)
+  (merge-attrs qas kvs))
+
+(define/typed+provide (attr-delete qas . ks)
+  (QuadAttrs QuadAttrKey * . -> . QuadAttrs)
+  (filter (λ([qa : QuadAttr]) (not (ormap (λ(k) (equal? (car qa) k)) ks))) qas))
+
+
 ;; functionally update a quad attr. Similar to hash-set
 (define/typed+provide (quad-attr-set q k v)
-  (Quad QuadAttrKey QuadAttrValue . -> . Quad)
+  (case->
+   (GroupQuad QuadAttrKey QuadAttrValue . -> . GroupQuad)
+  (Quad QuadAttrKey QuadAttrValue . -> . Quad))
   (quad-attr-set* q (list k v)))
 
 
 ;; functionally update multiple quad attrs. Similar to hash-set*
 (define/typed+provide (quad-attr-set* q kvs)
-  (Quad HashableList . -> . Quad)
-  (quad (quad-name q) (merge-attrs (quad-attrs q) kvs) (quad-list q)))
-
+  (case->
+   (GroupQuad HashableList . -> . GroupQuad)
+   (Quad HashableList . -> . Quad))
+  (quad (quad-name q) (attr-change (quad-attrs q) kvs) (quad-list q)))
 
 
 ;; functionally remove multiple quad attrs. Similar to hash-remove*
 (define/typed+provide (quad-attr-remove* q . ks)
-  (Quad QuadAttrKey * . -> . Quad)
+  (case->
+   (GroupQuad QuadAttrKey * . -> . GroupQuad)
+   (Quad QuadAttrKey * . -> . Quad))
   (if (not (empty? (quad-attrs q)))
       ;; test all ks as a set so that iteration through attrs only happens once
-      (quad (quad-name q) (filter (λ([qa : QuadAttr]) (not (ormap (λ(k) (equal? (car qa) k)) ks))) (quad-attrs q)) (quad-list q))
+      (quad (quad-name q) (apply attr-delete (quad-attrs q) ks) (quad-list q))
       q))
 
 

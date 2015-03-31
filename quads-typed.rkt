@@ -17,8 +17,6 @@
   (for/list : (Listof Any) ([(x i) (in-indexed xs)] #:when (even? i))
     x))
 
-
-
 (define/typed (quad-name q)
   (Quad . -> . QuadName)
   (car q))
@@ -139,35 +137,32 @@
 
 (define-syntax (define-quad-type stx)
   (syntax-case stx ()
-    [(_ id) 
+    [(_ id)
+     #'(define-quad-type id #f)]
+    [(_ id wants-group?) 
      (with-syntax ([id? (format-id #'id "~a?" #'id)]
-              ;;     [id-integer (string->number (symbol->string (gensym "")))]
-                   [idsym (format-id #'id "~asym" #'id)]
                    [IdQuad (format-id #'id "~aQuad" (string-titlecase (symbol->string (syntax->datum #'id))))]
                    [IdQuad? (format-id #'id "~aQuad?" (string-titlecase (symbol->string (syntax->datum #'id))))]
-                   [IdGroupQuad (format-id #'id "~aGroupQuad" (string-titlecase (symbol->string (syntax->datum #'id))))]
-                   [IdGroupQuad? (format-id #'id "~aGroupQuad?" (string-titlecase (symbol->string (syntax->datum #'id))))]
                    [quads->id (format-id #'id "quads->~a" #'id)])
-       #'(begin
+       #`(begin
            ;; quad converter
            (define/typed (quads->id qs)
-             ((Listof Quad) . -> . Quad)
+             ((Listof Quad) . -> . IdQuad)
              (apply id (gather-common-attrs qs) qs))
-
-        ;;   (define-type IdInteger id-integer) ; for experimental quad names (= faster, smaller fixnum names)
-           (define-type IdQuad (List* 'id QuadAttrs (Listof (U String Quad))))
+        
+           (define-type IdQuad (List* 'id QuadAttrs #,(if (syntax->datum #'wants-group?)
+                                                          #'GroupQuadList
+                                                          #'QuadList)))
            (define-predicate IdQuad? IdQuad)
-
-           ;; group version of quad has no strings in its quad-list
-           (define-type IdGroupQuad (List* 'id QuadAttrs (Listof Quad)))
-           (define-predicate IdGroupQuad? IdGroupQuad)
            (define id? IdQuad?)
            
            (define/typed (id [attrs '()] #:zzz [zzz 0] . xs)
-             (() ((U QuadAttrs HashableList) #:zzz Zero) #:rest QuadListItem . ->* . Quad)
+             (() ((U QuadAttrs HashableList) #:zzz Zero) #:rest #,(if (syntax->datum #'wants-group?)
+                                                          #'GroupQuadListItem
+                                                          #'QuadListItem) . ->* . IdQuad)
              (quad 'id (if (QuadAttrs? attrs)
-                           attrs
-                           (make-quadattrs attrs)) xs))))]))
+                            attrs
+                            (make-quadattrs attrs)) xs))))]))
 
 (define/typed (whitespace? x [nbsp? #f])
   ((Any) (Boolean) . ->* . Boolean)  
@@ -183,7 +178,9 @@
 
 (define-syntax (define-break-type stx)
   (syntax-case stx ()
-    [(_ id) 
+    [(_ id)
+     #'(define-break-type id #f)]
+    [(_ id wants-group?)  
      (with-syntax ([split-on-id-breaks (format-id #'id "split-on-~a-breaks" #'id)]
                    [id-break (format-id #'id "~a-break" #'id)]
                    [id-break? (format-id #'id "~a-break?" #'id)]
@@ -191,9 +188,9 @@
                    [multi-id? (format-id #'id "multi~a?" #'id)]
                    [quads->multi-id (format-id #'id "quads->multi~a" #'id)])
        #'(begin
-           (define-quad-type id)
-           (define-quad-type id-break)
-           (define-quad-type multi-id)
+           (define-quad-type id wants-group?)
+           (define-quad-type id-break) ; break is not necessarily a group
+           (define-quad-type multi-id wants-group?) ; multi-id is always a group
            ;; breaker
            (: split-on-id-breaks ((Listof Quad) . -> . (Listof (Listof Quad))))
            (define (split-on-id-breaks xs)
@@ -231,7 +228,7 @@
 (define-quad-type flag)
 (define-quad-type doc)
 (define-quad-type input)
-(define-quad-type piece)
+(define-quad-type piece #t)
 (define-quad-type run)
 
 
@@ -242,8 +239,9 @@
   (if (and (not (null? ql)) (string? (car ql)))
       (car ql)
       ""))
-(define-break-type page)
-(define-break-type column)
-(define-break-type block)
-(define-break-type line)
 
+
+(define-break-type page #t)
+(define-break-type column #t)
+(define-break-type block #t)
+(define-break-type line #t)
