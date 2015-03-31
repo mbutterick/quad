@@ -1,45 +1,46 @@
 #lang typed/racket/base
-(require (for-syntax typed/racket/base racket/syntax))
+(require (for-syntax typed/racket/base racket/syntax) "core-types.rkt")
 (provide (prefix-out world: (all-defined-out)))
 
-(define-syntax-rule (define-parameter name val)
-  (define name (make-parameter val)))
+
+(define-syntax-rule (define-parameter-typed name val type)
+  (define name : (Parameterof type) (make-parameter val)))
 
 (define-syntax (define-key-and-parameter stx)
   (syntax-case stx ()
-    [(_ name keyname val)
+    [(_ name keyname val type)
      (with-syntax ([name-key (format-id #'name "~a-key" #'name)]
                    [name-default (format-id #'name "~a-default" #'name)])
        #'(begin
-           (define name-key keyname)
-           (define-parameter name-default val)))]))
+           (define name-key : QuadAttrKey keyname)
+           (define-parameter-typed name-default val type)))]))
 
-(define-key-and-parameter measure 'measure 300.0)
+(define-key-and-parameter measure 'measure 300.0 QuadAttrValue)
 
 
-(define-key-and-parameter font-size 'size 13.0)
-(define-key-and-parameter font-name 'font "Triplicate T4")
-(define-key-and-parameter font-weight 'weight 'normal)
-(define-key-and-parameter font-style 'style 'normal)
-(define-key-and-parameter font-color 'color "black")
-(define-key-and-parameter font-background 'background "none")
+(define-key-and-parameter font-size 'size 13.0 Font-Size)
+(define-key-and-parameter font-name 'font "Triplicate T4" Font-Name)
+(define-key-and-parameter font-weight 'weight 'normal Font-Weight)
+(define-key-and-parameter font-style 'style 'normal Font-Style)
+(define-key-and-parameter font-color 'color "black" String)
+(define-key-and-parameter font-background 'background "none" String)
 
-(define-key-and-parameter column-count 'column-count 2)
-(define-key-and-parameter column-gutter 'column-gutter 30.0)
+(define-key-and-parameter column-count 'column-count 2 Index)
+(define-key-and-parameter column-gutter 'column-gutter 30.0 Float)
 
 
 (define max-quality 100)
 (define adaptive-quality 50)
 (define draft-quality 20)
-(define-key-and-parameter quality 'quality max-quality)
+(define-key-and-parameter quality 'quality max-quality Index)
 
 
-(define-key-and-parameter horiz-alignment 'x-align 'left)
-(define-key-and-parameter leading 'leading (floor (* (font-size-default) 1.4)))
+(define-key-and-parameter horiz-alignment 'x-align 'left QuadAttrKey)
+(define-key-and-parameter leading 'leading (floor (* (font-size-default) 1.4)) Float)
 
 
-(define-key-and-parameter paper-width 'paper-width (* 8.5 72))
-(define-key-and-parameter paper-height 'paper-height (* 11.0 72))
+(define-key-and-parameter paper-width 'paper-width (* 8.5 72) Float)
+(define-key-and-parameter paper-height 'paper-height (* 11.0 72) Float)
 
 (define line-looseness-key 'looseness)
 (define width-key 'width)
@@ -71,11 +72,9 @@
 
 (define mergeable-quad-types '(char run word))
 
+(define default-word-break-list : (Parameterof JoinableType) (make-parameter '(nb "" bb "-")))
 
-
-(define-parameter default-word-break-list '(nb "" bb "-"))
-
-(define-parameter optical-overhang 0.8)
+(define-parameter-typed optical-overhang 0.8 Float)
 
 (define line-looseness-tolerance 0.05) ; 0.04 seems to be the magic point that avoids a lot of hyphenation
 (define hyphen-limit 1) ; does not work with first-fit wrapping
@@ -96,5 +95,4 @@
 (define min-last-lines 2)
 (define default-lines-per-column 36)
 
-(: logging-level (Parameterof Log-Level))
-(define logging-level (make-parameter 'debug))  ;; usually 'debug for dev. change to 'info for less
+(define-parameter-typed logging-level 'debug Log-Level)  ;; usually 'debug for dev. change to 'info for less

@@ -1,7 +1,7 @@
 #lang typed/racket/base
 (require/typed hyphenate [hyphenate (String #:min-length Nonnegative-Integer #:min-left-length Nonnegative-Integer #:min-right-length Nonnegative-Integer . -> . String)])
 (require (for-syntax racket/syntax racket/base) racket/string racket/list sugar/debug racket/bool racket/function math/flonum)
-(require "quads-typed.rkt" "world-typed.rkt" "measure-typed.rkt")
+(require "quads-typed.rkt" "world-typed.rkt" "measure-typed.rkt" "core-types.rkt")
 
 (define/typed+provide (quad-map proc q)
   ((QuadListItem . -> . QuadListItem) Quad . -> . Quad)
@@ -20,7 +20,6 @@
 ;; push together multiple attr sources into one list of pairs.
 ;; mostly a helper function for the two attr functions below.
 ;; does not resolve duplicates (see merge-attrs for that)
-(define-type JoinableType (U Quad QuadAttrs HashableList)) 
 (define/typed+provide (join-attrs quads-or-attrs-or-lists)
   ((Listof JoinableType) . -> . QuadAttrs)
   (append-map (λ([x : JoinableType])
@@ -160,7 +159,8 @@
   (define result 
     (let loop : QuadListItem ([qli : QuadListItem qli][parent-x : Float 0.0][parent-y : Float 0.0])
       (cond
-        [(quad? qli) 
+        [(quad? qli)
+         (display 'foom3)
          (define adjusted-x (round-float (+ (assert (quad-attr-ref qli world:x-position-key 0.0) flonum?) parent-x)))
          (define adjusted-y (round-float (+ (assert (quad-attr-ref qli world:y-position-key 0.0) flonum?) parent-y)))
          (quad (quad-name qli) (merge-attrs qli (list world:x-position-key adjusted-x world:y-position-key adjusted-y)) ((inst map QuadListItem QuadListItem) (λ(qlii) (loop qlii adjusted-x adjusted-y)) (quad-list qli)))]
@@ -232,6 +232,7 @@
 
 (define/typed+provide (quad-height q)
   (Quad . -> . Float)
+  (display 'foom)
   (assert (quad-attr-ref q world:height-key 0.0) flonum?))
 
 ;; use heights to compute vertical positions
@@ -240,6 +241,7 @@
   (define-values (new-quads final-height)
     (for/fold ([new-quads : (Listof Quad) empty][height-so-far : Float 0.0])
               ([q (in-list (quad-list starting-quad))])
+      (display 'foom2)
       (assert q quad?)
       (values (cons (quad-attr-set q world:y-position-key height-so-far) new-quads) 
               (round-float (+ height-so-far (quad-height q))))))

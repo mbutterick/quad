@@ -1,6 +1,6 @@
 #lang typed/racket/base
 (require (for-syntax typed/racket/base racket/syntax racket/string))
-(require "lib-typed.rkt")
+(require "lib-typed.rkt" "core-types.rkt")
 ;; note to self: a require/typed function with proper typing
 ;; is faster than a generic function + type assertion at location of call
 (require/typed racket/list 
@@ -13,67 +13,11 @@
 (provide (all-defined-out))
 
 
-(define-syntax (define/typed stx)
-  (syntax-case stx ()
-    [(_ (proc-name arg ... . rest-arg) type-expr body ...)
-     #'(define/typed proc-name type-expr
-         (λ(arg ... . rest-arg) body ...))]
-    [(_ proc-name type-expr body ...)
-     #'(begin
-         (: proc-name type-expr)
-         (define proc-name body ...))]))
-
-(define-syntax (define/typed+provide stx)
-  (syntax-case stx ()
-    [(_ (proc-name arg ... . rest-arg) type-expr body ...)
-     #'(begin
-         (provide proc-name)
-         (define/typed proc-name type-expr
-           (λ(arg ... . rest-arg) body ...)))]
-    [(_ proc-name type-expr body ...)
-     #'(begin
-         (provide proc-name)
-         (begin
-           (: proc-name type-expr)
-           (define proc-name body ...)))]))
-
-
 (define-syntax-rule (even-members xs)
   (for/list : (Listof Any) ([(x i) (in-indexed xs)] #:when (even? i))
     x))
 
-(define-syntax (define-type+predicate stx)
-  (syntax-case stx ()
-    [(_ id basetype)
-     (with-syntax ([id? (format-id stx "~a?" #'id)])
-       #'(begin
-           (define-type id basetype)
-           (define-predicate id? id)))]))
 
-(define-type+predicate QuadName Symbol)
-(define-type+predicate QuadAttrKey Symbol)
-(define-type+predicate QuadAttrValue (U Float Index String Symbol Boolean))
-;; QuadAttr could be a list, but that would take twice as many cons cells.
-;; try the economical approach.
-(define-type+predicate QuadAttr (Pairof QuadAttrKey QuadAttrValue))
-(define-type+predicate QuadAttrs (Listof QuadAttr))
-(define-type+predicate HashableList  (Rec duo (U Null (List* QuadAttrKey Any duo))))
-
-(define quad-attrs? QuadAttrs?)
-
-(define-type QuadListItem (U String Quad))
-(define-type QuadList (Listof QuadListItem))
-(define-type (Treeof A) (Rec as (U A (Listof as))))
-
-
-;; funky implementation
-(define-type+predicate Quad (List* QuadName QuadAttrs (Listof (U String Quad))))
-(define-predicate quad? Quad)
-(define/typed (quad name attrs items)
-  (QuadName QuadAttrs QuadList . -> . Quad)
-  `(,name ,attrs ,@items))
-
-(define-type+predicate QuadSet (List QuadName QuadAttrs (Listof Quad)))
 
 (define/typed (quad-name q)
   (Quad . -> . QuadName)
@@ -102,7 +46,9 @@
       ((inst map QuadAttrKey QuadAttr) car qas)))
 
 (define/typed (quad-list q)
-  (Quad . -> . QuadList)
+  (case->
+   (GroupQuad . -> . GroupQuadList)
+   (Quad . -> . QuadList))
   (cdr (cdr q)))
 
 
@@ -199,6 +145,8 @@
                    [idsym (format-id #'id "~asym" #'id)]
                    [IdQuad (format-id #'id "~aQuad" (string-titlecase (symbol->string (syntax->datum #'id))))]
                    [IdQuad? (format-id #'id "~aQuad?" (string-titlecase (symbol->string (syntax->datum #'id))))]
+                   [IdGroupQuad (format-id #'id "~aGroupQuad" (string-titlecase (symbol->string (syntax->datum #'id))))]
+                   [IdGroupQuad? (format-id #'id "~aGroupQuad?" (string-titlecase (symbol->string (syntax->datum #'id))))]
                    [quads->id (format-id #'id "quads->~a" #'id)])
        #'(begin
            ;; quad converter
@@ -209,6 +157,10 @@
         ;;   (define-type IdInteger id-integer) ; for experimental quad names (= faster, smaller fixnum names)
            (define-type IdQuad (List* 'id QuadAttrs (Listof (U String Quad))))
            (define-predicate IdQuad? IdQuad)
+
+           ;; group version of quad has no strings in its quad-list
+           (define-type IdGroupQuad (List* 'id QuadAttrs (Listof Quad)))
+           (define-predicate IdGroupQuad? IdGroupQuad)
            (define id? IdQuad?)
            
            (define/typed (id [attrs '()] #:zzz [zzz 0] . xs)

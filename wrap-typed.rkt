@@ -3,9 +3,9 @@
 (require/typed sugar/list [slicef-after ((Listof Quad) (Quad . -> . Boolean) . -> . (Listof (Listof Quad)))]
                [shift ((Listof Any) (Listof Integer) . -> . (Listof Any))]
                [break-at ((Listof Quad) (Listof Nonnegative-Integer) . -> . (Listof (Listof Quad)))])
-(require math/flonum (except-in racket/list flatten) racket/vector math/statistics)
+(require math/flonum (except-in racket/list flatten) racket/vector math/statistics racket/bool)
 (require/typed racket/list [flatten (All (A) (Rec as (U Any (Listof as))) -> (Listof Any))])
-(require "ocm-typed.rkt" "quads-typed.rkt" "utils-typed.rkt" "measure-typed.rkt" "world-typed.rkt" "logger-typed.rkt")
+(require "ocm-typed.rkt" "quads-typed.rkt" "utils-typed.rkt" "measure-typed.rkt" "world-typed.rkt" "logger-typed.rkt" "core-types.rkt")
 
 ;; predicate for the soft hyphen
 (define/typed (soft-hyphen? x)
@@ -63,7 +63,7 @@
                                           [(soft-hyphen? str) (list world:no-break-key "" world:before-break-key "-")]
                                           ;; a visible breakable character is always visible
                                           [(visible-breakable? str) (list world:no-break-key str world:before-break-key str)]
-                                          [else (cast (world:default-word-break-list) HashableList)])) (quad-list q))]
+                                          [else (world:default-word-break-list)])) (quad-list q))]
                    [else #f]))
   (or result (error 'convert-to-word-break "result was a not word break for input:" q)))
 
@@ -82,25 +82,25 @@
   Make-Pieces-Type
   (define-values (breakable-items items-to-make-unbreakable) (split-at-right qs (min world:minimum-last-line-chars (length qs))))
   (define unbreak-qs (append breakable-items (map make-unbreakable items-to-make-unbreakable)))
-  (define lists-of-quads (slicef-after unbreak-qs (λ(q) (and (possible-word-break-quad? (cast q Quad)) (not (quad-attr-ref (cast q Quad) world:unbreakable-key #f))))))
+  (define lists-of-quads (slicef-after unbreak-qs (λ([q : Quad]) (and (possible-word-break-quad? q) (not (quad-attr-ref q world:unbreakable-key #f))))))
   (define-values (first-lists-of-quads last-list-of-quads) ((inst split-last (Listof Quad)) lists-of-quads))
   (define/typed (make-first-pieces qs)
     ((Listof Quad) . -> . Quad) 
     (let-values ([(first-qs last-q) ((inst split-last Quad) qs)])
-      (apply piece (list world:word-break-key (convert-to-word-break (cast last-q Quad))) (cast first-qs QuadList))))
+      (apply piece (list world:word-break-key (convert-to-word-break last-q)) first-qs)))
   (append (map make-first-pieces first-lists-of-quads) 
-          (list (apply piece #f (cast last-list-of-quads QuadList)))))
+          (list (apply piece null last-list-of-quads))))
 
 
 ;; extract font attributes from quad, or get default values
 (define/typed (font-attributes-with-defaults q)
-  (Quad . -> . (List Positive-Float String Symbol Symbol))
+  (Quad . -> . (List Font-Size Font-Name Font-Weight Font-Style))
   (list
-   (cast (let ([size (quad-attr-ref/parameter q world:font-size-key)])
-           (if (exact-integer? size) (fl size) size)) Positive-Float)
-   (cast (quad-attr-ref/parameter q world:font-name-key) String)
-   (cast (quad-attr-ref/parameter q world:font-weight-key) Symbol)
-   (cast (quad-attr-ref/parameter q world:font-style-key) Symbol)))
+   (assert (let ([size (quad-attr-ref/parameter q world:font-size-key)])
+             (if (exact-integer? size) (fl size) size)) Font-Size?)
+   (assert (quad-attr-ref/parameter q world:font-name-key) Font-Name?)
+   (assert (quad-attr-ref/parameter q world:font-weight-key) Font-Weight?)
+   (assert (quad-attr-ref/parameter q world:font-style-key) Font-Style?)))
 
 
 ;; get the width of a quad.
@@ -111,11 +111,11 @@
 (define/typed (quad-width q)
   Measure-Quad-Type
   (cond
-    [(quad-has-attr? q world:width-key) (fl (cast (quad-attr-ref q world:width-key) Real))]
+    [(quad-has-attr? q world:width-key) (fl (assert (quad-attr-ref q world:width-key) flonum?))]
     [(ormap (λ([pred : (Any . -> . Boolean)]) (pred q)) (list char? run? word? word-break?)) 
      (apply measure-text (word-string q) 
             (font-attributes-with-defaults q))]
-    [(line? q) (fl (apply + ((inst map Float Quad) quad-width (cast (quad-list q) (Listof Quad)))))]
+    [(LineGroupQuad? q) (foldl + 0.0 (map quad-width (quad-list q)))]
     [else 0.0]))
 
 ;; get the ascent (distance from top of text to baseline)
@@ -145,7 +145,7 @@
   ;; only needs it if the appearance of the piece changes based on location.
   ;; so words are likely to have a word-break item; boxes not.
   ;; the word break item contains the different characters needed to finish the piece.
-  (define the-word-break (cast (quad-attr-ref p world:word-break-key #f) (Option Quad)))
+  (define the-word-break (assert (quad-attr-ref p world:word-break-key #f) (λ(v) (or (false? v) (Quad? v)))))
   (let ([p (quad-attr-remove p world:word-break-key)]) ; so it doesn't propagate into subquads
     (if the-word-break
         (quad (quad-name p) (quad-attrs p) 
@@ -170,7 +170,7 @@
   (Quad Symbol . -> . Quad)
   (let ([break-char (quad-attr-ref wb key)])
     (quad (if (whitespace? break-char) 'word-break 'word)
-          (hash-remove (hash-remove (quad-attrs wb) world:no-break-key) world:before-break-key) (list (cast (quad-attr-ref wb key) String)))))
+          (quad-attrs (quad-attr-remove* wb world:no-break-key world:before-break-key)) (list (assert (quad-attr-ref wb key) string?)))))
 
 ;; uses macro above in no-break mode.
 (define/typed (word-break->no-break wb)
@@ -185,8 +185,8 @@
 ;; is this the last line? compare current line-idx to total lines 
 (define/typed (last-line? line)
   (Quad . -> . Boolean)
-  (define line-idx (cast (quad-attr-ref line world:line-index-key #f) Number))
-  (define lines (cast (quad-attr-ref line world:total-lines-key #f) Number))
+  (define line-idx (assert (quad-attr-ref line world:line-index-key #f) Index?))
+  (define lines (assert (quad-attr-ref line world:total-lines-key #f) Index?))
   (and line-idx lines (= (add1 line-idx) lines)))
 
 ;; optical kerns are automatically inserted at the beginning and end of a line
@@ -202,8 +202,8 @@
   ((Listof Quad) . -> . (Listof Quad))
   (define/typed (overhang-width q)
     ((U Quad False) . -> . Float)
-    (if (and (word? q) (member (word-string (cast q Quad)) world:hanging-chars))
-        (* -1.0 (world:optical-overhang) (apply measure-text (word-string (cast q Quad)) (font-attributes-with-defaults (cast q Quad))))
+    (if (and (word? q) (member (word-string q) world:hanging-chars))
+        (* -1.0 (world:optical-overhang) (apply measure-text (word-string q) (font-attributes-with-defaults q)))
         0.0))
   (cond
     [(not (empty? exploded-line-quads))
@@ -245,9 +245,9 @@
   (define/typed (copy-with-attrs q attr-source)
     (Quad Quad . -> . Quad)
     (define keys-to-ignore '(width)) ; width will be determined during fill routine
-    (define filtered-hash (cast (and (quad-attrs attr-source)
-                                     (foldl (λ(k [ht : HashTableTop]) (hash-remove ht k)) (quad-attrs attr-source) keys-to-ignore)) QuadAttrs))
-    (quad (quad-name q) (merge-attrs filtered-hash q) (quad-list q)))
+    (define filtered-attrs (and (quad-attrs attr-source)
+                                (quad-attrs (apply quad-attr-remove* attr-source keys-to-ignore))))
+    (quad (quad-name q) (merge-attrs (or filtered-attrs null) q) (quad-list q)))
   
   (quad (quad-name line) 
         (quad-attrs line) 
@@ -298,15 +298,15 @@
   (define rendered-pieces (render-pieces ps))
   (define split-pieces (map quad-list rendered-pieces))
   (define line-quads (let ([result (append* split-pieces)])
-                             (if (andmap Quad? result)
-                                 result
-                                 (error 'line-quads "bad result")))) 
+                       (if (andmap Quad? result)
+                           result
+                           (error 'line-quads "bad result")))) 
   (define line-quads-maybe-with-opticals 
     (if (and world:use-optical-kerns? (> (length line-quads) 0))
-              (render-optical-kerns
-               (let ([my-ok (list (optical-kern (quad-attrs (car line-quads))))]) ; take attrs from line, incl measure
-                 (append my-ok line-quads my-ok)))
-              line-quads))
+        (render-optical-kerns
+         (let ([my-ok (list (optical-kern (quad-attrs (car line-quads))))]) ; take attrs from line, incl measure
+           (append my-ok line-quads my-ok)))
+        line-quads))
   (define merged-quads (join-quads line-quads-maybe-with-opticals))
   (define merged-quad-widths (map measure-quad-proc merged-quads)) ; 10% of function time
   
@@ -317,9 +317,9 @@
     (error 'pieces->line "quad has no measure key: ~a" (first line-quads)))
   
   (define measure (let ([val (quad-attr-ref (first merged-quads) world:measure-key)])
-                          (if (flonum? val)
-                              val
-                              (error "got bad value for measure"))))
+                    (if (flonum? val)
+                        val
+                        (error "got bad value for measure"))))
   (define looseness (calc-looseness (foldl fl+ 0.0 merged-quad-widths) measure))
   
   ;; quads->line function hoists common attributes into the line
@@ -384,7 +384,7 @@
   (define no-break-width (fl+ basic-width (if p-word-break
                                               (quad-width (word (quad-attrs p-word-break) (cast (quad-attr-ref p-word-break world:no-break-key) QuadListItem)))
                                               0.0)))
-  (quad-attr-set* p 'bb-width before-break-width 'nb-width no-break-width))
+  (quad-attr-set* p (list 'bb-width before-break-width 'nb-width no-break-width)))
 
 (require sugar/debug)
 (define/typed (make-piece-vectors pieces)
