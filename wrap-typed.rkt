@@ -115,7 +115,7 @@
     [(ormap (λ([pred : (Any . -> . Boolean)]) (pred q)) (list char? run? word? word-break?)) 
      (apply measure-text (word-string q) 
             (font-attributes-with-defaults q))]
-    [(LineGroupQuad? q) (foldl + 0.0 (map quad-width (quad-list q)))]
+    [(LineGroupQuad? q) (foldl fl+ 0.0 (map quad-width (quad-list q)))]
     [else 0.0]))
 
 ;; get the ascent (distance from top of text to baseline)
