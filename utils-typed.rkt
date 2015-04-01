@@ -255,12 +255,10 @@
 
 ;; use heights to compute vertical positions
 (define/typed+provide (add-vert-positions starting-quad)
-  (Quad . -> . Quad)
+  (GroupQuad . -> . GroupQuad)
   (define-values (new-quads final-height)
     (for/fold ([new-quads : (Listof Quad) empty][height-so-far : Float 0.0])
               ([q (in-list (quad-list starting-quad))])
-      (display 'foom2)
-      (assert q quad?)
       (values (cons (quad-attr-set q world:y-position-key height-so-far) new-quads) 
               (round-float (+ height-so-far (quad-height q))))))
   (quad (quad-name starting-quad) (quad-attrs starting-quad) (reverse new-quads)))
