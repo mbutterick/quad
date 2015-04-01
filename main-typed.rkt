@@ -1,7 +1,7 @@
 #lang typed/racket/base
 (require racket/list math/flonum)
 (require/typed sugar/list [slice-at ((Listof Quad) Positive-Integer . -> . (Listof (Listof Quad)))])
-(require "quads-typed.rkt" "utils-typed.rkt" "wrap-typed.rkt" "measure-typed.rkt" "world-typed.rkt" "logger-typed.rkt")
+(require "quads-typed.rkt" "utils-typed.rkt" "wrap-typed.rkt" "measure-typed.rkt" "world-typed.rkt" "logger-typed.rkt" "core-types.rkt")
 
 (define-type Block-Type (Listof Quad))
 (define-type Multicolumn-Type (Listof Block-Type))
@@ -55,10 +55,10 @@
 
 
 (define/typed+provide (block->lines b)
-  (Quad . -> . (Listof Quad)) ;; todo: introduce a Quad subtype where quad-list is guaranteed to be all Quads (no strings)
+  (BlockQuad . -> . (Listof LineQuad)) ;; todo: introduce a Quad subtype where quad-list is guaranteed to be all Quads (no strings)
   (define quality (cast (quad-attr-ref/parameter b world:quality-key) Real))
   (define/typed (wrap-quads qs)
-    ((Listof Quad) . -> . (Listof Quad))
+    ((Listof Quad) . -> . (Listof LineQuad))
     (define wrap-proc (cond
                         [(>= quality world:max-quality) wrap-best] 
                         [(<= quality world:draft-quality) wrap-first]
@@ -85,21 +85,25 @@
   
   (log-quad-debug "final looseness = ~a" (average-looseness wrapped-lines))
   (map insert-spacers-in-line
-       (for/list : (Listof Quad) ([line-idx (in-naturals)][line (in-list wrapped-lines)])
-         (quad-attr-set* line 'line-idx line-idx 'lines (length wrapped-lines)))))
+       (for/list : (Listof LineQuad) ([line-idx (in-naturals)][the-line (in-list wrapped-lines)])
+         (apply line (attr-change (quad-attrs the-line) (list 'line-idx line-idx 'lines (length wrapped-lines))) (quad-list the-line)))))
 
 
 (define/typed+provide (number-pages ps)
-  ((Listof Quad) . -> . (Listof Quad))
+  ((Listof PageQuad) . -> . (Listof PageQuad))
   (for/list ([i (in-naturals)][p (in-list ps)])
-    (quad (quad-name p) (merge-attrs (quad-attrs p) `(page ,i)) (quad-list p))))
+    (apply page (merge-attrs (quad-attrs p) `(page ,i)) (quad-list p))))
 
 (define/typed+provide (pages->doc ps)
-  ((Listof Quad) . -> . Quad)  
+  ((Listof PageQuad) . -> . DocQuad)  
   ;; todo: resolve xrefs and other last-minute tasks
   ;; todo: generalize computation of widths and heights, recursively
-  (define (columns-mapper page)
-    (quad-map (compose1 add-vert-positions (λ(xs) (quad-map (λ(x) (compute-line-height (add-horiz-positions (fill (cast x Quad))))) (cast xs Quad)))) (cast page Quad)))
+  (define/typed (columns-mapper page-in)
+    (PageQuad . -> . PageQuad)
+    (apply page (quad-attrs page-in)
+           (for/list : (Listof Quad) ([pq (in-list (quad-list page-in))])
+             (add-vert-positions (for/list : (Listof Quad) ([x (in-list (quad-list pq))])
+                                   (compute-line-height (add-horiz-positions (fill (cast x Quad))))))))) 
   (define mapped-pages (map columns-mapper (number-pages ps)))
   (define doc (quads->doc mapped-pages))
   doc)
@@ -113,11 +117,11 @@
                                  (add-variable (Any (Listof Any) . -> . Void))
                                  (add-constraint ((Index . -> . Boolean) (Listof Any) . -> . Void)))])
 (define/typed+provide (lines->columns lines)
-  ((Listof Quad) . -> . (Listof Quad)) ; (lines? . -> . columns?)
+  ((Listof LineQuad) . -> . (Listof ColumnQuad))
   (define prob (new problem%))
   (define max-column-lines world:default-lines-per-column)
   (define-values (columns ignored-return-value)
-    (for/fold ([columns : (Listof Quad) empty][lines-remaining : (Listof Quad) lines])
+    (for/fold ([columns : (Listof ColumnQuad) empty][lines-remaining : (Listof Quad) lines])
               ([col-idx : Nonnegative-Integer (stop-before (in-naturals) (λ(x) (empty? lines-remaining)))])
       (log-quad-info "making column ~a" (add1 col-idx))
       ;; domain constraint is best way to simplify csp, because it limits the search space.
@@ -175,19 +179,18 @@
       
       (log-quad-debug "viable number of lines after first-lines constraint =\n~a" ((inst map Integer (HashTable String Integer)) (λ(x) (hash-ref x "column-lines")) (send prob get-solutions)))
       
-      
       (define s (send prob get-solution))
       (define how-many-lines-to-take (cast (hash-ref s "column-lines") Positive-Index))
       (define-values (lines-to-take lines-to-leave) (split-at lines-remaining how-many-lines-to-take))
       (log-quad-debug "taking ~a lines for column ~a:" how-many-lines-to-take (add1 col-idx))
-      (map (λ([idx : Number] [line : Quad]) (log-quad-debug "~a:~a ~v" (add1 col-idx) (add1 idx) (quad->string line))) (range how-many-lines-to-take) lines-to-take)
+      (map (λ([idx : Index] [line : LineQuad]) (log-quad-debug "~a:~a ~v" (add1 col-idx) (add1 idx) (quad->string line))) (range how-many-lines-to-take) lines-to-take)
       (send prob reset)
       (values (cons (quad-attr-set (quads->column lines-to-take) world:column-index-key col-idx) columns) lines-to-leave)))
   (reverse columns))
 
 
 (define/typed+provide (columns->pages cols)
-  ((Listof Quad) . -> . (Listof Quad)) ; (columns? . -> . pages?)
+  ((Listof ColumnQuad) . -> . (Listof PageQuad))
   (define columns-per-page (cast (quad-attr-ref/parameter (car cols) world:column-count-key) Positive-Integer))
   (define column-gutter (cast (quad-attr-ref/parameter (car cols) world:column-gutter-key) Float))
   ;; don't use default value here. If the col doesn't have a measure key, 
@@ -211,15 +214,15 @@
 (define (eof? x) (equal? x (current-eof)))
 
 (define/typed (block-quads->lines qs)
-  ((Listof Quad) . -> . (Listof Quad))
+  ((Listof Quad) . -> . (Listof LineQuad))
   (block->lines (quads->block qs)))
 
 (define/typed+provide (typeset x)
-  (Quad . -> . Quad) ; (coerce/input? . -> . doc?)
+  (InputQuad . -> . DocQuad)
   (load-text-cache-file)
-  (define pages (append* (for/list : (Listof (Listof Quad)) ([multipage (in-list (input->nested-blocks x))])
-                           (columns->pages (append* (for/list : (Listof (Listof Quad)) ([multicolumn (in-list multipage)])
-                                                      (lines->columns (append* (for/list : (Listof (Listof Quad)) ([block-quads (in-list multicolumn)])
+  (define pages (append* (for/list : (Listof (Listof PageQuad)) ([multipage (in-list (input->nested-blocks x))])
+                           (columns->pages (append* (for/list : (Listof (Listof ColumnQuad)) ([multicolumn (in-list multipage)])
+                                                      (lines->columns (append* (for/list : (Listof (Listof LineQuad)) ([block-quads (in-list multicolumn)])
                                                                                  (block-quads->lines block-quads))))))))))
   (define doc (pages->doc pages))
   (update-text-cache-file)
