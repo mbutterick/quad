@@ -43,6 +43,12 @@
 (define-type+predicate QuadAttr (Pairof QuadAttrKey QuadAttrValue))
 (define-type+predicate QuadAttrs (Listof QuadAttr))
 (define quad-attrs? QuadAttrs?)
+#|
+;; mutually recursive version
+(define-type HashableListKey (U Null (Pairof QuadAttrKey HashableListValue)))
+(define-type HashableListValue (Pairof QuadAttrValue HashableListKey))
+(define-type+predicate HashableList  HashableListKey)
+|#
 (define-type+predicate HashableList  (Rec duo (U Null (List* QuadAttrKey Any duo))))
 (define-type JoinableType (U Quad QuadAttrs HashableList)) 
 
