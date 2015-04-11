@@ -1,31 +1,28 @@
 #lang typed/racket/base
 (require (for-syntax racket/base racket/syntax))
-(require/typed sugar/list [slicef-after ((Listof Quad) (Quad . -> . Boolean) . -> . (Listof (Listof Quad)))]
-               ;; shift: need False in type because shift fills with #f
-               [shift ((Listof Quad) (Listof Integer) . -> . (List (Listof (U False Quad)) (Listof (U False Quad))))]
-               [break-at ((Listof PieceQuad) (Listof Breakpoint) . -> . (Listof (Listof PieceQuad)))])
+(require typed/sugar/list typed/sugar/define)
 (require math/flonum (except-in racket/list flatten) racket/vector math/statistics racket/bool)
 (require/typed racket/list [flatten (All (A) (Rec as (U Any (Listof as))) -> (Listof Any))])
 (require "ocm-typed.rkt" "quads-typed.rkt" "utils-typed.rkt" "measure-typed.rkt" "world-typed.rkt" "logger-typed.rkt" "core-types.rkt" "utils-typed.rkt")
 
 ;; predicate for the soft hyphen
 (define/typed (soft-hyphen? x)
-  (String . -> . Boolean)
+  (String -> Boolean)
   (equal? (format "~a" world:soft-hyphen) x))
 
 ;; visible characters that also mark possible breakpoints
 (define/typed (visible-breakable? x)
-  (String . -> . Boolean)
+  (String -> Boolean)
   (and (member x world:hyphens-and-dashes) #t))
 
 ;; invisible characters that denote possible breakpoints
 (define/typed (invisible-breakable? x)
-  (String . -> . Boolean)
+  (String -> Boolean)
   (and (member x (cons world:empty-string world:spaces)) #t))
 
 ;; union of visible & invisible
 (define/typed (breakable? x)
-  (Any . -> . Boolean)
+  (Any -> Boolean)
   (cond
     [(string? x) (or (visible-breakable? x) (invisible-breakable? x))]
     ;; word? should have a filter that returns a Quad type, then the Quad? check will be unnecessary
@@ -35,20 +32,20 @@
 ;; used by insert-spacers to determine which characters 
 ;; can be surrounded by stretchy spacers 
 (define/typed (takes-justification-space? x)
-  (Any . -> . Boolean)
+  (Any -> Boolean)
   (whitespace/nbsp? x))
 
 ;; test if a quad can be a word break:
 ;; either it's an explicit word break,
 ;; or it's breakable (and can be converted to a word break)
 (define/typed (possible-word-break-quad? q)
-  (Quad . -> . Boolean)
+  (Quad -> Boolean)
   (or (word-break? q) (breakable? q)))
 
 
 ;; convert a possible word break into an actual one
 (define/typed (convert-to-word-break q)
-  (Quad . -> . Quad)
+  (Quad -> Quad)
   (when (not (possible-word-break-quad? q))
     (error 'convert-to-word-break "input is not a possible word break:" q))
   (define result (cond 
@@ -69,7 +66,7 @@
   (or result (error 'convert-to-word-break "result was a not word break for input:" q)))
 
 (define/typed (make-unbreakable q)
-  (Quad . -> . Quad)
+  (Quad -> Quad)
   (quad-attr-set q world:unbreakable-key #t))
 
 
@@ -78,7 +75,7 @@
 ;; meaning, a line can wrap at a piece boundary, but not elsewhere.
 ;; hyphenation produces more, smaller pieces, which means more linebreak opportunities
 ;; but this also makes wrapping slower.
-(define-type Make-Pieces-Type ((Listof Quad) . -> . (Listof PieceQuad)))
+(define-type Make-Pieces-Type ((Listof Quad) -> (Listof PieceQuad)))
 (define/typed (make-pieces qs)
   Make-Pieces-Type
   (define-values (breakable-items items-to-make-unbreakable) (split-at-right qs (min world:minimum-last-line-chars (length qs))))
@@ -86,7 +83,7 @@
   (define lists-of-quads (slicef-after unbreak-qs (λ([q : Quad]) (and (possible-word-break-quad? q) (not (quad-attr-ref q world:unbreakable-key #f))))))
   (define-values (first-lists-of-quads last-list-of-quads) (split-last lists-of-quads))
   (define/typed (make-first-pieces qs)
-    ((Listof Quad) . -> . PieceQuad) 
+    ((Listof Quad) -> PieceQuad) 
     (let-values ([(first-qs last-q) ((inst split-last Quad) qs)])
       (apply piece (list world:word-break-key (convert-to-word-break last-q)) first-qs)))
   (append (map make-first-pieces first-lists-of-quads) 
@@ -95,7 +92,7 @@
 
 ;; extract font attributes from quad, or get default values
 (define/typed (font-attributes-with-defaults q)
-  (Quad . -> . (List Font-Size Font-Name Font-Weight Font-Style))
+  (Quad -> (List Font-Size Font-Name Font-Weight Font-Style))
   (list
    (assert (let ([size (quad-attr-ref/parameter q world:font-size-key)])
              (if (exact-integer? size) (fl size) size)) Font-Size?)
@@ -108,12 +105,12 @@
 ;; Try the attr first, and if it's not available, compute the width.
 ;; comes in fast or slow versions.
 ;; not designed to update the source quad.
-(define-type Measure-Quad-Type (Quad . -> . Float))
+(define-type Measure-Quad-Type (Quad -> Float))
 (define/typed (quad-width q)
   Measure-Quad-Type
   (cond
     [(quad-has-attr? q world:width-key) (fl (assert (quad-attr-ref q world:width-key) flonum?))]
-    [(ormap (λ([pred : (Any . -> . Boolean)]) (pred q)) (list char? run? word? word-break?)) 
+    [(ormap (λ([pred : (Any -> Boolean)]) (pred q)) (list char? run? word? word-break?)) 
      (apply measure-text (word-string q) 
             (font-attributes-with-defaults q))]
     [(LineQuad? q) (foldl fl+ 0.0 (map quad-width (quad-list q)))]
@@ -124,12 +121,12 @@
 ;; consult the attrs, and if not available, compute it.
 ;; not designed to update the source quad.
 (define/typed (ascent q)
-  (Quad . -> . Float)
+  (Quad -> Float)
   (define ascent-value-or-false (quad-attr-ref q world:ascent-key #f))
   (if (and ascent-value-or-false (flonum? ascent-value-or-false))
       ascent-value-or-false
       (cond 
-        [(ormap (λ([pred : (Any . -> . Boolean)]) (pred q)) (list char? run? word? word-break?)) 
+        [(ormap (λ([pred : (Any -> Boolean)]) (pred q)) (list char? run? word? word-break?)) 
          (apply measure-ascent (word-string q) (font-attributes-with-defaults q))]
         [else 0.0])))
 
@@ -161,31 +158,31 @@
 
 ;; shorthand 
 (define/typed (render-piece-before-break p)
-  (PieceQuad . -> . PieceQuad)
+  (PieceQuad -> PieceQuad)
   (render-piece p #t))
 
 
 ;; helper macro to convert quad into word-break.
 ;; look up the break character and convert the quad based on what is found.
 (define/typed (render-word-break wb key)
-  (Word-BreakQuad Symbol . -> . Quad)
+  (Word-BreakQuad Symbol -> Quad)
   (let ([break-char (quad-attr-ref wb key)])
     (quad (if (whitespace? break-char) 'word-break 'word)
           (quad-attrs (quad-attr-remove* wb world:no-break-key world:before-break-key)) (list (assert (quad-attr-ref wb key) string?)))))
 
 ;; uses macro above in no-break mode.
 (define/typed (word-break->no-break wb)
-  (Word-BreakQuad . -> . Quad)
+  (Word-BreakQuad -> Quad)
   (render-word-break wb world:no-break-key))
 
 ;; uses macro above in before-break mode.
 (define/typed (word-break->before-break wb)
-  (Word-BreakQuad . -> . Quad)
+  (Word-BreakQuad -> Quad)
   (render-word-break wb world:before-break-key))
 
 ;; is this the last line? compare current line-idx to total lines 
 (define/typed (last-line? line)
-  (Quad . -> . Boolean)
+  (Quad -> Boolean)
   (define line-idx (assert (quad-attr-ref line world:line-index-key #f) Index?))
   (define lines (assert (quad-attr-ref line world:total-lines-key #f) Index?))
   (and line-idx lines (= (add1 line-idx) lines)))
@@ -200,9 +197,9 @@
 ;; it just looks at quads on both sides and kerns them if appropriate.
 ;; in practice, only one will likely be used.
 (define/typed (render-optical-kerns exploded-line-quads)
-  ((Listof Quad) . -> . (Listof Quad))
+  ((Listof Quad) -> (Listof Quad))
   (define/typed (overhang-width q)
-    ((U Quad False) . -> . Float)
+    ((U Quad False) -> Float)
     (if (and (word? q) (member (word-string q) world:hanging-chars))
         (* -1.0 (world:optical-overhang) (apply measure-text (word-string q) (font-attributes-with-defaults q)))
         0.0))
@@ -243,7 +240,7 @@
                                          [else (values #f #f #f)]))
   
   (define/typed (copy-with-attrs q attr-source)
-    (Quad Quad . -> . Quad)
+    (Quad Quad -> Quad)
     (define keys-to-ignore '(width)) ; width will be determined during fill routine
     (define filtered-attrs (and (quad-attrs attr-source)
                                 (quad-attrs (apply quad-attr-remove* attr-source keys-to-ignore))))
@@ -264,23 +261,23 @@
 ;; installs the width in the quad.
 ;; this becomes the value reported by quad-width.
 (define/typed (embed-width q w)
-  (Quad Float . -> . Quad)
+  (Quad Float -> Quad)
   (quad-attr-set q world:width-key w))
 
 ;; installs the ascent in the quad.
 (define/typed (record-ascent q)
-  (Quad . -> . Quad)
+  (Quad -> Quad)
   (quad-attr-set q world:ascent-key (ascent q)))
 
 ;; helper function: doesn't need contract because it's already covered by the callers
 (define/typed (render-pieces ps)
-  ((Listof PieceQuad) . -> . (Listof PieceQuad))
+  ((Listof PieceQuad) -> (Listof PieceQuad))
   (define-values (initial-ps last-p) ((inst split-last PieceQuad) ps))
   (snoc (map render-piece initial-ps) (render-piece-before-break last-p)))
 
 
 (define/typed (calc-looseness total-width measure)
-  (Float Float . -> . Float)
+  (Float Float -> Float)
   (round-float (fl/ (fl- measure total-width) measure)))
 
 
@@ -288,7 +285,7 @@
 ;; take the contents of the rendered pieces and merge them.
 ;; compute looseness for line as a whole.
 ;; also add ascent to each component quad, which can be different depending on font & size.
-(define-type Compose-Line-Type ((Listof PieceQuad) (Quad . -> . Float) . -> . LineQuad))
+(define-type Compose-Line-Type ((Listof PieceQuad) (Quad -> Float) -> LineQuad))
 (define/typed (pieces->line ps measure-quad-proc)
   Compose-Line-Type
   (define rendered-pieces (render-pieces ps))
@@ -328,12 +325,12 @@
 
 ;; a faster line-measuring function used by the wrapping function to test lines.
 (define/typed (measure-potential-line ps)
-  ((Listof PieceQuad) . -> . Float)
+  ((Listof PieceQuad) -> Float)
   (foldl fl+ 0.0 (append-map (λ([rp : PieceQuad]) (map quad-width (quad-list rp))) (render-pieces ps))))
 
 
 (define/typed (vector-break-at vec bps)
-  ((Vectorof Any) (Listof Nonnegative-Integer) . -> . (Listof (Vectorof Any)))
+  ((Vectorof Any) (Listof Nonnegative-Integer) -> (Listof (Vectorof Any)))
   (define-values (vecs _) ;; loop backward
     (for/fold ([vecs : (Listof (Vectorof Any)) empty][end : Nonnegative-Integer (vector-length vec)])([start (in-list (reverse (cons 0 bps)))])
       (if (= start end)
@@ -368,7 +365,7 @@
 (define (breakpoints? x) (and (list? x) (andmap integer? x)))
 
 (define/typed (install-measurement-keys p)
-  (GroupQuad . -> . Quad)
+  (GroupQuad -> Quad)
   (define basic-width (round-float
                        (foldl fl+ 0.0 (map quad-width (quad-list p)))))
   (define p-word-break (assert (quad-attr-ref p world:word-break-key #f) quad?))
@@ -382,7 +379,7 @@
 
 (require sugar/debug)
 (define/typed (make-piece-vectors pieces)
-  ((Vectorof PieceQuad) . -> . (values (Vectorof Float) (Vectorof Float))) 
+  ((Vectorof PieceQuad) -> (values (Vectorof Float) (Vectorof Float))) 
   (define pieces-measured 
     (for/list : (Listof (Vector Float Float Float)) ([p (in-vector pieces)])
       (define wb (assert (quad-attr-ref p world:word-break-key #f) (λ(wb) (or (false? wb) (quad? wb)))))
@@ -403,20 +400,20 @@
 
 
 (define/typed (make-trial-line pieces-rendered-widths pieces-rendered-before-break-widths i j)
-  ((Vectorof Float) (Vectorof Float) Breakpoint Breakpoint . -> . (Vectorof Float))
+  ((Vectorof Float) (Vectorof Float) Breakpoint Breakpoint -> (Vectorof Float))
   (let ([vec (vector-copy pieces-rendered-widths i j)])
     (vector-set! vec (sub1 (vector-length vec)) (vector-ref pieces-rendered-before-break-widths (sub1 j)))
     vec))
 
 (define/typed (get-line-width line)
-  ((Vectorof Float) . -> . Float)
+  ((Vectorof Float) -> Float)
   (round-float (foldl + 0.0 (vector->list line))))
 
 (struct $penalty ([hyphens : Nonnegative-Integer][width : Value-Type]) #:transparent)
 
 ;; top-level adaptive wrap proc.
 ;; first-fit and best-fit are variants.
-(define-type Find-Breakpoints-Type ((Vectorof PieceQuad) Float . -> . (Listof Breakpoint)))
+(define-type Find-Breakpoints-Type ((Vectorof PieceQuad) Float -> (Listof Breakpoint)))
 (define/typed (adaptive-fit-proc pieces measure [use-first? #t] [use-best? #t])
   (((Vectorof PieceQuad) Float) (Boolean Boolean) . ->* . (Listof Nonnegative-Integer))
   
@@ -469,7 +466,7 @@
     [else
      
      (define/typed ($penalty->value x)
-       ($penalty . -> . Value-Type)
+       ($penalty -> Value-Type)
        ($penalty-width x))
      (define initial-value ($penalty 0 0.0))
      
@@ -559,7 +556,7 @@
 
 
 (define/typed (fixed-width? q) 
-  (Quad . -> . Boolean)
+  (Quad -> Boolean)
   (quad-has-attr? q world:width-key))
 
 
@@ -590,7 +587,7 @@
 ;; add x positions to a list of fixed-width quads
 ;; todo: adjust this to work recursively, so that positioning operation cascades down
 (define/typed+provide (add-horiz-positions starting-quad)
-  (GroupQuad . -> . GroupQuad)
+  (GroupQuad -> GroupQuad)
   (define-values (new-quads final-width)
     (for/fold ([new-quads : (Listof Quad) empty][width-so-far : Float 0.0])([q (in-list (quad-list starting-quad))])
       (values (cons (quad-attr-set q world:x-position-key width-so-far) new-quads) (round-float (fl+ (quad-width q) width-so-far)))))

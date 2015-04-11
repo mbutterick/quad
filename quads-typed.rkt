@@ -4,49 +4,45 @@
 ;; note to self: a require/typed function with proper typing
 ;; is faster than a generic function + type assertion at location of call
 (require/typed racket/list 
-               [flatten ((Listof QuadAttr) . -> . QuadAttrs)])
-(require/typed sugar/list [trimf (All (A) ((Listof A) (A . -> . Boolean) -> (Listof A)))]
-               [filter-split (All (A) ((Listof A) (A . -> . Boolean) -> (Listof (Listof A))))])
-(require/typed racket/string [string-append* ((Listof String) . -> . String)])
-(require/typed sugar/string [ends-with? (String String . -> . Boolean)])
-(require sugar/debug)
+               [flatten ((Listof QuadAttr) -> QuadAttrs)])
+(require/typed racket/string [string-append* ((Listof String) -> String)])
+(require typed/sugar/debug typed/sugar/string typed/sugar/list typed/sugar/define)
 (provide (all-defined-out))
-
 
 (define-syntax-rule (even-members xs)
   (for/list : (Listof Any) ([(x i) (in-indexed xs)] #:when (even? i))
     x))
 
 (define/typed (quad-name q)
-  (Quad . -> . QuadName)
+  (Quad -> QuadName)
   (car q))
 
 (define/typed (quad-attrs q)
-  (Quad . -> . QuadAttrs)
+  (Quad -> QuadAttrs)
   (car (cdr q)))
 
 (define/typed (make-quadattr k v)
-  (QuadAttrKey QuadAttrValue . -> . QuadAttr)
+  (QuadAttrKey QuadAttrValue -> QuadAttr)
   (cons k v))
 
 (define/typed (quadattr-key qa)
-  (QuadAttr . -> . QuadAttrKey)
+  (QuadAttr -> QuadAttrKey)
   (car qa))
 
 (define/typed (quadattr-value qa)
-  (QuadAttr . -> . QuadAttrValue)
+  (QuadAttr -> QuadAttrValue)
   (cdr qa))
 
 (define/typed (quad-attr-keys qas)
-  (QuadAttrs . -> . (Listof QuadAttrKey))
+  (QuadAttrs -> (Listof QuadAttrKey))
   (if (empty? qas)
       qas
       ((inst map QuadAttrKey QuadAttr) car qas)))
 
 (define/typed (quad-list q)
   (case->
-   (GroupQuad . -> . GroupQuadList)
-   (Quad . -> . QuadList))
+   (GroupQuad -> GroupQuadList)
+   (Quad -> QuadList))
   (cdr (cdr q)))
 
 
@@ -70,7 +66,7 @@
 (define cannot-be-common-attrs '(width x y page))
 (define attr-missing (gensym))
 
-(: quad-ends-with? (Quad String . -> . Boolean))
+(: quad-ends-with? (Quad String -> Boolean))
 (define (quad-ends-with? q str)
   (cond
     [(not (empty? (quad-list q)))
@@ -81,12 +77,12 @@
        [else #f])]
     [else #f]))
 
-(: quad-append (Quad QuadListItem . -> . Quad))
+(: quad-append (Quad QuadListItem -> Quad))
 (define (quad-append q new-item)
   (quad (quad-name q) (quad-attrs q) (append (quad-list q) (list new-item))))
 
 
-(: quad->string (Quad . -> . String))
+(: quad->string (Quad -> String))
 (define (quad->string x)
   (let loop : String ([x : (U Quad String) x])
     (cond 
@@ -95,8 +91,8 @@
       [else (string-append* ((inst map String QuadListItem) loop (quad-list x)))])))
 
 (define/typed+provide (gather-common-attrs qs)
-  ((Listof Quad) . -> . QuadAttrs)
-  (: check-cap (Quad QuadAttr . -> . Boolean))
+  ((Listof Quad) -> QuadAttrs)
+  (: check-cap (Quad QuadAttr -> Boolean))
   (define (check-cap q cap) ; cap = candidate-attr-pair
     (equal? (quad-attr-ref q (car cap) attr-missing) (cdr cap)))
   (if (null? qs)
@@ -120,7 +116,7 @@
 (define/typed (make-quadattrs xs)
   ;; no point typing the input as (U QuadAttrKey QuadAttrValue) 
   ;; because QuadAttrValue is Any, so that's the same as plain Any
-  ((Listof Any) . -> . QuadAttrs)
+  ((Listof Any) -> QuadAttrs)
   (let-values ([(ks vs even?) (for/fold 
                                ([ks : (Listof QuadAttrKey) null][vs : (Listof QuadAttrValue) null][even? : Boolean #t])
                                ([x (in-list xs)])
@@ -147,7 +143,7 @@
        #`(begin
            ;; quad converter
            (define/typed (quads->id qs)
-             ((Listof Quad) . -> . IdQuad)
+             ((Listof Quad) -> IdQuad)
              (apply id (gather-common-attrs qs) qs))
         
            (define-type IdQuad (List* 'id QuadAttrs #,(if (syntax->datum #'wants-group?)
@@ -192,7 +188,7 @@
            (define-quad-type id-break) ; break is not necessarily a group
            (define-quad-type multi-id wants-group?) ; multi-id is always a group
            ;; breaker
-           (: split-on-id-breaks ((Listof Quad) . -> . (Listof (Listof Quad))))
+           (: split-on-id-breaks ((Listof Quad) -> (Listof (Listof Quad))))
            (define (split-on-id-breaks xs)
              ;; omit leading & trailing whitespace, because they're superfluous next to a break
              (map (λ([xs : (Listof Quad)]) (trimf xs whitespace?)) (filter-split xs id-break?)))))]))
@@ -201,20 +197,20 @@
 
 
 (define/typed (quad-car q)
-  (Quad . -> . QuadListItem)
+  (Quad -> QuadListItem)
   (define ql (quad-list q))
   (if (not (empty? ql))
       ((inst car QuadListItem QuadList) ql)
       (error 'quad-car "quad-list empty")))
 
 (define/typed (quad-cdr q)
-  (Quad . -> . QuadList)
+  (Quad -> QuadList)
   (define ql (quad-list q))
   (if (not (empty? ql))
       ((inst cdr QuadListItem QuadList) ql)
       (error 'quad-car "quad-list empty")))
 
-(: quad-has-attr? (Quad QuadAttrKey . -> . Boolean))
+(: quad-has-attr? (Quad QuadAttrKey -> Boolean))
 (define (quad-has-attr? q key)
   (and ((inst member QuadAttrKey) key (quad-attr-keys (quad-attrs q))) #t))
 
@@ -234,7 +230,7 @@
 
 (define-break-type word)
 (define/typed (word-string c) 
-  (Quad . -> . String)
+  (Quad -> String)
   (define ql (quad-list c))
   (if (and (not (null? ql)) (string? (car ql)))
       (car ql)

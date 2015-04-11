@@ -1,5 +1,5 @@
 #lang typed/racket/base
-(require "quads-typed.rkt" racket/file racket/string racket/list)
+(require "quads-typed.rkt" "core-types.rkt" racket/file racket/string racket/list typed/sugar/define)
 (provide (all-defined-out))
 
 ;(define ti (block '(measure 54.0 leading 18.0) "Meg is an ally."))

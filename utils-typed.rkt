@@ -1,27 +1,28 @@
 #lang typed/racket/base
-(require/typed hyphenate [hyphenate (String #:min-length Nonnegative-Integer #:min-left-length Nonnegative-Integer #:min-right-length Nonnegative-Integer . -> . String)])
-(require (for-syntax racket/syntax racket/base) racket/string racket/list sugar/debug racket/bool racket/function math/flonum)
+(require/typed hyphenate [hyphenate (String #:min-length Nonnegative-Integer #:min-left-length Nonnegative-Integer #:min-right-length Nonnegative-Integer -> String)])
+(require (for-syntax racket/syntax racket/base) racket/string racket/list typed/sugar/debug typed/sugar/define racket/bool racket/function math/flonum)
 (require "quads-typed.rkt" "world-typed.rkt" "measure-typed.rkt" "core-types.rkt")
 
 (define/typed+provide (quad-map proc q)
-  ((QuadListItem . -> . QuadListItem) Quad . -> . Quad)
+  ((QuadListItem -> QuadListItem) Quad -> Quad)
   (quad (quad-name q) (quad-attrs q) (map proc (quad-list q))))
 
 
 ;; predicate for use below
-(: list-of-mergeable-attrs? (Any . -> . Boolean))
-(define (list-of-mergeable-attrs? xs)
+(define/typed (list-of-mergeable-attrs? xs)
+  (Any -> Boolean)
   (and (list? xs) (andmap (λ(x) (or (quad? x) (quad-attrs? x) (HashableList? x))) xs)))
 
-;; faster than (listof pair?)
-(: pairs? (Any . -> . Boolean))
-(define (pairs? x) (and (list? x) (andmap pair? x)))
+;; faster than (listof pair?
+(define/typed (pairs? x)
+  (Any -> Boolean)
+  (and (list? x) (andmap pair? x)))
 
 ;; push together multiple attr sources into one list of pairs.
 ;; mostly a helper function for the two attr functions below.
 ;; does not resolve duplicates (see merge-attrs for that)
 (define/typed+provide (join-attrs quads-or-attrs-or-lists)
-  ((Listof JoinableType) . -> . QuadAttrs)
+  ((Listof JoinableType) -> QuadAttrs)
   (append-map (λ([x : JoinableType])
                 (cond
                   [(quad? x) (quad-attrs x)]
@@ -32,7 +33,7 @@
 ;; merge uses join-attrs to concatenate attributes,
 ;; but then resolves duplicates, with later ones overriding earlier.
 (define/typed+provide (merge-attrs . quads-or-attrs-or-lists)
-  (JoinableType * . -> . QuadAttrs)
+  (JoinableType * -> QuadAttrs)
   (define all-attrs (join-attrs quads-or-attrs-or-lists))
   (hash->list (make-hash all-attrs)))
 
@@ -41,7 +42,7 @@
 (define-type QuadAttrFloatPair (Pairof QuadAttrKey Float))
 
 (define/typed+provide (flatten-attrs . joinable-items)
-  (JoinableType * . -> . QuadAttrs)
+  (JoinableType * -> QuadAttrs)
   (define all-attrs (join-attrs joinable-items))
   (define-values (x-attrs y-attrs other-attrs-reversed)
     (for/fold ([xas : (Listof QuadAttrFloatPair) null]
@@ -52,7 +53,7 @@
         [(and (equal? (car attr) world:x-position-key) (flonum? (cdr attr))) (values (cons attr xas) yas oas)]
         [(and (equal? (car attr) world:y-position-key) (flonum? (cdr attr))) (values xas (cons attr yas) oas)]
         [else (values xas yas (cons attr oas))])))
-  (: make-cartesian-attr (QuadAttrKey (Listof QuadAttrFloatPair) . -> . (Listof QuadAttrFloatPair)))
+  (: make-cartesian-attr (QuadAttrKey (Listof QuadAttrFloatPair) -> (Listof QuadAttrFloatPair)))
   (define (make-cartesian-attr key attrs) 
     (if (empty? attrs) 
         empty 
@@ -67,18 +68,17 @@
 ;; and flatten will go too far.
 ;; this version adds a check for quadness to the flattener.
 (define/typed+provide (flatten-quadtree quad-tree)
-  ((Treeof Quad) . -> . (Listof Quad))
+  ((Treeof Quad) -> (Listof Quad))
   (let loop ([sexp quad-tree][acc : (Listof Quad) null])
     (cond [(null? sexp) acc]
           [(quad? sexp) (cons sexp acc)]
           [else (loop (car sexp) (loop (cdr sexp) acc))])))
 
-(require sugar/debug)
 ;; starting with a single nested quad,
 ;; pushes attributes down from parent quads to children, 
 ;; resulting in a flat list of quads.
 (define/typed+provide (flatten-quad q)
-  (Quad . -> . (Listof Quad))
+  (Quad -> (Listof Quad))
   (flatten-quadtree 
    (let loop : (Treeof Quad)
      ([x : QuadListItem q][parent : Quad (quad 'null '() '())])
@@ -98,7 +98,7 @@
 ;; then dissolve it into individual character quads while copying attributes
 ;; input is often large, so macro allows us to avoid allocation
 (define/typed+provide (split-quad q)
-  (Quad . -> . (Listof Quad))
+  (Quad -> (Listof Quad))
   (: do-explode ((QuadListItem) (Quad) . ->* . (Treeof Quad)))
   (define (do-explode x [parent (box)])
     (cond
@@ -116,8 +116,7 @@
 ;; they get merged.
 ;; input is often large, so macro allows us to avoid allocation
 (define/typed+provide (join-quads qs-in)
-  ((Listof Quad) . -> . (Listof Quad))
-  
+  ((Listof Quad) -> (Listof Quad))
   (let ([make-matcher (λ ([base-q : Quad])
                         (λ([q : Quad])
                           (and (member (quad-name q) world:mergeable-quad-types) 
@@ -155,15 +154,14 @@
 ;; propagate x and y adjustments throughout the tree,
 ;; using parent x and y to adjust children, and so on.
 (define/typed+provide (compute-absolute-positions qli)
-  (Quad . -> . Quad)
+  (Quad -> Quad)
   (define result 
     (let loop : QuadListItem ([qli : QuadListItem qli][parent-x : Float 0.0][parent-y : Float 0.0])
       (cond
         [(quad? qli)
-         (display 'foom3)
          (define adjusted-x (round-float (+ (assert (quad-attr-ref qli world:x-position-key 0.0) flonum?) parent-x)))
          (define adjusted-y (round-float (+ (assert (quad-attr-ref qli world:y-position-key 0.0) flonum?) parent-y)))
-         (quad (quad-name qli) (merge-attrs qli (list world:x-position-key adjusted-x world:y-position-key adjusted-y)) ((inst map QuadListItem QuadListItem) (λ(qlii) (loop qlii adjusted-x adjusted-y)) (quad-list qli)))]
+         (quad (quad-name qli) (merge-attrs qli (list world:x-position-key adjusted-x world:y-position-key adjusted-y)) (map (λ([qlii : QuadListItem]) (loop qlii adjusted-x adjusted-y)) (quad-list qli)))]
         [else ;; it's a string
          qli])))
   (if (string? result)
@@ -176,35 +174,35 @@
 ;; is that they strip out type.
 ;; whereas these "surgical" alternatives can be used when preserving type is essential
 (define/typed+provide (attr-change qas kvs)
-  (QuadAttrs HashableList . -> . QuadAttrs)
+  (QuadAttrs HashableList -> QuadAttrs)
   (merge-attrs qas kvs))
 
 (define/typed+provide (attr-delete qas . ks)
-  (QuadAttrs QuadAttrKey * . -> . QuadAttrs)
+  (QuadAttrs QuadAttrKey * -> QuadAttrs)
   (filter (λ([qa : QuadAttr]) (not (ormap (λ(k) (equal? (car qa) k)) ks))) qas))
 
 
 ;; functionally update a quad attr. Similar to hash-set
 (define/typed+provide (quad-attr-set q k v)
   (case->
-   (GroupQuad QuadAttrKey QuadAttrValue . -> . GroupQuad)
-  (Quad QuadAttrKey QuadAttrValue . -> . Quad))
+   (GroupQuad QuadAttrKey QuadAttrValue -> GroupQuad)
+  (Quad QuadAttrKey QuadAttrValue -> Quad))
   (quad-attr-set* q (list k v)))
 
 
 ;; functionally update multiple quad attrs. Similar to hash-set*
 (define/typed+provide (quad-attr-set* q kvs)
   (case->
-   (GroupQuad HashableList . -> . GroupQuad)
-   (Quad HashableList . -> . Quad))
+   (GroupQuad HashableList -> GroupQuad)
+   (Quad HashableList -> Quad))
   (quad (quad-name q) (attr-change (quad-attrs q) kvs) (quad-list q)))
 
 
 ;; functionally remove multiple quad attrs. Similar to hash-remove*
 (define/typed+provide (quad-attr-remove* q . ks)
   (case->
-   (GroupQuad QuadAttrKey * . -> . GroupQuad)
-   (Quad QuadAttrKey * . -> . Quad))
+   (GroupQuad QuadAttrKey * -> GroupQuad)
+   (Quad QuadAttrKey * -> Quad))
   (if (not (empty? (quad-attrs q)))
       ;; test all ks as a set so that iteration through attrs only happens once
       (quad (quad-name q) (apply attr-delete (quad-attrs q) ks) (quad-list q))
@@ -218,7 +216,7 @@
 
 ;; the last char of a quad
 (define/typed+provide (quad-last-char q)
-  (Quad . -> . (Option String))
+  (Quad -> (Option String))
   (define split-qs (split-quad q)) ; split makes it simple, but is it too expensive?
   (if (or (empty? split-qs) (empty? (quad-list (last split-qs))))
       #f
@@ -229,7 +227,7 @@
 
 ;; the first char of a quad
 (define/typed+provide (quad-first-char q)
-  (Quad . -> . (Option String))
+  (Quad -> (Option String))
   (define split-qs (split-quad q)) ; explosion makes it simple, but is it too expensive?
   (if (or (empty? split-qs) (empty? (quad-list (first split-qs))))
       #f
@@ -241,21 +239,21 @@
 
 ;; todo: how to guarantee line has leading key?
 (define/typed+provide (compute-line-height line)
-  (Quad . -> . Quad)
+  (Quad -> Quad)
   (quad-attr-set line world:height-key (quad-attr-ref/parameter line world:leading-key)))
 
 (define/typed (fixed-height? q)
-  (Quad . -> . Boolean)
+  (Quad -> Boolean)
   (quad-has-attr? q world:height-key))
 
 (define/typed+provide (quad-height q)
-  (Quad . -> . Float)
+  (Quad -> Float)
   (display 'foom)
   (assert (quad-attr-ref q world:height-key 0.0) flonum?))
 
 ;; use heights to compute vertical positions
 (define/typed+provide (add-vert-positions starting-quad)
-  (GroupQuad . -> . GroupQuad)
+  (GroupQuad -> GroupQuad)
   (define-values (new-quads final-height)
     (for/fold ([new-quads : (Listof Quad) empty][height-so-far : Float 0.0])
               ([q (in-list (quad-list starting-quad))])
@@ -265,7 +263,7 @@
 
 ;; recursively hyphenate strings in a quad
 (define/typed+provide (hyphenate-quad x)
-  (QuadListItem . -> . QuadListItem)
+  (QuadListItem -> QuadListItem)
   (cond
     [(quad? x) (quad-map hyphenate-quad x)]
     [(string? x) (hyphenate x

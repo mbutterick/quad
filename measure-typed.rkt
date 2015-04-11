@@ -1,8 +1,8 @@
 #lang typed/racket/base
 (require (for-syntax typed/racket/base))
-(require typed/racket/class math/flonum racket/list racket/file typed/racket/draw "core-types.rkt")
-(require/typed racket/serialize [serialize (Any . -> . Any)]
-               [deserialize (Any . -> . (HashTable (List String String Symbol Symbol) Measurement-Result-Type))])
+(require typed/racket/class math/flonum racket/list racket/file typed/racket/draw "core-types.rkt" typed/sugar/define)
+(require/typed racket/serialize [serialize (Any -> Any)]
+               [deserialize (Any -> (HashTable (List String String Symbol Symbol) Measurement-Result-Type))])
 (provide measure-text measure-ascent round-float update-text-cache-file load-text-cache-file)
 
 
@@ -16,7 +16,7 @@
 (define current-font-cache (make-parameter ((inst make-hash (List Font-Name Font-Weight Font-Style) (Instance Font%)) '())))
 
 (define/typed (round-float x)
-  (Float . -> . Float)
+  (Float -> Float)
   (/ (round (* base x)) base))
 
 
@@ -39,7 +39,7 @@
 
 
 (define/typed (get-cached-font font weight style)
-  (Font-Name Font-Weight Font-Style . -> . (Instance Font%))
+  (Font-Name Font-Weight Font-Style -> (Instance Font%))
   (hash-ref! (current-font-cache) (list font weight style) (λ() (make-font #:size max-size #:style style #:weight weight #:face font))))
 
 
@@ -64,7 +64,7 @@
 
 ;; works by taking max size and scaling it down. Allows caching of results.
 (define/typed (measure-text text size font weight style)
-  (String Font-Size Font-Name Font-Weight Font-Style . -> . Float)
+  (String Font-Size Font-Name Font-Weight Font-Style -> Float)
   (define raw-width (width (measure-max-size text font weight style)))
   (round-float (/ (* raw-width size) max-size)))
 

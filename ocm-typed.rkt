@@ -1,25 +1,25 @@
 #lang typed/racket/base
 (require (for-syntax racket/base racket/syntax))
-(require racket/list sugar/debug racket/function racket/vector  "logger-typed.rkt")
+(require racket/list typed/sugar/debug typed/sugar/define racket/function racket/vector  "logger-typed.rkt")
 (define-logger ocm)
 
 (provide minima-idx-key minima-payload-key smawky? Entry->Value-Type Value-Type No-Value-Type Entry-Type Index-Type Matrix-Proc-Type OCM-Type make-ocm reduce reduce2 concave-minima (prefix-out ocm- (combine-out min-entry min-value min-index)))
 
-(: select-elements ((Listof Any) (Listof Index-Type) . -> . (Listof Any)))
-(define (select-elements xs is)
+(define/typed (select-elements xs is)
+  ((Listof Any) (Listof Index-Type) -> (Listof Any))
   (map (λ([i : Index-Type]) ((inst list-ref Any) xs i)) is))
 
-(: odd-elements ((Listof Any) . -> . (Listof Any)))
-(define (odd-elements xs)
+(define/typed (odd-elements xs)
+  ((Listof Any) -> (Listof Any))
   (select-elements xs (range 1 (length xs) 2)))
 
-(: vector-odd-elements ((Vectorof Any) . -> . (Vectorof Any)))
-(define (vector-odd-elements xs)
+(define/typed (vector-odd-elements xs)
+  ((Vectorof Any) -> (Vectorof Any))
   (for/vector ([i (in-range (vector-length xs))] #:when (odd? i))
     (vector-ref xs i)))
 
-(: even-elements ((Listof Any) . -> . (Listof Any)))
-(define (even-elements xs)
+(define/typed (even-elements xs)
+  ((Listof Any) -> (Listof Any))
   (select-elements xs (range 0 (length xs) 2)))
 
 
@@ -40,8 +40,8 @@
   ((inst vector-append (U Index-Type No-Value-Type)) xs (vector value)))
 
 
-(: vector-set (All (a) ((Vectorof a) Integer a -> (Vectorof a))))
-(define (vector-set vec idx val)
+(define/typed (vector-set vec idx val)
+  (All (a) ((Vectorof a) Integer a -> (Vectorof a)))
   (vector-set! vec idx val)
   vec)
 
@@ -55,14 +55,14 @@
 (define (integers? x) (and (list? x) (andmap integer? x)))
 
 ;; Reduce phase: make number of rows at most equal to number of cols
-(: reduce ((Vectorof Index-Type) (Vectorof Index-Type) Matrix-Proc-Type Entry->Value-Type . -> . (Vectorof Index-Type)))
-(define (reduce row-indices col-indices matrix-proc entry->value)
-  ;(vector? vector? procedure? procedure? . -> . vector?)
+(define/typed (reduce row-indices col-indices matrix-proc entry->value)
+  ((Vectorof Index-Type) (Vectorof Index-Type) Matrix-Proc-Type Entry->Value-Type -> (Vectorof Index-Type))
+  ;(vector? vector? procedure? procedure? -> vector?)
   (log-ocm-debug "starting reduce phase with")
   (log-ocm-debug "row-indices = ~a" row-indices)
   (log-ocm-debug "col-indices = ~a" col-indices)
   
-  (: process-stack ((Vectorof Index-Type) Index-Type . -> . (Vectorof Index-Type)))
+  (: process-stack ((Vectorof Index-Type) Index-Type -> (Vectorof Index-Type)))
   (define (process-stack stack row-idx)
     (log-ocm-debug "row stack = ~a" stack)
     (let ([last-stack-idx (sub1 (vector-length stack))])
@@ -91,7 +91,7 @@
   (log-ocm-debug "finished reduce. row indexes = ~v" reduced-row-indexes)
   reduced-row-indexes)
 
-(: reduce2 ((Vectorof Index-Type) (Vectorof Index-Type) Matrix-Proc-Type Entry->Value-Type . -> . (Vectorof Index-Type)))
+(: reduce2 ((Vectorof Index-Type) (Vectorof Index-Type) Matrix-Proc-Type Entry->Value-Type -> (Vectorof Index-Type)))
 (define (reduce2 row-indices col-indices matrix-proc entry->value)
   (let find-survivors ([rows row-indices][survivors : (Listof Index-Type) empty])
     (cond 
@@ -126,8 +126,8 @@
 (define minima-payload-key 'entry)
 
 (define-type Make-Minimum-Input (Pair Any Index-Type)) 
-(: make-minimum (Make-Minimum-Input . -> . (HashTable Any Any)))
-(define (make-minimum value-rowidx-pair)
+(define/typed (make-minimum value-rowidx-pair)
+  (Make-Minimum-Input -> (HashTable Any Any))
   (define ht ((inst make-hash Any Any)))
   (! ht minima-payload-key (car value-rowidx-pair))
   (! ht minima-idx-key (cdr value-rowidx-pair))
@@ -139,9 +139,9 @@
 (define-syntax-rule (vector-last v)
   (vector-ref v (sub1 (vector-length v))))
 
-(: interpolate ((HashTable Any Any) (Vectorof Index-Type) (Vectorof Index-Type) Matrix-Proc-Type Entry->Value-Type . -> . (HashTable Any Any)))
-(define (interpolate minima row-indices col-indices matrix-proc entry->value)
-  ;(hash? vector? vector? procedure? procedure? . -> . hash?)
+(define/typed (interpolate minima row-indices col-indices matrix-proc entry->value)
+  ((HashTable Any Any) (Vectorof Index-Type) (Vectorof Index-Type) Matrix-Proc-Type Entry->Value-Type -> (HashTable Any Any))
+  ;(hash? vector? vector? procedure? procedure? -> hash?)
   (for ([col-idx (in-range 0 (vector-length col-indices) 2)]) ;; even-col-indices
     (define col (vector-ref col-indices col-idx))
     (define idx-of-last-row
@@ -158,8 +158,8 @@
     (! minima col (make-minimum smallest-value-entry)))
   minima)
 
-(: interpolate2 ((HashTable Any Any) (Vectorof Index-Type) (Vectorof Index-Type) Matrix-Proc-Type Entry->Value-Type . -> . (HashTable Any Any)))
-(define (interpolate2 minima row-indices col-indices matrix-proc entry->value)
+(define/typed (interpolate2 minima row-indices col-indices matrix-proc entry->value)
+  ((HashTable Any Any) (Vectorof Index-Type) (Vectorof Index-Type) Matrix-Proc-Type Entry->Value-Type -> (HashTable Any Any))
   (define idx-of-last-col (sub1 (vector-length col-indices)))
   (define (smallest-value-entry [col : Index-Type] [idx-of-last-row : Index-Type])
     ((inst argmin Make-Minimum-Input) (λ(x) (entry->value (car x)))
@@ -177,8 +177,8 @@
 ;; The return value `minima` is a hash:
 ;; the keys are col-indices (integers)
 ;; the values are pairs of (value row-index).
-(: concave-minima ((Vectorof Index-Type) (Vectorof Index-Type) Matrix-Proc-Type Entry->Value-Type . -> . HashTableTop))
-(define (concave-minima row-indices col-indices matrix-proc entry->value)
+(define/typed (concave-minima row-indices col-indices matrix-proc entry->value)
+  ((Vectorof Index-Type) (Vectorof Index-Type) Matrix-Proc-Type Entry->Value-Type -> HashTableTop)
   ;((vector?) ((or/c #f vector?) procedure? procedure?) . ->* . hash?)
   (define reduce-proc reduce2)
   (define interpolate-proc interpolate2)
@@ -202,40 +202,40 @@
 (define-type Value-Type Float)
 (define-type No-Value-Type Symbol)
 (define-type Finished-Value-Type Index-Type)
-(define-type Matrix-Proc-Type (Index-Type Index-Type . -> . Entry-Type))
-(define-type Entry->Value-Type (Entry-Type . -> . Value-Type))
+(define-type Matrix-Proc-Type (Index-Type Index-Type -> Entry-Type))
+(define-type Entry->Value-Type (Entry-Type -> Value-Type))
 
 (struct $ocm ([min-entrys : (Vectorof Entry-Type)] [min-row-indices : (Vectorof (U Index-Type No-Value-Type))] [finished : Finished-Value-Type] [matrix-proc : Matrix-Proc-Type] [entry->value : Entry->Value-Type] [base : Index-Type] [tentative : Index-Type]) #:transparent #:mutable)
 
 (define-type OCM-Type $ocm)
 
-(: make-ocm ((Matrix-Proc-Type Entry->Value-Type) (Entry-Type) . ->* . OCM-Type))
-(define (make-ocm matrix-proc entry->value [initial-entry 0.0])
+(define/typed (make-ocm matrix-proc entry->value [initial-entry 0.0])
+  ((Matrix-Proc-Type Entry->Value-Type) (Entry-Type) . ->* . OCM-Type)
   (log-ocm-debug "making new ocm")
   ($ocm (vector initial-entry) (vector no-value) 0 matrix-proc entry->value 0 0)) 
 
 ;; Return min { Matrix(i,j) | i < j }.
-(: min-entry (OCM-Type Index-Type . -> . Entry-Type))
-(define (min-entry ocm j)
+(define/typed (min-entry ocm j)
+  (OCM-Type Index-Type -> Entry-Type)
   (if (< (cast ($ocm-finished ocm) Real) j)
       (begin (advance! ocm) (min-entry ocm j))
       (vector-ref ($ocm-min-entrys ocm) j)))
 
 ;; same as min-entry, but converts to raw value
-(: min-value (OCM-Type Index-Type . -> . Value-Type))
-(define (min-value ocm j)
+(define/typed (min-value ocm j)
+  (OCM-Type Index-Type -> Value-Type)
   (($ocm-entry->value ocm) (min-entry ocm j)))
 
 ;; Return argmin { Matrix(i,j) | i < j }.
-(: min-index (OCM-Type Index-Type . -> . (U Index-Type No-Value-Type)))
-(define (min-index ocm j)
+(define/typed (min-index ocm j)
+  (OCM-Type Index-Type -> (U Index-Type No-Value-Type))
   (if (< (cast ($ocm-finished ocm) Real) j)     
       (begin (advance! ocm) (min-index ocm j))
       ((inst vector-ref (U Index-Type No-Value-Type)) ($ocm-min-row-indices ocm) j)))
 
 ;; Finish another value,index pair.
-(: advance! (OCM-Type . -> . Void))
-(define (advance! ocm)
+(define/typed (advance! ocm)
+  (OCM-Type -> Void)
   (define next (add1 ($ocm-finished ocm)))  
   (log-ocm-debug "advance! ocm to next = ~a" (add1 ($ocm-finished ocm)))
   (cond
@@ -296,15 +296,14 @@
         (set-$ocm-tentative! ocm next)
         (set-$ocm-finished! ocm next)])]))
 
-(: print (OCM-Type . -> . Void))
-(define (print ocm)
+(define/typed (print ocm)
+  (OCM-Type -> Void)
   (displayln ($ocm-min-entrys ocm))
   (displayln ($ocm-min-row-indices ocm)))
 
-
-(: smawky? ((Listof (Listof Real)) . -> . Boolean))
-(define (smawky? m)
-  (: position-of-minimum ((Listof Real) . -> . Index-Type)) 
+(define/typed (smawky? m)
+  ((Listof (Listof Real)) -> Boolean)
+  (: position-of-minimum ((Listof Real) -> Index-Type)) 
   (define (position-of-minimum xs)
     ;; put each element together with its list index
     (let ([xs : (Listof (Pairof Index-Type Real)) (map (inst cons Index-Type Real) (range (length xs)) xs)]) 

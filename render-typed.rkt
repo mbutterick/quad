@@ -1,28 +1,6 @@
 #lang typed/racket/base
-(require typed/racket/class racket/file racket/list)
-(require/typed racket/draw
-               [current-ps-setup (Parameterof (Instance (Class (init-field)
-                                                               [set-margin (Number Number . -> . Void)]
-                                                               [set-scaling (Number Number . -> . Void)])))]
-               [the-color-database (Instance (Class 
-                                              (find-color (String . -> . (Option (Instance (Class)))))))]
-               [pdf-dc% (Class (init [interactive Boolean][use-paper-bbox Boolean][as-eps Boolean]
-                                     [output Output-Port]
-                                     [width Float][height Float])
-                               (start-doc (String . -> . Void))
-                               (set-pen (String Real Symbol . -> . Void))
-                               (set-brush (String Symbol . -> . Void))
-                               (set-font ((Instance (Class)) . -> . Void))
-                               (set-text-foreground ((Instance (Class)) . -> . Void))
-                               (set-text-background ((Instance (Class)) . -> . Void))
-                               (set-text-mode (Symbol . -> . Void))
-                               (draw-text (String Float Float Boolean . -> . Void))
-                               (start-page (-> Void))
-                               (end-page (-> Void))
-                               (end-doc (-> Void)))]
-               [make-font ((#:size Nonnegative-Float) (#:style Symbol) (#:weight Symbol) (#:face String) . -> . (Instance (Class (init-field))))])
-(require/typed sugar/cache [make-caching-proc ((String Nonnegative-Float Symbol Symbol -> (Instance (Class))) . -> . (String Nonnegative-Float Symbol Symbol -> (Instance (Class))))])
-(require "utils-typed.rkt" "quads-typed.rkt" "world-typed.rkt")
+(require typed/racket/class racket/file racket/list typed/racket/draw typed/sugar/cache)
+(require "utils-typed.rkt" "quads-typed.rkt" "world-typed.rkt" "core-types.rkt")
 
 (define abstract-renderer%
   
@@ -32,7 +10,7 @@
     (define renderable-quads '(word box))
     
     ;; hash implementation
-    (: render (Quad . -> . Any))
+    (: render (Quad -> Any))
     (define/public (render doc-quad)
       (finalize
        (let ([rendering-input (flatten-quad (setup doc-quad))])
@@ -42,24 +20,24 @@
              ((inst hash-update! Nonnegative-Integer (Listof Quad)) page-quad-hash (cast (quad-attr-ref q world:page-key) Nonnegative-Integer) (λ(v) ((inst cons Quad (Listof Quad)) q v)) (λ() (cast null (Listof Quad))))))
          (map (λ([k : Nonnegative-Integer]) (render-page ((inst hash-ref Nonnegative-Integer (Listof Quad) (Listof Quad)) page-quad-hash k))) (sort (hash-keys page-quad-hash) <)))))
     
-    (: render-element (Quad . -> . Any))
+    (: render-element (Quad -> Any))
     (define/public (render-element q)
       (cond 
         [(word? q) (render-word q)]
         [else q]))
     
-    (: setup (Quad . -> . Quad))
+    (: setup (Quad -> Quad))
     (define/public (setup q) q)
     
     ;; use in lieu of 'abstract' definition
-    (: render-page ((Listof Quad) . -> . Void))
+    (: render-page ((Listof Quad) -> Void))
     (define/public (render-page qs) (void)) 
     
     ;; use in lieu of 'abstract' definition
-    (: render-word (Quad . -> . Any))
+    (: render-word (Quad -> Any))
     (define/public (render-word x) (word)) 
     
-    (: finalize (Any . -> . Any))
+    (: finalize (Any -> Any))
     (define/public (finalize x) x)))
 
 (define-syntax-rule (map/send method xs)
@@ -94,8 +72,8 @@
     (inherit render-element)
     
     
-    (define font-cache ((inst make-hash (List String Nonnegative-Flonum Symbol Symbol) (Instance (Class (init-field)))) '()))
-    (: get-cached-font (String Nonnegative-Flonum Symbol Symbol . -> .  (Instance (Class (init-field)))))
+    (define font-cache ((inst make-hash (List String Nonnegative-Flonum Font-Style Font-Weight) (Instance Font%)) '()))
+    (: get-cached-font (String Nonnegative-Flonum Font-Style Font-Weight ->  (Instance Font%)))
     (define (get-cached-font font size style weight)
       (hash-ref! font-cache (list font size style weight) (λ () (make-font #:face font #:size size #:style style #:weight weight))))
     
@@ -103,8 +81,8 @@
     (define/override (render-word w)
       (define word-font (cast (quad-attr-ref/parameter w world:font-name-key) String))
       (define word-size (cast (quad-attr-ref/parameter w world:font-size-key) Nonnegative-Float))
-      (define word-style (cast (quad-attr-ref/parameter w world:font-style-key) Symbol))
-      (define word-weight (cast (quad-attr-ref/parameter w world:font-weight-key) Symbol))
+      (define word-style (cast (quad-attr-ref/parameter w world:font-style-key) Font-Style))
+      (define word-weight (cast (quad-attr-ref/parameter w world:font-weight-key) Font-Weight))
       (define word-color (cast (quad-attr-ref/parameter w world:font-color-key) String))
       (define word-background (cast (quad-attr-ref/parameter w world:font-background-key) String))
       (send dc set-font (get-cached-font word-font word-size word-style word-weight))
@@ -131,7 +109,7 @@
       (send dc end-doc)
       (get-output-bytes dc-output-port))
     
-    (: render-to-file (Quad Path-String . -> . Void))
+    (: render-to-file (Quad Path-String -> Void))
     (define/public (render-to-file doc-quad path)
       (define result-bytes (send this render doc-quad))
       (display-to-file result-bytes path #:exists 'replace #:mode 'binary))
