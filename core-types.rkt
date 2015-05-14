@@ -49,4 +49,4 @@
 
 (define-predicate Index? Index)
 
-(define-type+predicate Breakpoint Index)
+(define-type+predicate Breakpoint Nonnegative-Integer)

@@ -437,7 +437,7 @@
         (define line-width (get-line-width (make-trial-line pieces-rendered-widths
                                                             pieces-rendered-before-break-widths
                                                             ;; add1 does not preserve Index type, so assert
-                                                            line-starting-bp (assert (add1 j-1) index?))))
+                                                            line-starting-bp (add1 j-1))))
         (if (fl> line-width (fl* world:allowed-overfull-ratio measure))
             (values (cons j-1 bps) (cons line-width line-widths))
             (values bps line-widths))))
@@ -500,7 +500,7 @@
                           0.0)
                       (fl world:new-line-penalty) 
                       ($penalty->value penalty-up-to-i)
-                      (let ([line-width (get-line-width (make-trial-line pieces-rendered-widths pieces-rendered-before-break-widths (assert i index?) (assert j index?)))])
+                      (let ([line-width (get-line-width (make-trial-line pieces-rendered-widths pieces-rendered-before-break-widths i j))])
                         (cond
                           ;; overfull line: huge penalty prevents break; multiplier is essential for monotonicity.
                           ;; multiply by -1 because line-width is longer than measure, thus diff is negative
