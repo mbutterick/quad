@@ -431,12 +431,10 @@
       ;; bps will end up with at least two values (if all pieces fit on first line, bps = 0 and last bp)
       (for/fold ([bps : (Pairof Breakpoint (Listof Breakpoint)) '(0) ]
                  [line-widths : (Listof Value-Type) empty])
-                ;; (in-range (vector-length pieces)) won't work here because it doesn't preserve Index type
-                ([j-1 : Breakpoint (in-list (range (vector-length pieces)))])
+                ([j-1 : Breakpoint (in-range (vector-length pieces))])
         (define line-starting-bp (car bps))
         (define line-width (get-line-width (make-trial-line pieces-rendered-widths
                                                             pieces-rendered-before-break-widths
-                                                            ;; add1 does not preserve Index type, so assert
                                                             line-starting-bp (add1 j-1))))
         (if (fl> line-width (fl* world:allowed-overfull-ratio measure))
             (values (cons j-1 bps) (cons line-width line-widths))

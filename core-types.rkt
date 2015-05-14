@@ -49,4 +49,7 @@
 
 (define-predicate Index? Index)
 
+;; Index is arguably the stricter type for Breakpoint,
+;; but in practice it's annoying because doing math with Indexes
+;; often leads to non-Index values.
 (define-type+predicate Breakpoint Nonnegative-Integer)
