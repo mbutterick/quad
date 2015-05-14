@@ -206,7 +206,7 @@
   (cond
     [(not (empty? exploded-line-quads))
      ;; after exploding, each quad will have a string with one character.
-     (define shifted-lists (shift exploded-line-quads '(1 -1)))
+     (define shifted-lists (shifts exploded-line-quads '(1 -1)))
      (define lefts (first shifted-lists))
      (define rights (second shifted-lists))
      (for/list : (Listof Quad) ([q-left (in-list lefts)][q (in-list exploded-line-quads)][q-right (in-list rights)])
@@ -415,26 +415,29 @@
 ;; first-fit and best-fit are variants.
 (define-type Find-Breakpoints-Type ((Vectorof PieceQuad) Float -> (Listof Breakpoint)))
 (define/typed (adaptive-fit-proc pieces measure [use-first? #t] [use-best? #t])
-  (((Vectorof PieceQuad) Float) (Boolean Boolean) . ->* . (Listof Nonnegative-Integer))
+  (((Vectorof PieceQuad) Float) (Boolean Boolean) . ->* . (Listof Breakpoint))
   
   ;; this is the winning performance strategy: extract the numbers first, then just wrap on those.
   ;; todo: how to avoid re-measuring pieces later?
   ;; todo: how to retain information about words per line and hyphen at end?
   (define-values (pieces-rendered-widths pieces-rendered-before-break-widths)
     (make-piece-vectors pieces))
-  (define pieces-with-word-space (vector-map (λ([piece : PieceQuad]) (and (quad-has-attr? piece world:word-break-key) (equal? (quad-attr-ref (assert (quad-attr-ref piece world:word-break-key) quad?) 'nb) " "))) pieces))
+  (define pieces-with-word-space (vector-map (λ([piece : PieceQuad]) (and (quad-has-attr? piece world:word-break-key) (equal? (quad-attr-ref (assert (quad-attr-ref piece world:word-break-key) quad?) world:no-break-key) " "))) pieces))
   
   (define (make-first-fit-bps-and-widths)
     (define-values (reversed-bps reversed-widths)
       ;; breakpoints get stacked onto bps, so (car bps) is always the next starting point
       ;; thus use '(0) as a starting value to indicate that the first line starts at bp 0
       ;; bps will end up with at least two values (if all pieces fit on first line, bps = 0 and last bp)
-      (for/fold ([bps : (Pairof Breakpoint (Listof Breakpoint)) '(0) ][line-widths : (Listof Float) empty])
-                ([j-1 : Breakpoint (in-range (vector-length pieces))])
+      (for/fold ([bps : (Pairof Breakpoint (Listof Breakpoint)) '(0) ]
+                 [line-widths : (Listof Value-Type) empty])
+                ;; (in-range (vector-length pieces)) won't work here because it doesn't preserve Index type
+                ([j-1 : Breakpoint (in-list (range (vector-length pieces)))])
         (define line-starting-bp (car bps))
         (define line-width (get-line-width (make-trial-line pieces-rendered-widths
                                                             pieces-rendered-before-break-widths
-                                                            line-starting-bp (add1 j-1))))
+                                                            ;; add1 does not preserve Index type, so assert
+                                                            line-starting-bp (assert (add1 j-1) index?))))
         (if (fl> line-width (fl* world:allowed-overfull-ratio measure))
             (values (cons j-1 bps) (cons line-width line-widths))
             (values bps line-widths))))
@@ -497,7 +500,7 @@
                           0.0)
                       (fl world:new-line-penalty) 
                       ($penalty->value penalty-up-to-i)
-                      (let ([line-width (get-line-width (make-trial-line pieces-rendered-widths pieces-rendered-before-break-widths i j))])
+                      (let ([line-width (get-line-width (make-trial-line pieces-rendered-widths pieces-rendered-before-break-widths (assert i index?) (assert j index?)))])
                         (cond
                           ;; overfull line: huge penalty prevents break; multiplier is essential for monotonicity.
                           ;; multiply by -1 because line-width is longer than measure, thus diff is negative
