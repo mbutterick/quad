@@ -182,7 +182,7 @@
   (cond
     [(not (empty? exploded-line-quads))
      ;; after exploding, each quad will have a string with one character.
-     (for/list ([(q-left q q-right) (apply in-parallel (shift exploded-line-quads '(1 0 -1)))])
+     (for/list ([(q-left q q-right) (apply in-parallel (shifts exploded-line-quads '(1 0 -1)))])
        (if (optical-kern? q)
            (quad-attr-set q world:width-key (fl+ (overhang-width q-left) (overhang-width q-right)))
            q))]

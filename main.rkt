@@ -205,6 +205,6 @@
   (parameterize ([world:quality-default world:draft-quality]
                  [world:paper-width-default 600]
                  [world:paper-height-default 700])
-    (define sample (ti5))
+    (define sample (ti3))
     (define to (begin (time (typeset sample))))
     (time (send (new pdf-renderer%) render-to-file to "foo.pdf"))))
