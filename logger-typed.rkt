@@ -1,6 +1,6 @@
-#lang typed/racket
+#lang typed/racket/base
 (require (for-syntax typed/racket/base))
-(require typed/racket/date "world-typed.rkt")
+(require typed/racket/date racket/match "world-typed.rkt")
 (provide (all-defined-out))
 
 (define-syntax-rule (define-orphan-logger name)
