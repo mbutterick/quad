@@ -248,7 +248,6 @@
 
 (define/typed+provide (quad-height q)
   (Quad -> Float)
-  (display 'foom)
   (assert (quad-attr-ref q world:height-key 0.0) flonum?))
 
 ;; use heights to compute vertical positions
