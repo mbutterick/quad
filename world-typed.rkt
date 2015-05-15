@@ -88,7 +88,7 @@
 (define new-line-penalty 5000)
 (define hyphen-penalty 5000)
 
-(define hanging-chars '("." "-" "," "‘" "’" "“" "”" "'" "\"" ")" "(" "[" "]" "{" "}" ":" ";"))
+(define hanging-chars (regexp-match* #rx"." ".-,‘’“”'\"()[]{}:;"))
 
 (define minimum-lines-per-column 4)
 (define min-first-lines 2)

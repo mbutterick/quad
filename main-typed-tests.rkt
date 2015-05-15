@@ -3,7 +3,7 @@
 (require "main-typed.rkt" "quads-typed.rkt" "world-typed.rkt")
 
 
-(check-equal? (input->nested-blocks (input #f (block #f "1" (block-break) "2"))) 
+(check-equal? (input->nested-blocks (input '() (block '() "1" (block-break) "2"))) 
               (list (list (list (list (quad 'word '#hash() '("1"))) (list (quad 'word '#hash() '("2")))))))
 (check-equal? (input->nested-blocks (input #f (block #f "1" (column-break) "2"))) 
               (list (list (list (list (quad 'word '#hash() '("1")))) (list (list (quad 'word '#hash() '("2")))))))

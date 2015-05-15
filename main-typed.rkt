@@ -1,6 +1,22 @@
 #lang typed/racket/base
-(require racket/list math/flonum)
-(require/typed sugar/list [slice-at ((Listof Quad) Positive-Integer . -> . (Listof (Listof Quad)))])
+(require racket/list math/flonum typed/racket/class)
+(require typed/sugar/define typed/sugar/list)
+(require/typed csp
+               [problem%  (Class (init-field [solver Any])
+                                 (field [_solver Any])
+                                 (field [_variable-domains Any])
+                                 (field [_constraints Any])
+                                 [reset (-> Void)]
+                                 [custom-print (Output-Port Integer -> Void)]
+                                 [custom-display (Output-Port -> Void)]
+                                 [custom-write (Output-Port -> Void)]
+                                 [add-variable (Any (Listof Any) . -> . Void)]
+                                 [add-variables ((Listof Any) Any . -> . Void)]
+                                 [add-constraint ((Index . -> . Boolean) (Listof Any) . -> . Void)][get-solution (-> HashTableTop)]
+                                 [get-solutions (-> (Listof (HashTable String Integer)))]
+                                 [get-solution-iter (-> HashTableTop)]
+                                 [set-solver (Any . -> . Void)]
+                                 [get-solver (-> Any)])])
 (require "quads-typed.rkt" "utils-typed.rkt" "wrap-typed.rkt" "measure-typed.rkt" "world-typed.rkt" "logger-typed.rkt" "core-types.rkt")
 
 (define-type Block-Type (Listof Quad))
@@ -108,17 +124,10 @@
   (define doc (quads->doc mapped-pages))
   doc)
 
-(require racket/class)
-(require/typed csp
-               [problem%  (Class (init-field) 
-                                 (reset (-> Void))
-                                 (get-solution (-> HashTableTop))
-                                 (get-solutions (-> (Listof (HashTable String Integer))))
-                                 (add-variable (Any (Listof Any) . -> . Void))
-                                 (add-constraint ((Index . -> . Boolean) (Listof Any) . -> . Void)))])
+
 (define/typed+provide (lines->columns lines)
   ((Listof LineQuad) . -> . (Listof ColumnQuad))
-  (define prob (new problem%))
+  (define prob (new problem% [solver #f]))
   (define max-column-lines world:default-lines-per-column)
   (define-values (columns ignored-return-value)
     (for/fold ([columns : (Listof ColumnQuad) empty][lines-remaining : (Listof LineQuad) lines])
@@ -218,13 +227,21 @@
   ((Listof Quad) . -> . (Listof LineQuad))
   (block->lines (quads->block qs)))
 
+(require typed/sugar/debug)
 (define/typed+provide (typeset x)
-  (InputQuad . -> . DocQuad)
+  (Quad . -> . DocQuad)
   (load-text-cache-file)
-  (define pages (append* (for/list : (Listof (Listof PageQuad)) ([multipage (in-list (input->nested-blocks x))])
-                           (columns->pages (append* (for/list : (Listof (Listof ColumnQuad)) ([multicolumn (in-list multipage)])
-                                                      (lines->columns (append* (for/list : (Listof (Listof LineQuad)) ([block-quads (in-list multicolumn)])
-                                                                                 (block-quads->lines block-quads))))))))))
+  
+  (define pages (append*
+                 (for/list : (Listof (Listof PageQuad))
+                   ([multipage (in-list (input->nested-blocks x))])
+                   (columns->pages (append*
+                                    (for/list : (Listof (Listof ColumnQuad))
+                                      ([multicolumn (in-list multipage)])
+                                      (lines->columns (append*
+                                                       (for/list : (Listof (Listof LineQuad))
+                                                         ([block-quads (in-list multicolumn)])
+                                                         (block-quads->lines block-quads))))))))))
   (define doc (pages->doc pages))
   (update-text-cache-file)
   doc)

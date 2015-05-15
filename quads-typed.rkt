@@ -53,7 +53,7 @@
   (if qa-result 
       ;; car beacause result of memf is a list tail; cadr because second element in pair
       (quadattr-value (car qa-result))
-      (if (not (equal? default attr-missing)) default (error 'key-not-found))))
+      (if (not (equal? default attr-missing)) default (error 'quad-attr-ref (format "Key ~v not found in quad attributes ~v" key qas)))))
 
 
 (define-syntax (quad-attr-ref/parameter stx)
@@ -92,9 +92,6 @@
 
 (define/typed+provide (gather-common-attrs qs)
   ((Listof Quad) -> QuadAttrs)
-  (: check-cap (Quad QuadAttr -> Boolean))
-  (define (check-cap q cap) ; cap = candidate-attr-pair
-    (equal? (quad-attr-ref q (car cap) attr-missing) (cdr cap)))
   (if (null? qs)
       qs
       (let loop 
@@ -102,16 +99,16 @@
          ;; start with the set of pairs in the first quad, then filter it down
          [candidate-attr-pairs : (Listof QuadAttr) (let ([first-attrs (quad-attrs (car qs))])
                                                      (if first-attrs
-                                                         (for/fold ([kvps : QuadAttrs null]) ([qa (in-list first-attrs)])  
-                                                           (if (member (car qa) cannot-be-common-attrs)
-                                                               kvps
-                                                               (cons qa kvps)))
+                                                         (for/fold ([caps : QuadAttrs null]) ([cap (in-list first-attrs)])  
+                                                           (if (member (car cap) cannot-be-common-attrs)
+                                                               caps
+                                                               (cons cap caps)))
                                                          null))])
         (cond
           [(null? candidate-attr-pairs) null] ; ran out of possible pairs, so return #f
           [(null? qs) candidate-attr-pairs] ; ran out of quads, so return common-attr-pairs
           ;; todo: reconsider type interface between output of this function and input to quadattrs
-          [else (loop (cdr qs) (filter (λ([cap : QuadAttr]) (check-cap (car qs) cap)) candidate-attr-pairs))]))))
+          [else (loop (cdr qs) (filter (λ([cap : QuadAttr]) (member cap (quad-attrs (car qs)))) candidate-attr-pairs))]))))
 
 (define/typed (make-quadattrs xs)
   ;; no point typing the input as (U QuadAttrKey QuadAttrValue) 
@@ -145,7 +142,7 @@
            (define/typed (quads->id qs)
              ((Listof Quad) -> IdQuad)
              (apply id (gather-common-attrs qs) qs))
-        
+           
            (define-type IdQuad (List* 'id QuadAttrs #,(if (syntax->datum #'wants-group?)
                                                           #'GroupQuadList
                                                           #'QuadList)))
@@ -154,11 +151,11 @@
            
            (define/typed (id [attrs '()] #:zzz [zzz 0] . xs)
              (() ((U QuadAttrs HashableList) #:zzz Zero) #:rest #,(if (syntax->datum #'wants-group?)
-                                                          #'GroupQuadListItem
-                                                          #'QuadListItem) . ->* . IdQuad)
+                                                                      #'GroupQuadListItem
+                                                                      #'QuadListItem) . ->* . IdQuad)
              (quad 'id (if (QuadAttrs? attrs)
-                            attrs
-                            (make-quadattrs attrs)) xs))))]))
+                           attrs
+                           (make-quadattrs attrs)) xs))))]))
 
 (define/typed (whitespace? x [nbsp? #f])
   ((Any) (Boolean) . ->* . Boolean)  

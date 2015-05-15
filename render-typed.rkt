@@ -1,5 +1,5 @@
 #lang typed/racket/base
-(require typed/racket/class racket/file racket/list typed/racket/draw typed/sugar/cache)
+(require typed/racket/class racket/file racket/list typed/racket/draw typed/sugar/cache typed/sugar/debug)
 (require "utils-typed.rkt" "quads-typed.rkt" "world-typed.rkt" "core-types.rkt")
 
 (define abstract-renderer%

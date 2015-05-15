@@ -12,6 +12,8 @@
 (check-equal? (flatten-attrs '(dup 100) '(dup 200)) '((dup . 200))) ; later overrides earlier
 
 (check-equal? (gather-common-attrs (list (box '(foo bar)) (box '(foo bar goo bar zam zino)) (box '(foo bar goo rab)))) '((foo . bar)))
+(check-equal? (gather-common-attrs (list (box '(foo bar zim zam)) (box '(foo bar)))) '((foo . bar)))
+(check-equal? (gather-common-attrs (list (box '(foo bar)) (box '(foo bar zim zam)))) '((foo . bar)))
 (check-equal? (gather-common-attrs (list (box) (box '(foo bar goo bar zam zino)) (box '(foo bar)))) empty)
 (check-equal? (gather-common-attrs (list (box '(width bar)) (box '(width bar)) (box '(width bar)))) empty)
 (check-equal? (gather-common-attrs (list (box '(foo bar)) (box '(foo zam)))) empty)
@@ -35,7 +37,7 @@
 
 (check-equal? (compute-absolute-positions (page '(x 100.0 y 100.0) (line '(x 10.0 y 10.0) (word '(x 1.0 y 1.0) "hello")
                                                                      (word '(x 2.0 y 2.0) "world"))))
-              (page '(y 100.0 x 100.0) (line '(y 110.0 x 110.0) (word '(y 111.0 x 111.0) "hello")(word '(y 112.0 x 112.0) "world"))))
+              (page '(x 100.0 y 100.0) (line '(x 110.0 y 110.0) (word '(x 111.0 y 111.0) "hello")(word '(x 112.0 y 112.0) "world"))))
 
 (define b2-exploded (list (word '(x 10.0) "1") (word '(x 10.0) "s") (word '(x 10.0) "t") (word '(x 10.0 foo bar) "2") (word '(x 10.0 foo bar) "n") (word '(x 10.0 foo bar) "d") (word '(x 10.0) "3") (word '(x 10.0) "r") (word '(x 10.0) "d")))
 
@@ -46,8 +48,8 @@
 
 (check-equal? (quad-attr-set (box '(foo bar)) 'foo 'zam) (box '(foo zam)))
 (check-equal? (quad-attr-set (box) 'foo 'zam) (box '(foo zam)))
-(check-equal? (quad-attr-set* (box) '(foo zam bar boo)) (box '(bar boo foo zam)))
-(check-equal? (quad-attr-set* (box '(foo bar)) '(foo zam bar boo)) (box '(bar boo foo zam)))
+(check-equal? (quad-attr-set* (box) '(foo zam bar boo)) (box '(foo zam bar boo)))
+(check-equal? (quad-attr-set* (box '(foo bar)) '(foo zam bar boo)) (box '(foo zam bar boo)))
 
 (check-equal? (quad-attr-remove (box '(foo bar zim zam)) 'foo) (box '(zim zam)))
 (check-equal? (quad-attr-remove (box) 'zim) (box))
