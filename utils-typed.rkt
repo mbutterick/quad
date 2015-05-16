@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 (require/typed hyphenate [hyphenate (String #:min-length Nonnegative-Integer #:min-left-length Nonnegative-Integer #:min-right-length Nonnegative-Integer -> String)])
 (require (for-syntax racket/syntax racket/base) racket/string racket/list typed/sugar/debug typed/sugar/define racket/bool racket/function math/flonum)
 (require "quads-typed.rkt" "world-typed.rkt" "measure-typed.rkt" "core-types.rkt")

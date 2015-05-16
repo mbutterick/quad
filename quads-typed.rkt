@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 (require (for-syntax typed/racket/base racket/syntax racket/string))
 (require "lib-typed.rkt" "core-types.rkt")
 ;; note to self: a require/typed function with proper typing
@@ -117,12 +117,14 @@
   (let-values ([(ks vs even?) (for/fold 
                                ([ks : (Listof QuadAttrKey) null][vs : (Listof QuadAttrValue) null][even? : Boolean #t])
                                ([x (in-list xs)])
+                                (displayln (QuadAttrKey? x))
                                 (if (and even? (QuadAttrKey? x))
                                     (values (cons x ks) vs #f)
-                                    (values ks (cons (assert x QuadAttrValue?) vs) #t)))]) 
+                                    (values ks (cons x vs) #t)))]) 
     (when (not even?) (error 'quadattrs "odd number of elements in ~a" xs))
     ;; use for/fold rather than for/list to impliedly reverse the list
     ;; (having been reversed once above, this puts it back in order)
+    (displayln ks)
     (for/fold ([qas : QuadAttrs null])([k (in-list ks)][v (in-list vs)])
       (cons (make-quadattr k v) qas))))
 

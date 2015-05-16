@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 (require typed/racket/class racket/file racket/list typed/racket/draw typed/sugar/cache typed/sugar/debug)
 (require "utils-typed.rkt" "quads-typed.rkt" "world-typed.rkt" "core-types.rkt")
 

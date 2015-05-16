@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 (require (for-syntax typed/racket/base racket/syntax) "core-types.rkt")
 (provide (prefix-out world: (all-defined-out)))
 

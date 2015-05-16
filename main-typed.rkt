@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 (require racket/list math/flonum typed/racket/class)
 (require typed/sugar/define typed/sugar/list)
 (require/typed csp

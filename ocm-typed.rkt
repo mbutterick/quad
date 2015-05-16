@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 (require (for-syntax racket/base racket/syntax))
 (require racket/list typed/sugar/debug typed/sugar/define racket/function racket/vector  "logger-typed.rkt")
 (define-logger ocm)

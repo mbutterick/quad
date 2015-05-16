@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 (require (for-syntax typed/racket/base))
 (require typed/racket/date racket/match "world-typed.rkt")
 (provide (all-defined-out))

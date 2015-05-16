@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 (require "utils-typed.rkt" "quads-typed.rkt" "world-typed.rkt" "measure-typed.rkt" racket/list racket/format)
 (require typed/rackunit)
 

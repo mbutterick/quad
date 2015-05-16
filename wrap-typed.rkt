@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 (require (for-syntax racket/base racket/syntax))
 (require typed/sugar/list typed/sugar/define)
 (require math/flonum (except-in racket/list flatten) racket/vector math/statistics racket/bool)

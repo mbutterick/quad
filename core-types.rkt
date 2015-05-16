@@ -1,4 +1,4 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 (require (for-syntax typed/racket/base racket/syntax) (only-in typed/racket/draw Font-Weight Font-Style) typed/sugar/define)
 (provide (all-defined-out) (all-from-out typed/racket/draw))
 
