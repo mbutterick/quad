@@ -7,7 +7,7 @@
                [flatten ((Listof QuadAttr) -> QuadAttrs)])
 (require/typed racket/string [string-append* ((Listof String) -> String)])
 (require typed/sugar/debug typed/sugar/string typed/sugar/list typed/sugar/define)
-(provide (all-defined-out))
+(provide (all-defined-out) (all-from-out "core-types.rkt"))
 
 (define-syntax-rule (even-members xs)
   (for/list : (Listof Any) ([(x i) (in-indexed xs)] #:when (even? i))

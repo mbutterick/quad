@@ -61,3 +61,13 @@
 
 (define (calc-attrs tref)
   (map attr-ref-hash (filter (λ(attr) (<= (attr-ref-start attr) tref (sub1 (attr-ref-end attr)))) (current-token-attrs))))
+
+(module+ main
+  (require rackunit)
+  (define ti (block '(measure 54) "Meg is " (box '(foo 42)) " ally."))
+  (define-values (tokens attrs) (make-tokens-and-attrs ti))
+  (current-tokens tokens)
+  (current-token-attrs attrs)
+  ;; todo: repair this test
+  #;(check-equal? tokens (vector #\M #\e #\g #\space #\i #\s #\space (box) #\space #\a #\l #\l #\y #\.))
+  (check-equal? attrs '(#(#hash((measure . 54)) 0 14) #(#hash((foo . 42)) 7 8))))

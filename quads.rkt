@@ -144,7 +144,7 @@
                                  kv-pair)
                                empty)])
     (cond
-      [(empty? common-attrs) #f]
+      [(empty? common-attrs) empty]
       [(empty? qs) (flatten common-attrs)]
       [else (loop (cdr qs) 
                   (filter (λ(ca) (equal? (quad-attr-ref (car qs) (car ca) attr-missing) (cdr ca)))
@@ -167,7 +167,7 @@
            ;; put contract here rather than on struct, because this is the main interface
            ;; and this contract is more liberal.
            ;; but don't put a separate contract on struct, because it's superfluous.
-           (define/contract (id [attrs #f] . xs)
+           (define/contract (id [attrs empty] . xs)
              (() ((or/c quad-attrs? hashable-list?)) #:rest quad-list? . ->* . id?)
              (quad 'id (and attrs (if (hash? attrs) attrs (apply hash attrs))) xs))
            ;; quad list predicate and list-of-list predicate.
@@ -234,6 +234,6 @@
 (define-break-type block)
 (define-break-type line)
 
-(define (->input q) (input #f q))
+(define (->input q) (input empty q))
 (define coerce/input? (make-coercion-contract input))
 
