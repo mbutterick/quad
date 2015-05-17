@@ -4,22 +4,22 @@
 (require "ocm.rkt" "quads.rkt" "utils.rkt" "measure.rkt" "world.rkt" "logger.rkt" )
 
 ;; predicate for the soft hyphen
-(define+provide/contract (soft-hyphen? x)
+(define+provide (soft-hyphen? x)
   (string? . -> . boolean?)
   (equal? (format "~a" world:soft-hyphen) x))
 
 ;; visible characters that also mark possible breakpoints
-(define+provide/contract (visible-breakable? x)
+(define+provide (visible-breakable? x)
   (string? . -> . boolean?)
   (and (member x world:hyphens-and-dashes) #t))
 
 ;; invisible characters that denote possible breakpoints
-(define+provide/contract (invisible-breakable? x)
+(define+provide (invisible-breakable? x)
   (string? . -> . boolean?)
   (and (member x (cons world:empty-string world:spaces)) #t))
 
 ;; union of visible & invisible
-(define+provide/contract (breakable? x)
+(define+provide (breakable? x)
   (any/c . -> . boolean?)
   (cond
     [(string? x) (or (visible-breakable? x) (invisible-breakable? x))]
@@ -28,19 +28,19 @@
 
 ;; used by insert-spacers to determine which characters 
 ;; can be surrounded by stretchy spacers 
-(define+provide/contract (takes-justification-space? x)
+(define+provide (takes-justification-space? x)
   (any/c . -> . boolean?)
   (whitespace/nbsp? x))
 
 ;; test if a quad can be a word break:
 ;; either it's an explicit word break,
 ;; or it's breakable (and can be converted to a word break)
-(define+provide/contract (possible-word-break-quad? q)
+(define+provide (possible-word-break-quad? q)
   (quad? . -> . boolean?)
   (or (word-break? q) (breakable? q)))
 
 ;; convert a possible word break into an actual one
-(define+provide/contract (convert-to-word-break q)
+(define+provide (convert-to-word-break q)
   (possible-word-break-quad? . -> . word-break?)
   (cond 
     [(word-break? q) q]
@@ -65,7 +65,7 @@
 ;; meaning, a line can wrap at a piece boundary, but not elsewhere.
 ;; hyphenation produces more, smaller pieces, which means more linebreak opportunities
 ;; but this also makes wrapping slower.
-(define+provide/contract (make-pieces qs)
+(define+provide (make-pieces qs)
   (quads? . -> . pieces?)
   (define-values (breakable-items items-to-make-unbreakable) (split-at-right qs (min world:minimum-last-line-chars (length qs))))
   (define unbreak-qs (append breakable-items (map make-unbreakable items-to-make-unbreakable)))
@@ -91,7 +91,7 @@
 ;; Try the attr first, and if it's not available, compute the width.
 ;; comes in fast or slow versions.
 ;; not designed to update the source quad.
-(define+provide/contract (quad-width q)
+(define+provide (quad-width q)
   (quad? . -> . flonum?)
   (cond
     [(quad-has-attr? q world:width-key) (fl (quad-attr-ref q world:width-key))]
@@ -106,7 +106,7 @@
 ;; used by renderer to align text runs baseline-to-baseline.
 ;; consult the attrs, and if not available, compute it.
 ;; not designed to update the source quad.
-(define+provide/contract (ascent q)
+(define+provide (ascent q)
   (quad? . -> . flonum?)
   (or (quad-attr-ref q world:ascent-key #f)
       (cond 
@@ -119,7 +119,7 @@
 ;; if a piece appears elsewhere in a line, it is rendered in "no break" mode.
 ;; this allows the appearance of a piece to change depending on whether it's at the end.
 ;; and thus give correct behavior to trailing word spaces, soft hyphens, etc.
-(define+provide/contract (render-piece p [before-break? #f])
+(define+provide (render-piece p [before-break? #f])
   ((piece?) (boolean?) . ->* . piece?)
   ;; a piece doesn't necessarily have a word-break item in it.
   ;; only needs it if the appearance of the piece changes based on location.
@@ -157,7 +157,7 @@
   (render-word-break wb world:before-break-key))
 
 ;; is this the last line? compare current line-idx to total lines 
-(define+provide/contract (last-line? line)
+(define+provide (last-line? line)
   (line? . -> . boolean?)
   (define line-idx (quad-attr-ref line world:line-index-key #f))
   (define lines (quad-attr-ref line world:total-lines-key #f))
@@ -173,7 +173,7 @@
 ;; the optical kern doesn't have left- or right-handed versions.
 ;; it just looks at quads on both sides and kerns them if appropriate.
 ;; in practice, only one will likely be used.
-(define+provide/contract (render-optical-kerns exploded-line-quads)
+(define+provide (render-optical-kerns exploded-line-quads)
   (quads? . -> . quads?)
   (define (overhang-width q)
     (if (and (word? q) (member (word-string q) world:hanging-chars))
@@ -193,7 +193,7 @@
 ;; spacers are used to soak up extra space left over in a line.
 ;; depending on where the spacers are inserted, different formatting effects are achieved.
 ;; e.g., left / right / centered / justified.
-(define+provide/contract (insert-spacers-in-line line [alignment-override #f])
+(define+provide (insert-spacers-in-line line [alignment-override #f])
   ((line?) ((or/c #f symbol?)) . ->* . line?)
   ;; important principle: avoid peeking into quad-list to get attributes.
   ;; because non-attributed quads may be added.
@@ -507,7 +507,7 @@
 
 ;; build quad out to a given width by distributing excess into spacers
 ;; todo: adjust this to work recursively, so that fill operation cascades down
-(define+provide/contract (fill starting-quad [target-width? #f])
+(define+provide (fill starting-quad [target-width? #f])
   ((quad?) ((or/c #f flonum?)) . ->* . quad?)
   (define target-width (fl (or target-width? (quad-attr-ref starting-quad world:measure-key)))) 
   (define subquads (quad-list starting-quad))
@@ -530,7 +530,7 @@
 
 ;; add x positions to a list of fixed-width quads
 ;; todo: adjust this to work recursively, so that positioning operation cascades down
-(define+provide/contract (add-horiz-positions starting-quad)
+(define+provide (add-horiz-positions starting-quad)
   ((and/c quad? fixed-width?) . -> . quad?)
   (define-values (new-quads final-width)
     (for/fold ([new-quads empty][width-so-far 0.0])([q (in-list (quad-list starting-quad))])

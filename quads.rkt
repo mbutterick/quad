@@ -104,7 +104,7 @@
 (define-syntax-rule (quad-ref q r)
   (list-ref (quad-list q) r))
 
-(define/contract (quad-ends-with? q str)
+(define (quad-ends-with? q str)
   (quad? string? . -> . boolean?)
   (cond
     [(not (empty? (quad-list q)))
@@ -115,11 +115,11 @@
     [else #f]))
 
 
-(define/contract (quad-append q new-item)
+(define (quad-append q new-item)
   (quad? (or/c quad? string?) . -> . quad?)
   (quad (quad-name q) (quad-attrs q) (append (quad-list q) (list new-item))))
 
-(define/contract (quad->string x)
+(define (quad->string x)
   (quad? . -> . string?)
   (cond
     [(quad? x) (string-append* (map quad->string (quad-list x)))]
@@ -167,7 +167,7 @@
            ;; put contract here rather than on struct, because this is the main interface
            ;; and this contract is more liberal.
            ;; but don't put a separate contract on struct, because it's superfluous.
-           (define/contract (id [attrs empty] . xs)
+           (define (id [attrs empty] . xs)
              (() ((or/c quad-attrs? hashable-list?)) #:rest quad-list? . ->* . id?)
              (quad 'id (and attrs (if (hash? attrs) attrs (apply hash attrs))) xs))
            ;; quad list predicate and list-of-list predicate.
@@ -183,7 +183,7 @@
 
 ;; do not treat empty string as whitespace.
 ;; throws off tests that rely on adjacency to positive whitespace.
-(define/contract (whitespace? x [nbsp? #f])
+(define (whitespace? x [nbsp? #f])
   ((any/c)(boolean?) . ->* . coerce/boolean?)
   (cond
     [(quad? x) (whitespace? (quad-list x) nbsp?)]
@@ -210,7 +210,7 @@
            (define-box-type id-break)
            (define-box-type multi-id)
            ;; breaker
-           (define/contract (split-on-id-breaks x)
+           (define (split-on-id-breaks x)
              (quads? . -> . lists-of-quads?)
              ;; omit leading & trailing whitespace, because they're superfluous next to a break
              (map (curryr trimf whitespace?) (filter-split x id-break?)))))]))

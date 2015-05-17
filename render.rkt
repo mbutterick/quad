@@ -3,8 +3,8 @@
 (require "utils.rkt" "quads.rkt" "world.rkt")
 (provide (all-defined-out))
 
-(define/contract abstract-renderer%
-  (class/c [render (quad? . ->m . any/c)]
+(define abstract-renderer%
+  #;(class/c [render (quad? . ->m . any/c)]
            [render-element (quad? . ->m . quad?)])
   
   (class object% 

@@ -74,12 +74,12 @@
          (quad-attr-set* line 'line-idx line-idx 'lines (length wrapped-lines)))))
 
 
-(define+provide/contract (number-pages ps)
+(define+provide (number-pages ps)
   (pages? . -> . pages?)
   (for/list ([i (in-naturals)][p (in-list ps)])
     (quad (quad-name p) (merge-attrs (quad-attrs p) `(page ,i)) (quad-list p))))
 
-(define+provide/contract (pages->doc ps)
+(define+provide (pages->doc ps)
   (pages? . -> . doc?)  
   ;; todo: resolve xrefs and other last-minute tasks
   ;; todo: generalize computation of widths and heights, recursively
@@ -90,7 +90,7 @@
   doc)
 
 (require racket/class csp)
-(define+provide/contract (lines->columns lines)
+(define+provide (lines->columns lines)
   (lines? . -> . columns?)
   (define prob (new problem%))
   (define max-column-lines world:default-lines-per-column)
@@ -159,7 +159,7 @@
       (values (cons (quad-attr-set (quads->column lines-to-take) world:column-index-key col-idx) columns) lines-to-leave)))
   (reverse columns))
 
-(define/contract (columns->pages cols)
+(define (columns->pages cols)
   (columns? . -> . pages?)
   (define columns-per-page (quad-attr-ref/parameter (car cols) world:column-count-key))
   (define column-gutter (quad-attr-ref/parameter (car cols) world:column-gutter-key))
@@ -186,7 +186,7 @@
 (define (block-quads->lines qs)
   (block->lines (quads->block qs)))
 
-(define/contract (typeset x)
+(define (typeset x)
   (coerce/input? . -> . doc?)  
   (load-text-cache-file)
   (define pages (append* (for/list ([multipage (in-list (input->nested-blocks x))])
@@ -205,6 +205,6 @@
   (parameterize ([world:quality-default world:draft-quality]
                  [world:paper-width-default 600]
                  [world:paper-height-default 700])
-    (define sample (ti5))
+    (define sample (jude0))
     (define to (begin (time (typeset sample))))
     (time (send (new pdf-renderer%) render-to-file to "foo.pdf"))))

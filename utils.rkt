@@ -13,7 +13,7 @@
 
 ;; push together multiple attr sources into one list of pairs.
 ;; mostly a helper function for the two attr functions below.
-(define+provide/contract (join-attrs quads-or-attrs-or-lists)
+(define+provide (join-attrs quads-or-attrs-or-lists)
   (list-of-mergeable-attrs? . -> . pairs?)
   (append-map hash->list (filter-not false? (map (λ(x)
                                                    (cond
@@ -25,44 +25,44 @@
 
 ;; merge concatenates attributes, with later ones overriding earlier.
 ;; most of the work is done by join-attrs.
-(define+provide/contract (merge-attrs . quads-or-attrs-or-lists)
+(define+provide (merge-attrs . quads-or-attrs-or-lists)
   (() #:rest list-of-mergeable-attrs? . ->* . quad-attrs?)
   (define all-attrs (join-attrs quads-or-attrs-or-lists))
   (apply hash (flatten all-attrs)))
 
 ;; functionally update a quad attr. Similar to hash-set
-(define+provide/contract (quad-attr-set q k v)
+(define+provide (quad-attr-set q k v)
   (quad? symbol? any/c . -> . quad?)
   (quad (quad-name q) (merge-attrs (quad-attrs q) (list k v)) (quad-list q)))
 
 
 ;; functionally update multiple quad attrs. Similar to hash-set*
-(define+provide/contract (quad-attr-set* q . kvs)
+(define+provide (quad-attr-set* q . kvs)
   ((quad?) #:rest hashable-list? . ->* . quad?)
   (for/fold ([current-q q])([kv-list (in-list (slice-at kvs 2))])
     (apply quad-attr-set current-q kv-list)))
 
 ;; functionally remove a quad attr. Similar to hash-remove
-(define+provide/contract (quad-attr-remove q k)
+(define+provide (quad-attr-remove q k)
   (quad? symbol? . -> . quad?)
   (if (quad-attrs q)
       (quad (quad-name q) (hash-remove (quad-attrs q) k) (quad-list q))
       q))
 
 ;; functionally remove multiple quad attrs. Similar to hash-remove
-(define+provide/contract (quad-attr-remove* q . ks)
+(define+provide (quad-attr-remove* q . ks)
   ((quad?) #:rest (λ(ks) (and (list? ks) (andmap symbol? ks))) . ->* . quad?)
   (for/fold ([current-q q])([k (in-list ks)])
     (quad-attr-remove current-q k)))
 
-(define+provide/contract (quad-map proc q)
+(define+provide (quad-map proc q)
   (procedure? quad? . -> . quad?)
   (quad (quad-name q) (quad-attrs q) (map proc (quad-list q))))
 
 
 ;; flatten merges attributes, but applies special logic suitable to flattening
 ;; for instance, resolving x and y coordinates.
-(define+provide/contract (flatten-attrs . quads-or-attrs-or-falses)
+(define+provide (flatten-attrs . quads-or-attrs-or-falses)
   (() #:rest (listof (or/c quad? quad-attrs?)) . ->* . quad-attrs?)
   (define all-attrs (join-attrs quads-or-attrs-or-falses))
   (define-values (x-attrs y-attrs other-attrs-reversed)
@@ -149,7 +149,7 @@
 
 
 ;; the last char of a quad
-(define+provide/contract (quad-last-char q)
+(define+provide (quad-last-char q)
   (quad? . -> . (or/c #f string?))
   (define split-qs (split-quad q)) ; split makes it simple, but is it too expensive?
   (if (or (empty? split-qs) (empty? (quad-list (last split-qs))))
@@ -157,7 +157,7 @@
       (car (quad-list (last split-qs)))))
 
 ;; the first char of a quad
-(define+provide/contract (quad-first-char q)
+(define+provide (quad-first-char q)
   (quad? . -> . (or/c #f string?))
   (define split-qs (split-quad q)) ; explosion makes it simple, but is it too expensive?
   (if (or (empty? split-qs) (empty? (quad-list (first split-qs))))
@@ -167,7 +167,7 @@
 
 ;; propagate x and y adjustments throughout the tree,
 ;; using parent x and y to adjust children, and so on.
-(define+provide/contract (compute-absolute-positions i [parent-x 0][parent-y 0])
+(define+provide (compute-absolute-positions i [parent-x 0][parent-y 0])
   ((quad?) (integer? integer?) . ->* . quad?)
   (cond
     [(quad? i) 
@@ -199,23 +199,23 @@
              result)))]))
 
 ;; find total pages in doc by searching on page count key.
-(define+provide/contract (pages-in-doc doc)
+(define+provide (pages-in-doc doc)
   (doc? . -> . integer?)
   (add1 (apply max (map (curryr quad-attr-ref world:page-key 0) (quad-list doc)))))
 
 
 ;; todo: how to guarantee line has leading key?
-(define+provide/contract (compute-line-height line)
+(define+provide (compute-line-height line)
   (line? . -> . line?)
   (quad-attr-set line world:height-key (quad-attr-ref/parameter line world:leading-key)))
 
 (define (fixed-height? q) (quad-has-attr? q world:height-key))
-(define+provide/contract (quad-height q)
+(define+provide (quad-height q)
   (quad? . -> . number?)
   (quad-attr-ref q world:height-key 0))
 
 ;; use heights to compute vertical positions
-(define+provide/contract (add-vert-positions starting-quad)
+(define+provide (add-vert-positions starting-quad)
   (quad? . -> . quad?)
   (define-values (new-quads final-height)
     (for/fold ([new-quads empty][height-so-far 0])([q (in-list (quad-list starting-quad))])
@@ -224,7 +224,7 @@
   (quad (quad-name starting-quad) (quad-attrs starting-quad) (reverse new-quads)))
 
 ;; recursively hyphenate strings in a quad
-(define+provide/contract (hyphenate-quad x)
+(define+provide (hyphenate-quad x)
   (quad? . -> . quad?)
   (cond
     [(quad? x) (quad-map hyphenate-quad x)]
