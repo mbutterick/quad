@@ -1,5 +1,5 @@
 #lang racket/base
-(require (for-syntax racket/base racket/syntax racket/string) racket/string racket/contract racket/serialize sugar/list racket/format racket/list sugar/debug sugar/coerce racket/bool racket/function sugar/string)
+(require (for-syntax racket/base racket/syntax racket/string) racket/string racket/contract racket/serialize sugar/list racket/format racket/list sugar/debug sugar/coerce racket/bool racket/function sugar/unstable/string)
 (require "world.rkt")
 (provide (all-defined-out))
 

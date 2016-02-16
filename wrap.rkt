@@ -189,6 +189,11 @@
     [else exploded-line-quads]))
 
 
+(define-syntax (when/splice stx)
+  (syntax-case stx ()
+    [(_ test body)
+     #'(if test (list body) '())]))
+
 ;; ultimately every line is filled to fit the whole measure.
 ;; spacers are used to soak up extra space left over in a line.
 ;; depending on where the spacers are inserted, different formatting effects are achieved.
