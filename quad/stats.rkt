@@ -34,7 +34,7 @@
                         #:measure-quad-proc quad-width 
                         #:compose-line-proc pieces->line
                         #:fast-measure-pieces-proc measure-potential-line
-                        #:find-breakpoints-proc first-fit-proc))
+                        #:find-breakpoints-proc wrap-first))
 
 ;; wrap proc based on penalty function
 (define wrap-best-bps (make-wrap-proc-bps 
@@ -42,7 +42,7 @@
                        #:measure-quad-proc quad-width 
                        #:compose-line-proc pieces->line
                        #:fast-measure-pieces-proc measure-potential-line
-                       #:find-breakpoints-proc best-fit-proc))
+                       #:find-breakpoints-proc wrap-best))
 
 (define ti (block '(measure 54 leading 18) "Meg is an ally."))
 
@@ -84,7 +84,7 @@
   mh)
 
 (define (piece-length p)
-  (apply + (map quad-width-fast (quad-list p))))
+  (apply + (map quad-width (quad-list p))))
 
 (define (trial wrap-proc ti measure)
   (match-define-values (result time _ _) (time-apply wrap-proc (append (list ti) (list measure))))

@@ -98,6 +98,7 @@
 ;; input is often large, so macro allows us to avoid allocation
 (define+provide (split-quad q)
   ;(quad? . -> . quads?)
+  (displayln q)
   (letrec ([do-explode (λ(x [parent #f])
                          (cond
                            [(quad? x)

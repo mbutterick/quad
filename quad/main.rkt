@@ -23,7 +23,7 @@
   (define-values (first-quads last-quad) (split-last (quad-list q)))
   (quad (quad-name q) (quad-attrs q) (snoc (map hyphenate-quad first-quads) last-quad)))
 
-(define (average-looseness lines)
+(define+provide (average-looseness lines)
   (if (<= (length lines) 1)
       0.0
       (let ([lines-to-measure (drop-right lines 1)]) ; exclude last line from looseness calculation

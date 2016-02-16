@@ -10,3 +10,6 @@ Using Racket 6.0+, install from the command line:
 And update like so:
 
     raco pkg update --update-deps quad
+
+
+Docs: http://docs.racket-lang.org/quad
