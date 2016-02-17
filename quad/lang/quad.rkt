@@ -10,4 +10,5 @@
      (replace-context #'(expr ...)
                       #'(#%module-begin
                          (define out (block #f expr ...))
+                         (println out)
                          (provide out)))]))

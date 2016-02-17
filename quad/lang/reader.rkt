@@ -14,4 +14,5 @@ quad/lang/quad
                           #:syntax? #t 
                           #:inside? #t))
   (define source-stx (quad-at-reader path-string p))
+  (println (syntax->datum source-stx))
   source-stx)

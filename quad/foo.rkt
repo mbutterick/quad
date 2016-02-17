@@ -9,6 +9,7 @@
 (quad? o:out)
 (define o:ts (typeset o:out))
 (time (send (new pdf-renderer%) render-to-file o:ts "foo-test.pdf"))
-(require "foo2.rkt")
-(define ts (typeset out))
-(time (send (new pdf-renderer%) render-to-file ts "foo2-test.pdf"))
+
+;(require "foo2.rkt")
+;(define ts (typeset out))
+;(time (send (new pdf-renderer%) render-to-file ts "foo2-test.pdf"))
