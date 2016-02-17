@@ -9,6 +9,6 @@
     [(_ expr ...)
      (replace-context #'(expr ...)
                       #'(#%module-begin
-                         (define out (block #f expr ...))
-                         (println out)
+                         (define result (memf block? (list expr ...)))
+                         (define out (if result (car result) (block #f)))
                          (provide out)))]))
