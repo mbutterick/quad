@@ -9,9 +9,5 @@
     [(_ expr ...)
      (replace-context #'(expr ...)
                       #'(#%module-begin
-                         (define src (box null (list expr ...)))
-                         (parameterize ([world:quality-default world:draft-quality])
-                           (displayln "Typesetting:")
-                           (displayln src)
-                           (define to (time (typeset src)))
-                           (displayln "PDF rendering:"))))]))
+                         (define out (block #f expr ...))
+                         (provide out)))]))

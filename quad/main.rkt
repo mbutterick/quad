@@ -198,7 +198,7 @@
   doc)
 
 
-(module+ main
+#;(module+ main
   (require "render.rkt" racket/class profile sugar/debug)
   (require "samples.rkt")
   (activate-logger quad-logger)

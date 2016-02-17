@@ -77,9 +77,9 @@
 
 ;; pushes attributes down from parent quads to children, 
 ;; resulting in a flat list of quads.
-;; input is often large, so macro allows us to avoid allocation
 (provide flatten-quad)
-(define-syntax-rule (flatten-quad q)
+(require sugar/debug)
+(define (flatten-quad q)
   ;  (quad? . -> . quads?)
   (flatten
    (let loop ([x q][parent #f])
@@ -98,7 +98,6 @@
 ;; input is often large, so macro allows us to avoid allocation
 (define+provide (split-quad q)
   ;(quad? . -> . quads?)
-  (displayln q)
   (letrec ([do-explode (λ(x [parent #f])
                          (cond
                            [(quad? x)

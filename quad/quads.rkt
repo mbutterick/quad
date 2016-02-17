@@ -10,8 +10,8 @@
                      [(define write-proc (λ(b port mode)
                                            (display (format "(~a)" (string-join (filter-not void? (list
                                                                                                    (~a (quad-name b)) 
-                                                                                                   (if (and (hash? (quad-attrs b)) (> (length (hash-keys (quad-attrs b))) 0)) (~v (flatten (hash->list (quad-attrs b)))) (void))
-                                                                                                   (if (> (length (quad-list b)) 0) (~a (string-join (map ~v (quad-list b)) "")) (void)))) " ")) port)))]
+                                                                                                   (if (and (hash? (quad-attrs b)) (> (length (hash-keys (quad-attrs b))) 0)) (~v (flatten (hash->list (quad-attrs b)))) "#f")
+                                                                                                   (if (> (length (quad-list b)) 0) (~a (string-join (map ~v (quad-list b)) " ")) (void)))) " ")) port)))]
                      #:property prop:sequence (λ(q) (quad-list q)))
 
 
