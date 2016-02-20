@@ -5,10 +5,10 @@
 
 (require quad quad/quads quad/render)
 
-(time (send (new pdf-renderer%) render-to-file (typeset 1-out) "f1-test.pdf"))
+;(time (send (new pdf-renderer%) render-to-file (typeset 1-out) "f1-test.pdf"))
 
 (require (prefix-in 2- "foo2.rkt"))
 (time (send (new pdf-renderer%) render-to-file (typeset 2-out) "f2-test.pdf"))
 
 (require (prefix-in 3- "foo3.rkt"))
-(time (send (new pdf-renderer%) render-to-file (typeset 3-out) "f3-test.pdf"))
+;(time (send (new pdf-renderer%) render-to-file (typeset 3-out) "f3-test.pdf"))

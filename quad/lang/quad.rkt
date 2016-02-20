@@ -9,6 +9,7 @@
     [(_ expr ...)
      (replace-context #'(expr ...)
                       #'(#%module-begin
-                         (define result (memf block? (list expr ...)))
-                         (define out (if result (car result) (block #f)))
-                         (provide out)))]))
+                         
+                         (define out (block '(measure 200.0 font "Times New Roman" leading 16.0 vmeasure 300.0 size 13.5) expr ...))
+                           (provide out)))]))
+
