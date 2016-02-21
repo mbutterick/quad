@@ -2,12 +2,12 @@
 (require racket/list sugar racket/contract racket/function math/flonum)
 (require "quads.rkt" "utils.rkt" "wrap.rkt" "measure.rkt" "world.rkt" "logger.rkt")
 (provide typeset)
-
+(require sugar/debug)
 (define (input->nested-blocks i)
   (define-syntax-rule (cons-reverse x y) (cons (reverse x) y))
   (define-values (mps mcs bs b)
     (for/fold ([multipages empty][multicolumns empty][blocks empty][block-acc empty])
-              ([q (in-list (split-quad i))])
+              ([q (in-list (report (split-quad i)))])
       (cond
         [(page-break? q) (values (cons-reverse (cons-reverse (cons-reverse block-acc blocks) multicolumns) multipages) empty empty empty)]
         [(column-break? q) (values multipages (cons-reverse (cons-reverse block-acc blocks) multicolumns) empty empty)]
@@ -33,10 +33,10 @@
 (define (log-debug-lines lines)
   (log-quad-debug "line report:")
   (for/list ([(line idx) (in-indexed lines)])
-    (format "~a/~a: ~v ~a" idx
-            (length lines) 
-            (quad->string line)
-            (quad-attr-ref line world:line-looseness-key))))
+            (format "~a/~a: ~v ~a" idx
+                    (length lines) 
+                    (quad->string line)
+                    (quad-attr-ref line world:line-looseness-key))))
 
 
 (require racket/trace)
@@ -71,13 +71,13 @@
   (log-quad-debug "final looseness = ~a" (average-looseness wrapped-lines))
   (map insert-spacers-in-line
        (for/list ([line-idx (in-naturals)][line (in-list wrapped-lines)])
-         (quad-attr-set* line 'line-idx line-idx 'lines (length wrapped-lines)))))
+                 (quad-attr-set* line 'line-idx line-idx 'lines (length wrapped-lines)))))
 
 
 (define+provide (number-pages ps)
   (pages? . -> . pages?)
   (for/list ([i (in-naturals)][p (in-list ps)])
-    (quad (quad-name p) (merge-attrs (quad-attrs p) `(page ,i)) (quad-list p))))
+            (quad (quad-name p) (merge-attrs (quad-attrs p) `(page ,i)) (quad-list p))))
 
 (define+provide (pages->doc ps)
   (pages? . -> . doc?)  
@@ -172,10 +172,10 @@
   (define result-pages
     (map (λ(cols) (quads->page cols)) 
          (for/list ([page-cols (in-list (slice-at cols columns-per-page))])
-           (define-values (last-x cols)
-             (for/fold ([current-x (/ (- (world:paper-width-default) width-of-printed-area) 2)][cols empty]) ([col (in-list page-cols)][idx (in-naturals)])
-               (values (+ current-x column-width column-gutter) (cons (quad-attr-set* col 'x current-x 'y 40 world:column-index-key idx) cols))))
-           (reverse cols))))
+                   (define-values (last-x cols)
+                     (for/fold ([current-x (/ (- (world:paper-width-default) width-of-printed-area) 2)][cols empty]) ([col (in-list page-cols)][idx (in-naturals)])
+                       (values (+ current-x column-width column-gutter) (cons (quad-attr-set* col 'x current-x 'y 40 world:column-index-key idx) cols))))
+                   (reverse cols))))
   result-pages)
 
 (define current-eof (make-parameter (gensym)))
@@ -190,21 +190,24 @@
   (coerce/input? . -> . doc?)  
   (load-text-cache-file)
   (define pages (append* (for/list ([multipage (in-list (input->nested-blocks x))])
-                           (columns->pages (append* (for/list ([multicolumn (in-list multipage)])
-                                                      (lines->columns (append* (for/list ([block-quads (in-list multicolumn)])
-                                                                                 (block-quads->lines block-quads))))))))))
+                                   (columns->pages (append* (for/list ([multicolumn (in-list multipage)])
+                                                                      (lines->columns (append* (for/list ([block-quads (in-list multicolumn)])
+                                                                                                         (block-quads->lines block-quads))))))))))
   (define doc (pages->doc pages))
   (update-text-cache-file)
   doc)
 
 
-#;(module+ main
+(module+ main
   (require "render.rkt" racket/class profile sugar/debug)
   (require "samples.rkt")
   (activate-logger quad-logger)
   (parameterize ([world:quality-default world:draft-quality]
                  [world:paper-width-default 600]
                  [world:paper-height-default 700])
-    (define sample (jude0))
-    (define to (begin (time (typeset sample))))
-    (time (send (new pdf-renderer%) render-to-file to "foo.pdf"))))
+    #;(define sample (block '(measure 54.0 leading 18.0) "\n" "\n" "Meg is an ally."))
+    (let ([toa (begin (time (typeset (dynamic-require "foo2.rkt" 'out))))]
+          [tob (typeset (block '(measure 54.0 leading 18.0) "Meg \nis an ally."))])
+      (report* toa tob (equal? toa tob))
+      (time (send (new pdf-renderer%) render-to-file toa "foo-a.pdf"))
+      (time (send (new pdf-renderer%) render-to-file tob "foo-b.pdf")))))

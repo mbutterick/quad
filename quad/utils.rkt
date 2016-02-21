@@ -78,7 +78,6 @@
 ;; pushes attributes down from parent quads to children, 
 ;; resulting in a flat list of quads.
 (provide flatten-quad)
-(require sugar/debug)
 (define (flatten-quad q)
   ;  (quad? . -> . quads?)
   (flatten
@@ -93,9 +92,10 @@
               (map (λ(xi) (loop xi x-with-parent-attrs)) (quad-list x))))] ; replace quad with its elements
        [(string? x) (quad (quad-name parent) (quad-attrs parent) (list x))]))))
 
+(require sugar/debug)
 ;; flatten quad as above, 
 ;; then dissolve it into individual character quads while copying attributes
-;; input is often large, so macro allows us to avoid allocation
+
 (define+provide (split-quad q)
   ;(quad? . -> . quads?)
   (letrec ([do-explode (λ(x [parent #f])
@@ -104,7 +104,8 @@
                             (if (empty? (quad-list x))
                                 x ; no subelements, so stop here
                                 (map (λ(xi) (do-explode xi x)) (quad-list x)))] ; replace quad with its elements, exploded
-                           [else (map (λ(xc) (quad 'word (quad-attrs parent) (list xc))) (regexp-match* #px"." x))]))])
+                           ;; todo: figure out why newlines foul up the input stream. Does it suffice to ignore them? 
+                           [else (map (λ(xc) (quad 'word (quad-attrs parent) (list xc))) (report (regexp-match* #px"[^\r\n]" x)))]))])
     (flatten (map do-explode (flatten-quad q)))))
 
 

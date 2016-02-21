@@ -49,6 +49,7 @@
 (define-syntax-rule (map/send method xs)
   (map (λ(x) (method x)) xs))
 
+
 (define pdf-renderer%
   (class abstract-renderer%
     (super-new)
@@ -70,7 +71,7 @@
     
     (define/caching (make-font/caching font size style weight)
       (make-font #:face font #:size size #:style style #:weight weight))
-    
+
     (define/override-final (render-word w)
       (define word-font (quad-attr-ref/parameter w world:font-name-key))
       (define word-size (quad-attr-ref/parameter w world:font-size-key))
