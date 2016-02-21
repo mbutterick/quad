@@ -9,9 +9,11 @@ quad/lang/quad
 (define (quad-read p)
   (syntax->datum (quad-read-syntax (object-name p) p)))
 
+(define quad-command-char #\@)
+
 (define (quad-read-syntax path-string p)
   (define quad-at-reader (make-at-reader
-                          #:command-char #\◊
+                          #:command-char quad-command-char
                           #:syntax? #t 
                           #:inside? #t))
   (define source-stx (quad-at-reader path-string p))
@@ -24,9 +26,9 @@ quad/lang/quad
      (define my-make-scribble-inside-lexer
        (dynamic-require 'syntax-color/scribble-lexer 'make-scribble-inside-lexer (λ () #f)))
      (cond [my-make-scribble-inside-lexer
-            (my-make-scribble-inside-lexer #:command-char #\◊)]
+            (my-make-scribble-inside-lexer #:command-char quad-command-char)]
            [else default])]
     [(drracket:toolbar-buttons)
      (define my-make-drracket-buttons (dynamic-require 'quad/lang/buttons 'make-drracket-buttons))
-     (my-make-drracket-buttons #\◊)]
+     (my-make-drracket-buttons)]
     [else default]))

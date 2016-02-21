@@ -19,7 +19,7 @@ http://pkg-build.racket-lang.org/doc/tools/drracket_module-language-tools.html#%
 |#
 
 
-(define (make-command-char-button command-char)
+(define (make-command-char-button)
   (let ([label "Render PDF"]
         [bitmap (make-object bitmap% html-png-path 'png/mask)]
         [callback (λ (drr-frame)
@@ -38,6 +38,6 @@ http://pkg-build.racket-lang.org/doc/tools/drracket_module-language-tools.html#%
     
     (list label bitmap callback number)))
 
-(define (make-drracket-buttons command-char)
-  (let ([command-char-button (make-command-char-button command-char)])
+(define (make-drracket-buttons)
+  (let ([command-char-button (make-command-char-button)])
     (list command-char-button)))
