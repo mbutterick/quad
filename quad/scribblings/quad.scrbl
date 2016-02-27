@@ -58,6 +58,17 @@ Quad produces finished document layouts using three ingredients:
 
 While there's no reason Quad couldn't produce an HTML layout, that's an easier problem, because most of the document-layout chores can (and should) be delegated to the web browser. For now, most of Quad's apparatus is devoted to its layout engine so it can produce layouts for PDF.
 
+@section{What doesn't Quad do?}
+
+@itemlist[#:style 'ordered
+@item{Quad is not a WYSIWYG or interactive previewing tool.}
+
+@item{Quad does not have user-level representations of formatting, à la Word style sheets.}
+
+@item{Quad does not handle semantic or configurable markup. Its markup is limited to its specific, layout-based vocabulary.}
+]
+Rather, it is designed to cooperate with tools that offer these facilities.
+
 @section{Theory of operation}
 
 A document processor starts with input that we can think of as one giant line of text. It breaks this into smaller lines, and then distributes these lines across pages. Conceptually, it's a bin-packing problem.
@@ -79,7 +90,7 @@ A document processor starts with input that we can think of as one giant line of
 
   @item{Columns are composed into pages.}
 
-  @item{This completes the typesetting phase. Note that at every step in the process, the document is represented in the Quad markup language. There isn't a distinction between the public and private markup interface.}
+  @item{This completes the typesetting phase. Note that at every step in the process, the document is represented in the Quad markup language. There isn't a distinction between the public and private markup interface, or the high- and low-level markup entities. Thus, external tools that generate Quad markup have some latitude.}
 
   @item{Before the typeset markup is passed to the renderer, it goes through a simplification phase — a lot of adjacent quads will have the same formatting characteristics, and these can be consolidated into runs of text.}
 
