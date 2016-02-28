@@ -4,7 +4,7 @@
 
 @author[(author+email "Matthew Butterick" "mb@mbtype.com")]
 
-@defmodule[quad]
+@defmodulelang[quad]
 
 @italic{This documentation explains software that is under development. It is therefore rife with optimistic claims and wishful thinking.}
 
@@ -100,8 +100,6 @@ A document processor starts with input that we can think of as one giant line of
 
 
 @section{The markup language}
-
-@defmodulelang[quad]
 
 Quad's markup language is a Racket-implemented DSL (= domain-specific language). It's not a language in the sense of Turing-complete. Rather, a Quad ``program'' resembles text annotated with high-level layout-description commands (not unlike XML/HTML). 
 
