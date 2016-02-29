@@ -3,7 +3,7 @@
          racket/gui/base
          racket/class
          quad/render
-         quad
+         quad/typeset
          racket/system)
 
 (provide make-drracket-buttons)
@@ -31,7 +31,7 @@ http://pkg-build.racket-lang.org/doc/tools/drracket_module-language-tools.html#%
                     (when fn-out
                       (define-values (fn-dir name dir?) (split-path fn))
                       (parameterize ([current-directory fn-dir])
-                        (local-require "../render.rkt" racket/class profile sugar/debug quad/logger quad/world)
+                        (local-require "render.rkt" racket/class profile sugar/debug quad/logger quad/world)
                         (activate-logger quad-logger)
                         (parameterize ([world:quality-default world:max-quality]
                                        [world:paper-width-default 600]

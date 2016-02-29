@@ -1,6 +1,6 @@
 #lang racket/base
 
-(require "main.rkt"  "world.rkt" "quick-sample.rkt"
+(require "typeset.rkt"  "world.rkt" "quick-sample.rkt"
            "render.rkt" racket/class quad/quads)
   (parameterize ([world:quality-default world:draft-quality])
     (displayln "Untyped Quad")

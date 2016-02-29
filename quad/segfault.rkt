@@ -1,5 +1,5 @@
 #lang racket/base
-(require "main.rkt" "samples.rkt" "render.rkt" "world.rkt" racket/class "logger.rkt")
+(require "typeset.rkt" "samples.rkt" "render.rkt" "world.rkt" racket/class "logger.rkt")
 
 (module+ main
   (define line-limit (with-handlers ([exn:fail? (λ(exn) #f)])

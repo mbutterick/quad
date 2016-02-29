@@ -1,6 +1,6 @@
 #lang racket
 (require math/statistics sugar racket/serialize plot)
-(require (except-in "quads.rkt" line) "utils.rkt" "wrap.rkt" "world.rkt" "measure.rkt" "logger.rkt" "main.rkt")
+(require (except-in "quads.rkt" line) "utils.rkt" "wrap.rkt" "world.rkt" "measure.rkt" "logger.rkt" "typeset.rkt")
 
 (define+provide (make-wrap-proc-bps
                  #:make-pieces-proc make-pieces-proc 

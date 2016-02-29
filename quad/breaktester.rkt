@@ -1,5 +1,5 @@
 #lang racket
-(require hyphenate "quads.rkt" "world.rkt" "render.rkt" "main.rkt" "utils.rkt")
+(require hyphenate "quads.rkt" "world.rkt" "render.rkt" "typeset.rkt" "utils.rkt")
 
 (define (make-test-blocks string)
   (let ([string string])
