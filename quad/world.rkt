@@ -94,4 +94,6 @@
 (define min-last-lines 2)
 (define default-lines-per-column 36)
 
+(define top-page-margin 100)
+
 (define-parameter logging-level 'debug)

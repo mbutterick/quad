@@ -26,17 +26,14 @@ http://pkg-build.racket-lang.org/doc/tools/drracket_module-language-tools.html#%
                     (define fn (send (send drr-frame get-definitions-text) get-filename))
                     (define pdfn (path-replace-suffix fn #".pdf"))
                     (define fn-out (parameterize ([current-namespace (make-base-namespace)])
-                                     (namespace-attach-module (namespace-anchor->namespace cache-module-ns) 'quad)
+                                     (namespace-attach-module (namespace-anchor->namespace cache-module-ns) 'quad/typeset)
                                      (dynamic-require `(submod ,fn outy) 'out)))
                     (when fn-out
                       (define-values (fn-dir name dir?) (split-path fn))
                       (parameterize ([current-directory fn-dir])
                         (local-require "render.rkt" racket/class profile sugar/debug quad/logger quad/world)
                         (activate-logger quad-logger)
-                        (parameterize ([world:quality-default world:max-quality]
-                                       [world:paper-width-default 600]
-                                       [world:paper-height-default 700])
-                          (send (new pdf-renderer%) render-to-file (typeset fn-out) pdfn)))
+                        (send (new pdf-renderer%) render-to-file (typeset fn-out) pdfn))
                       (parameterize ([current-input-port (open-input-string "")])
                         (system (format "open \"~a\"" (path->string pdfn))))))]
         [number 99])

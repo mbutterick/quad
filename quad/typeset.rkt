@@ -174,7 +174,7 @@
          (for/list ([page-cols (in-list (slice-at cols columns-per-page))])
                    (define-values (last-x cols)
                      (for/fold ([current-x (/ (- (world:paper-width-default) width-of-printed-area) 2)][cols empty]) ([col (in-list page-cols)][idx (in-naturals)])
-                       (values (+ current-x column-width column-gutter) (cons (quad-attr-set* col 'x current-x 'y 40 world:column-index-key idx) cols))))
+                       (values (+ current-x column-width column-gutter) (cons (quad-attr-set* col 'x current-x 'y world:top-page-margin world:column-index-key idx) cols))))
                    (reverse cols))))
   result-pages)
 
