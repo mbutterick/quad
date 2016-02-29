@@ -1,6 +1,6 @@
 #lang scribble/manual
 
-@(require (for-label racket/draw))
+@(require (for-label racket/base racket/draw))
 
 @title[#:style 'toc]{Quad: document processor}
 
@@ -53,12 +53,12 @@ Quad produces finished document layouts using three ingredients:
 @itemlist[#:style 'ordered
   @item{A @bold{markup-based language} for embedding high-level typsetting instructions in a text document. (Sort of like XML/HTML.)}
 
-  @item{A @bold{layout engine} that converts these typesetting instructions into an output-independent layout — e.g., putting characters into lines, and lines into pages.}
+  @item{A @bold{typesetting engine} that converts these typesetting instructions into an output-independent layout — e.g., putting characters into lines, and lines into pages.}
 
   @item{A @bold{rendering engine} that takes this layout and prepares it for a particular output format (e.g., PDF, SVG).}
 ]
 
-While there's no reason Quad couldn't produce an HTML layout, that's an easier problem, because most of the document-layout chores can (and should) be delegated to the web browser. For now, most of Quad's apparatus is devoted to its layout engine so it can produce layouts for PDF.
+While there's no reason Quad couldn't produce an HTML layout, that's an easier problem, because most of the document-layout chores can (and should) be delegated to the web browser. For now, most of Quad's apparatus is devoted to its typesetting engine so it can produce layouts for PDF.
 
 @section{What doesn't Quad do?}
 
@@ -78,7 +78,7 @@ A document processor starts with input that we can think of as one giant line of
 @itemlist[#:style 'ordered
   @item{Quad starts with an input file written in the @code{#lang quad} markup language. For the most part, it's text with markup codes (though it may also include things like diagrams and images).}
 
-  @item{Each markup entity is called a @defterm{quad}. A quad roughly corresponds to a box. ``Roughly'' because quads can have zero or negative dimension. Also, at the input stage, the contents of some quads may end up being spread across multiple non-overlapping boxes (e.g., a quad containing a word might be hyphenated to appear on two lines). The more precise description of a quad is therefore ``contiguous markup region.'' Quads can be recursively nested inside other quads, thus the input file is tree-shaped.}
+  @item{Each markup entity is called a @defterm{quad}. A quad roughly corresponds to a box. ``Roughly'' because quads can have zero or negative dimension. Also, at the input stage, the contents of some quads may end up being spread across multiple non-overlapping boxes (e.g., a quad containing a word might be hyphenated to appear on two lines). The more precise description of a quad is therefore ``contiguous formatting region.'' Quads can be recursively nested inside other quads, thus the input file is tree-shaped.}
 
   @item{This tree-shaped input file is flattened into a list of atomic  quads. ``Atomic'' because these are the smallest items the typesetter can manipulate. (For instance, the word @italic{bar} would become three one-character quads. An image or other indivisible box would remain as is.) During the flattening, tags from higher in the tree are propagated downward by copying them into the atomic quads. The result is a ``stateless'' representation of the input, in the sense that all the information needed to typeset an atomic quad is contained within the quad itself.
 
@@ -98,25 +98,168 @@ A document processor starts with input that we can think of as one giant line of
 
   @item{Before the typeset markup is passed to the renderer, it goes through a simplification phase — a lot of adjacent quads will have the same formatting characteristics, and these can be consolidated into runs of text.}
 
-  @item{The renderer walks through the markup and draws each quad, using information in the markup attributes to determine position, color, font size & style, etc.}
+  @item{The renderer walks through the markup and draws each quad, using information in the markup attributes to determine position, color, font, size, style, etc.}
 
 ]
 
 
-@section{The markup language}
+@section{Enough talk — let's rock}
 
-Quad's markup language is a Racket-implemented DSL (= domain-specific language). It's not a language in the sense of Turing-complete. Rather, a Quad ``program'' resembles text annotated with high-level layout-description commands (not unlike XML/HTML). 
+Open DrRacket and start a new document with @code{#lang quad} as the first line:
 
-Quad programs can be written directly, or generated as the output of other programs.
+@codeblock|{
+#lang quad
+Brennan and Dale like fancy sauce.
+}|
+
+Save the document. Any place, any name is fine. 
+
+Run the document. You'll get output like this:
+
+@racketvalfont{@code{(block '(measure 360.0 font "Times New Roman" x-align justify leading 14.0 size 11.5 x-align-last-line left column-count 1 column-gutter 10.0) "\n" "Brennan and Dale like fancy sauce. ")}}
+
+This is the compiled Quad markup, showing what will get sent to the typesetting engine. This output is itself valid Quad markup (meaning you could put it back in the definitions window and it would compile again).
+
+@code{#lang quad} uses the @"@"-expression reader for ease of use. But these @"@"-expressions become S-expressions in the usual manner. Also as usual, you can prefix any S-expressionized Quad markup with a @litchar{@"@"} in the definitions window to turn it back into an @"@"-expression.
+
+@margin-note{@secref["how-to:reader" #:doc '(lib "scribblings/scribble/scribble.scrbl")] introduces @"@"-expressions.}
+
+Now click the @onscreen{Render and Open PDF} button. After a moment, this should open your PDF previewing program with the Quad-generated PDF, which will say, unsurprisingly, ``Brennan and Dale like fancy sauce.''
+
+As you work through the demo, you can alternatively use the @onscreen{Render PDF} button to regenerate the PDF without opening your previewer. (The Preview app on OS X, for instance, will automatically refresh when it detects the PDF has changed, which prevents a welter of windows.)
+
+@code{#lang quad} is a Racket-implemented DSL (= domain-specific language). It's not a language in the sense of Turing-complete. Rather, a @code{#lang quad} ``program'' resembles text annotated with high-level layout-description commands (not unlike XML/HTML). @code{#lang quad} programs can be written directly, or generated as the output of other programs.
+
+Each @"@"-expression in @code{#lang quad} is interpreted as a @italic{quad} (roughly a box; more precisely a contiguous formatting region). A quad has the following syntax:
+
+@code|{@quad-name[(list 'attr-name attr-val ...)]{text-or-more-quads ...}}|
+
+The @code{(list 'attr-name attr-val ...)} is an interleaved list of symbols and values, as you might provide to @racket[hash]. The attribute list is mandatory. If a quad has no attributes of its own, this can be signaled with either @racket[empty] or @racket[#f]:
+
+@codeblock|{
+@quad-name[empty]{text-or-more-quads ...}
+@quad-name[#f]{text-or-more-quads ...}
+}|
+
+If you thought this resembled an @link["http://docs.racket-lang.org/pollen/second-tutorial.html#%28part._.X-expressions%29"]{X-expression}, you wouldn't be wrong. Like X-expressions, quads are recursively composable. Also like X-expressions, the attributes in a quad apply to all the text or quads within, unless superseded by another attribute declaration deeper down.
+
+Let's see how this works. The simplest kind of quad is a @code{block}. If we wrap our text in a @code{block} without attributes, what happens to the PDF?
+
+@codeblock|{
+#lang quad
+@block[#f]{Brennan and Dale like fancy sauce.}
+}|
+
+Right — nothing. A block without attributes just evaporates. Move the boundaries of the block:
+
+@codeblock|{
+#lang quad
+@block[#f]{Brennan and Dale} like fancy sauce.
+}|
+
+Still the same. Let's add some bold formatting with the @code{weight} attribute:
+
+@codeblock|{
+#lang quad
+@block['(weight bold)]{Brennan and Dale} like fancy sauce.
+}|
+
+What an accomplishment. To show you that attributes are additive, we'll put a quad inside our quad:
+
+@codeblock|{
+#lang quad
+@block['(weight bold)]{Brennan and @block['(color "red")]{Dale}} like fancy sauce.
+}|
+
+You're getting the idea. In terms of type styling, here are the attributes and values that Quad understands:
+
+@code{'weight} = @code{'normal} (default) or @code{'bold}
+@(linebreak)@code{'style} = @code{'normal} (default) or @code{'italic}
+@(linebreak)@code{'font} = family name as string
+@(linebreak)@code{'size} = point size as floating-point number
+@(linebreak)@code{leading} = baseline-to-baseline measure in points
+@(linebreak)@code{'color} = color string from @racket[color-database<%>]
+
+Feel free to impose these on your demo program.
+
+Though we're using @"@"-expressions, a @code{#lang quad} source file doesn't imply any formatting characteristics as it would in Scribble or Pollen. For instance, see what happens if you add two line break and some more text:
+
+@codeblock|{
+#lang quad
+@block['(size 16)]{Brennan and @block['(color "red")]{Dale}} like fancy sauce.
+
+Derek does not.
+}|
+
+The text ``Derek does not'' appears flush against the first sentence. In Scribble those linebreaks would suggest a paragraph break. In HTML they would suggest a word space. In @code{#lang quad} they suggest neither. Why not? Because @code{#lang quad} is strictly a language for describing explicit typesetting. Newlines have no meaning.
+
+OK, so how do we create a paragraph? Quad supports a special set of quads called @italic{breaks} that move the typesetting position. For instance, @code{@"@"(block-break)} will act like a carriage return, moving the next typeset item below the previous item and all the way to the left edge of the column:
+
+@codeblock|{
+#lang quad
+@block['(size 16)]{Brennan and @block['(color "red")]{Dale}} like fancy sauce.
+@(block-break)
+Derek does not.
+}|
+
+Now ``Derek does not'' appears on its own line. What about things like paragraph spacing and first-line indents? Again, because @code{#lang quad} is about explicit typesetting, all these things need to be inserted explicitly in the code. For instance, to make an indent, we add a @code{box} with a @code{'width} attribute:
+
+@codeblock|{
+#lang quad
+@block['(size 16)]{Brennan and @block['(color "red")]{Dale}} like fancy sauce.
+@(block-break)
+@box['(width 15)]
+Derek does not.
+}|
+
+Quad also handles @code|{@(line-break)}|, @code|{@(column-break)}|, and @code|{@(page-break)}|. Try the last one:
+
+@codeblock|{
+#lang quad
+@block['(size 16)]{Brennan and @block['(color "red")]{Dale}} like fancy sauce.
+@(page-break)
+@box['(width 15)]
+Derek does not.
+}|
+
+Next, let's look at Quad's linebreaking mechanism. For the next sample, please paste in a large block of plain text between the curly braces so you'll get some linewrapping:
+
+@codeblock|{
+#lang quad
+@block[#f]{A text that goes on for a while ...}
+}|
+
+You will see a block of justified text. The demo is running at maximum quality, so two other things will also be true. 
+
+First, the lines are broken using the Knuth-Plass algorithm developed for TeX. This is a very nice algorithm that looks at all possible ways of breaking the lines in the paragraph and picks the one that leaves the smallest total gap at the right edge. (Quad will also hyphenate if necessary, but only if all the unhyphenated possibilities are bad.)
+
+Second, notice that punctuation hangs a little outside the text block. This is an optical adjustment that makes for neater-looking blocks. Whether you literally care about this kind of optical adjustment is not the point. The point is that the Quad typesetting engine @italic{permits} it. And that is really what we are going for here: a hackable typesetting engine. When you have fine control over all the page elements, then other things become possible (for instance, mathematical-equation typesetting, which is quite a bit more involved than just hanging punctuation off the edges).
+
+Justification is the default setting for the demo. To override this setting, use these attributes:
+
+@code{'x-align} = @code{'justify} (default), @code{'left}, @code{'center}, or @code{'right}
+@code{'x-align-last-line} = @code{'justify} (default), @code{'left}, @code{'center}, or @code{'right}
 
 
+@codeblock|{
+#lang quad
+@block['(x-align center x-align-last-line center)]{A text that goes on for a while ...}
+}|
 
+Then you can combine blocks with different styles:
 
+@codeblock|{
+#lang quad
+@block['(x-align center x-align-last-line center size 24)]{Very important headline}
+@(block-break)
+@block['(style italic)]{A subhead that maybe lasts a few lines}
+@(block-break)
+@box['(width 10)]@block[#f]{A text that goes on for a while ...}
+}|
 
+In sum, you can build up complex typsetting with a relatively small vocabulary of typsetting commands.
 
-@section{The layout engine}
-
-@section{The rendering engine}
+You are welcome to shovel large quantities of plain text into your @code{#lang quad} window to see it broken into lines and paginated.
 
 
 @section{Bottlenecks, roadblocks, & unanswered questions}
@@ -129,7 +272,7 @@ In no particular order.
 
 @italic{Possible improvements}: Put the attributes into a separate data structure that treats each attribute as having a scope. But this makes editing the input data more difficult & fragile, because you have two parallel structures to keep sychronized. Also, there's probably no reason that the attributes have to allow arbitrary key–value pairs. If the keys and certain values were reduced to a fixed vocabulary, they could be encoded as (smaller, quicker) integers rather than symbols and strings.}
 
-@item{@bold{Allocation is wasteful.} Many typesetting operations break bigger quads into smaller ones, or group smaller quads into bigger ones, etc. The result is that there's a lot of allocation & garbage collection comparied to the typical Racket program.
+@item{@bold{Allocation is wasteful.} Many typesetting operations break bigger quads into smaller ones, or group smaller quads into bigger ones, etc. The result is that there's a lot of allocation & garbage collection relative to the typical Racket program.
 
 @italic{Possible improvements}: Perhaps the input can be fixed some structure and results of each typesetting operation stored as a set of edits (like a diff) rather than copying the whole structure.}
 
@@ -161,9 +304,6 @@ In no particular order.
 @item{@bold{Run-to-run caching is difficult.} By this I mean that a common workflow in typesetting is to edit the document, preview the typesetting, make adjustments, preview again, etc. At each step, potentially not that much of the document is changing. But the typesetter needs to run start to finish anyhow.
 
 @italic{Possible improvements}: The most expensive operation is linebreaking. It would be nice to find a way to cache linebreaking between runs — e.g., ``this paragraph hasn't changed, so we can just reuse the linebreaks from last time.'' But this would require some kind of checksumming of each paragraph and disk caching, which itself would get expensive.} 
-
-
-
 
 ]
 
