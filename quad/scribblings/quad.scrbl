@@ -127,7 +127,7 @@ In no particular order.
 
 @item{@bold{Flattening is wasteful.} Exploding the input into atomic quads and copying the attributes works, but it creates an enormous data structure with a huge amount of repetition. But, how do you create a stateless representation of the input? 
 
-@italic{Possible improvements}: Put the attributes into a separate data structure that treats each attribute almost like a ``scope.'' But this makes editing the data structure more difficult & fragile. Also, there's probably no reason that the attributes have to allow arbitrary key–value pairs. If the keys and certain values were reduced to a fixed vocabulary, they could be encoded as (smaller, quicker) integers rather than symbols and strings.}
+@italic{Possible improvements}: Put the attributes into a separate data structure that treats each attribute as having a scope. But this makes editing the input data more difficult & fragile, because you have two parallel structures to keep sychronized. Also, there's probably no reason that the attributes have to allow arbitrary key–value pairs. If the keys and certain values were reduced to a fixed vocabulary, they could be encoded as (smaller, quicker) integers rather than symbols and strings.}
 
 @item{@bold{Allocation is wasteful.} Many typesetting operations break bigger quads into smaller ones, or group smaller quads into bigger ones, etc. The result is that there's a lot of allocation & garbage collection comparied to the typical Racket program.
 
