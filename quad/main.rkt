@@ -7,7 +7,7 @@
   (define-syntax-rule (cons-reverse x y) (cons (reverse x) y))
   (define-values (mps mcs bs b)
     (for/fold ([multipages empty][multicolumns empty][blocks empty][block-acc empty])
-              ([q (in-list (report (split-quad i)))])
+              ([q (in-list (split-quad i))])
       (cond
         [(page-break? q) (values (cons-reverse (cons-reverse (cons-reverse block-acc blocks) multicolumns) multipages) empty empty empty)]
         [(column-break? q) (values multipages (cons-reverse (cons-reverse block-acc blocks) multicolumns) empty empty)]

@@ -105,7 +105,7 @@
                                 x ; no subelements, so stop here
                                 (map (λ(xi) (do-explode xi x)) (quad-list x)))] ; replace quad with its elements, exploded
                            ;; todo: figure out why newlines foul up the input stream. Does it suffice to ignore them? 
-                           [else (map (λ(xc) (quad 'word (quad-attrs parent) (list xc))) (report (regexp-match* #px"[^\r\n]" x)))]))])
+                           [else (map (λ(xc) (quad 'word (quad-attrs parent) (list xc))) (regexp-match* #px"[^\r\n]" x))]))])
     (flatten (map do-explode (flatten-quad q)))))
 
 
