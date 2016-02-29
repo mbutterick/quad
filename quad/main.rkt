@@ -39,7 +39,6 @@
     source-stx)
   
   (define (custom-get-info key default [proc (λ _ #f)])
-    (displayln 'yay)
     (case key
       [(color-lexer)
        (define my-make-scribble-inside-lexer
