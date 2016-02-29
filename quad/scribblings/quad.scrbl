@@ -1,5 +1,7 @@
 #lang scribble/manual
 
+@(require (for-label racket/draw))
+
 @title[#:style 'toc]{Quad: document processor}
 
 @author[(author+email "Matthew Butterick" "mb@mbtype.com")]
@@ -78,7 +80,9 @@ A document processor starts with input that we can think of as one giant line of
 
   @item{Each markup entity is called a @defterm{quad}. A quad roughly corresponds to a box. ``Roughly'' because quads can have zero or negative dimension. Also, at the input stage, the contents of some quads may end up being spread across multiple non-overlapping boxes (e.g., a quad containing a word might be hyphenated to appear on two lines). The more precise description of a quad is therefore ``contiguous markup region.'' Quads can be recursively nested inside other quads, thus the input file is tree-shaped.}
 
-  @item{This tree-shaped input file is flattened into a list of atomic  quads. ``Atomic'' because these are the smallest items the typesetter can manipulate. (For instance, the word @italic{bar} would become three one-character quads. An image or other indivisible box would remain as is.) During the flattening, tags from higher in the tree are propagated downward by copying them into the atomic quads. The result is a ``stateless'' representation of the input, in the sense that all the information needed to typeset an atomic quad is contained within the quad itself.}
+  @item{This tree-shaped input file is flattened into a list of atomic  quads. ``Atomic'' because these are the smallest items the typesetter can manipulate. (For instance, the word @italic{bar} would become three one-character quads. An image or other indivisible box would remain as is.) During the flattening, tags from higher in the tree are propagated downward by copying them into the atomic quads. The result is a ``stateless'' representation of the input, in the sense that all the information needed to typeset an atomic quad is contained within the quad itself.
+
+  @margin-note{The input is flattened because typesetting operations are easier to think about as a linear sequence (i.e., an imperative model). To see why, consider how you'd handle a page-break instruction within a tree model. No matter how deep you were in your typesetting tree, you'd have to jump back to the top level to handle your page break (because it affects the positioning of all subsequent items). Then you'd have to jump back to where you were, deep in the tree. That's not a natural way to traverse any tree. This is also why, to my mind, typesetting does not lend itself to a class- or object-based approach, as these create hierarchies that just lead you back to this tree problem.}}
 
   @item{Atomic quads are composed into lines using one of three algorithms. (A line is just a quad of a certain width.) The first-fit algorithm puts as many quads onto a line as it can before moving on to the next. The best-fit algorithm minimizes the total looseness of all the lines in a paragraph (aka the Knuth–Plass linebreaking algorithm developed for TeX). Because best-fit is more expensive, Quad also has an adaptive-fit algorithm that uses a statistical heuristic to guess whether the paragraph will benefit from best-fit; if not, it uses first-fit.}
 
@@ -115,7 +119,53 @@ Quad programs can be written directly, or generated as the output of other progr
 @section{The rendering engine}
 
 
-@section{Bottlenecks, roadblocks, irritations}
+@section{Bottlenecks, roadblocks, & unanswered questions}
+
+In no particular order.
+
+@itemlist[#:style 'ordered
+
+@item{@bold{Flattening is wasteful.} Exploding the input into atomic quads and copying the attributes works, but it creates an enormous data structure with a huge amount of repetition. But, how do you create a stateless representation of the input? 
+
+@italic{Possible improvements}: Put the attributes into a separate data structure that treats each attribute almost like a ``scope.'' But this makes editing the data structure more difficult & fragile. Also, there's probably no reason that the attributes have to allow arbitrary key–value pairs. If the keys and certain values were reduced to a fixed vocabulary, they could be encoded as (smaller, quicker) integers rather than symbols and strings.}
+
+@item{@bold{Allocation is wasteful.} Many typesetting operations break bigger quads into smaller ones, or group smaller quads into bigger ones, etc. The result is that there's a lot of allocation & garbage collection comparied to the typical Racket program.
+
+@italic{Possible improvements}: Perhaps the input can be fixed some structure and results of each typesetting operation stored as a set of edits (like a diff) rather than copying the whole structure.}
+
+@item{@bold{Pango text measuring is slow.} The most cumulatively expensive operation is measuring text so linebreaks can be calculated. @racketmodname[racket/draw] relies on Pango, which is fine for occasional UI stuff, but not zillions of lookups. (BTW Pango does have higher-level text-layout facilities which are of course faster than measuring characters individually. But the point of Quad is to micromanage the typesetting and thereby make things possible that are not in Pango.) 
+
+@italic{Possible improvements}: First, use the FFI to measure text through the underlying FreeType library. This is a lot faster, but costs some functionality. Second, better caching (but see next note). 
+}
+
+@item{@bold{Caching is tricky.} Caching is an essential ingredient in a text-rendering system because so many measurements are reused. Two hard parts, however. First, simplifying the key logic so you don't end up with immensely huge hashtables with commensurately costly lookups. Second, preserving caches between runs of the program. Sure, save it on disk, but a giant hashtable in a .rktd file is still going to take a moment to be reconstituted into memory.
+
+@italic{Possible improvements}: Rely on disk-based hashtables, i.e., cache files that can be read & updated without having to reconstitute the whole file into a RAM-resident hashtable, and then write it all out again. I'm sure someone figured this out in 1972, I just haven't researched it yet.}
+
+
+@item{@bold{Cairo's PDFs are weak.} Cairo's PDF generator is missing key features  (e.g., @link["http://cairographics.org/roadmap/"]{hyperlinks}) and in general makes PDFs that are bigger and less capable than, say, @tt{tex2pdf}. Since PDFs are undoubtedly the #1 target format for a document processor, this is a major liability. OTOH, the idea of writing a PostScript/PDF compiler is, for me anyhow, daunting.
+
+@italic{Possible improvements}: Bite the bullet and make a PDF compiler. If one wants to be free of LaTeX, and have better-quality PDFs than Cairo allows, there's not reallyi a second option.}
+
+@item{@bold{Overall performance is slow.} Outside of text measurement, most of Quad consists of simple mathematical operations. It seems like it should be highly optimizable. (Using Typed Racket, however, wasn't the answer.)
+
+@italic{Possible improvements}: Use more unsafe math operations, gingerly.}
+
+
+@item{@bold{Dependencies are broad.} One reason switching to Typed Racket did nothing for Quad is that it touches a lot of other pieces of Racket. In TR's case, creating typed interfaces for untyped libraries consumed all the potential performance gains from static typing. But still, using a small slice of a lot of libraries adds a certain overhead.}
+
+@item{@bold{Glyph shaping is nowhere.} A proper 21st-century typesetting engine needs OpenType glyph shaping, and the only open-source game in town is @link["https://www.freedesktop.org/wiki/Software/HarfBuzz/"]{HarfBuzz}. Haven't used it, don't know how to integrate it.}
+
+@item{@bold{Parallel processing is difficult.} It's unclear to me how to exploit Racket's parallel-processing facilities to speed up typesetting. A typeset document is likely to have a lot of finely interdependent pieces (e.g., table of contents, table of authorities, footnotes, etc.)} 
+
+@item{@bold{Run-to-run caching is difficult.} By this I mean that a common workflow in typesetting is to edit the document, preview the typesetting, make adjustments, preview again, etc. At each step, potentially not that much of the document is changing. But the typesetter needs to run start to finish anyhow.
+
+@italic{Possible improvements}: The most expensive operation is linebreaking. It would be nice to find a way to cache linebreaking between runs — e.g., ``this paragraph hasn't changed, so we can just reuse the linebreaks from last time.'' But this would require some kind of checksumming of each paragraph and disk caching, which itself would get expensive.} 
+
+
+
+
+]
 
 @section{Why is it called Quad?}
 
