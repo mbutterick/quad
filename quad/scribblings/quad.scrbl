@@ -288,7 +288,7 @@ In no particular order.
 
 @item{@bold{Cairo's PDFs are weak.} Cairo's PDF generator is missing key features  (e.g., @link["http://cairographics.org/roadmap/"]{hyperlinks}) and in general makes PDFs that are bigger and less capable than, say, @tt{tex2pdf}. Since PDFs are undoubtedly the #1 target format for a document processor, this is a major liability. OTOH, the idea of writing a PostScript/PDF compiler is, for me anyhow, daunting.
 
-@italic{Possible improvements}: Bite the bullet and make a PDF compiler. If one wants to be free of LaTeX, and have better-quality PDFs than Cairo allows, there's not reallyi a second option.}
+@italic{Possible improvements}: Bite the bullet and make a PDF compiler. If one wants to be free of LaTeX, and have better-quality PDFs than Cairo allows, there's not really a second option.}
 
 @item{@bold{Overall performance is slow.} Outside of text measurement, most of Quad consists of simple mathematical operations. It seems like it should be highly optimizable. (Using Typed Racket, however, wasn't the answer.)
 
