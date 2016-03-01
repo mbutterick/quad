@@ -51,7 +51,7 @@ But web browsers have a few limitations. First, web browsers only render HTML, a
 Quad produces finished document layouts using three ingredients: 
 
 @itemlist[#:style 'ordered
-  @item{A @bold{markup-based language} for embedding high-level typsetting instructions in a text document. (Sort of like XML/HTML.)}
+  @item{A @bold{markup-based language} for embedding high-level typesetting instructions in a text document. (Sort of like XML/HTML.)}
 
   @item{A @bold{typesetting engine} that converts these typesetting instructions into an output-independent layout — e.g., putting characters into lines, and lines into pages.}
 
@@ -182,7 +182,7 @@ You're getting the idea. In terms of type styling, here are the attributes and v
 
 Feel free to impose these on your demo program.
 
-Though we're using @"@"-expressions, a @code{#lang quad} source file doesn't imply any formatting characteristics as it would in Scribble or Pollen. For instance, see what happens if you add two line break and some more text:
+Though we're using @"@"-expressions, a @code{#lang quad} source file doesn't imply any formatting characteristics as it would in Scribble or Pollen. For instance, see what happens if you add two line breaks and some more text:
 
 @codeblock|{
 #lang quad
@@ -257,7 +257,7 @@ Then you can combine blocks with different styles:
 @box['(width 10)]@block[#f]{A text that goes on for a while ...}
 }|
 
-In sum, you can build up complex typsetting with a relatively small vocabulary of typsetting commands.
+In sum, you can build up complex typesetting with a relatively small vocabulary of typesetting commands.
 
 You are welcome to shovel large quantities of plain text into your @code{#lang quad} window to see it broken into lines and paginated.
 
