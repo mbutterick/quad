@@ -5,22 +5,22 @@
 
 ;; predicate for the soft hyphen
 (define+provide (soft-hyphen? x)
-  (string? . -> . boolean?)
+  #;(string? . -> . boolean?)
   (equal? (format "~a" world:soft-hyphen) x))
 
 ;; visible characters that also mark possible breakpoints
 (define+provide (visible-breakable? x)
-  (string? . -> . boolean?)
+  #;(string? . -> . boolean?)
   (and (member x world:hyphens-and-dashes) #t))
 
 ;; invisible characters that denote possible breakpoints
 (define+provide (invisible-breakable? x)
-  (string? . -> . boolean?)
+  #;(string? . -> . boolean?)
   (and (member x (cons world:empty-string world:spaces)) #t))
 
 ;; union of visible & invisible
 (define+provide (breakable? x)
-  (any/c . -> . boolean?)
+  #;(any/c . -> . boolean?)
   (cond
     [(string? x) (or (visible-breakable? x) (invisible-breakable? x))]
     [(word? x) (breakable? (word-string x))]
@@ -29,19 +29,19 @@
 ;; used by insert-spacers to determine which characters 
 ;; can be surrounded by stretchy spacers 
 (define+provide (takes-justification-space? x)
-  (any/c . -> . boolean?)
+  #;(any/c . -> . boolean?)
   (whitespace/nbsp? x))
 
 ;; test if a quad can be a word break:
 ;; either it's an explicit word break,
 ;; or it's breakable (and can be converted to a word break)
 (define+provide (possible-word-break-quad? q)
-  (quad? . -> . boolean?)
+  #;(quad? . -> . boolean?)
   (or (word-break? q) (breakable? q)))
 
 ;; convert a possible word break into an actual one
 (define+provide (convert-to-word-break q)
-  (possible-word-break-quad? . -> . word-break?)
+  #;(possible-word-break-quad? . -> . word-break?)
   (cond 
     [(word-break? q) q]
     [(word? q)
@@ -66,7 +66,7 @@
 ;; hyphenation produces more, smaller pieces, which means more linebreak opportunities
 ;; but this also makes wrapping slower.
 (define+provide (make-pieces qs)
-  (quads? . -> . pieces?)
+  #;(quads? . -> . pieces?)
   (define-values (breakable-items items-to-make-unbreakable) (split-at-right qs (min world:minimum-last-line-chars (length qs))))
   (define unbreak-qs (append breakable-items (map make-unbreakable items-to-make-unbreakable)))
   (define lists-of-quads (slicef-after unbreak-qs (λ(q) (and (possible-word-break-quad? q) (not (quad-attr-ref q world:unbreakable-key #f))))))
@@ -92,7 +92,7 @@
 ;; comes in fast or slow versions.
 ;; not designed to update the source quad.
 (define+provide (quad-width q)
-  (quad? . -> . flonum?)
+  #;(quad? . -> . flonum?)
   (cond
     [(quad-has-attr? q world:width-key) (fl (quad-attr-ref q world:width-key))]
     [(ormap (λ(pred) (pred q)) (list char? run? word? word-break?)) 
@@ -107,7 +107,7 @@
 ;; consult the attrs, and if not available, compute it.
 ;; not designed to update the source quad.
 (define+provide (ascent q)
-  (quad? . -> . flonum?)
+  #;(quad? . -> . flonum?)
   (or (quad-attr-ref q world:ascent-key #f)
       (cond 
         [(ormap (λ(pred) (pred q)) (list char? run? word? word-break?)) 
@@ -120,7 +120,7 @@
 ;; this allows the appearance of a piece to change depending on whether it's at the end.
 ;; and thus give correct behavior to trailing word spaces, soft hyphens, etc.
 (define+provide (render-piece p [before-break? #f])
-  ((piece?) (boolean?) . ->* . piece?)
+  #;((piece?) (boolean?) . ->* . piece?)
   ;; a piece doesn't necessarily have a word-break item in it.
   ;; only needs it if the appearance of the piece changes based on location.
   ;; so words are likely to have a word-break item; boxes not.
@@ -158,7 +158,7 @@
 
 ;; is this the last line? compare current line-idx to total lines 
 (define+provide (last-line? line)
-  (line? . -> . boolean?)
+  #;(line? . -> . boolean?)
   (define line-idx (quad-attr-ref line world:line-index-key #f))
   (define lines (quad-attr-ref line world:total-lines-key #f))
   (and line-idx lines (= (add1 line-idx) lines)))
@@ -174,7 +174,7 @@
 ;; it just looks at quads on both sides and kerns them if appropriate.
 ;; in practice, only one will likely be used.
 (define+provide (render-optical-kerns exploded-line-quads)
-  (quads? . -> . quads?)
+  #;(quads? . -> . quads?)
   (define (overhang-width q)
     (if (and (word? q) (member (word-string q) world:hanging-chars))
         (fl*s -1.0 (world:optical-overhang) (apply measure-text (word-string q) (font-attributes-with-defaults q)))
@@ -199,7 +199,7 @@
 ;; depending on where the spacers are inserted, different formatting effects are achieved.
 ;; e.g., left / right / centered / justified.
 (define+provide (insert-spacers-in-line line [alignment-override #f])
-  ((line?) ((or/c #f symbol?)) . ->* . line?)
+  #;((line?) ((or/c #f symbol?)) . ->* . line?)
   ;; important principle: avoid peeking into quad-list to get attributes.
   ;; because non-attributed quads may be added.
   ;; here, we know that common attributes are hoisted into the line.
@@ -255,7 +255,7 @@
 ;; compute looseness for line as a whole.
 ;; also add ascent to each component quad, which can be different depending on font & size.
 (define+provide (pieces->line ps measure-quad-proc)
-  (pieces? procedure? . -> . line?)
+  #;(pieces? procedure? . -> . line?)
   
   ;; handle optical kerns here to avoid resplitting and rejoining later.
   (define rendered-pieces (render-pieces ps))
@@ -513,7 +513,7 @@
 ;; build quad out to a given width by distributing excess into spacers
 ;; todo: adjust this to work recursively, so that fill operation cascades down
 (define+provide (fill starting-quad [target-width? #f])
-  ((quad?) ((or/c #f flonum?)) . ->* . quad?)
+  #;((quad?) ((or/c #f flonum?)) . ->* . quad?)
   (define target-width (fl (or target-width? (quad-attr-ref starting-quad world:measure-key)))) 
   (define subquads (quad-list starting-quad))
   (define-values (flexible-subquads fixed-subquads) (partition spacer? subquads)) ; only puts fill into spacers.
@@ -536,7 +536,7 @@
 ;; add x positions to a list of fixed-width quads
 ;; todo: adjust this to work recursively, so that positioning operation cascades down
 (define+provide (add-horiz-positions starting-quad)
-  ((and/c quad? fixed-width?) . -> . quad?)
+  #;((and/c quad? fixed-width?) . -> . quad?)
   (define-values (new-quads final-width)
     (for/fold ([new-quads empty][width-so-far 0.0])([q (in-list (quad-list starting-quad))])
       (values (cons (quad-attr-set q world:x-position-key width-so-far) new-quads) (round-float (fl+ (quad-width q) width-so-far)))))
