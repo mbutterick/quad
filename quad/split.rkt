@@ -5,8 +5,7 @@
   (flatten
    (let loop ([x x][attrs default-attrs])
      (cond
-       [(char? x) (quad attrs x)]
-       [(string? x) (map (λ(xi) (loop xi attrs)) (string->list x))]
+       [(string? x) (map (λ(xi) (quad attrs xi)) (string->list x))]
        [else
         (define x-attrs (quad-attrs x))
         (for ([i (in-range (vector-length attrs))])
