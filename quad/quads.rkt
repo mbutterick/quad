@@ -1,41 +1,53 @@
-#lang quad/dev
+#lang racket/base
 (provide (all-defined-out))
 (require (for-syntax racket/string))
 
+(struct $quad (attrs list) #:transparent)
 
-(define (quad-attrs q) (vector-ref q 1))
-(define (quad-list q) (vector-ref q 0))
+(define quad? $quad?)
 
-
-(define (quad? x)
-  (and (vector? x)
-       (vector? (quad-attrs x))
-       (list? (quad-list x))))
+(define quad-attrs $quad-attrs)
+(define quad-list $quad-list)
 
 (define (quad-attrs? x) (list? x))
 
 
-(define default-attrs (vector 12 "Courier" 0 0))
-(define (quad attrs . xs)
-  (vector-immutable xs attrs))
+#|
+Attrs needed to specify rendered appearance:
+(font) family
+(font) style 
+(font) size
+color
+background
+position
 
-(define (make-quad-attrs #:size [size #f]
-              #:font [font #f]
-              #:x [x #f]
-              #:y [y #f])
-  (vector size font x y))
+|#
+(define default-attrs (vector 12 "Courier" 0))
+(define (quad attr . xs)
+  ($quad (or attr (attrs)) xs))
 
-(define attrs '(size font x y))
+(define (attrs #:size [size #f]
+               #:font [font #f]
+               #:posn [posn #f])
+  (vector size font posn))
+
 
 (define (attr-size a) (vector-ref a 0))
 (define (attr-font a) (vector-ref a 1))
 (define (attr-x a) (vector-ref a 2))
 (define (attr-y a) (vector-ref a 3))
 
+(define (override-with dest source)
+  ;; replace missing values in dest with values from source
+  (for ([i (in-range (vector-length source))])
+            (unless (vector-ref dest i)
+              (vector-set! dest i (vector-ref source i))))
+  dest)
+
 (module+ test
   (require rackunit)
-  (define q (quad "bar"))
+  (define q (quad #f "bar"))
   (check-true (quad? q))
   (check-false (quad? 42))
-  (check-equal? (quad-attrs q) default-attrs)
+  (check-equal? (quad-attrs q) (attrs))
   (check-equal? (quad-list q) '("bar")))
