@@ -8,4 +8,4 @@ multicolumn : multiblock [/BLOCK-BREAK multiblock]*
 
 multiblock : multiline [/LINE-BREAK multiline]*
 
-multiline : QUAD*
+multiline : /WHITESPACE* (QUAD [WHITESPACE+ QUAD]*)* /WHITESPACE* 
