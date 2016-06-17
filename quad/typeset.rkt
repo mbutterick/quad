@@ -15,5 +15,5 @@
                                         (block-quads->lines block-quads)))))))))))
 
 
-(define input (quad #f "Meg is" (quad #f 'line-break) " an ally."))
+(define input (quad #f "Meg is an ally." (quad #f 'page-break) "Meg is an ally."))
 (syntax->datum (parse (tokenize input)))

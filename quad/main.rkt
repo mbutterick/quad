@@ -1,8 +1,11 @@
 #lang racket/base
-(require "top.rkt")
-(provide (except-out (all-from-out racket/base) #%top)
-         (rename-out [~top #%top]))
+(require "quads.rkt")
+(provide (all-from-out racket/base "quads.rkt"))
 
 
-(module reader syntax/module-reader
-  #:language 'quad)
+(module reader racket/base
+  (require br/reader-utils "parse.rkt" "tokenize.rkt")
+  
+  (define-read-and-read-syntax (source-path input-port)
+    #`(module quad-mod 
+        #,(parse source-path (tokenize input-port)))))
