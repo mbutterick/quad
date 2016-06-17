@@ -6,7 +6,7 @@
   (flatten
    (let loop ([x x][attrs default-attrs])
      (cond
-       [(symbol? x) (token (string->symbol (string-upcase (symbol->string x))) #f)]
+       [(symbol? x) (token x #f)]
        [(string? x)
          (map (λ(xi) (token 'QUAD (quad attrs xi))) (string->list x))]
        [else
@@ -14,6 +14,5 @@
 
 (module+ test
   (require rackunit)
-  (tokenize (quad (attrs #:size 10 #:font "Eq") "ba" (quad #f 'line-break) "r" (quad (attrs #:size 8) "zam") "q\tux"))
-
-  (tokenize (quad #f "Meg is" (quad #f 'line-break) " an ally.")))
+  (tokenize (quad (attrs #:size 10 #:font "Eq") "ba" (line-break) "r" (quad (attrs #:size 8) "zam") "q\tux"))
+  (tokenize (quad #f "Meg is" (block-break) " an ally.")))

@@ -1,3 +1,3 @@
-#lang quad
+#lang quad/text
 
-(quad #f "Meg is an ally." (quad #f 'page-break) "Meg is an ally.")
+Meg is an ally. @(line-break) Meg is an ally.
