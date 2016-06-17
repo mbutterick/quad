@@ -10,7 +10,8 @@ but substitutes a Scribble-style text-based reader
   #:read quad-read
   #:read-syntax quad-read-syntax
   #:whole-body-readers? #t ;; need this to make at-reader work
-  (require scribble/reader racket/list sugar/list)
+  (require scribble/reader racket/list)
+  (require sugar/debug)
   
   (define (quad-read p)
     (syntax->datum (quad-read-syntax (object-name p) p)))
@@ -28,6 +29,7 @@ but substitutes a Scribble-style text-based reader
     ;; we dump all whitespace lines in plain-text mode, as they have no semantic purpose
     ;; the at-reader will kindly separate these all-whitespace lines into their own list elements
     (define source-stx-no-interline-whitespace
-      (filter (λ(stx) (define datum (syntax->datum stx))
-                (and (string? datum) (regexp-match #rx"\\s+" datum))) (cdr source-stx-list)))
+      (filter-not (λ(stx)
+                    (define datum (syntax->datum stx))
+                    (and (string? datum) (regexp-match #px"^\\s+$" datum))) (cdr source-stx-list)))
     (datum->syntax source-stx (cons config-line source-stx-no-interline-whitespace) source-stx)))
