@@ -12,8 +12,8 @@
 (define (multiblock . xs) xs)
 
 (define (multiline . xs)
-  (break-lines xs))
+  (wrap-lines xs))
 
-(struct $line (xs) #:transparent)
-(define (break-lines xs)
-  (map (λ(xis) ($line xis)) (slice-at xs 6)))
+(struct $line $quad () #:transparent)
+(define (wrap-lines xs)
+  (map (λ(xis) ($line (gather-common-attrs xis) xis)) (slice-at xs 6)))

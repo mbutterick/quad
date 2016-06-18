@@ -3,6 +3,7 @@
 (require (for-syntax racket/string racket/base racket/syntax))
 
 (struct $quad (attrs list) #:transparent)
+(struct $quad-white $quad () #:transparent)
 
 (define quad? $quad?)
 
@@ -32,6 +33,14 @@ measure (line width)
                #:posn [posn #f])
   (vector size font posn))
 
+(define (gather-common-attrs xs)
+  (define reference-attrs (quad-attrs (car xs)))
+  (for/vector ([idx (in-range (vector-length default-attrs))])
+              (if (for/and ([x (in-list (cdr xs))])
+                           (equal? (vector-ref reference-attrs idx) (vector-ref (quad-attrs x) idx)))
+                  (vector-ref reference-attrs idx)
+                  #f)))
+
 
 (define (attr-size a) (vector-ref a 0))
 (define (attr-font a) (vector-ref a 1))
@@ -41,8 +50,8 @@ measure (line width)
 (define (override-with dest source)
   ;; replace missing values in dest with values from source
   (for ([i (in-range (vector-length source))])
-            (unless (vector-ref dest i)
-              (vector-set! dest i (vector-ref source i))))
+       (unless (vector-ref dest i)
+         (vector-set! dest i (vector-ref source i))))
   dest)
 
 (require (for-syntax sugar/debug))

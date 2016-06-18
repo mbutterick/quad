@@ -10,7 +10,7 @@
        [(string? x)
         (for/list ([c (in-string x)])
                   (case c
-                    [(#\space #\newline #\return) (token 'WHITESPACE (quad attrs c))]
+                    [(#\space #\newline #\return) (token 'QUAD-WHITE ($quad-white attrs c))]
                     [else (token 'QUAD (quad attrs c))]))]
        [else
         (map (λ(xi) (loop xi ((quad-attrs x) . override-with . attrs))) (quad-list x))]))))
