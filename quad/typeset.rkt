@@ -1,19 +1,22 @@
 #lang quad/dev
 (provide (all-defined-out))
-(require "tokenize.rkt" "parse.rkt")
+(require "measure.rkt")
 
-#;(define (typeset x)
-    (pages->doc
-     (append*
-      (for/list ([multipage (in-list (input->nested-blocks x))])
-                (columns->pages
-                 (append*
-                  (for/list ([multicolumn (in-list multipage)])
-                            (lines->columns
-                             (append*
-                              (for/list ([block-quads (in-list multicolumn)])
-                                        (block-quads->lines block-quads)))))))))))
+(define line-start-k #f)
 
+(define (typeset qs)
+  (for-each measure! qs)
+  (for/fold ([line-pos 0])
+            ([q (in-list qs)])
+    (unless line-start-k
+      (let/cc here-k (set! line-start-k here-k)))
+    (define next-line-pos (+ line-pos (quad-posn q)))
+    (if (and (> next-line-pos 84) ($white? q))
+        (begin (quad-posn-set! q 'break-line) 0)
+        next-line-pos))
+  qs)
 
-(define input (quad #f "Meg is an ally." (quad #f 'page-break) "Meg is an ally."))
-(syntax->datum (parse (tokenize input)))
+(module+ test
+  (require "atomize.rkt")
+  (define qs (atomize (quad #f "Meg is an ally.")))
+  (typeset qs))
