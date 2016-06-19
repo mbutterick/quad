@@ -2,11 +2,11 @@
 (provide (all-defined-out))
 (require (for-syntax racket/string racket/base racket/syntax))
 
-(struct $quad (attrs val) #:transparent #:mutable)
-(struct $black $quad () #:transparent #:mutable)
-(struct $white $quad () #:transparent #:mutable)
-(struct $skip $quad () #:transparent #:mutable)
-(struct $shim $quad () #:transparent #:mutable)
+(struct $quad (attrs posn val) #:transparent #:mutable)
+(struct $black $quad () #:transparent)
+(struct $white $quad () #:transparent)
+(struct $skip $quad () #:transparent)
+(struct $shim $quad () #:transparent)
 
 (define quad? $quad?)
 
@@ -27,28 +27,26 @@ position
 measure (line width)
 
 |#
-(define default-attrs (vector 12 "Courier" 0))
+(define default-attrs (hasheq 'size 12 'font "Courier"))
 (define (quad attr . xs)
-  ($quad (or attr (attrs)) xs))
+  ($quad (or attr (make-attrs)) 0 xs))
 
-(define (attrs #:size [size #f]
-               #:font [font #f]
-               #:posn [posn #f])
-  (vector size font posn))
+(struct $attrs (size font) #:transparent)
+(define (make-attrs #:size [size #f]
+                    #:font [font #f])
+  (hasheq 'size size 'font font))
 
 
 (define (quad-posn q)
-  (vector-ref ($quad-attrs q) 2))
+  ($quad-posn q))
 
 (define (quad-posn-set! q val)
-  (vector-set! ($quad-attrs q) 2 val))
+  (set-$quad-posn! q val))
 
 (define (override-with dest source)
   ;; replace missing values in dest with values from source
-  (for ([i (in-range (vector-length source))])
-       (unless (vector-ref dest i)
-         (vector-set! dest i (vector-ref source i))))
-  dest)
+  (for/hasheq ([k (in-hash-keys source)])
+              (values k (or (hash-ref dest k) (hash-ref source k)))))
 
 (require (for-syntax sugar/debug))
 (define-syntax (define-break stx)
@@ -68,5 +66,5 @@ measure (line width)
   (define q (quad #f "bar"))
   (check-true (quad? q))
   (check-false (quad? 42))
-  (check-equal? (quad-attrs q) (attrs))
+  (check-equal? (quad-attrs q) (make-attrs))
   (check-equal? (quad-val q) '("bar")))
