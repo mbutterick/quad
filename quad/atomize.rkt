@@ -3,7 +3,8 @@
 (provide (all-defined-out))
 
 (define (atomize x)
-  (flatten
+  (apply vector-immutable
+   (flatten
    (let loop ([x x][loop-attrs default-attrs])
      (cond
        [(symbol? x) ($shim (make-attrs) 0 x)]
@@ -14,7 +15,7 @@
                           [(#\space #\newline #\return) ($white loop-attrs 0 c)]
                           [else ($black loop-attrs 0 c)])))]
        [else
-        (map (λ(xi) (loop xi ((quad-attrs x) . override-with . loop-attrs))) (quad-val x))]))))
+        (map (λ(xi) (loop xi ((quad-attrs x) . override-with . loop-attrs))) (quad-val x))])))))
 
 (module+ test
   (require rackunit)

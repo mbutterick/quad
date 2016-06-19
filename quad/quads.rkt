@@ -27,7 +27,7 @@ position
 measure (line width)
 
 |#
-(define default-attrs (hasheq 'size 12 'font "Courier"))
+(define default-attrs (hasheq 'size 10 'font "sc.otf")) ; Source Code Pro, 12 pt, chars are 6pt wide
 (define (quad attr . xs)
   ($quad (or attr (make-attrs)) 0 xs))
 
@@ -39,6 +39,11 @@ measure (line width)
 
 (define (quad-posn q)
   ($quad-posn q))
+
+(define (quad-font q)
+  (hash-ref (quad-attrs q) 'font))
+(define (quad-font-size q)
+  (hash-ref (quad-attrs q) 'size))
 
 (define (quad-posn-set! q val)
   (set-$quad-posn! q val))

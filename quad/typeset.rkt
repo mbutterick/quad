@@ -2,21 +2,23 @@
 (provide (all-defined-out))
 (require "measure.rkt")
 
-(define line-start-k #f)
+(define last-bp-k #f)
+(define line-measure 60)
 
 (define (typeset qs)
-  (for-each measure! qs)
   (for/fold ([line-pos 0])
-            ([q (in-list qs)])
-    (unless line-start-k
-      (let/cc here-k (set! line-start-k here-k)))
-    (define next-line-pos (+ line-pos (quad-posn q)))
-    (if (and (> next-line-pos 84) ($white? q))
-        (begin (quad-posn-set! q 'break-line) 0)
-        next-line-pos))
+            ([q (in-vector qs)])
+    (measure! q)
+    (when (and ($white? q) (let/cc bp-k (set! last-bp-k bp-k) #f))
+      (quad-posn-set! q 'break-line))
+    (cond
+      [(eq? 'break-line (quad-posn q)) 0]
+      [else (define next-line-pos (+ line-pos (quad-posn q)))
+            (if (> next-line-pos line-measure)
+                (last-bp-k #t)
+                next-line-pos)]))
   qs)
 
 (module+ test
   (require "atomize.rkt")
-  (define qs (atomize (quad #f "Meg is an ally.")))
-  (typeset qs))
+  (time (typeset (atomize (quad #f "Meg is an ally.")))))
