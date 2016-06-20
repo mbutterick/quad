@@ -4,9 +4,8 @@
 
 (struct $quad (attrs dim val) #:transparent #:mutable)
 (struct $black $quad () #:transparent)
-(struct $white $quad () #:transparent)
-(struct $skip $quad () #:transparent)
-(struct $shim $quad () #:transparent)
+(struct $soft $quad () #:transparent)
+(struct $hard $quad () #:transparent)
 
 (define quad? $quad?)
 
@@ -54,17 +53,25 @@ measure (line width)
               (values k (or (hash-ref dest k) (hash-ref source k)))))
 
 (require (for-syntax sugar/debug))
-(define-syntax (define-break stx)
-  (syntax-case stx ()
-    [(_ name)
-     (with-syntax ([BREAK-NAME (string->symbol (string-upcase (symbol->string (syntax->datum #'name))))])
-       #'(define (name) (quad #f 'BREAK-NAME)))]))
+(define-syntax-rule (define-break name)
+  (define (name) (quad #f 'name)))
 
 (define-break page-break)
 (define-break column-break)
 (define-break block-break)
 (define-break line-break)
 
+(define-syntax (caseq stx)
+  ;; like case but strictly uses `eq?` comparison (as opposed to `equal?`)
+  (syntax-case stx ()
+    [(_ test-val [(match-val ...) . result] ... [else . else-result])
+     #'(cond
+         [(memq test-val '(match-val ...)) . result] ...
+         [else . else-result])]
+    [(_ test-val [(match-val ...) . result] ...)
+     #'(caseq test-val
+              [(match-val ...) . result] ...
+              [else (error 'caseq "no match")])]))
 
 (module+ test
   (require rackunit)
