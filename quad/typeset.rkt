@@ -7,30 +7,33 @@
 (define col-measure 150)
 (define page-measure 300)
 
+(struct tp (page col line) #:transparent)
+
+(define (increment-tpos tpos page col line)
+  (tp (+ (tp-page tpos) page) (+ (tp-col tpos) col) (+ (tp-line tpos) line)))
+
 (define (typeset qs)
-  (for/fold ([page-pos 0]
-              [col-pos 0]
-              [line-pos 0])
-             ([q (in-vector qs)])
+  (for/fold ([tpos (tp 0 0 0)])
+            ([q (in-vector qs)])
     (cond
       [(not (quad-dim q)) ; fit pass
        (measure! q)
        (cond
-         [(> page-pos page-measure) (last-bp-k 'break-page)]
-         [(> col-pos col-measure) (last-bp-k 'break-col)]
-         [(> line-pos line-measure) (last-bp-k 'break-line)]
+         [(> (tp-page tpos) page-measure) (last-bp-k 'break-page)]
+         [(> (tp-col tpos) col-measure) (last-bp-k 'break-col)]
+         [(> (tp-line tpos) line-measure) (last-bp-k 'break-line)]
          [(and ($white? q) (let/cc bp-k (set! last-bp-k bp-k) #f))
           =>
           (λ(k-result)
             (quad-dim-set! q k-result)
             (case k-result
-              [(break-line) (values page-pos col-pos 0)]
-              [(break-col)  (values page-pos 0 0)]
-              [(break-page) (values 0 0 0)]))]
+              [(break-line) (tp (tp-page tpos) (tp-col tpos) 0)]
+              [(break-col)  (tp (tp-page tpos) 0 0)]
+              [(break-page) (tp 0 0 0)]))]
          [else (define qpos (quad-dim q))
-               (values (+ page-pos qpos) (+ col-pos qpos) (+ line-pos qpos))])]
+               (increment-tpos tpos qpos qpos qpos)])]
       [else ; fill pass
-       (values page-pos col-pos line-pos)]))
+       tpos]))
   qs)
 
 (module+ test
