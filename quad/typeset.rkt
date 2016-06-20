@@ -8,7 +8,7 @@
 (define page-measure 300)
 
 (define (typeset qs)
-  (for*/fold ([page-pos 0]
+  (for/fold ([page-pos 0]
               [col-pos 0]
               [line-pos 0])
              ([q (in-vector qs)])
