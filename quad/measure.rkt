@@ -3,7 +3,7 @@
 (provide (all-defined-out))
 
 (define (measure! q)
-  (quad-posn-set! q
+  (quad-dim-set! q
                   (cond
                     [(or ($black? q) ($white? q))
                      (* (measure-char (quad-font q) (quad-val q)) (quad-font-size q))]

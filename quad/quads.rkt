@@ -2,7 +2,7 @@
 (provide (all-defined-out))
 (require (for-syntax racket/string racket/base racket/syntax))
 
-(struct $quad (attrs posn val) #:transparent #:mutable)
+(struct $quad (attrs dim val) #:transparent #:mutable)
 (struct $black $quad () #:transparent)
 (struct $white $quad () #:transparent)
 (struct $skip $quad () #:transparent)
@@ -37,16 +37,16 @@ measure (line width)
   (hasheq 'size size 'font font))
 
 
-(define (quad-posn q)
-  ($quad-posn q))
+(define (quad-dim q)
+  ($quad-dim q))
 
 (define (quad-font q)
   (hash-ref (quad-attrs q) 'font))
 (define (quad-font-size q)
   (hash-ref (quad-attrs q) 'size))
 
-(define (quad-posn-set! q val)
-  (set-$quad-posn! q val))
+(define (quad-dim-set! q val)
+  (set-$quad-dim! q val))
 
 (define (override-with dest source)
   ;; replace missing values in dest with values from source

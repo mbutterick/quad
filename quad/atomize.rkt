@@ -7,13 +7,13 @@
    (flatten
    (let loop ([x x][loop-attrs default-attrs])
      (cond
-       [(symbol? x) ($shim (make-attrs) 0 x)]
+       [(symbol? x) ($shim (make-attrs) #f x)]
        [(string? x)
         (for/list ([c (in-string x)])
-                  (cons ($shim (make-attrs) 0 0)
+                  (cons ($shim (make-attrs) #f 0)
                         (case c
-                          [(#\space #\newline #\return) ($white loop-attrs 0 c)]
-                          [else ($black loop-attrs 0 c)])))]
+                          [(#\space #\newline #\return) ($white loop-attrs #f c)]
+                          [else ($black loop-attrs #f c)])))]
        [else
         (map (λ(xi) (loop xi ((quad-attrs x) . override-with . loop-attrs))) (quad-val x))])))))
 
