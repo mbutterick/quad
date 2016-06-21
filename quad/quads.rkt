@@ -4,8 +4,13 @@
 
 (struct $quad (attrs dim val) #:transparent #:mutable)
 (struct $black $quad () #:transparent)
-(struct $soft $quad () #:transparent)
-(struct $hard $quad () #:transparent)
+(struct $space $quad () #:transparent)
+(struct $hyphen $black () #:transparent) ; hyphen should be treated as black in measure & render ops
+(struct $shy $quad () #:transparent)
+(struct $shim $quad () #:transparent)
+(struct $eof $quad () #:transparent)
+
+(define (quad-printable? x) (or ($black? x) ($space? x) ($hyphen? x)))
 
 (define quad? $quad?)
 
@@ -30,8 +35,8 @@ measure (line width)
 
 (define (munge-whitespace str)
   ;; reduce multiple whitespace to single
-  ;; trim remaining
-  (string-trim (regexp-replace* #px"\\s+" str " ")))
+  ;; trim remaining (? maybe not)
+  (regexp-replace* #px"\\s+" str " "))
 
 (define (merge-strings xs)
   ;; merge consecutive strings
@@ -46,30 +51,6 @@ measure (line width)
        (append (if (empty? strs)
                    empty
                    (list (munge-whitespace (string-append* strs)))) nonstrs (loop restrest))])))
-
-#;(define (merge-strings1 xs)
-    ;; merge consecutive strings
-    (define-values (last-list list-of-lists last-negating)
-      (for/fold ([current-list empty]
-                 [list-of-lists empty]
-                 [negating? #f])
-                ([x (in-list xs)])
-        (define current-pred (if negating? (λ (x) (not (string? x))) string?))
-        (if (current-pred x)
-            (values (cons x current-list) list-of-lists negating?)
-            (values (cons x null) (if (not (empty? current-list))
-                                      (cons (reverse current-list) list-of-lists)
-                                      list-of-lists) (not negating?)))))
-    (append-map (λ(xs) (if (string? (car xs))
-                           (list (munge-whitespace (string-append* xs)))
-                           xs))
-                (reverse (cons (reverse last-list) list-of-lists))))
-
-#;(require sugar/list)
-#;(define (merge-strings xs)
-    (append-map (λ(xis) (if (string? (car xis))
-                            (list (munge-whitespace (string-append* xis)))
-                            xis)) (slicef xs string?)))
 
 
 (struct $attrs (size font) #:transparent)
@@ -102,25 +83,36 @@ measure (line width)
 
 (require (for-syntax sugar/debug))
 (define-syntax-rule (define-break name)
-  (define (name) (quad #f 'name)))
+  (define (name) ($shim (make-attrs) 'name #f)))
 
 (define-break page-break)
 (define-break column-break)
 (define-break block-break)
 (define-break line-break)
 
-
-(define-syntax (caseq stx)
-  ;; like case but strictly uses `eq?` comparison (as opposed to `equal?`)
+(define-syntax (define-case-macro stx)
   (syntax-case stx ()
-    [(_ test-val [(match-val ...) . result] ... [else . else-result])
-     #'(cond
-         [(memq test-val '(match-val ...)) . result] ...
-         [else . else-result])]
-    [(_ test-val [(match-val ...) . result] ...)
-     #'(caseq test-val
-              [(match-val ...) . result] ...
-              [else (error 'caseq "no match")])]))
+    [(_ ID PRED)
+     #'(define-syntax (ID stx)
+         (syntax-case stx ()
+           [(_ test-val
+               [(match-val0 . match-vals) . result] (... ...)
+               [else . else-result])
+            #'(cond
+                [(PRED test-val '(match-val0 . match-vals)) . result] (... ...)
+                [else . else-result])]
+           [(_ test-val
+               match-clause (... ...))
+            #'(ID test-val
+                  match-clause (... ...)
+                  [else (error 'ID "no match")])]))]))
+
+;; like case but strictly uses `eq?` comparison (as opposed to `equal?`)
+(define-case-macro caseq memq)
+
+;; `eqv?` is OK for chars (same as `char=?`)
+(define-case-macro casev memv)
+
 
 (module+ test
   (require rackunit)
@@ -129,4 +121,4 @@ measure (line width)
   (check-false (quad? 42))
   (check-equal? (quad-attrs q) (make-attrs))
   (check-equal? (quad-val q) '("bar"))
-  (check-equal? (merge-strings '(50 " foo   " "   bar  " 42 "  zam")) '(50 "foo bar" 42 "zam")))
+  #;(check-equal? (merge-strings '(50 " foo   " "   bar  " 42 "  zam")) '(50 "foo bar" 42 "zam")))

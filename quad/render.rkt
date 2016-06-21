@@ -19,12 +19,12 @@
   (for ([q (in-vector qs)])
        (define qd (quad-dim q))
        (cond
-         [(symbol? qd)
-          (case qd
+         [(symbol? qd) ; symbol indicates a break
+          (caseq qd
             [(line-break) (line-counter-increment!)]
             [(column-break)  (line-counter-reset!) (printf "\n--col--")]
             [(page-break) (printf "\n\n==page==\n")])
           (print-line-counter)]
-         [(or ($black? q) ($soft? q)) (printf "~a" (quad-val q))]
+         [(quad-printable? q) (printf "~a" (quad-val q))]
          [else (void)]))
   (printf "\n\n"))

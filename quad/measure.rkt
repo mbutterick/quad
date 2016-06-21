@@ -5,7 +5,7 @@
 (define (measure! q)
   (quad-dim-set! q
                  (cond
-                   [(or ($black? q) ($soft? q))
+                   [(quad-printable? q)
                     (* (measure-char (quad-font q) (quad-val q)) (quad-font-size q))]
                    [else 0])))
 

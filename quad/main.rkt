@@ -8,10 +8,13 @@
    (define main-quad (apply quad #f (add-between (list . args) "\n"))) ; at-reader splits lines, but we want one contiguous run
    ;; branch on config-arg to allow debug / inspection options on #lang line
    (define config-pieces (string-split (string-trim lang-line-config-arg)))
-   (case (car config-pieces)
-     [("#:atoms") (atomize main-quad)]
-     [("#:fit") (time (debug-render (apply typeset-fit (atomize main-quad) (map string->number (cdr config-pieces)))))]
-     [else (typeset-fit (atomize main-quad))])))
+   (and (pair? config-pieces)
+        (let ([config-args (map string->number (cdr config-pieces))])
+          (case (car config-pieces)
+            [("in") (atomize main-quad)]
+            [("out") (time (apply fit (atomize main-quad) config-args))]
+            [("test") (time (debug-render (apply fit (atomize main-quad) config-args)))]
+            [else (fit (atomize main-quad))])))))
 
 (module reader syntax/module-reader
   quad/main)

@@ -1,7 +1,7 @@
 #lang racket/base
-(require (for-syntax racket/base) racket/list sugar/debug "quads.rkt")
+(require (for-syntax racket/base) racket/list sugar/debug "quads.rkt" "error.rkt")
 (provide (except-out (all-from-out racket/base) #%module-begin)
-         (all-from-out racket/list sugar/debug "quads.rkt")
+         (all-from-out racket/list sugar/debug "quads.rkt" "error.rkt")
          (rename-out [~module-begin #%module-begin])
          (for-syntax (all-from-out racket/base)))
 
