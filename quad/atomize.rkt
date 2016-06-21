@@ -1,5 +1,5 @@
 #lang quad/dev
-(require racket/vector)
+(require racket/string)
 (provide (all-defined-out))
 
 (define (atomize x)
@@ -12,7 +12,7 @@
         [(symbol? x) ($hard empty-attrs x #f)]
         [(string? x)
          ;; consolidate consecutive whitespaces into single word space
-         (for/list ([c (in-string (regexp-replace* #px"\\s+" x " "))]) 
+         (for/list ([c (in-string x)]) 
                    (cons ($hard empty-attrs #f #f)
                          ;; todo: is it feasible to box or otherwise object-ize a char
                          ;; so that all the quads with that char share that object

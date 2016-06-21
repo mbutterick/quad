@@ -1,6 +1,6 @@
 #lang racket/base
 (provide (all-defined-out))
-(require (for-syntax racket/string racket/base racket/syntax))
+(require racket/string racket/list (for-syntax  racket/base racket/syntax))
 
 (struct $quad (attrs dim val) #:transparent #:mutable)
 (struct $black $quad () #:transparent)
@@ -27,13 +27,59 @@ measure (line width)
 
 |#
 (define default-attrs (hasheq 'size 10 'font "sc.otf")) ; Source Code Pro, 12 pt, chars are 6pt wide
-(define (quad attr . xs)
-  ($quad (or attr (make-attrs)) 0 xs))
+
+(define (munge-whitespace str)
+  ;; reduce multiple whitespace to single
+  ;; trim remaining
+  (string-trim (regexp-replace* #px"\\s+" str " ")))
+
+(define (merge-strings xs)
+  ;; merge consecutive strings
+  (let loop ([xs xs])
+    (cond
+      [(empty? xs) empty]
+      [else
+       (define-values (strs rest) (splitf-at xs string?))
+       (define-values (nonstrs restrest) (splitf-at rest (λ(x) (not (string? x)))))
+       (append (if (empty? strs)
+                   empty
+                   (list (munge-whitespace (string-append* strs)))) nonstrs (loop restrest))])))
+
+#;(define (merge-strings1 xs)
+    ;; merge consecutive strings
+    (define-values (last-list list-of-lists last-negating)
+      (for/fold ([current-list empty]
+                 [list-of-lists empty]
+                 [negating? #f])
+                ([x (in-list xs)])
+        (define current-pred (if negating? (λ (x) (not (string? x))) string?))
+        (if (current-pred x)
+            (values (cons x current-list) list-of-lists negating?)
+            (values (cons x null) (if (not (empty? current-list))
+                                      (cons (reverse current-list) list-of-lists)
+                                      list-of-lists) (not negating?)))))
+    (append-map (λ(xs) (if (string? (car xs))
+                           (list (munge-whitespace (string-append* xs)))
+                           xs))
+                (reverse (cons (reverse last-list) list-of-lists))))
+
+#;(require sugar/list)
+#;(define (merge-strings xs)
+    (append-map (λ(xis) (if (string? (car xis))
+                            (list (munge-whitespace (string-append* xis)))
+                            xis)) (slicef xs string?)))
+
 
 (struct $attrs (size font) #:transparent)
 (define (make-attrs #:size [size #f]
                     #:font [font #f])
   (hasheq 'size size 'font font))
+
+
+(define (quad attr . xs)
+  ;; squeeze excess whitespace out of quad args
+  ;; todo: find way to do this with less allocation
+  ($quad (or attr (make-attrs)) 0 (merge-strings xs)))
 
 
 (define (quad-dim q)
@@ -61,6 +107,7 @@ measure (line width)
 (define-break block-break)
 (define-break line-break)
 
+
 (define-syntax (caseq stx)
   ;; like case but strictly uses `eq?` comparison (as opposed to `equal?`)
   (syntax-case stx ()
@@ -79,4 +126,5 @@ measure (line width)
   (check-true (quad? q))
   (check-false (quad? 42))
   (check-equal? (quad-attrs q) (make-attrs))
-  (check-equal? (quad-val q) '("bar")))
+  (check-equal? (quad-val q) '("bar"))
+  (check-equal? (merge-strings '(50 " foo   " "   bar  " 42 "  zam")) '(50 "foo bar" 42 "zam")))
