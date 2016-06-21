@@ -4,10 +4,10 @@
 
 (define (measure! q)
   (quad-dim-set! q
-                  (cond
-                    [(or ($black? q) ($soft? q))
-                     (* (measure-char (quad-font q) (quad-val q)) (quad-font-size q))]
-                    [else 0])))
+                 (cond
+                   [(or ($black? q) ($soft? q))
+                    (* (measure-char (quad-font q) (quad-val q)) (quad-font-size q))]
+                   [else 0])))
 
 (module+ test
   (require rackunit)
@@ -23,7 +23,10 @@
         [ft-face-cache (make-hash)])
     (λ (font-pathstring char)
       (define (do-measure)
-        (define ft-face (hash-ref! ft-face-cache font-pathstring (λ () (FT_New_Face ft-library font-pathstring 0))))
+        (define ft-face (hash-ref! ft-face-cache font-pathstring
+                                   (λ () (unless (file-exists? font-pathstring)
+                                           (error 'measure-char (format "font path ~v does not exist" font-pathstring)))
+                                     (FT_New_Face ft-library font-pathstring 0))))
         (define width
           (let ([glyph-idx (hash-ref! glyph-idx-cache (cons char font-pathstring)
                                       (λ () (FT_Get_Char_Index ft-face (char->integer char))))])

@@ -12,6 +12,7 @@
         [(symbol? x) ($hard empty-attrs x #f)]
         [(string? x)
          ;; consolidate consecutive whitespaces into single word space
+         ;; todo: hyphenate here? then they are in the quad stream
          (for/list ([c (in-string x)]) 
                    (cons ($hard empty-attrs #f #f)
                          ;; todo: is it feasible to box or otherwise object-ize a char

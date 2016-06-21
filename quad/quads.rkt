@@ -35,6 +35,8 @@ measure (line width)
 
 (define (merge-strings xs)
   ;; merge consecutive strings
+  ;; todo: only trim remove space between string and a hard break.
+  ;; space between a string and a subquad is ok
   (let loop ([xs xs])
     (cond
       [(empty? xs) empty]
