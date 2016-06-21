@@ -13,4 +13,4 @@
      [else (typeset-fit (atomize main-quad))])))
 
 (module reader syntax/module-reader
-  "main.rkt")
+  quad/main)

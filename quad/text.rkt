@@ -6,7 +6,7 @@ but substitutes a Scribble-style text-based reader
 |#
 
 (module reader syntax/module-reader
-  "main.rkt"
+  quad/main
   #:read quad-read
   #:read-syntax quad-read-syntax
   #:whole-body-readers? #t ;; need this to make at-reader work
