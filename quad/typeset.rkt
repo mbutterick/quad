@@ -33,7 +33,7 @@
            [(page-break) page-start-position]
            [else current-posn]))
   
-  (for/fold ([current-posn (handle-break 'page-break)]) ; moves to page start position
+  (for/fold ([current-posn page-start-position]) 
             ([q (in-vector qs)])
     (unless (quad-dim q) (measure! q))
     (cond

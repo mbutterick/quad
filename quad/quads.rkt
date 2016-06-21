@@ -58,6 +58,9 @@ measure (line width)
                     #:font [font #f])
   (hasheq 'size size 'font font))
 
+(define (make-empty-attrs) (make-attrs))
+
+
 
 (define (quad attr . xs)
   ;; squeeze excess whitespace out of quad args
