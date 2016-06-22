@@ -2,6 +2,9 @@
 (provide (all-defined-out))
 (require "measure.rkt")
 
+;; track this k outside of for/fold loop to keep it independent.
+;; otherwise, every time k is invoked, the loop k will also change.
+;; (mutated data is not reset by a continuation, but loop vars are)
 (define last-breakpoint-k raise-overflow-error)
 
 (define (set-breakpoint-k-here!)
@@ -52,6 +55,7 @@
       [(>= (posn-page current-posn) page-width) (last-breakpoint-k 'page-break)]
       
       ;; set a new bp-k, or resume after invoking a bp-k
+      ;; bp-k has to be in conditional so it triggers side effect but also forces next branch
       [(and ($space? q) (set-breakpoint-k-here!))
        => ; grabs the value of the condition: the arg passed to breakpoint-k
        (λ (breakpoint-k-result)
