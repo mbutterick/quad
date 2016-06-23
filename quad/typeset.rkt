@@ -45,14 +45,15 @@
       
       ;; test for overset (before a new bp-k gets set).
       ;; send break type back through continuation
-      ;; test tp-horiz with > because no characters exist in the line at the start
-      [(> (posn-line current-posn) line-width) (last-breakpoint-k 'line-break)]
-      
-      ;; test tp-vert with >= because one column impliedly exists at the start
-      [(>= (posn-col current-posn) col-height) (last-breakpoint-k 'column-break)]
-      
-      ;; test page-horiz with >= because one column impliedly exists at the start
-      [(>= (posn-page current-posn) page-width) (last-breakpoint-k 'page-break)]
+      ;; we do a combined test to find out the "biggest" break that is needed
+      ;; order connotes precedence
+      [(or
+        ;; test page-horiz with >= because one column impliedly exists at the start
+        (and (>= (posn-page current-posn) page-width) 'page-break)
+        ;; test tp-vert with >= because one column impliedly exists at the start
+        (and (>= (posn-col current-posn) col-height) 'column-break)
+        ;; test tp-horiz with > because no characters exist in the line at the start
+        (and (> (posn-line current-posn) line-width) 'line-break)) => last-breakpoint-k]
       
       ;; set a new bp-k, or resume after invoking a bp-k
       ;; bp-k has to be in conditional so it triggers side effect but also forces next branch
