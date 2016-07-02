@@ -1,5 +1,5 @@
 #lang quad/dev
-(require racket/class racket/contract sugar/debug sugar/cache racket/list racket/file racket/draw data/gvector)
+(require racket/class racket/contract racket/string sugar/debug sugar/cache racket/list racket/file racket/draw data/gvector)
 (provide (all-defined-out))
 
 (define (world:paper-width-default) 612)
@@ -28,25 +28,34 @@
               (send dc end-page))
   
   (define (print-status)
-    (send dc draw-text (format "foobar ~a" (current-milliseconds)) 0 0))
+    (send dc draw-text (format "quad pdf test @ ~a" (current-milliseconds)) 0 0))
   
-  (define f (make-font #:face "Source Code Pro" #:size 10))
-  (send dc set-font f)
+  (send dc set-font (make-font #:face "Source Code Pro" #:size 10))
   
   (send dc start-page)
-  (print-status) 
+  (print-status)
+  
+  (define default-x 40)
+  (define default-y 40)
   
   (when qs
     (for/fold ([page-pos 0]
-               [x-pos 40]
-               [y-pos 40])
+               [x-pos default-x]
+               [y-pos default-y])
               ([q (in-vector qs)])
+      (let ([font-attr (hash-ref (quad-attrs q) 'font #f)])
+        (when font-attr
+          (send dc set-font (make-font #:face (string-trim font-attr ".ttf") #:size 10))))
       (cond
         [(eq? (quad-dim q) 'page-break)
          (send dc end-page)
          (send dc start-page)
          (print-status)
-         (values page-pos 40 40)]
+         (values page-pos default-x default-y)]
+        [(eq? (quad-dim q) 'line-break)
+         (values page-pos default-x (+ y-pos 12))]
+        [(eq? (quad-dim q) 'column-break)
+         (values page-pos x-pos y-pos)] ; ignore for now
         [(quad-printable? q)
          (send dc draw-text (format "~a" (quad-val q)) x-pos y-pos)
          (values page-pos (+ x-pos (quad-dim q)) y-pos)]
