@@ -9,7 +9,7 @@
     (provide id)))
 
 (define-runtime-lib freetype-lib
-  [(unix) #f] ; todo: get unix runtime path
+  [(unix) (ffi-lib "libfontconfig" '("1" ""))]
   [(macosx) (ffi-lib "libfreetype.6.dylib")]
   [(windows) (ffi-lib "libfreetype-6.dll")])
 
