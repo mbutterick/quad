@@ -26,14 +26,16 @@
   (check-true (qexpr? '(quad "Hello world")))
   (check-false (qexpr? 'q)))
 
-(define/contract (qexpr attrs . elems)
-  ((txexpr-attrs?) #:rest txexpr-elements? . ->* . qexpr?)
-  (txexpr 'q (remove-duplicates attrs #:key car) elems))
+(define/contract (qexpr #:clean-attrs? [clean-attrs? #f]
+                        attrs . elems)
+  ((txexpr-attrs?) (#:clean-attrs? any/c) #:rest txexpr-elements? . ->* . qexpr?)
+  (txexpr 'q (if clean-attrs? (remove-duplicates attrs #:key car) attrs) elems))
 
 (module+ test
   (check-equal? (qexpr null "foo") '(q "foo"))
   (check-equal? (qexpr '((k "v")) "foo") '(q ((k "v")) "foo"))
-  (check-equal? (qexpr '((k "v2")(k "v1")) "foo") '(q ((k "v2")) "foo")))
+  (check-equal? (qexpr '((k "v2")(k "v1")) "foo") '(q ((k "v2")(k "v1")) "foo"))
+  (check-equal? (qexpr #:clean-attrs? #t '((k "v2")(k "v1")) "foo") '(q ((k "v2")) "foo")))
 
 (define/contract (qml->qexpr x)
   (string? . -> . qexpr?)
