@@ -1,5 +1,5 @@
-#lang br
-(require xml racket/contract txexpr)
+#lang racket/base
+(require xml racket/contract racket/match racket/list txexpr)
 (provide (all-defined-out))
 
 (module+ test (require rackunit))

@@ -1,6 +1,6 @@
 #lang racket/base
 (require racket/contract racket/match racket/list txexpr sugar/debug
-         "qexpr.rkt")
+         "qexpr.rkt" "param.rkt")
 (provide (all-defined-out))
 
 (define/contract (atomize qx)
@@ -8,7 +8,7 @@
   ;; propagate attrs downward by appending to front of attrs list.
   ;; ok to have duplicate attrs (leftmost attr takes precedence)
   (qexpr? . -> . (listof qexpr?))
-  (let loop ([x qx][attrs null])
+  (let loop ([x qx][attrs (current-default-attrs)])
     (match x
       [(? string?) (for/list ([c (in-string x)]) ;; strings are exploded
                      (qexpr attrs (string c)))]
