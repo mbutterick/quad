@@ -15,7 +15,7 @@
 (define/contract (atomize qx)
   ;; normalize a quad by reducing it to one-character quads.
   ;; propagate attrs downward.
-  (quad? . -> . atomic-quads?)
+  (quad? . -> . (listof atomic-quad?))
   (let loop ([x qx][attrs (current-default-attrs)])
     (match x
       [(? char? c) (list (q attrs c))]
