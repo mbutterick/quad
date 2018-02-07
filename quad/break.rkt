@@ -5,93 +5,79 @@
 
 (define/contract (break xs-in [target-size (current-line-width)])
   (((listof (or/c promise? procedure?))) (integer?) . ->* . (listof any/c))
-  (define last-breakpoint-k (λ (x) (error 'no-breakpoint-found)))
+  (define last-breakpoint-k #f)
   (define (capture-k!) (let/cc k (set! last-breakpoint-k k) #f))
-  (define start-key 'start)
-  (define end-key 'end)
   (for/fold ([xs null]
+             [break-open? #f]
              [size-so-far 0]
              #:result (reverse xs))
             ([(x idx) (in-indexed xs-in)])
-    (define-values (size-start size-mid size-end) (if (promise? x) (force x) (x)))
+    (define-values (size-start size-mid size-end breakability) (if (promise? x) (force x) (x)))
     (cond
-      [(zero? size-so-far) ;; looking for break-start
-       (values (cons (and (positive? size-start) start-key) xs) size-start)] ;; size-start is either zero or positive
-      ;; looking for break-end
-      [(or (= idx (sub1 (length xs-in))) ; x is last element, thus must be break-end
-           (and (positive? size-end) (capture-k!))) ; store possible break-end candidate
-       (values (cons end-key xs) 0)]
-      [(< (+ size-so-far size-end) target-size) ;; check condition based on size-end (as if x were breakpoint) ...
-       (values (cons #f xs) (+ size-so-far size-mid))] ;; but recur based on size-mid
+      [(not break-open?) (values (cons #t xs) #t (+ size-so-far size-start))]
+      [(<= (+ size-so-far size-end) target-size) ;; check condition based on size-end (as if x were breakpoint) ...
+       (cond
+         [(or (eq? breakability 'must) (and (eq? breakability 'can) (capture-k!))) ;; return point for `last-breakpoint-k`
+          (set! last-breakpoint-k #f)
+          (values (cons #f xs) #f 0)] ;; closes the break at this quad
+         [else
+          (values (cons #f xs) #t (if (zero? size-so-far) ;; we're still at start
+                                      size-start
+                                      (+ size-so-far size-mid)))])] ;; otherwise recur based on size-mid
       ;; todo bug: but this doesn't work right with a trailing sequence of word spaces
-      [else (last-breakpoint-k #t)])))
+      
+      ;; overflow handlers
+      [last-breakpoint-k (last-breakpoint-k #t)]
+      [else (values (cons #t xs) #t size-start)]))) ;; fallback if no last-breakpoint-k exists
 
-;; todo bug: break lists have to be >= 2 elements
 ;; todo bug: constrain breaking to certain junctures
-(define char (delay (values 1 1 1)))
-(define space (delay (values 0 1 0)))
-(break (list char char char space char char space char char space char char char char char) 2)
+(define ch (delay (values 1 1 1 #f)))
+(define sp (delay (values 0 1 0 'can)))
+(define br (delay (values 0 0 0 'must)))
 
-#;(module+ test
-    (check-equal? (break (atomize "aaa bb cc ddddd") 5
-                         #:size-proc (λ (q) 1)
-                         #:break-start-key 'line-start
-                         #:break-end-key 'line-end
-                         #:breakable-proc (λ (q) (equal? (second q) " ")))
-                  '((q ((line-start "true")) "a")
-                    (q "a")
-                    (q ((line-end "true")) "a")
-                    (q " ")
-                    (q ((line-start "true")) "b")
-                    (q "b")
-                    (q " ")
-                    (q "c")
-                    (q ((line-end "true")) "c")
-                    (q " ")
-                    (q ((line-start "true")) "d")
-                    (q "d")
-                    (q "d")
-                    (q "d")
-                    (q ((line-end "true")) "d")))
-    (check-equal?
-     (break (atomize "aaa bb cc ddddd") 6
-            #:size-proc (λ (q) 1)
-            #:break-start-key 'line-start
-            #:break-end-key 'line-end
-            #:breakable-proc (λ (q) (equal? (second q) " ")))
-     '((q ((line-start "true")) "a")
-       (q "a")
-       (q "a")
-       (q " ")
-       (q "b")
-       (q ((line-end "true")) "b")
-       (q " ")
-       (q ((line-start "true")) "c")
-       (q ((line-end "true")) "c")
-       (q " ")
-       (q ((line-start "true")) "d")
-       (q "d")
-       (q "d")
-       (q "d")
-       (q ((line-end "true")) "d")))
+(module+ test
+  (check-equal? (break (list) 1) null)
+  (check-equal? (break (list ch) 1) '(#t))
+  (check-equal? (break (list ch ch) 1) '(#t #t))
+  (check-equal? (break (list ch ch ch) 1) '(#t #t #t))
+  (check-equal? (break (list ch ch ch) 2) '(#t #f #t))
+  (check-equal? (break (list ch ch ch ch) 2) '(#t #f #t #f))
+  (check-equal? (break (list ch ch ch ch ch) 3) '(#t #f #f #t #f))
+  (check-equal? (break (list ch ch ch ch ch) 1) '(#t #t #t #t #t))
+  (check-equal? (break (list ch ch ch ch ch) 10) '(#t #f #f #f #f))
 
-    (check-equal? (break (atomize "aaa bb cc ddddd") 8
-                         #:size-proc (λ (q) 1)
-                         #:break-start-key 'line-start
-                         #:break-end-key 'line-end
-                         #:breakable-proc (λ (q) (equal? (second q) " ")))
-                  '((q ((line-start "true")) "a")
-                    (q "a")
-                    (q "a")
-                    (q " ")
-                    (q "b")
-                    (q ((line-end "true")) "b")
-                    (q " ")
-                    (q ((line-start "true")) "c")
-                    (q "c")
-                    (q " ")
-                    (q "d")
-                    (q "d")
-                    (q "d")
-                    (q "d")
-                    (q ((line-end "true")) "d"))))
+  (check-equal? (break (list sp) 1) '(#t))
+  (check-equal? (break (list sp sp) 1) '(#t #f))
+  (check-equal? (break (list sp sp) 2) '(#t #f))
+  (check-equal? (break (list sp sp) 3) '(#t #f))
+  (check-equal? (break (list sp sp sp) 1) '(#t #f #f))
+  (check-equal? (break (list sp sp sp) 2) '(#t #f #f))
+  (check-equal? (break (list sp sp sp) 3) '(#t #f #f))
+
+  (check-equal? (break (list ch sp) 1) '(#t #f))
+  (check-equal? (break (list sp ch) 1) '(#t #f))
+  (check-equal? (break (list sp ch ch) 1) '(#t #f #t))
+  (check-equal? (break (list ch sp ch) 1) '(#t #f #t))
+  (check-equal? (break (list ch sp sp ch) 1) '(#t #f #t #f))
+  (check-equal? (break (list ch sp ch sp) 1) '(#t #f #t #f))
+  (check-equal? (break (list ch ch sp ch) 2) '(#t #f #f #t))
+  (check-equal? (break (list ch sp ch) 3) '(#t #f #f))
+  (check-equal? (break (list ch sp ch ch) 3) '(#t #f #t #f))
+
+  ;; trailing spaces
+  (check-equal? (break (list ch sp) 3) '(#t #f))
+  (check-equal? (break (list ch sp sp) 3) '(#t #f #f))
+  (check-equal? (break (list ch sp sp) 2) '(#t #f #f))
+  (check-equal? (break (list ch sp sp) 1) '(#t #f #f))
+  
+  (check-equal? (break (list ch br ch) 2) '(#t #f #t))
+  (check-equal? (break (list ch br ch ch) 3) '(#t #f #t #f))
+  (check-equal? (break (list ch ch br ch) 3) '(#t #f #f #t))
+  (check-equal? (break (list ch ch ch ch) 3) '(#t #f #f #t))
+
+  (check-equal? (break (list ch ch ch sp sp ch ch) 2) '(#t #f #t #f #f #t #f))
+  (check-equal? (break (list ch ch ch sp ch ch) 3) '(#t #f #f #f #t #f))
+
+  )
+
+
