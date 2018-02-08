@@ -18,14 +18,16 @@
   ;; also drop leading & trailing whitespaces
   ;; (same behavior as web browsers)
   (define (white-aq? aq) (char-whitespace? (car (qe aq))))
-   (let loop ([acc null][aqs aqs])
-     (if (null? aqs)
-         (trimf (flatten acc) white-aq?)
-         (let*-values ([(ws rest) (splitf-at aqs white-aq?)]
-                       [(bs rest) (splitf-at rest (negate white-aq?))])
-           (loop (list acc (match ws
-                             [(list ($quad attrs elems) rest ...) (break attrs #\space)]
-                             [else null]) bs) rest)))))
+  (let loop ([acc null][aqs aqs])
+    (if (null? aqs)
+        (flatten acc)
+        (let*-values ([(bs rest) (splitf-at aqs (negate white-aq?))]
+                      [(ws rest) (splitf-at rest white-aq?)])
+          (loop (list acc bs (if (and (pair? rest) ;; we precede bs (only #t if rest starts with bs, because we took the ws)
+                                      (pair? bs) ;; we follow bs
+                                      (pair? ws)) ;; we have ws
+                                 (break (qa (car ws)) #\space)
+                                 null)) rest)))))
 
 (module+ test
   (check-equal? (merge-whitespace (list (q #\space) (q #\newline) (q #\H) (q #\space) (q #\newline) (q #\space) (q #\i) (q #\newline)))

@@ -1,10 +1,10 @@
-#lang sugar/debug racket/base
+#lang debug racket/base
 (require racket/contract racket/list txexpr sugar/debug racket/promise
-         "param.rkt" "qexpr.rkt" "atomize.rkt")
+         "param.rkt" "qexpr.rkt" "atomize.rkt" "quad.rkt")
 (module+ test (require rackunit))
 
-(define/contract (break xs-in [target-size (current-line-width)])
-  (((listof (or/c promise? procedure?))) (integer?) . ->* . (listof any/c))
+(define/contract (breaks xs-in [target-size (current-line-width)])
+  (((listof atomic-quad?)) (integer?) . ->* . (listof any/c))
   (define last-breakpoint-k #f)
   (define (capture-k!) (let/cc k (set! last-breakpoint-k k) #f))
   (for/fold ([xs null]
@@ -12,7 +12,8 @@
              [size-so-far 0]
              #:result (reverse xs))
             ([(x idx) (in-indexed xs-in)])
-    (define-values (size-start size-mid size-end breakability) (if (promise? x) (force x) (x)))
+    (define-values (size-start size-mid size-end breakability) (let ([x (hash-ref (qa x) 'size)])
+                                                                 (if (promise? x) (force x) (x))))
     (cond
       [(not break-open?) (values (cons #f xs) #t (+ size-so-far size-start))]
       [(<= (+ size-so-far size-end) target-size) ;; check condition based on size-end (as if x were breakpoint) ...
@@ -31,35 +32,35 @@
       [else (values (cons #t xs) #t size-start)]))) ;; fallback if no last-breakpoint-k exists
 
 ;; todo bug: constrain breaking to certain junctures
-(define ch (delay (values 1 1 1 #f)))
-(define sp (delay (values 0 1 0 'can)))
-(define br (delay (values 0 0 0 'must)))
+(define ch (q (hasheq 'size (delay (values 1 1 1 #f))) #\c))
+(define sp (break (hasheq 'size (delay (values 0 1 0 'can))) #\space))
+(define br (break (hasheq 'size (delay (values 0 0 0 'must))) #\newline))
 
 (module+ test
-  (check-equal? (break (list) 1) null)
-  (check-equal? (break (list ch) 1) '(#f))
-  (check-equal? (break (list ch ch) 1) '(#f #t))
-  (check-equal? (break (list ch ch ch) 1) '(#f #t #t))
-  (check-equal? (break (list ch ch ch) 2) '(#f #f #t))
-  (check-equal? (break (list ch ch ch ch) 2) '(#f #f #t #f))
-  (check-equal? (break (list ch ch ch ch ch) 3) '(#f #f #f #t #f))
-  (check-equal? (break (list ch ch ch ch ch) 1) '(#f #t #t #t #t))
-  (check-equal? (break (list ch ch ch ch ch) 10) '(#f #f #f #f #f))
+  (check-equal? (breaks (list) 1) null)
+  (check-equal? (breaks (list ch) 1) '(#f))
+  (check-equal? (breaks (list ch ch) 1) '(#f #t))
+  (check-equal? (breaks (list ch ch ch) 1) '(#f #t #t))
+  (check-equal? (breaks (list ch ch ch) 2) '(#f #f #t))
+  (check-equal? (breaks (list ch ch ch ch) 2) '(#f #f #t #f))
+  (check-equal? (breaks (list ch ch ch ch ch) 3) '(#f #f #f #t #f))
+  (check-equal? (breaks (list ch ch ch ch ch) 1) '(#f #t #t #t #t))
+  (check-equal? (breaks (list ch ch ch ch ch) 10) '(#f #f #f #f #f))
 
   
-  (check-equal? (break (list sp) 1) '(#f))
-  (check-equal? (break (list sp sp) 1) '(#f #f))
-  (check-equal? (break (list sp sp) 2) '(#f #f))
-  (check-equal? (break (list sp sp) 3) '(#f #f))
-  (check-equal? (break (list sp sp sp) 1) '(#f #f #f))
-  (check-equal? (break (list sp sp sp) 2) '(#f #f #f))
-  (check-equal? (break (list sp sp sp) 3) '(#f #f #f))
+  (check-equal? (breaks (list sp) 1) '(#f))
+  (check-equal? (breaks (list sp sp) 1) '(#f #f))
+  (check-equal? (breaks (list sp sp) 2) '(#f #f))
+  (check-equal? (breaks (list sp sp) 3) '(#f #f))
+  (check-equal? (breaks (list sp sp sp) 1) '(#f #f #f))
+  (check-equal? (breaks (list sp sp sp) 2) '(#f #f #f))
+  (check-equal? (breaks (list sp sp sp) 3) '(#f #f #f))
 
   ;; now it gets weird
-  (check-equal? (break (list ch sp) 1) '(#f #f))
-  (check-equal? (break (list sp ch) 1) '(#f #f))
-  (check-equal? (break (list sp ch ch) 1) '(#f #f #t))
-  (check-equal? (break (list ch sp ch) 1) '(#f #f #t))
+  (check-equal? (breaks (list ch sp) 1) '(#f #f))
+  (check-equal? (breaks (list sp ch) 1) '(#f #f))
+  (check-equal? (breaks (list sp ch ch) 1) '(#f #f #t))
+  (check-equal? (breaks (list ch sp ch) 1) '(#f #f #t))
   #|
   (check-equal? (break (list ch sp sp ch) 1) '(#f #f #t #f))
   (check-equal? (break (list ch sp ch sp) 1) '(#f #f #t #f))

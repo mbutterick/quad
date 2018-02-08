@@ -18,7 +18,7 @@
 (define (atomic-quad? x) (and (quad? x) (match (qe x)
                                           [(list (? char?)) #t]
                                           [else #f])))
-(define (atomic-quads? xs) (and (pair? xs) (andmap atomic-quad? xs)))
+(define (atomic-quads? xs) (andmap atomic-quad? xs))
 (module+ test
   (check-true (atomic-quad? ($quad '#hasheq() '(#\H))))
   (check-true (atomic-quads? (list ($quad '#hasheq() '(#\H))))))
