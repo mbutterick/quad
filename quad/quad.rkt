@@ -14,7 +14,7 @@
     [(list (? quad-attrs? attrs) (? quad-elem? elems) ...) (type attrs elems)]
     [(list (? quad-elem? elems) ...) (apply quad #:type type #f elems)]
     [else (error 'bad-quad-input)]))
-(define (quads? xs) (and (pair? xs) (andmap quad? xs)))
+(define (quads? xs) (andmap quad? xs))
 (define (atomic-quad? x) (and (quad? x) (match (qe x)
                                           [(list (? char?)) #t]
                                           [else #f])))
