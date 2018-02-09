@@ -1,20 +1,12 @@
 #lang debug racket/base
 (require racket/contract racket/list txexpr sugar/debug sugar/list racket/promise
          "param.rkt" "qexpr.rkt" "atomize.rkt" "quad.rkt")
-(module+ test (require rackunit))
-
-(define (alternating-atomic-quads? xs)
-  (or (null? xs)
-      (and (atomic-quads? xs)
-           (not ($break? (first xs)))
-           (not ($break? (last xs)))
-           (let ([sublists (filter-split xs (compose1 not $break?))])
-             (or (null? sublists) (= 1 (apply max (map length sublists))))))))
 
 (define debug #f)
-(define/contract (breaks qs-in
+(define/contract (breaks xs-in
                          [target-size (current-line-width)]
                          #:break-val [break-val 'break]
+                         ;; todo: generalize these procs so they're not particular to quads
                          #:mandatory-break-proc [mandatory-break? (λ (q) (memv (car (qe q)) '(#\newline)))]
                          #:optional-break-proc [optional-break? (λ (q) (memv (car (qe q)) '(#\space)))]
                          #:size-proc [size-proc (λ (q) (let ([val (hash-ref (qa q) 'size (λ ()
@@ -22,57 +14,52 @@
                                                                                                (delay (values 0 1 0))
                                                                                                (delay (values 1 1 1)))))])
                                                          (if (promise? val) (force val) (val))))])
-  ((quads?) (integer? #:break-val any/c
+  ((any/c) (integer? #:break-val any/c
                       #:mandatory-break-proc procedure?
                       #:optional-break-proc procedure?
                       #:size-proc procedure?) . ->* . (listof any/c))
   (define last-breakpoint-k #f)
   (define (capture-k!) (let/cc k (set! last-breakpoint-k k) #f))
-  (define break-here #t)
-  (for/fold ([qss null]
-             [break-open? #t]
+  (for/fold ([xss null]
              [size-so-far 0]
-             #:result (reverse qss))
-            ([(q qidx) (in-indexed qs-in)])
-    (define-values (size-start size-mid size-end) (size-proc q))
+             #:result (reverse xss))
+            ([x (in-list xs-in)])
+    (define-values (size-start size-mid size-end) (size-proc x))
     (cond
-      [(not break-open?) (when debug (report q 'open-break))
-                         (values (append (list q) qss) (not break-open?) (+ size-so-far size-start))]
-      [(<= (+ size-so-far size-end) target-size) ;; check condition based on size-end (as if x were breakpoint) ...
+      [(<= (+ size-so-far size-end) target-size) ;; check overflow condition based on size-end (as if x were breakpoint)
        (cond
-         [(or (mandatory-break? q)
-              (and (optional-break? q) (capture-k!))) ;; return point for `last-breakpoint-k`
-          (when debug (report q 'resuming-breakpoint))
+         [(mandatory-break? x) (when debug (report x 'got-mandatory-break))
+                               (values (cons break-val xss) 0)]
+         [(and (optional-break? x) (capture-k!)) (when debug (report x 'resuming-breakpoint)) ;; return point for k
           (set! last-breakpoint-k #f) ;; prevents continuation loop
-          ;; when break is found, q is omitted from accumulation
-          (values (append (list break-val) qss) (not break-open?) 0)] ;; closes the break at this quad
-         [else (when debug (report q 'add-to-line))
-               (values (append (list q) qss) break-open? (if (zero? size-so-far) ;; we're still at start
-                                                             size-start
-                                                             (+ size-so-far size-mid)))])] ;; otherwise recur based on size-mid
+          (values (cons break-val xss) 0)] ;; when break is found, q is omitted from accumulation
+         [else (when debug (report x 'add-to-line))
+               (values (cons x xss) (if (zero? size-so-far) ;; we're still at start
+                                               size-start
+                                               (+ size-so-far size-mid)))])] ;; otherwise recur based on size-mid
       ;; overflow handlers
-      [last-breakpoint-k (when debug (report q 'invoking-last-breakpoint))
+      [last-breakpoint-k (when debug (report x 'invoking-last-breakpoint))
                          (last-breakpoint-k #t)]
-      [else (when debug (report q 'falling-back))
-            (values (append (list q break-val) qss) break-open? size-start)])))
-;; fallback if no last-breakpoint-k exists
+      [else (when debug (report x 'falling-back))
+            (values (list* x break-val xss) size-start)]))) ;; fallback if no last-breakpoint-k exists
 
-;; todo bug: constrain breaking to certain junctures
-(define ch (q (hasheq 'size (delay (values 1 1 1))) #\x))
-(define a (q (hasheq 'size (delay (values 1 1 1))) #\a))
-(define b (q (hasheq 'size (delay (values 1 1 1))) #\b))
-(define c (q (hasheq 'size (delay (values 1 1 1))) #\c))
-(define d (q (hasheq 'size (delay (values 1 1 1))) #\d))
-(define sp (q (hasheq 'size (delay (values 0 1 0))) #\space))
-(define br (q (hasheq 'size (delay (values 0 0 0))) #\newline))
-
-(define (visual-breaks str int)
-  (apply string (for/list ([b (in-list (breaks (atomize str) int))])
-                  (cond
-                    [(quad? b) (car (qe b))]
-                    [else #\|]))))
 
 (module+ test
+  (require rackunit)
+  (define ch (q (hasheq 'size (delay (values 1 1 1))) #\x))
+  (define a (q (hasheq 'size (delay (values 1 1 1))) #\a))
+  (define b (q (hasheq 'size (delay (values 1 1 1))) #\b))
+  (define c (q (hasheq 'size (delay (values 1 1 1))) #\c))
+  (define d (q (hasheq 'size (delay (values 1 1 1))) #\d))
+  (define sp (q (hasheq 'size (delay (values 0 1 0))) #\space))
+  (define br (q (hasheq 'size (delay (values 0 0 0))) #\newline))
+
+  (define (visual-breaks str int)
+    (apply string (for/list ([b (in-list (breaks (atomize str) int))])
+                    (cond
+                      [(quad? b) (car (qe b))]
+                      [else #\|]))))
+  
   (check-equal? (breaks (list) 1) null)  
   (check-equal? (breaks (list ch) 1) (list ch))
   (check-equal? (breaks (list ch ch) 1) (list ch 'break ch))
