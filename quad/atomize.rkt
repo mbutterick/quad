@@ -13,11 +13,10 @@
    ((hasheq 'foo "bar" 'zim "zam") . update-with .  (hasheq 'zim "BANG") (hasheq 'toe "jam") (hasheq 'foo "zay"))
    '#hasheq((zim . "BANG") (foo . "zay") (toe . "jam"))))
 
-(define (merge-whitespace aqs)
+(define (merge-whitespace aqs [white-aq? (λ (aq) (char-whitespace? (car (qe aq))))])
   ;; collapse each sequence of whitespace aqs to the first one, and make it a space
   ;; also drop leading & trailing whitespaces
   ;; (same behavior as web browsers)
-  (define (white-aq? aq) (char-whitespace? (car (qe aq))))
   (let loop ([acc null][aqs aqs])
     (if (null? aqs)
         (flatten acc)

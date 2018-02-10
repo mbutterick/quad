@@ -1,10 +1,10 @@
 #lang debug racket/base
-(require racket/contract racket/list txexpr sugar/debug sugar/list racket/promise
+(require racket/contract racket/list txexpr sugar/debug sugar/list racket/promise racket/function
          "param.rkt" "qexpr.rkt" "atomize.rkt" "quad.rkt")
 
-(define debug #f)
-(define/contract (breaks xs-in
+(define/contract (breaks xs
                          [target-size (current-line-width)]
+                         [debug #f]
                          #:break-val [break-val 'break]
                          ;; todo: generalize these procs so they're not particular to quads
                          #:mandatory-break-proc [mandatory-break? (λ (q) (memv (car (qe q)) '(#\newline)))]
@@ -14,46 +14,59 @@
                                                                                                (delay (values 0 1 0))
                                                                                                (delay (values 1 1 1)))))])
                                                          (if (promise? val) (force val) (val))))])
-  ((any/c) (integer? #:break-val any/c
-                      #:mandatory-break-proc procedure?
-                      #:optional-break-proc procedure?
-                      #:size-proc procedure?) . ->* . (listof any/c))
+  ((any/c) (integer? any/c
+                     #:break-val any/c
+                     #:mandatory-break-proc procedure?
+                     #:optional-break-proc procedure?
+                     #:size-proc procedure?) . ->* . (listof any/c))
+  #;(and (pair? xs)
+         (let ([can-be-break? (disjoin mandatory-break? optional-break?)])
+           (for/first ([x (in-list xs)]
+                       [next-x (in-list (cdr xs))]
+                       #:when (and (can-be-break? x) (can-be-break? next-x)))
+             (raise-argument-error 'breaks "no adjacent break possibilities allowed in input" (list x next-x)))))
   (define last-breakpoint-k #f)
   (define (capture-k!) (let/cc k (set! last-breakpoint-k k) #f))
-  (for/fold ([xss null]
-             [size-so-far 0]
-             #:result (reverse xss))
-            ([x (in-list xs-in)])
+  (for/fold ([vals null]
+             [size-so-far #f]
+             #:result (reverse (dropf vals optional-break?)))
+            ([x (in-list xs)])
     (define-values (size-start size-mid size-end) (size-proc x))
     (cond
-      [(<= (+ size-so-far size-end) target-size) ;; check overflow condition based on size-end (as if x were breakpoint)
+      [(and (not size-so-far) (optional-break? x)) (when debug (report x 'skipping-opt-break-at-beginning))
+                                                   (values vals size-so-far)]
+      [(or (not size-so-far) (<= (+ size-so-far size-end) target-size)) ;; check overflow condition based on size-end (as if x were breakpoint)
+       (define (insert-break) (values (cons break-val (dropf vals optional-break?)) #f))
        (cond
          [(mandatory-break? x) (when debug (report x 'got-mandatory-break))
-                               (values (cons break-val xss) 0)]
+                               (insert-break)]
          [(and (optional-break? x) (capture-k!)) (when debug (report x 'resuming-breakpoint)) ;; return point for k
-          (set! last-breakpoint-k #f) ;; prevents continuation loop
-          (values (cons break-val xss) 0)] ;; when break is found, q is omitted from accumulation
+                                                 (set! last-breakpoint-k #f) ;; prevents continuation loop
+                                                 (insert-break)] ;; when break is found, q is omitted from accumulation
          [else (when debug (report x 'add-to-line))
-               (values (cons x xss) (if (zero? size-so-far) ;; we're still at start
-                                               size-start
-                                               (+ size-so-far size-mid)))])] ;; otherwise recur based on size-mid
+               (values (cons x vals) (if (not size-so-far) ;; we're still at start
+                                         size-start
+                                         (+ size-so-far size-mid)))])] ;; otherwise recur based on size-mid
       ;; overflow handlers
       [last-breakpoint-k (when debug (report x 'invoking-last-breakpoint))
                          (last-breakpoint-k #t)]
       [else (when debug (report x 'falling-back))
-            (values (list* x break-val xss) size-start)]))) ;; fallback if no last-breakpoint-k exists
+            (values (list* x break-val vals) size-start)]))) ;; fallback if no last-breakpoint-k exists
+
+
+(define x (q (hasheq 'size (delay (values 1 1 1))) #\x))
+(define zwx (q (hasheq 'size (delay (values 0 0 0))) #\z))
+(define a (q (hasheq 'size (delay (values 1 1 1))) #\a))
+(define b (q (hasheq 'size (delay (values 1 1 1))) #\b))
+(define c (q (hasheq 'size (delay (values 1 1 1))) #\c))
+(define d (q (hasheq 'size (delay (values 1 1 1))) #\d))
+(define sp (q (hasheq 'size (delay (values 0 1 0))) #\space))
+(define br (q (hasheq 'size (delay (values 0 0 0))) #\newline))
 
 
 (module+ test
   (require rackunit)
-  (define ch (q (hasheq 'size (delay (values 1 1 1))) #\x))
-  (define a (q (hasheq 'size (delay (values 1 1 1))) #\a))
-  (define b (q (hasheq 'size (delay (values 1 1 1))) #\b))
-  (define c (q (hasheq 'size (delay (values 1 1 1))) #\c))
-  (define d (q (hasheq 'size (delay (values 1 1 1))) #\d))
-  (define sp (q (hasheq 'size (delay (values 0 1 0))) #\space))
-  (define br (q (hasheq 'size (delay (values 0 0 0))) #\newline))
-
+  
   (define (visual-breaks str int)
     (apply string (for/list ([b (in-list (breaks (atomize str) int))])
                     (cond
@@ -61,26 +74,40 @@
                       [else #\|]))))
   
   (check-equal? (breaks (list) 1) null)  
-  (check-equal? (breaks (list ch) 1) (list ch))
-  (check-equal? (breaks (list ch ch) 1) (list ch 'break ch))
-  (check-equal? (breaks (list ch ch ch) 1) (list ch 'break ch 'break ch))
-  (check-equal? (breaks (list ch ch ch) 2) (list ch ch 'break ch))
-  (check-equal? (breaks (list ch ch ch ch) 2) (list ch ch 'break ch ch))
-  (check-equal? (breaks (list ch ch ch ch ch) 3) (list ch ch ch 'break ch ch))
-  (check-equal? (breaks (list ch ch ch ch ch) 1) (list ch 'break ch 'break ch 'break ch 'break ch))
-  (check-equal? (breaks (list ch ch ch ch ch) 10) (list ch ch ch ch ch))
-  
-  (check-equal? (breaks (list ch sp ch) 1) (list ch 'break ch))
-  (check-equal? (breaks (list ch ch sp ch) 2) (list ch ch 'break ch))
+  (check-equal? (breaks (list x) 1) (list x))
+  (check-equal? (breaks (list x x) 1) (list x 'break x))
+  (check-equal? (breaks (list x x x) 1) (list x 'break x 'break x))
+  (check-equal? (breaks (list x x x) 2) (list x x 'break x))
+  (check-equal? (breaks (list x x x x) 2) (list x x 'break x x))
+  (check-equal? (breaks (list x x x x x) 3) (list x x x 'break x x))
+  (check-equal? (breaks (list x x x x x) 1) (list x 'break x 'break x 'break x 'break x))
+  (check-equal? (breaks (list x x x x x) 10) (list x x x x x))
+
+  (check-equal? (breaks (list x sp x) 1) (list x 'break x))
+  (check-equal? (breaks (list x x sp x) 2) (list x x 'break x))
   (check-equal? (breaks (list a sp b) 3) (list a sp b))
-  (check-equal? (breaks (list ch sp ch ch) 3) (list ch 'break ch ch))
+  (check-equal? (breaks (list x sp x x) 3) (list x 'break x x))
+
+  ;; leading & trailing spaces
+  (check-equal? (breaks (list sp x) 2) (list x))
+  (check-equal? (breaks (list x sp) 2) (list x))
+  (check-equal? (breaks (list sp x sp) 2) (list x))
+  (check-equal? (breaks (list sp sp x sp sp) 2) (list x))
+  (check-equal? (breaks (list sp sp x sp sp x sp) 1) (list x 'break x))
+  
+  ;; zero width nonbreakers
+  (check-equal? (breaks (list sp zwx) 2) (list zwx))
+  (check-equal? (breaks (list zwx sp) 2) (list zwx))
+  (check-equal? (breaks (list sp zwx sp) 2) (list zwx))
+  (check-equal? (breaks (list sp sp zwx sp sp) 2) (list zwx))
+  (check-equal? (breaks (list sp sp zwx sp sp zwx sp) 2) (list zwx sp sp zwx))
   
   (check-equal? (breaks (list a br b) 2) (list a 'break b))
-  (check-equal? (breaks (list ch br ch ch) 3) (list ch 'break ch ch))
-  (check-equal? (breaks (list ch ch br ch) 3) (list ch ch 'break ch))
-  (check-equal? (breaks (list ch ch ch ch) 3) (list ch ch ch 'break ch))
-  (check-equal? (breaks (list ch ch ch sp ch ch) 2) (list ch ch 'break ch 'break ch ch))
-  (check-equal? (breaks (list ch ch ch sp ch ch) 3) (list ch ch ch 'break ch ch))
+  (check-equal? (breaks (list x br x x) 3) (list x 'break x x))
+  (check-equal? (breaks (list x x br x) 3) (list x x 'break x))
+  (check-equal? (breaks (list x x x x) 3) (list x x x 'break x))
+  (check-equal? (breaks (list x x x sp x x) 2) (list x x 'break x 'break x x))
+  (check-equal? (breaks (list x x x sp x x) 3) (list x x x 'break x x))
 
   (check-equal? (visual-breaks "My dog has fleas" 1) "M|y|d|o|g|h|a|s|f|l|e|a|s")
   (check-equal? (visual-breaks "My dog has fleas" 2) "My|do|g|ha|s|fl|ea|s")
