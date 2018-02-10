@@ -19,12 +19,6 @@
                      #:mandatory-break-proc procedure?
                      #:optional-break-proc procedure?
                      #:size-proc procedure?) . ->* . (listof any/c))
-  #;(and (pair? xs)
-         (let ([can-be-break? (disjoin mandatory-break? optional-break?)])
-           (for/first ([x (in-list xs)]
-                       [next-x (in-list (cdr xs))]
-                       #:when (and (can-be-break? x) (can-be-break? next-x)))
-             (raise-argument-error 'breaks "no adjacent break possibilities allowed in input" (list x next-x)))))
   (define start-signal (gensym))
   (define last-breakpoint-k #f)
   (define (capture-k!) (let/cc k (set! last-breakpoint-k k) #f))
@@ -32,13 +26,12 @@
              [size-so-far start-signal]
              #:result (reverse (dropf vals optional-break?)))
             ([x (in-list xs)])
-    (define (at-start?) (eq? size-so-far start-signal))
-    (define (underflow?) (<= (+ size-so-far size-end) target-size))
-    (define (add-to-segment)
-      (values (cons x vals) (if (at-start?)
-                                size-start
-                                (+ size-so-far size-mid))))
     (define-values (size-start size-mid size-end) (size-proc x))
+    (define at-start? (eq? size-so-far start-signal))
+    (define underflow? (and (not at-start?) (<= (+ size-so-far size-end) target-size)))
+    (define (add-to-segment) (values (cons x vals) (if at-start?
+                                                       size-start
+                                                       (+ size-so-far size-mid))))
     (define (insert-break)
       ;; when break is found, q is omitted from accumulation
       ;; and any preceding optional breaks are dropped (that would be trailing before the break)
@@ -48,14 +41,14 @@
                             (insert-break)]
       [(optional-break? x)
        (cond
-         [(at-start?) (when debug (report x 'skipping-opt-break-at-beginning)) (values vals size-so-far)]
-         [(and (underflow?) (capture-k!)) (when debug (report x 'resuming-breakpoint))
-                                          (set! last-breakpoint-k #f) ;; prevents continuation loop
-                                          (insert-break)]
+         [at-start? (when debug (report x 'skipping-opt-break-at-beginning)) (values vals size-so-far)]
+         [(and underflow? (capture-k!)) (when debug (report x 'resuming-breakpoint))
+                                        (set! last-breakpoint-k #f) ;; prevents continuation loop
+                                        (insert-break)]
          [else (when debug (report x 'add-optional-break))
                (add-to-segment)])]
-      [(or (at-start?) (underflow?)) (when debug (report x 'add-ordinary-char))
-                                          (add-to-segment)]
+      [(or at-start? underflow?) (when debug (report x 'add-ordinary-char))
+                                 (add-to-segment)]
       [last-breakpoint-k (when debug (report x 'invoking-last-breakpoint))
                          (last-breakpoint-k #t)]
       [else (when debug (report x 'falling-back))
