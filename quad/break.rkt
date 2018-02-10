@@ -2,18 +2,14 @@
 (require racket/contract racket/list txexpr sugar/debug sugar/list racket/promise racket/function
          "param.rkt" "qexpr.rkt" "atomize.rkt" "quad.rkt")
 
-(define/contract (breaks xs
-                         [target-size (current-line-width)]
-                         [debug #f]
-                         #:break-val [break-val 'break]
-                         ;; todo: generalize these procs so they're not particular to quads
-                         #:mandatory-break-proc [mandatory-break? (λ (q) (and (quad? q) (memv (car (qe q)) '(#\newline))))]
-                         #:optional-break-proc [optional-break? (λ (q) (and (quad? q) (memv (car (qe q)) '(#\space))))]
-                         #:size-proc [size-proc (λ (q) (let ([val (hash-ref (qa q) 'size (λ ()
-                                                                                           (if (memv (car (qe q)) '(#\space))
-                                                                                               (delay (values 0 1 0))
-                                                                                               (delay (values 1 1 1)))))])
-                                                         (if (promise? val) (force val) (val))))])
+(define/contract (insert-breaks xs
+                                [target-size (current-line-width)]
+                                [debug #f]
+                                #:break-val [break-val 'break]
+                                ;; todo: generalize these procs so they're not particular to quads
+                                #:mandatory-break-proc [mandatory-break? (const #f)]
+                                #:optional-break-proc [optional-break? (const #f)]
+                                #:size-proc [size-proc (const 1)])
   ((any/c) (integer? any/c
                      #:break-val any/c
                      #:mandatory-break-proc procedure?
@@ -68,63 +64,76 @@
 (module+ test
   (require rackunit)
 
+  (define (lbs xs size [debug #f])
+    (insert-breaks xs size debug
+                   #:break-val 'lb
+                   #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (qe q)) '(#\newline))))
+                   #:optional-break-proc (λ (q) (and (quad? q) (memv (car (qe q)) '(#\space))))
+                   #:size-proc (λ (q) (let ([val (hash-ref (qa q) 'size (λ ()
+                                                                          (if (memv (car (qe q)) '(#\space))
+                                                                              (delay (values 0 1 0))
+                                                                              (delay (values 1 1 1)))))])
+                                        (if (promise? val) (force val) (val))))))
+
   (test-case
    "chars"
-   (check-equal? (breaks (list) 1) null)  
-   (check-equal? (breaks (list x) 1) (list x))
-   (check-equal? (breaks (list x x) 1) (list x 'break x))
-   (check-equal? (breaks (list x x x) 1) (list x 'break x 'break x))
-   (check-equal? (breaks (list x x x) 2) (list x x 'break x))
-   (check-equal? (breaks (list x x x x) 2) (list x x 'break x x))
-   (check-equal? (breaks (list x x x x x) 3) (list x x x 'break x x))
-   (check-equal? (breaks (list x x x x x) 1) (list x 'break x 'break x 'break x 'break x))
-   (check-equal? (breaks (list x x x x x) 10) (list x x x x x)))
+   (check-equal? (lbs (list) 1) null)  
+   (check-equal? (lbs (list x) 1) (list x))
+   (check-equal? (lbs (list x x) 1) (list x 'lb x))
+   (check-equal? (lbs (list x x x) 1) (list x 'lb x 'lb x))
+   (check-equal? (lbs (list x x x) 2) (list x x 'lb x))
+   (check-equal? (lbs (list x x x x) 2) (list x x 'lb x x))
+   (check-equal? (lbs (list x x x x x) 3) (list x x x 'lb x x))
+   (check-equal? (lbs (list x x x x x) 1) (list x 'lb x 'lb x 'lb x 'lb x))
+   (check-equal? (lbs (list x x x x x) 10) (list x x x x x)))
 
   (test-case
    "chars and spaces"
-   (check-equal? (breaks (list x sp x) 1) (list x 'break x))
-   (check-equal? (breaks (list x x sp x) 2) (list x x 'break x))
-   (check-equal? (breaks (list a sp b) 3) (list a sp b))
-   (check-equal? (breaks (list x sp x x) 3) (list x 'break x x)))
+   (check-equal? (lbs (list x sp x) 1) (list x 'lb x))
+   (check-equal? (lbs (list x x sp x) 2) (list x x 'lb x))
+   (check-equal? (lbs (list a sp b) 3) (list a sp b))
+   (check-equal? (lbs (list x sp x x) 3) (list x 'lb x x)))
 
   (test-case
    "leading & trailing spaces"
-   (check-equal? (breaks (list sp x) 2) (list x))
-   (check-equal? (breaks (list x sp) 2) (list x))
-   (check-equal? (breaks (list sp x sp) 2) (list x))
-   (check-equal? (breaks (list sp sp x sp sp) 2) (list x))
-   (check-equal? (breaks (list sp sp x sp sp x sp) 1) (list x 'break x)))
+   (check-equal? (lbs (list sp x) 2) (list x))
+   (check-equal? (lbs (list x sp) 2) (list x))
+   (check-equal? (lbs (list sp x sp) 2) (list x))
+   (check-equal? (lbs (list sp sp x sp sp) 2) (list x))
+   (check-equal? (lbs (list sp sp x sp sp x sp) 1) (list x 'lb x)))
   
   (test-case
    "zero width nonbreakers"
-   (check-equal? (breaks (list sp zwx) 2) (list zwx))
-   (check-equal? (breaks (list zwx sp) 2) (list zwx))
-   (check-equal? (breaks (list sp zwx sp) 2) (list zwx))
-   (check-equal? (breaks (list sp sp zwx sp sp) 2) (list zwx))
-   (check-equal? (breaks (list sp sp zwx sp sp zwx sp) 2) (list zwx sp sp zwx)))
+   (check-equal? (lbs (list sp zwx) 2) (list zwx))
+   (check-equal? (lbs (list zwx sp) 2) (list zwx))
+   (check-equal? (lbs (list sp zwx sp) 2) (list zwx))
+   (check-equal? (lbs (list sp sp zwx sp sp) 2) (list zwx))
+   (check-equal? (lbs (list sp sp zwx sp sp zwx sp) 2) (list zwx sp sp zwx)))
 
   (test-case
    "mandatory breaks"
-   (check-equal? (breaks (list br) 2) (list 'break))
-   (check-equal? (breaks (list a br b) 2) (list a 'break b))
-   (check-equal? (breaks (list x br x x) 3) (list x 'break x x))
-   (check-equal? (breaks (list x x br x) 3) (list x x 'break x))
-   (check-equal? (breaks (list x x x x) 3) (list x x x 'break x))
-   (check-equal? (breaks (list x x x sp x x) 2) (list x x 'break x 'break x x))
-   (check-equal? (breaks (list x x x sp x x) 3) (list x x x 'break x x)))
+   (check-equal? (lbs (list br) 2) (list 'lb))
+   (check-equal? (lbs (list a br b) 2) (list a 'lb b))
+   (check-equal? (lbs (list a b br) 2) (list a b 'lb))
+   (check-equal? (lbs (list a b br br) 2) (list a b 'lb 'lb))
+   (check-equal? (lbs (list x br x x) 3) (list x 'lb x x))
+   (check-equal? (lbs (list x x br x) 3) (list x x 'lb x))
+   (check-equal? (lbs (list x x x x) 3) (list x x x 'lb x))
+   (check-equal? (lbs (list x x x sp x x) 2) (list x x 'lb x 'lb x x))
+   (check-equal? (lbs (list x x x sp x x) 3) (list x x x 'lb x x)))
 
   (test-case
    "mandatory breaks and spurious spaces"
-   (check-equal? (breaks (list a sp sp sp br b) 2) (list a 'break b))
-   (check-equal? (breaks (list x sp br sp sp x x sp) 3) (list x 'break x x))
-   (check-equal? (breaks (list sp sp x x sp sp br sp sp sp x) 3) (list x x 'break x))
-   (check-equal? (breaks (list a sp b sp sp br sp c) 3) (list a sp b 'break c))
-   (check-equal? (breaks (list x x x x) 3) (list x x x 'break x))
-   (check-equal? (breaks (list x x x sp x x) 2) (list x x 'break x 'break x x))
-   (check-equal? (breaks (list x x x sp x x) 3) (list x x x 'break x x)))
+   (check-equal? (lbs (list a sp sp sp br b) 2) (list a 'lb b))
+   (check-equal? (lbs (list x sp br sp sp x x sp) 3) (list x 'lb x x))
+   (check-equal? (lbs (list sp sp x x sp sp br sp sp sp x) 3) (list x x 'lb x))
+   (check-equal? (lbs (list a sp b sp sp br sp c) 3) (list a sp b 'lb c))
+   (check-equal? (lbs (list x x x x) 3) (list x x x 'lb x))
+   (check-equal? (lbs (list x x x sp x x) 2) (list x x 'lb x 'lb x x))
+   (check-equal? (lbs (list x x x sp x x) 3) (list x x x 'lb x x)))
 
   (define (visual-breaks str int)
-    (apply string (for/list ([b (in-list (breaks (atomize str) int))])
+    (apply string (for/list ([b (in-list (lbs (atomize str) int))])
                     (cond
                       [(quad? b) (car (qe b))]
                       [else #\|]))))
@@ -146,4 +155,41 @@
    (check-equal? (visual-breaks "My dog has fleas" 13) "My dog has|fleas")
    (check-equal? (visual-breaks "My dog has fleas" 14) "My dog has|fleas")
    (check-equal? (visual-breaks "My dog has fleas" 15) "My dog has|fleas")
-   (check-equal? (visual-breaks "My dog has fleas" 16) "My dog has fleas")))
+   (check-equal? (visual-breaks "My dog has fleas" 16) "My dog has fleas"))
+
+  
+  (define (pbs xs size [debug #f])
+    (insert-breaks xs size debug
+                   #:break-val 'pb
+                   #:mandatory-break-proc (λ (x) (and (quad? x) (memv (car (qe x)) '(#\page))))
+                   #:optional-break-proc (λ (x) (eq? x 'lb))
+                   #:size-proc (λ (q) (case q
+                                        [(lb) (values 0 0 0)]
+                                        [else (values 1 1 1)]))))
+  (define pbr (q (hasheq 'size (delay (values 0 0 0))) #\page))
+
+  (test-case
+   "soft page breaks"
+   (check-equal? (pbs null 2) null)
+   (check-equal? (pbs (list x) 2) (list x))
+   (check-equal? (pbs (list x x) 2) (list x x))
+   (check-equal? (pbs (list x x x) 1) (list x 'pb x 'pb x))
+   (check-equal? (pbs (list x x x) 2) (list x x 'pb x))
+   (check-equal? (pbs (list x x x) 3) (list x x x))
+   (check-equal? (pbs (list x x x) 4) (list x x x))
+   (check-equal? (pbs (list x 'lb x x) 2) (list x 'pb x x)))
+
+  (test-case
+   "hard page breaks"
+   (check-equal? (pbs (list x pbr x x) 2) (list x 'pb x x))
+   (check-equal? (pbs (list x pbr x x) 1) (list x 'pb x 'pb x))
+   (check-equal? (pbs (list x pbr pbr x x) 1) (list x 'pb 'pb x 'pb x))
+   (check-equal? (pbs (list x pbr pbr x x) 2) (list x 'pb 'pb x x))
+   (check-equal? (pbs (list 'lb x 'lb 'lb pbr 'lb x x 'lb) 2) (list x 'pb x x)))
+
+  (test-case
+   "composed line breaks and page breaks"
+   (check-equal? (pbs (lbs null 1) 2) null)
+   (check-equal? (pbs (lbs (list x) 1) 2) (list x))
+   (check-equal? (pbs (lbs (list x x x) 1) 2) (list x 'lb x 'pb x))
+   (check-equal? (pbs (lbs (list x x x) 2) 2) (list x x 'pb x))))
