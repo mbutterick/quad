@@ -9,37 +9,38 @@
                                 ;; todo: generalize these procs so they're not particular to quads
                                 #:mandatory-break-proc [mandatory-break? (const #f)]
                                 #:optional-break-proc [optional-break? (const #f)]
-                                #:size-proc [size-proc (const 1)]
-                                #:group-proc [group-proc values])
+                                #:finish-segment-proc [finish-segment (λ (pieces) (dropf pieces optional-break?))]
+                                #:size-proc [size-proc (const 1)])
   ((any/c) (integer? any/c
                      #:break-val any/c
                      #:mandatory-break-proc procedure?
                      #:optional-break-proc procedure?
                      #:size-proc procedure?
-                     #:group-proc procedure?) . ->* . (listof any/c))
+                     #:finish-segment-proc procedure?) . ->* . (listof any/c))
   (define start-signal (gensym))
   (define last-optional-break-k #f)
   (define (capture-optional-break-k!) (let/cc k (set! last-optional-break-k k) #f))
   (for/fold ([vals null]
+             [pieces null]
              [size-so-far start-signal]
-             #:result (reverse (dropf vals optional-break?)))
+             #:result (reverse (append (finish-segment pieces) vals)))
             ([x (in-list xs)])
     (define-values (size-start size-mid size-end) (size-proc x))
     (define at-start? (eq? size-so-far start-signal))
     (define underflow? (and (not at-start?) (<= (+ size-so-far size-end) target-size)))
-    (define (add-to-segment) (values (cons x vals) (if at-start?
-                                                       size-start
-                                                       (+ size-so-far size-mid))))
+    (define (add-to-segment) (values vals (cons x pieces) (if at-start?
+                                                              size-start
+                                                              (+ size-so-far size-mid))))
     (define (insert-break)
       ;; when break is found, q is omitted from accumulation
       ;; and any preceding optional breaks are dropped (that would be trailing before the break)
-      (values (cons break-val (dropf vals optional-break?)) start-signal))
+      (values (cons break-val (append (finish-segment pieces) vals)) null start-signal))
     (cond
       [(mandatory-break? x) (when debug (report x 'got-mandatory-break))
                             (insert-break)]
       [(optional-break? x)
        (cond
-         [at-start? (when debug (report x 'skipping-opt-break-at-beginning)) (values vals size-so-far)]
+         [at-start? (when debug (report x 'skipping-opt-break-at-beginning)) (values vals null size-so-far)]
          [(and underflow? (capture-optional-break-k!)) (when debug (report x 'resuming-breakpoint))
                                                        (set! last-optional-break-k #f) ;; prevents continuation loop
                                                        (insert-break)]
@@ -50,7 +51,8 @@
       [last-optional-break-k (when debug (report x 'invoking-last-breakpoint))
                              (last-optional-break-k #t)]
       [else (when debug (report x 'falling-back))
-            (values (list* x break-val vals) size-start)]))) ;; fallback if no last-breakpoint-k exists
+            (define-values (vals pcs size-so-far) (insert-break))
+            (values vals (list x) size-start)]))) ;; fallback if no last-breakpoint-k exists
 
 
 (define x (q (hasheq 'size (delay (values 1 1 1))) #\x))
@@ -61,12 +63,13 @@
 (define d (q (hasheq 'size (delay (values 1 1 1))) #\d))
 (define sp (q (hasheq 'size (delay (values 0 1 0))) #\space))
 (define br (q (hasheq 'size (delay (values 0 0 0))) #\newline))
+(define optional-break? (λ (q) (and (quad? q) (memv (car (qe q)) '(#\space)))))
 
 (define (lbs xs size [debug #f])
   (insert-breaks xs size debug
                  #:break-val 'lb
                  #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (qe q)) '(#\newline))))
-                 #:optional-break-proc (λ (q) (and (quad? q) (memv (car (qe q)) '(#\space))))
+                 #:optional-break-proc optional-break?
                  #:size-proc (λ (q) (let ([val (hash-ref (qa q) 'size (λ ()
                                                                         (if (memv (car (qe q)) '(#\space))
                                                                             (delay (values 0 1 0))
@@ -195,3 +198,28 @@
    (check-equal? (pbs (lbs (list x x x) 1) 2) (list x 'lb x 'pb x))
    (check-equal? (pbs (lbs (list x x x) 2) 2) (list x x 'pb x))
    (check-equal? (pbs (lbs (list x x x) 2) 1) (list x 'pb x 'pb x))))
+
+(struct $slug $quad () #:transparent)
+(define (slug . xs) ($slug #f xs))
+(define (lbs2 xs size [debug #f])
+  (insert-breaks xs size debug
+                 #:break-val 'lb
+                 #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (qe q)) '(#\newline))))
+                 #:optional-break-proc optional-break?
+                 #:size-proc (λ (q) (let ([val (hash-ref (qa q) 'size (λ ()
+                                                                        (if (memv (car (qe q)) '(#\space))
+                                                                            (delay (values 0 1 0))
+                                                                            (delay (values 1 1 1)))))])
+                                      (if (promise? val) (force val) (val))))
+                 #:finish-segment-proc (λ (pcs) (list ($slug #f (reverse (dropf pcs optional-break?)))))))
+
+(module+ test
+  (test-case
+   "mandatory breaks and spurious spaces with slugs"
+   (check-equal? (lbs2 (list a sp sp sp br b) 2) (list (slug a) 'lb (slug b)))
+   (check-equal? (lbs2 (list x sp br sp sp x x sp) 3) (list (slug x) 'lb (slug x x)))
+   (check-equal? (lbs2 (list sp sp x x sp sp br sp sp sp x) 3) (list (slug x x) 'lb (slug x)))
+   (check-equal? (lbs2 (list a sp b sp sp br sp c) 3) (list (slug a sp b) 'lb (slug c)))
+   (check-equal? (lbs2 (list x x x x) 3) (list (slug x x x) 'lb (slug x)))
+   (check-equal? (lbs2 (list x x x sp x x) 2) (list (slug x x) 'lb (slug x) 'lb (slug x x)))
+   (check-equal? (lbs2 (list x x x sp x x) 3) (list (slug x x x) 'lb (slug x x)))))
