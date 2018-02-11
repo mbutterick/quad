@@ -1,3 +1,0 @@
-#lang quad
-
-match-select specifies the collected results. The default of car means that the result is the list of matches without returning parenthesized sub-patterns. It can be given as a ‘selector’ function which chooses an item from a list, or it can choose a list of items. For example, you can use cdr to get a list of lists of parenthesized sub-patterns matches, or values (as an identity function) to get the full matches as well. (Note that the selector must choose an element of its input list or a list of elements, but it must not inspect its input as they can be either a list of strings or a list of position pairs. Furthermore, the selector must be consistent in its choice(s).)

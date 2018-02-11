@@ -1,15 +1,14 @@
 #lang debug racket/base
-(require racket/contract racket/list txexpr sugar/debug sugar/list racket/promise racket/function
+(require racket/contract racket/list racket/match txexpr sugar/debug sugar/define sugar/list racket/promise racket/function (only-in racket/control call/prompt)
          "param.rkt" "qexpr.rkt" "atomize.rkt" "quad.rkt")
 
-(define/contract (insert-breaks xs
+(define+provide/contract (insert-breaks xs
                                 [target-size (current-line-width)]
                                 [debug #f]
                                 #:break-val [break-val 'break]
-                                ;; todo: generalize these procs so they're not particular to quads
                                 #:mandatory-break-proc [mandatory-break? (const #f)]
                                 #:optional-break-proc [optional-break? (const #f)]
-                                #:finish-segment-proc [finish-segment (λ (pieces) (dropf pieces optional-break?))]
+                                #:finish-segment-proc [finish-segment-proc values]
                                 #:size-proc [size-proc (const 1)])
   ((any/c) (integer? any/c
                      #:break-val any/c
@@ -18,41 +17,44 @@
                      #:size-proc procedure?
                      #:finish-segment-proc procedure?) . ->* . (listof any/c))
   (define start-signal (gensym))
+  (define (finish-segment pieces) (finish-segment-proc (reverse (dropf pieces optional-break?))))
   (define last-optional-break-k #f)
-  (define (capture-optional-break-k!) (let/cc k (set! last-optional-break-k k) #f))
-  (for/fold ([vals null]
-             [pieces null]
-             [size-so-far start-signal]
-             #:result (reverse (append (finish-segment pieces) vals)))
-            ([x (in-list xs)])
-    (define-values (size-start size-mid size-end) (size-proc x))
-    (define at-start? (eq? size-so-far start-signal))
-    (define underflow? (and (not at-start?) (<= (+ size-so-far size-end) target-size)))
-    (define (add-to-segment) (values vals (cons x pieces) (if at-start?
-                                                              size-start
-                                                              (+ size-so-far size-mid))))
-    (define (insert-break)
-      ;; when break is found, q is omitted from accumulation
-      ;; and any preceding optional breaks are dropped (that would be trailing before the break)
-      (values (cons break-val (append (finish-segment pieces) vals)) null start-signal))
-    (cond
-      [(mandatory-break? x) (when debug (report x 'got-mandatory-break))
-                            (insert-break)]
-      [(optional-break? x)
-       (cond
-         [at-start? (when debug (report x 'skipping-opt-break-at-beginning)) (values vals null size-so-far)]
-         [(and underflow? (capture-optional-break-k!)) (when debug (report x 'resuming-breakpoint))
-                                                       (set! last-optional-break-k #f) ;; prevents continuation loop
-                                                       (insert-break)]
-         [else (when debug (report x 'add-optional-break))
-               (add-to-segment)])]
-      [(or at-start? underflow?) (when debug (report x 'add-ordinary-char))
-                                 (add-to-segment)]
-      [last-optional-break-k (when debug (report x 'invoking-last-breakpoint))
-                             (last-optional-break-k #t)]
-      [else (when debug (report x 'falling-back))
-            (define-values (vals pcs size-so-far) (insert-break))
-            (values vals (list x) size-start)]))) ;; fallback if no last-breakpoint-k exists
+  (call/prompt ;; continuation boundary for last-optional-break-k
+   (thunk
+    (define (capture-optional-break-k!) (let/cc k (set! last-optional-break-k k) #f))
+    (for/fold ([segments null]
+               [pieces null]
+               [size-so-far start-signal]
+               #:result (append* (reverse (cons (finish-segment pieces) segments))))
+              ([x (in-list xs)])
+      (define-values (size-start size-mid size-end) (size-proc x))
+      (define at-start? (eq? size-so-far start-signal))
+      (define underflow? (and (not at-start?) (<= (+ size-so-far size-end) target-size)))
+      (define (add-to-segment) (values segments (cons x pieces) (if at-start?
+                                                                    size-start
+                                                                    (+ size-so-far size-mid))))
+      (define (insert-break)
+        ;; when break is found, q is omitted from accumulation
+        ;; and any preceding optional breaks are dropped (that would be trailing before the break)
+        (values (list* (list break-val) (finish-segment pieces) segments) null start-signal))
+      (cond
+        [(mandatory-break? x) (when debug (report x 'got-mandatory-break))
+                              (insert-break)]
+        [(optional-break? x)
+         (cond
+           [at-start? (when debug (report x 'skipping-opt-break-at-beginning)) (values segments null size-so-far)]
+           [(and underflow? (capture-optional-break-k!)) (when debug (report x 'resuming-breakpoint))
+                                                         (set! last-optional-break-k #f) ;; prevents continuation loop
+                                                         (insert-break)]
+           [else (when debug (report x 'add-optional-break))
+                 (add-to-segment)])]
+        [(or at-start? underflow?) (when debug (report x 'add-ordinary-char))
+                                   (add-to-segment)]
+        [last-optional-break-k (when debug (report x 'invoking-last-breakpoint))
+                               (last-optional-break-k #t)]
+        [else (when debug (report x 'falling-back))
+              (match-define-values (vals _ _) (insert-break))
+              (values vals (list x) size-start)]))))) ;; fallback if no last-breakpoint-k exists
 
 
 (define x (q (hasheq 'size (delay (values 1 1 1))) #\x))
@@ -211,7 +213,7 @@
                                                                             (delay (values 0 1 0))
                                                                             (delay (values 1 1 1)))))])
                                       (if (promise? val) (force val) (val))))
-                 #:finish-segment-proc (λ (pcs) (list ($slug #f (reverse (dropf pcs optional-break?)))))))
+                 #:finish-segment-proc (λ (pcs) (list ($slug #f pcs)))))
 
 (module+ test
   (test-case

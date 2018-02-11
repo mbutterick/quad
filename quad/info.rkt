@@ -1,4 +1,3 @@
 #lang info
-
-(define compile-omit-paths '("old-master"))
-(define test-omit-paths '("old-master"))
+(define collection "quad")
+(define version "0.0")
