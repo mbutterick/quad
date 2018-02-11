@@ -4,28 +4,28 @@
 
 (define optional-break? (λ (q) (and (quad? q) (memv (car (qe q)) '(#\space)))))
 (struct $slug $quad () #:transparent)
-(define (slug . xs) ($slug #f xs))
+(define (slug . xs) ($slug (hasheq) xs))
+(struct $break $quad () #:transparent)
+(define (break . xs) ($break (hasheq 'size (delay (values 0 0 0))) xs))
 (define (lbs xs size [debug #f])
   (insert-breaks xs size debug
-                 #:break-val 'lb
+                 #:break-val (break #\newline)
                  #:optional-break-proc optional-break?
                  #:size-proc (λ (q) (let ([val (hash-ref (qa q) 'size (λ ()
                                                                         (if (memv (car (qe q)) '(#\space))
                                                                             (delay (values 0 1 0))
                                                                             (delay (values 1 1 1)))))])
                                       (if (promise? val) (force val) (val))))
-                 #:finish-segment-proc (λ (pcs) (list ($slug #f pcs)))))
+                 #:finish-segment-proc (λ (pcs) (list ($slug (hasheq) pcs)))))
 
 (define (pbs xs size [debug #f])
-    (insert-breaks xs size debug
-                   #:break-val 'pb
-                   #:optional-break-proc (λ (x) (eq? x 'lb))
-                   #:size-proc (λ (q) (case q
-                                        [(lb) (values 0 0 0)]
-                                        [else (values 1 1 1)]))))
+  (insert-breaks xs size debug
+                 #:break-val (break #\page)
+                 #:optional-break-proc $break?
+                 #:size-proc (λ (q) (force (hash-ref (qa q) 'size (λ () (delay (values 1 1 1))))))))
 
 (define (typeset args)
-  (pbs (lbs (atomize (apply quad #f args)) 5) 2))
+  (pbs (lbs (atomize (apply quad #f args)) 3) 2))
 
 (define-syntax-rule (mb lang-line-config-arg . args)
   (#%module-begin
