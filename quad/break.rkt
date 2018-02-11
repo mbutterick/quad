@@ -9,15 +9,17 @@
                                 ;; todo: generalize these procs so they're not particular to quads
                                 #:mandatory-break-proc [mandatory-break? (const #f)]
                                 #:optional-break-proc [optional-break? (const #f)]
-                                #:size-proc [size-proc (const 1)])
+                                #:size-proc [size-proc (const 1)]
+                                #:group-proc [group-proc values])
   ((any/c) (integer? any/c
                      #:break-val any/c
                      #:mandatory-break-proc procedure?
                      #:optional-break-proc procedure?
-                     #:size-proc procedure?) . ->* . (listof any/c))
+                     #:size-proc procedure?
+                     #:group-proc procedure?) . ->* . (listof any/c))
   (define start-signal (gensym))
-  (define last-breakpoint-k #f)
-  (define (capture-k!) (let/cc k (set! last-breakpoint-k k) #f))
+  (define last-optional-break-k #f)
+  (define (capture-optional-break-k!) (let/cc k (set! last-optional-break-k k) #f))
   (for/fold ([vals null]
              [size-so-far start-signal]
              #:result (reverse (dropf vals optional-break?)))
@@ -38,15 +40,15 @@
       [(optional-break? x)
        (cond
          [at-start? (when debug (report x 'skipping-opt-break-at-beginning)) (values vals size-so-far)]
-         [(and underflow? (capture-k!)) (when debug (report x 'resuming-breakpoint))
-                                        (set! last-breakpoint-k #f) ;; prevents continuation loop
-                                        (insert-break)]
+         [(and underflow? (capture-optional-break-k!)) (when debug (report x 'resuming-breakpoint))
+                                                       (set! last-optional-break-k #f) ;; prevents continuation loop
+                                                       (insert-break)]
          [else (when debug (report x 'add-optional-break))
                (add-to-segment)])]
       [(or at-start? underflow?) (when debug (report x 'add-ordinary-char))
                                  (add-to-segment)]
-      [last-breakpoint-k (when debug (report x 'invoking-last-breakpoint))
-                         (last-breakpoint-k #t)]
+      [last-optional-break-k (when debug (report x 'invoking-last-breakpoint))
+                             (last-optional-break-k #t)]
       [else (when debug (report x 'falling-back))
             (values (list* x break-val vals) size-start)]))) ;; fallback if no last-breakpoint-k exists
 
@@ -60,20 +62,19 @@
 (define sp (q (hasheq 'size (delay (values 0 1 0))) #\space))
 (define br (q (hasheq 'size (delay (values 0 0 0))) #\newline))
 
+(define (lbs xs size [debug #f])
+  (insert-breaks xs size debug
+                 #:break-val 'lb
+                 #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (qe q)) '(#\newline))))
+                 #:optional-break-proc (λ (q) (and (quad? q) (memv (car (qe q)) '(#\space))))
+                 #:size-proc (λ (q) (let ([val (hash-ref (qa q) 'size (λ ()
+                                                                        (if (memv (car (qe q)) '(#\space))
+                                                                            (delay (values 0 1 0))
+                                                                            (delay (values 1 1 1)))))])
+                                      (if (promise? val) (force val) (val))))))
 
 (module+ test
   (require rackunit)
-
-  (define (lbs xs size [debug #f])
-    (insert-breaks xs size debug
-                   #:break-val 'lb
-                   #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (qe q)) '(#\newline))))
-                   #:optional-break-proc (λ (q) (and (quad? q) (memv (car (qe q)) '(#\space))))
-                   #:size-proc (λ (q) (let ([val (hash-ref (qa q) 'size (λ ()
-                                                                          (if (memv (car (qe q)) '(#\space))
-                                                                              (delay (values 0 1 0))
-                                                                              (delay (values 1 1 1)))))])
-                                        (if (promise? val) (force val) (val))))))
 
   (test-case
    "chars"
@@ -192,4 +193,5 @@
    (check-equal? (pbs (lbs null 1) 2) null)
    (check-equal? (pbs (lbs (list x) 1) 2) (list x))
    (check-equal? (pbs (lbs (list x x x) 1) 2) (list x 'lb x 'pb x))
-   (check-equal? (pbs (lbs (list x x x) 2) 2) (list x x 'pb x))))
+   (check-equal? (pbs (lbs (list x x x) 2) 2) (list x x 'pb x))
+   (check-equal? (pbs (lbs (list x x x) 2) 1) (list x 'pb x 'pb x))))
