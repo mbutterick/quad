@@ -1,11 +1,11 @@
 #lang debug br/quicklang
-(require racket/promise racket/list "quad.rkt" "atomize.rkt" "break.rkt" "qexpr.rkt")
+(require racket/promise racket/list "quad.rkt" "atomize.rkt" "break.rkt" "qexpr.rkt" "generic.rkt")
 (provide (rename-out [mb #%module-begin]))
 
-(define optional-break? (λ (q) (and (quad? q) (memv (car (qe q)) '(#\space)))))
+(define optional-break? (λ (q) (and (quad? q) (memv (car (elems q)) '(#\space)))))
 (struct $shim $quad () #:transparent)
 (struct $char $quad () #:transparent)
-(define (charify q) ($char (qa q) (qe q)))
+(define (charify q) ($char (attrs q) (elems q)))
 (define (shimify xs) (add-between (map charify xs)
                                   (list ($shim (hasheq) null))
                                   #:splice? #t
@@ -20,8 +20,8 @@
   (insert-breaks xs size debug
                  #:break-val (break #\newline)
                  #:optional-break-proc optional-break?
-                 #:size-proc (λ (q) (let ([val (hash-ref (qa q) 'size (λ ()
-                                                                        (if (memv (car (qe q)) '(#\space))
+                 #:size-proc (λ (q) (let ([val (hash-ref (attrs q) 'size (λ ()
+                                                                        (if (memv (car (elems q)) '(#\space))
                                                                             (delay (values 0 1 0))
                                                                             (delay (values 1 1 1)))))])
                                       (if (promise? val) (force val) (val))))
@@ -31,7 +31,7 @@
   (insert-breaks xs size debug
                  #:break-val (break #\page)
                  #:optional-break-proc $break?
-                 #:size-proc (λ (q) (force (hash-ref (qa q) 'size (λ () (delay (values 1 1 1))))))
+                 #:size-proc (λ (q) (force (hash-ref (attrs q) 'size (λ () (delay (values 1 1 1))))))
                  #:finish-segment-proc (λ (pcs) (list ($page (hasheq) (filter-not $break? pcs))))))
 
 (define (typeset args)

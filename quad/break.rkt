@@ -1,6 +1,6 @@
 #lang debug racket/base
 (require racket/contract racket/list racket/match txexpr sugar/debug sugar/define sugar/list racket/promise racket/function (only-in racket/control call/prompt)
-         "param.rkt" "qexpr.rkt" "atomize.rkt" "quad.rkt")
+         "param.rkt" "qexpr.rkt" "atomize.rkt" "quad.rkt" "generic.rkt")
 
 (define+provide/contract (insert-breaks xs
                                 [target-size (current-line-width)]
@@ -65,15 +65,15 @@
 (define d (q (hasheq 'size (delay (values 1 1 1))) #\d))
 (define sp (q (hasheq 'size (delay (values 0 1 0))) #\space))
 (define br (q (hasheq 'size (delay (values 0 0 0))) #\newline))
-(define optional-break? (λ (q) (and (quad? q) (memv (car (qe q)) '(#\space)))))
+(define optional-break? (λ (q) (and (quad? q) (memv (car (elems q)) '(#\space)))))
 
 (define (lbs xs size [debug #f])
   (insert-breaks xs size debug
                  #:break-val 'lb
-                 #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (qe q)) '(#\newline))))
+                 #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (elems q)) '(#\newline))))
                  #:optional-break-proc optional-break?
-                 #:size-proc (λ (q) (let ([val (hash-ref (qa q) 'size (λ ()
-                                                                        (if (memv (car (qe q)) '(#\space))
+                 #:size-proc (λ (q) (let ([val (hash-ref (attrs q) 'size (λ ()
+                                                                        (if (memv (car (elems q)) '(#\space))
                                                                             (delay (values 0 1 0))
                                                                             (delay (values 1 1 1)))))])
                                       (if (promise? val) (force val) (val))))))
@@ -141,7 +141,7 @@
   (define (visual-breaks str int)
     (apply string (for/list ([b (in-list (lbs (atomize str) int))])
                     (cond
-                      [(quad? b) (car (qe b))]
+                      [(quad? b) (car (elems b))]
                       [else #\|]))))
 
   (test-case
@@ -167,7 +167,7 @@
   (define (pbs xs size [debug #f])
     (insert-breaks xs size debug
                    #:break-val 'pb
-                   #:mandatory-break-proc (λ (x) (and (quad? x) (memv (car (qe x)) '(#\page))))
+                   #:mandatory-break-proc (λ (x) (and (quad? x) (memv (car (elems x)) '(#\page))))
                    #:optional-break-proc (λ (x) (eq? x 'lb))
                    #:size-proc (λ (q) (case q
                                         [(lb) (values 0 0 0)]
@@ -206,10 +206,10 @@
 (define (lbs2 xs size [debug #f])
   (insert-breaks xs size debug
                  #:break-val 'lb
-                 #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (qe q)) '(#\newline))))
+                 #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (elems q)) '(#\newline))))
                  #:optional-break-proc optional-break?
-                 #:size-proc (λ (q) (let ([val (hash-ref (qa q) 'size (λ ()
-                                                                        (if (memv (car (qe q)) '(#\space))
+                 #:size-proc (λ (q) (let ([val (hash-ref (attrs q) 'size (λ ()
+                                                                        (if (memv (car (elems q)) '(#\space))
                                                                             (delay (values 0 1 0))
                                                                             (delay (values 1 1 1)))))])
                                       (if (promise? val) (force val) (val))))

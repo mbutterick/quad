@@ -1,5 +1,5 @@
 #lang debug racket/base
-(require xml racket/contract racket/string racket/match racket/list txexpr "quad.rkt")
+(require xml racket/contract racket/string racket/match racket/list txexpr "quad.rkt" "generic.rkt")
 (provide (all-defined-out))
 
 (module+ test (require rackunit))
@@ -27,8 +27,7 @@
   (check-true (qexpr? '(quad "Hello world")))
   (check-false (qexpr? 'q)))
 
-(define (quad-name q)
-  (string->symbol (string-trim (symbol->string (vector-ref (struct->vector q) 0)) "struct:$")))
+(define (quad-name q) (string->symbol (string-trim (symbol->string (object-name q)) "$")))
 
 (define/contract (qexpr #:clean-attrs? [clean-attrs? #f]
                         #:name [name 'q]
@@ -50,7 +49,7 @@
   (quad? . -> . qexpr?)
   (let loop ([x q])
     (cond
-      [(quad? x) (apply qexpr #:name (quad-name x) #:clean-attrs? #t (hash->attrs (qa x)) (map loop (qe x)))]
+      [(quad? x) (apply qexpr #:name (quad-name x) #:clean-attrs? #t (hash->attrs (attrs x)) (map loop (elems x)))]
       [else x])))
 
 (define/contract (qml->qexpr x)

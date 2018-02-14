@@ -1,6 +1,6 @@
 #lang debug racket/base
 (require racket/contract racket/match racket/list txexpr racket/dict sugar/list racket/function
-         "quad.rkt" "qexpr.rkt" "param.rkt")
+         "quad.rkt" "qexpr.rkt" "param.rkt" "generic.rkt")
 (provide (all-defined-out))
 (module+ test (require rackunit))
 
@@ -13,7 +13,7 @@
    ((hasheq 'foo "bar" 'zim "zam") . update-with .  (hasheq 'zim "BANG") (hasheq 'toe "jam") (hasheq 'foo "zay"))
    '#hasheq((zim . "BANG") (foo . "zay") (toe . "jam"))))
 
-(define (merge-whitespace aqs [white-aq? (λ (aq) (char-whitespace? (car (qe aq))))])
+(define (merge-whitespace aqs [white-aq? (λ (aq) (char-whitespace? (car (elems aq))))])
   ;; collapse each sequence of whitespace aqs to the first one, and make it a space
   ;; also drop leading & trailing whitespaces
   ;; (same behavior as web browsers)
@@ -25,7 +25,7 @@
           (loop (list acc bs (if (and (pair? rest) ;; we precede bs (only #t if rest starts with bs, because we took the ws)
                                       (pair? bs) ;; we follow bs
                                       (pair? ws)) ;; we have ws
-                                 (quad (qa (car ws)) #\space)
+                                 (quad (attrs (car ws)) #\space)
                                  null)) rest)))))
 
 (module+ test
