@@ -3,6 +3,14 @@
 (provide (rename-out [mb #%module-begin]))
 
 (define optional-break? (λ (q) (and (quad? q) (memv (car (qe q)) '(#\space)))))
+(struct $shim $quad () #:transparent)
+(struct $char $quad () #:transparent)
+(define (charify q) ($char (qa q) (qe q)))
+(define (shimify xs) (add-between (map charify xs)
+                                  (list ($shim (hasheq) null))
+                                  #:splice? #t
+                                  #:before-first (list ($shim (hasheq) null))
+                                  #:after-last (list ($shim (hasheq) null))))
 (struct $line $quad () #:transparent)
 (struct $page $quad () #:transparent)
 (struct $doc $quad () #:transparent)
@@ -17,7 +25,7 @@
                                                                             (delay (values 0 1 0))
                                                                             (delay (values 1 1 1)))))])
                                       (if (promise? val) (force val) (val))))
-                 #:finish-segment-proc (λ (pcs) (list ($line (hasheq) pcs)))))
+                 #:finish-segment-proc (λ (pcs) (list ($line (hasheq) (map charify pcs))))))
 
 (define (pbs xs size [debug #f])
   (insert-breaks xs size debug

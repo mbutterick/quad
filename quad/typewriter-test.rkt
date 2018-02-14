@@ -1,3 +1,3 @@
 #lang quad/typewriter
 
-a b cd e f gh
+a b cd ef g h
