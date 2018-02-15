@@ -8,5 +8,5 @@
   (entrance-point quad)
   (exit-point quad)
   (inner-point quad)
-  (size quad)
-  (draw quad))
+  (size quad [condition])
+  (draw quad [surface] [origin]))

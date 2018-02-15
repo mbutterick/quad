@@ -10,8 +10,8 @@
    (define (entrance-point q) (hash-ref (attrs q) 'entrance 'entrance))
    (define (exit-point q) (hash-ref (attrs q) 'exit 'exit))
    (define (inner-point q) (hash-ref (attrs q) 'inner 'inner))
-   (define (size q) (length (elems q)))
-   (define (draw q) "<···>")])
+   (define (size q [condition #f]) (hash-ref (attrs q) 'size (λ () (length (elems q)))))
+   (define (draw q [surface #f] [origin #f]) ((hash-ref (attrs q) 'draw (λ () (λ () (println "<no draw routine>"))))))])
 
 (define (quad-attrs? x) (and (hash? x) (hash-eq? x)))
 (define (quad-elem? x) (or (char? x) (string? x) ($quad? x)))
@@ -37,3 +37,10 @@
 (define (break . xs) (apply quad #:type $break xs))
 (define b break)
 
+(module+ test
+  (define x ($quad (hasheq 'entrance 0
+                           'exit 10+10i
+                           'inner 5+5i
+                           'size 8+8i
+                           'draw (λ () (println "foo"))) '(#\H #\e #\l #\o)))
+  (draw x))
