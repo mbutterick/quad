@@ -2,7 +2,7 @@
 (require racket/contract racket/list racket/match txexpr sugar/debug sugar/define sugar/list racket/promise racket/function (only-in racket/control call/prompt)
          "param.rkt" "qexpr.rkt" "atomize.rkt" "quad.rkt" "generic.rkt")
 
-(define+provide/contract (insert-breaks xs
+(define+provide/contract (wrap xs
                                 [target-size (current-line-width)]
                                 [debug #f]
                                 #:break-val [break-val 'break]
@@ -67,8 +67,8 @@
 (define br (q (hasheq 'size (delay (values 0 0 0))) #\newline))
 (define optional-break? (λ (q) (and (quad? q) (memv (car (elems q)) '(#\space)))))
 
-(define (lbs xs size [debug #f])
-  (insert-breaks xs size debug
+(define (linewrap xs size [debug #f])
+  (wrap xs size debug
                  #:break-val 'lb
                  #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (elems q)) '(#\newline))))
                  #:optional-break-proc optional-break?
@@ -83,89 +83,89 @@
 
   (test-case
    "chars"
-   (check-equal? (lbs (list) 1) null)  
-   (check-equal? (lbs (list x) 1) (list x))
-   (check-equal? (lbs (list x x) 1) (list x 'lb x))
-   (check-equal? (lbs (list x x x) 1) (list x 'lb x 'lb x))
-   (check-equal? (lbs (list x x x) 2) (list x x 'lb x))
-   (check-equal? (lbs (list x x x x) 2) (list x x 'lb x x))
-   (check-equal? (lbs (list x x x x x) 3) (list x x x 'lb x x))
-   (check-equal? (lbs (list x x x x x) 1) (list x 'lb x 'lb x 'lb x 'lb x))
-   (check-equal? (lbs (list x x x x x) 10) (list x x x x x)))
+   (check-equal? (linewrap (list) 1) null)  
+   (check-equal? (linewrap (list x) 1) (list x))
+   (check-equal? (linewrap (list x x) 1) (list x 'lb x))
+   (check-equal? (linewrap (list x x x) 1) (list x 'lb x 'lb x))
+   (check-equal? (linewrap (list x x x) 2) (list x x 'lb x))
+   (check-equal? (linewrap (list x x x x) 2) (list x x 'lb x x))
+   (check-equal? (linewrap (list x x x x x) 3) (list x x x 'lb x x))
+   (check-equal? (linewrap (list x x x x x) 1) (list x 'lb x 'lb x 'lb x 'lb x))
+   (check-equal? (linewrap (list x x x x x) 10) (list x x x x x)))
 
   (test-case
    "chars and spaces"
-   (check-equal? (lbs (list x sp x) 1) (list x 'lb x))
-   (check-equal? (lbs (list x x sp x) 2) (list x x 'lb x))
-   (check-equal? (lbs (list a sp b) 3) (list a sp b))
-   (check-equal? (lbs (list x sp x x) 3) (list x 'lb x x)))
+   (check-equal? (linewrap (list x sp x) 1) (list x 'lb x))
+   (check-equal? (linewrap (list x x sp x) 2) (list x x 'lb x))
+   (check-equal? (linewrap (list a sp b) 3) (list a sp b))
+   (check-equal? (linewrap (list x sp x x) 3) (list x 'lb x x)))
 
   (test-case
    "leading & trailing spaces"
-   (check-equal? (lbs (list sp x) 2) (list x))
-   (check-equal? (lbs (list x sp) 2) (list x))
-   (check-equal? (lbs (list sp x sp) 2) (list x))
-   (check-equal? (lbs (list sp sp x sp sp) 2) (list x))
-   (check-equal? (lbs (list sp sp x sp sp x sp) 1) (list x 'lb x)))
+   (check-equal? (linewrap (list sp x) 2) (list x))
+   (check-equal? (linewrap (list x sp) 2) (list x))
+   (check-equal? (linewrap (list sp x sp) 2) (list x))
+   (check-equal? (linewrap (list sp sp x sp sp) 2) (list x))
+   (check-equal? (linewrap (list sp sp x sp sp x sp) 1) (list x 'lb x)))
   
   (test-case
    "zero width nonbreakers"
-   (check-equal? (lbs (list sp zwx) 2) (list zwx))
-   (check-equal? (lbs (list zwx sp) 2) (list zwx))
-   (check-equal? (lbs (list sp zwx sp) 2) (list zwx))
-   (check-equal? (lbs (list sp sp zwx sp sp) 2) (list zwx))
-   (check-equal? (lbs (list sp sp zwx sp sp zwx sp) 2) (list zwx sp sp zwx)))
+   (check-equal? (linewrap (list sp zwx) 2) (list zwx))
+   (check-equal? (linewrap (list zwx sp) 2) (list zwx))
+   (check-equal? (linewrap (list sp zwx sp) 2) (list zwx))
+   (check-equal? (linewrap (list sp sp zwx sp sp) 2) (list zwx))
+   (check-equal? (linewrap (list sp sp zwx sp sp zwx sp) 2) (list zwx sp sp zwx)))
 
   (test-case
    "mandatory breaks"
-   (check-equal? (lbs (list br) 2) (list 'lb))
-   (check-equal? (lbs (list a br b) 2) (list a 'lb b))
-   (check-equal? (lbs (list a b br) 2) (list a b 'lb))
-   (check-equal? (lbs (list a b br br) 2) (list a b 'lb 'lb))
-   (check-equal? (lbs (list x br x x) 3) (list x 'lb x x))
-   (check-equal? (lbs (list x x br x) 3) (list x x 'lb x))
-   (check-equal? (lbs (list x x x x) 3) (list x x x 'lb x))
-   (check-equal? (lbs (list x x x sp x x) 2) (list x x 'lb x 'lb x x))
-   (check-equal? (lbs (list x x x sp x x) 3) (list x x x 'lb x x)))
+   (check-equal? (linewrap (list br) 2) (list 'lb))
+   (check-equal? (linewrap (list a br b) 2) (list a 'lb b))
+   (check-equal? (linewrap (list a b br) 2) (list a b 'lb))
+   (check-equal? (linewrap (list a b br br) 2) (list a b 'lb 'lb))
+   (check-equal? (linewrap (list x br x x) 3) (list x 'lb x x))
+   (check-equal? (linewrap (list x x br x) 3) (list x x 'lb x))
+   (check-equal? (linewrap (list x x x x) 3) (list x x x 'lb x))
+   (check-equal? (linewrap (list x x x sp x x) 2) (list x x 'lb x 'lb x x))
+   (check-equal? (linewrap (list x x x sp x x) 3) (list x x x 'lb x x)))
 
   (test-case
    "mandatory breaks and spurious spaces"
-   (check-equal? (lbs (list a sp sp sp br b) 2) (list a 'lb b))
-   (check-equal? (lbs (list x sp br sp sp x x sp) 3) (list x 'lb x x))
-   (check-equal? (lbs (list sp sp x x sp sp br sp sp sp x) 3) (list x x 'lb x))
-   (check-equal? (lbs (list a sp b sp sp br sp c) 3) (list a sp b 'lb c))
-   (check-equal? (lbs (list x x x x) 3) (list x x x 'lb x))
-   (check-equal? (lbs (list x x x sp x x) 2) (list x x 'lb x 'lb x x))
-   (check-equal? (lbs (list x x x sp x x) 3) (list x x x 'lb x x)))
+   (check-equal? (linewrap (list a sp sp sp br b) 2) (list a 'lb b))
+   (check-equal? (linewrap (list x sp br sp sp x x sp) 3) (list x 'lb x x))
+   (check-equal? (linewrap (list sp sp x x sp sp br sp sp sp x) 3) (list x x 'lb x))
+   (check-equal? (linewrap (list a sp b sp sp br sp c) 3) (list a sp b 'lb c))
+   (check-equal? (linewrap (list x x x x) 3) (list x x x 'lb x))
+   (check-equal? (linewrap (list x x x sp x x) 2) (list x x 'lb x 'lb x x))
+   (check-equal? (linewrap (list x x x sp x x) 3) (list x x x 'lb x x)))
 
-  (define (visual-breaks str int)
-    (apply string (for/list ([b (in-list (lbs (atomize str) int))])
+  (define (visual-wrap str int)
+    (apply string (for/list ([b (in-list (linewrap (atomize str) int))])
                     (cond
                       [(quad? b) (car (elems b))]
                       [else #\|]))))
 
   (test-case
    "visual breaks"
-   (check-equal? (visual-breaks "My dog has fleas" 1) "M|y|d|o|g|h|a|s|f|l|e|a|s")
-   (check-equal? (visual-breaks "My dog has fleas" 2) "My|do|g|ha|s|fl|ea|s")
-   (check-equal? (visual-breaks "My dog has fleas" 3) "My|dog|has|fle|as")
-   (check-equal? (visual-breaks "My dog has fleas" 4) "My|dog|has|flea|s")
-   (check-equal? (visual-breaks "My dog has fleas" 5) "My|dog|has|fleas")
-   (check-equal? (visual-breaks "My dog has fleas" 6) "My dog|has|fleas")
-   (check-equal? (visual-breaks "My dog has fleas" 7) "My dog|has|fleas")
-   (check-equal? (visual-breaks "My dog has fleas" 8) "My dog|has|fleas")
-   (check-equal? (visual-breaks "My dog has fleas" 9) "My dog|has fleas")
-   (check-equal? (visual-breaks "My dog has fleas" 10) "My dog has|fleas")
-   (check-equal? (visual-breaks "My dog has fleas" 11) "My dog has|fleas")
-   (check-equal? (visual-breaks "My dog has fleas" 12) "My dog has|fleas")
-   (check-equal? (visual-breaks "My dog has fleas" 13) "My dog has|fleas")
-   (check-equal? (visual-breaks "My dog has fleas" 14) "My dog has|fleas")
-   (check-equal? (visual-breaks "My dog has fleas" 15) "My dog has|fleas")
-   (check-equal? (visual-breaks "My dog has fleas" 16) "My dog has fleas"))
+   (check-equal? (visual-wrap "My dog has fleas" 1) "M|y|d|o|g|h|a|s|f|l|e|a|s")
+   (check-equal? (visual-wrap "My dog has fleas" 2) "My|do|g|ha|s|fl|ea|s")
+   (check-equal? (visual-wrap "My dog has fleas" 3) "My|dog|has|fle|as")
+   (check-equal? (visual-wrap "My dog has fleas" 4) "My|dog|has|flea|s")
+   (check-equal? (visual-wrap "My dog has fleas" 5) "My|dog|has|fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 6) "My dog|has|fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 7) "My dog|has|fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 8) "My dog|has|fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 9) "My dog|has fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 10) "My dog has|fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 11) "My dog has|fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 12) "My dog has|fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 13) "My dog has|fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 14) "My dog has|fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 15) "My dog has|fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 16) "My dog has fleas"))
 
   
-  (define (pbs xs size [debug #f])
-    (insert-breaks xs size debug
+  (define (pagewrap xs size [debug #f])
+    (wrap xs size debug
                    #:break-val 'pb
                    #:mandatory-break-proc (λ (x) (and (quad? x) (memv (car (elems x)) '(#\page))))
                    #:optional-break-proc (λ (x) (eq? x 'lb))
@@ -176,35 +176,35 @@
 
   (test-case
    "soft page breaks"
-   (check-equal? (pbs null 2) null)
-   (check-equal? (pbs (list x) 2) (list x))
-   (check-equal? (pbs (list x x) 2) (list x x))
-   (check-equal? (pbs (list x x x) 1) (list x 'pb x 'pb x))
-   (check-equal? (pbs (list x x x) 2) (list x x 'pb x))
-   (check-equal? (pbs (list x x x) 3) (list x x x))
-   (check-equal? (pbs (list x x x) 4) (list x x x))
-   (check-equal? (pbs (list x 'lb x x) 2) (list x 'pb x x)))
+   (check-equal? (pagewrap null 2) null)
+   (check-equal? (pagewrap (list x) 2) (list x))
+   (check-equal? (pagewrap (list x x) 2) (list x x))
+   (check-equal? (pagewrap (list x x x) 1) (list x 'pb x 'pb x))
+   (check-equal? (pagewrap (list x x x) 2) (list x x 'pb x))
+   (check-equal? (pagewrap (list x x x) 3) (list x x x))
+   (check-equal? (pagewrap (list x x x) 4) (list x x x))
+   (check-equal? (pagewrap (list x 'lb x x) 2) (list x 'pb x x)))
 
   (test-case
    "hard page breaks"
-   (check-equal? (pbs (list x pbr x x) 2) (list x 'pb x x))
-   (check-equal? (pbs (list x pbr x x) 1) (list x 'pb x 'pb x))
-   (check-equal? (pbs (list x pbr pbr x x) 1) (list x 'pb 'pb x 'pb x))
-   (check-equal? (pbs (list x pbr pbr x x) 2) (list x 'pb 'pb x x))
-   (check-equal? (pbs (list 'lb x 'lb 'lb pbr 'lb x x 'lb) 2) (list x 'pb x x)))
+   (check-equal? (pagewrap (list x pbr x x) 2) (list x 'pb x x))
+   (check-equal? (pagewrap (list x pbr x x) 1) (list x 'pb x 'pb x))
+   (check-equal? (pagewrap (list x pbr pbr x x) 1) (list x 'pb 'pb x 'pb x))
+   (check-equal? (pagewrap (list x pbr pbr x x) 2) (list x 'pb 'pb x x))
+   (check-equal? (pagewrap (list 'lb x 'lb 'lb pbr 'lb x x 'lb) 2) (list x 'pb x x)))
 
   (test-case
    "composed line breaks and page breaks"
-   (check-equal? (pbs (lbs null 1) 2) null)
-   (check-equal? (pbs (lbs (list x) 1) 2) (list x))
-   (check-equal? (pbs (lbs (list x x x) 1) 2) (list x 'lb x 'pb x))
-   (check-equal? (pbs (lbs (list x x x) 2) 2) (list x x 'pb x))
-   (check-equal? (pbs (lbs (list x x x) 2) 1) (list x 'pb x 'pb x))))
+   (check-equal? (pagewrap (linewrap null 1) 2) null)
+   (check-equal? (pagewrap (linewrap (list x) 1) 2) (list x))
+   (check-equal? (pagewrap (linewrap (list x x x) 1) 2) (list x 'lb x 'pb x))
+   (check-equal? (pagewrap (linewrap (list x x x) 2) 2) (list x x 'pb x))
+   (check-equal? (pagewrap (linewrap (list x x x) 2) 1) (list x 'pb x 'pb x))))
 
 (struct $slug $quad () #:transparent)
 (define (slug . xs) ($slug #f xs))
-(define (lbs2 xs size [debug #f])
-  (insert-breaks xs size debug
+(define (linewrap2 xs size [debug #f])
+  (wrap xs size debug
                  #:break-val 'lb
                  #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (elems q)) '(#\newline))))
                  #:optional-break-proc optional-break?
@@ -218,10 +218,10 @@
 (module+ test
   (test-case
    "mandatory breaks and spurious spaces with slugs"
-   (check-equal? (lbs2 (list a sp sp sp br b) 2) (list (slug a) 'lb (slug b)))
-   (check-equal? (lbs2 (list x sp br sp sp x x sp) 3) (list (slug x) 'lb (slug x x)))
-   (check-equal? (lbs2 (list sp sp x x sp sp br sp sp sp x) 3) (list (slug x x) 'lb (slug x)))
-   (check-equal? (lbs2 (list a sp b sp sp br sp c) 3) (list (slug a sp b) 'lb (slug c)))
-   (check-equal? (lbs2 (list x x x x) 3) (list (slug x x x) 'lb (slug x)))
-   (check-equal? (lbs2 (list x x x sp x x) 2) (list (slug x x) 'lb (slug x) 'lb (slug x x)))
-   (check-equal? (lbs2 (list x x x sp x x) 3) (list (slug x x x) 'lb (slug x x)))))
+   (check-equal? (linewrap2 (list a sp sp sp br b) 2) (list (slug a) 'lb (slug b)))
+   (check-equal? (linewrap2 (list x sp br sp sp x x sp) 3) (list (slug x) 'lb (slug x x)))
+   (check-equal? (linewrap2 (list sp sp x x sp sp br sp sp sp x) 3) (list (slug x x) 'lb (slug x)))
+   (check-equal? (linewrap2 (list a sp b sp sp br sp c) 3) (list (slug a sp b) 'lb (slug c)))
+   (check-equal? (linewrap2 (list x x x x) 3) (list (slug x x x) 'lb (slug x)))
+   (check-equal? (linewrap2 (list x x x sp x x) 2) (list (slug x x) 'lb (slug x) 'lb (slug x x)))
+   (check-equal? (linewrap2 (list x x x sp x x) 3) (list (slug x x x) 'lb (slug x x)))))

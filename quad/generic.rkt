@@ -3,10 +3,17 @@
 (provide (all-defined-out))
 
 (define-generics quad
-  (elems quad)
-  (attrs quad)
-  (entrance-point quad)
-  (exit-point quad)
-  (inner-point quad)
+  (start quad)
+  (end quad)
+  (inner quad)
+
   (size quad [condition])
-  (draw quad [surface] [origin]))
+  (offset quad [condition])
+
+  (origin quad)
+  (set-origin! quad where)
+
+  (draw quad [surface])
+
+  (elems quad)
+  (attrs quad))

@@ -3,14 +3,17 @@
 (provide (all-defined-out))
 (module+ test (require rackunit))
 
-(struct $quad (attrs elems) #:transparent
+(struct $quad (attrs elems) #:transparent #:mutable
   #:methods gen:quad
   [(define (elems q) ($quad-elems q))
    (define (attrs q) ($quad-attrs q))
-   (define (entrance-point q) (hash-ref (attrs q) 'entrance 'entrance))
-   (define (exit-point q) (hash-ref (attrs q) 'exit 'exit))
-   (define (inner-point q) (hash-ref (attrs q) 'inner 'inner))
-   (define (size q [condition #f]) (hash-ref (attrs q) 'size (λ () (length (elems q)))))
+   (define (start q) (hash-ref (attrs q) 'start 'nw))
+   (define (end q) (hash-ref (attrs q) 'end 'ne))
+   (define (inner q) (hash-ref (attrs q) 'inner (λ () (start q))))
+   (define (size q [condition #f]) (hash-ref (attrs q) 'size 1))
+   (define (offset q [condition #f]) (hash-ref (attrs q) 'offset 0))
+   (define (origin q) (hash-ref (attrs q) 'origin 0))
+   (define (set-origin! q val) (set-$quad-attrs! q (hash-set (attrs q) 'origin val)))
    (define (draw q [surface #f] [origin #f]) ((hash-ref (attrs q) 'draw (λ () (λ () (println "<no draw routine>"))))))])
 
 (define (quad-attrs? x) (and (hash? x) (hash-eq? x)))
