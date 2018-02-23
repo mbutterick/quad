@@ -1,5 +1,12 @@
 #lang debug racket/base
-(require xml racket/contract racket/string racket/match racket/list txexpr "quad.rkt" "generic.rkt")
+(require xml
+         racket/contract
+         racket/dict
+         racket/string
+         racket/match
+         racket/list
+         txexpr 
+         "quad.rkt" "generic.rkt" sugar/debug)
 (provide (all-defined-out))
 
 (module+ test (require rackunit))
@@ -43,13 +50,15 @@
   (check-equal? (qexpr '((k "v2")(k "v1")) "foo") '(q ((k "v2")(k "v1")) "foo"))
   (check-equal? (qexpr #:clean-attrs? #t '((k "v2")(k "v1")) "foo") '(q ((k "v2")) "foo")))
 
-
+(define (hash->qattrs attr-hash)
+  (for/list ([(k v) (in-dict (hash->list attr-hash))])
+    (list k (format "~a" v))))
 
 (define/contract (quad->qexpr q)
   (quad? . -> . qexpr?)
   (let loop ([x q])
     (cond
-      [(quad? x) (apply qexpr #:name (quad-name x) #:clean-attrs? #t (hash->attrs (attrs x)) (map loop (elems x)))]
+      [(quad? x) (apply qexpr #:name (quad-name x) #:clean-attrs? #t (hash->qattrs (attrs x)) (map loop (elems x)))]
       [else x])))
 
 (define/contract (qml->qexpr x)

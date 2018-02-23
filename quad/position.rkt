@@ -27,7 +27,7 @@
       [(nw) '(0 0  )] [(n) '(0.5 0  )] [(ne) '(1 0  )]
       [( w) '(0 0.5)] [(c) '(0.5 0.5)] [( e) '(1 0.5)]
       [(sw) '(0 1  )] [(s) '(0.5 1  )] [(se) '(1 1  )]))
-  (pt (coerce-int (* (pt-x (size q)) x-fac)) (coerce-int (* (pt-y (size q)) y-fac))))
+  (pt (coerce-int (* (pt-x #R(size q)) x-fac)) (coerce-int (* (pt-y (size q)) y-fac))))
 
 
 (define/contract (inner-point q)
@@ -44,8 +44,9 @@
   ((quad?) (point?) . ->* . quad?)
   (set-origin! q (pt- previous-end-pt (anchor->point q (start q))))
   (for/fold ([pt (inner-point q)])
-            ([q (in-list (elems q))])
-    (end-point (position q pt)))
+            ([q (in-list (elems q))]
+             #:when (quad? q))
+    (end-point #R(position q pt)))
   q)
 
 

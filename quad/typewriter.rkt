@@ -1,5 +1,5 @@
 #lang debug br/quicklang
-(require racket/promise racket/list "quad.rkt" "atomize.rkt" "wrap.rkt" "qexpr.rkt" "generic.rkt")
+(require racket/promise racket/list sugar/debug "quad.rkt" "atomize.rkt" "wrap.rkt" "qexpr.rkt" "generic.rkt" "position.rkt")
 (provide (rename-out [mb #%module-begin]))
 
 (define optional-break? (λ (q) (and (quad? q) (memv (car (elems q)) '(#\space)))))
@@ -22,8 +22,8 @@
         #:optional-break-proc optional-break?
         #:size-proc (λ (q) (let ([val (hash-ref (attrs q) 'size (λ ()
                                                                   (if (memv (car (elems q)) '(#\space))
-                                                                      (delay (values 0 1 0))
-                                                                      (delay (values 1 1 1)))))])
+                                                                      (delay (values 0 7.2 0))
+                                                                      (delay (values 7.2 7.2 7.2)))))])
                              (if (promise? val) (force val) (val))))
         #:finish-segment-proc (λ (pcs) (list ($line (hasheq) (map charify pcs))))))
 
@@ -31,11 +31,11 @@
   (wrap xs size debug
         #:break-val (break #\page)
         #:optional-break-proc $break?
-        #:size-proc (λ (q) (force (hash-ref (attrs q) 'size (λ () (delay (values 1 1 1))))))
+        #:size-proc (λ (q) (force (hash-ref (attrs q) 'size (λ () (delay (values 12 12 12))))))
         #:finish-segment-proc (λ (pcs) (list ($page (hasheq) (filter-not $break? pcs))))))
 
 (define (typeset args)
-  (quad->qexpr ($doc (hasheq) (filter-not $break? (pbs (lbs (atomize (apply quad #f args)) 3) 2)))))
+  (quad->qexpr ($doc (hasheq) (map position (filter-not $break? (pbs (lbs (atomize (apply quad #f args)) (* 3 7.2)) (* 2 12)))))))
 
 (define-syntax-rule (mb lang-line-config-arg . args)
   (#%module-begin

@@ -10,7 +10,7 @@
                                 #:optional-break-proc [optional-break? (const #f)]
                                 #:finish-segment-proc [finish-segment-proc values]
                                 #:size-proc [size-proc (const 1)])
-  ((any/c) (integer? any/c
+  ((any/c) (real? any/c
                      #:break-val any/c
                      #:mandatory-break-proc procedure?
                      #:optional-break-proc procedure?
