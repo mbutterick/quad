@@ -1,38 +1,47 @@
 #lang debug racket/base
 (require racket/contract racket/list racket/match txexpr sugar/debug sugar/define sugar/list racket/promise racket/function (only-in racket/control call/prompt)
-         "param.rkt" "qexpr.rkt" "atomize.rkt" "quad.rkt" "generic.rkt")
+         "param.rkt" "qexpr.rkt" "atomize.rkt" "quad.rkt" "generic.rkt" "position.rkt")
+
+(define/contract (distance q [signal #f])
+  ((any/c) (any/c) . ->* . real?)
+  (cond
+    [(quad? q)
+     (match-define (list ∆x ∆y) (map - (end-point q signal) (start-point q signal)))
+     (cond
+       [(zero? ∆x) ∆y]
+       [(zero? ∆y) ∆x]
+       [else (sqrt (+ (* ∆x ∆x) (* ∆y ∆y)))])]
+    [else 0]))
+
 
 (define+provide/contract (wrap xs
-                                [target-size (current-line-width)]
-                                [debug #f]
-                                #:break-val [break-val 'break]
-                                #:mandatory-break-proc [mandatory-break? (const #f)]
-                                #:optional-break-proc [optional-break? (const #f)]
-                                #:finish-segment-proc [finish-segment-proc values]
-                                #:size-proc [size-proc (const 1)])
-  ((any/c) (integer? any/c
-                     #:break-val any/c
-                     #:mandatory-break-proc procedure?
-                     #:optional-break-proc procedure?
-                     #:size-proc procedure?
-                     #:finish-segment-proc procedure?) . ->* . (listof any/c))
+                               [target-size (current-line-width)]
+                               [debug #f]
+                               #:break-val [break-val 'break]
+                               #:mandatory-break-proc [mandatory-break? (const #f)]
+                               #:optional-break-proc [optional-break? (const #f)]
+                               #:finish-segment-proc [finish-segment-proc values])
+  ((any/c) (real? any/c
+                  #:break-val any/c
+                  #:mandatory-break-proc procedure?
+                  #:optional-break-proc procedure?
+                  #:finish-segment-proc procedure?) . ->* . (listof any/c))
   (define start-signal (gensym))
   (define (finish-segment pieces) (finish-segment-proc (reverse (dropf pieces optional-break?))))
   (define last-optional-break-k #f)
   (call/prompt ;; continuation boundary for last-optional-break-k
    (thunk
-    (define (capture-optional-break-k!) (let/cc k (set! last-optional-break-k k) #f))
+    (define (capture-optional-break-k!) (when debug (report 'capture)) (let/cc k (set! last-optional-break-k k) #f))
     (for/fold ([segments null]
                [pieces null]
-               [size-so-far start-signal]
+               [dist-so-far start-signal]
                #:result (append* (reverse (cons (finish-segment pieces) segments))))
               ([x (in-list xs)])
-      (define-values (size-start size-mid size-end) (size-proc x))
-      (define at-start? (eq? size-so-far start-signal))
-      (define underflow? (and (not at-start?) (<= (+ size-so-far size-end) target-size)))
+      (define at-start? (eq? dist-so-far start-signal))
+      (define underflow? (and (not at-start?) (<= (+ dist-so-far (distance x 'end)) target-size)))
       (define (add-to-segment) (values segments (cons x pieces) (if at-start?
-                                                                    size-start
-                                                                    (+ size-so-far size-mid))))
+                                                                    (distance x 'start)
+                                                                    (+ dist-so-far (distance x)))))
       (define (insert-break)
         ;; when break is found, q is omitted from accumulation
         ;; and any preceding optional breaks are dropped (that would be trailing before the break)
@@ -42,7 +51,7 @@
                               (insert-break)]
         [(optional-break? x)
          (cond
-           [at-start? (when debug (report x 'skipping-opt-break-at-beginning)) (values segments null size-so-far)]
+           [at-start? (when debug (report x 'skipping-opt-break-at-beginning)) (values segments null dist-so-far)]
            [(and underflow? (capture-optional-break-k!)) (when debug (report x 'resuming-breakpoint))
                                                          (set! last-optional-break-k #f) ;; prevents continuation loop
                                                          (insert-break)]
@@ -54,29 +63,28 @@
                                (last-optional-break-k #t)]
         [else (when debug (report x 'falling-back))
               (match-define-values (vals _ _) (insert-break))
-              (values vals (list x) size-start)]))))) ;; fallback if no last-breakpoint-k exists
+              (values vals (list x) (distance x 'start))]))))) ;; fallback if no last-breakpoint-k exists
 
 
-(define x (q (hasheq 'size (delay (values 1 1 1))) #\x))
-(define zwx (q (hasheq 'size (delay (values 0 0 0))) #\z))
-(define a (q (hasheq 'size (delay (values 1 1 1))) #\a))
-(define b (q (hasheq 'size (delay (values 1 1 1))) #\b))
-(define c (q (hasheq 'size (delay (values 1 1 1))) #\c))
-(define d (q (hasheq 'size (delay (values 1 1 1))) #\d))
-(define sp (q (hasheq 'size (delay (values 0 1 0))) #\space))
-(define br (q (hasheq 'size (delay (values 0 0 0))) #\newline))
+
+(define x (q #f #\x))
+(define zwx (q (list 'size (pt 0 0)) #\z))
+(define a (q #f #\a))
+(define b (q #f #\b))
+(define c (q #f #\c))
+(define d (q #f #\d))
+(define sp (q (list 'size (λ (sig)
+                            (case sig
+                              [(start end) (pt 0 0)]
+                              [else (pt 1 1)]))) #\space))
+(define br (q (list 'size (pt 0 0)) #\newline))
 (define optional-break? (λ (q) (and (quad? q) (memv (car (elems q)) '(#\space)))))
 
 (define (linewrap xs size [debug #f])
   (wrap xs size debug
-                 #:break-val 'lb
-                 #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (elems q)) '(#\newline))))
-                 #:optional-break-proc optional-break?
-                 #:size-proc (λ (q) (let ([val (hash-ref (attrs q) 'size (λ ()
-                                                                        (if (memv (car (elems q)) '(#\space))
-                                                                            (delay (values 0 1 0))
-                                                                            (delay (values 1 1 1)))))])
-                                      (if (promise? val) (force val) (val))))))
+        #:break-val 'lb
+        #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (elems q)) '(#\newline))))
+        #:optional-break-proc optional-break?))
 
 (module+ test
   (require rackunit)
@@ -100,6 +108,7 @@
    (check-equal? (linewrap (list a sp b) 3) (list a sp b))
    (check-equal? (linewrap (list x sp x x) 3) (list x 'lb x x)))
 
+
   (test-case
    "leading & trailing spaces"
    (check-equal? (linewrap (list sp x) 2) (list x))
@@ -107,7 +116,7 @@
    (check-equal? (linewrap (list sp x sp) 2) (list x))
    (check-equal? (linewrap (list sp sp x sp sp) 2) (list x))
    (check-equal? (linewrap (list sp sp x sp sp x sp) 1) (list x 'lb x)))
-  
+
   (test-case
    "zero width nonbreakers"
    (check-equal? (linewrap (list sp zwx) 2) (list zwx))
@@ -138,8 +147,8 @@
    (check-equal? (linewrap (list x x x sp x x) 2) (list x x 'lb x 'lb x x))
    (check-equal? (linewrap (list x x x sp x x) 3) (list x x x 'lb x x)))
 
-  (define (visual-wrap str int)
-    (apply string (for/list ([b (in-list (linewrap (atomize str) int))])
+  (define (visual-wrap str int [debug #f])
+    (apply string (for/list ([b (in-list (linewrap (atomize str) int debug))])
                     (cond
                       [(quad? b) (car (elems b))]
                       [else #\|]))))
@@ -163,16 +172,12 @@
    (check-equal? (visual-wrap "My dog has fleas" 15) "My dog has|fleas")
    (check-equal? (visual-wrap "My dog has fleas" 16) "My dog has fleas"))
 
-  
   (define (pagewrap xs size [debug #f])
     (wrap xs size debug
-                   #:break-val 'pb
-                   #:mandatory-break-proc (λ (x) (and (quad? x) (memv (car (elems x)) '(#\page))))
-                   #:optional-break-proc (λ (x) (eq? x 'lb))
-                   #:size-proc (λ (q) (case q
-                                        [(lb) (values 0 0 0)]
-                                        [else (values 1 1 1)]))))
-  (define pbr (q (hasheq 'size (delay (values 0 0 0))) #\page))
+          #:break-val 'pb
+          #:mandatory-break-proc (λ (x) (and (quad? x) (memv (car (elems x)) '(#\page))))
+          #:optional-break-proc (λ (x) (eq? x 'lb))))
+  (define pbr (q '(size (0 0)) #\page))
 
   (test-case
    "soft page breaks"
@@ -208,11 +213,6 @@
                  #:break-val 'lb
                  #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (elems q)) '(#\newline))))
                  #:optional-break-proc optional-break?
-                 #:size-proc (λ (q) (let ([val (hash-ref (attrs q) 'size (λ ()
-                                                                        (if (memv (car (elems q)) '(#\space))
-                                                                            (delay (values 0 1 0))
-                                                                            (delay (values 1 1 1)))))])
-                                      (if (promise? val) (force val) (val))))
                  #:finish-segment-proc (λ (pcs) (list ($slug #f pcs)))))
 
 (module+ test

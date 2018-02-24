@@ -1,7 +1,14 @@
 #lang debug racket/base
-(require racket/match racket/function racket/dict "generic.rkt")
+(require racket/match racket/function racket/promise racket/dict "generic.rkt")
 (provide (all-defined-out))
 (module+ test (require rackunit))
+
+(define (default-size-proc q sig)
+  (match (elems q)
+    [(list (? char-whitespace? c)) (case sig
+                              [(start end) '(0 0)]
+                              [else '(1 1)])]
+    [else '(1 1)]))
 
 (struct $quad (attrs elems) #:transparent #:mutable
   #:methods gen:quad
@@ -10,8 +17,12 @@
    (define (start q) (hash-ref (attrs q) 'start 'nw))
    (define (end q) (hash-ref (attrs q) 'end 'ne))
    (define (inner q) (hash-ref (attrs q) 'inner (λ () (start q))))
-   (define (size q [condition #f]) (hash-ref (attrs q) 'size '(1 1)))
-   (define (offset q [condition #f]) (hash-ref (attrs q) 'offset '(0 0)))
+   (define (size q [signal #f]) (let ([v (hash-ref (attrs q) 'size (λ () (default-size-proc q signal)))])
+                                  (cond
+                                    [(procedure? v) (v signal)]
+                                    [(promise? v) (force v)]
+                                    [else v])))
+   (define (offset q [signal #f]) (hash-ref (attrs q) 'offset '(0 0)))
    (define (origin q) (hash-ref (attrs q) 'origin '(0 0)))
    (define (set-origin! q val) (set-$quad-attrs! q (hash-set (attrs q) 'origin val)))
    (define (draw q [surface #f] [origin #f]) ((hash-ref (attrs q) 'draw (λ () (λ () (println "<no draw routine>"))))))])
@@ -24,7 +35,7 @@
     [(list #f xs ...) (apply quad #:type type (hasheq) xs)]
     [(list (list (? symbol? sym) rest ...) (? quad-elem? elems) ...) (type (apply hasheq (cons sym rest)) elems)]
     [(list (? dict? attrs) (? quad-elem? elems) ...) (type (for/hasheq ([(k v) (in-dict attrs)])
-                                                                       (values k v)) elems)]
+                                                             (values k v)) elems)]
     [(list (? quad-attrs? attrs) (? quad-elem? elems) ...) (type attrs elems)]
     [(list (? quad-elem? elems) ...) (apply quad #:type type #f elems)]
     [else (error 'bad-quad-input)]))

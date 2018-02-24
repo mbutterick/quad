@@ -18,8 +18,8 @@
 (define (coerce-int x) (if (integer? x) (inexact->exact x) x))
 
 
-(define/contract (anchor->point q anchor)
-  (quad? symbol? . -> . point?)
+(define/contract (anchor->point q anchor [signal #f])
+  ((quad? symbol?) (any/c) . ->* . point?)
   (unless (valid-anchor? anchor)
     (raise-argument-error 'relative-anchor-pt "valid anchor" anchor))
   (match-define (list x-fac y-fac)
@@ -27,20 +27,22 @@
       [(nw) '(0 0  )] [(n) '(0.5 0  )] [(ne) '(1 0  )]
       [( w) '(0 0.5)] [(c) '(0.5 0.5)] [( e) '(1 0.5)]
       [(sw) '(0 1  )] [(s) '(0.5 1  )] [(se) '(1 1  )]))
-  (pt (coerce-int (* (pt-x (size q)) x-fac)) (coerce-int (* (pt-y (size q)) y-fac))))
+  (match-define (list x y) (size q signal))
+  (pt (coerce-int (* x x-fac)) (coerce-int (* y y-fac))))
 
+(define point/c ((quad?) (any/c) . ->* . point?))
 
-(define/contract (inner-point q)
-  (quad? . -> . point?)
-  (pt+ (origin q) (anchor->point q (inner q)) (offset q)))
+(define/contract (inner-point q [signal #f])
+  point/c
+  (pt+ (origin q) (anchor->point q (inner q) signal) (offset q)))
 
-(define/contract (start-point q)
-  (quad? . -> . point?)
-  (anchor->point q (start q)))
+(define/contract (start-point q [signal #f])
+  point/c
+  (anchor->point q (start q) signal))
 
-(define/contract (end-point q)
-  (quad? . -> . point?)
-  (pt+ (origin q) (anchor->point q (end q)))) ; no offset because end-point is calculated without padding
+(define/contract (end-point q [signal #f])
+  point/c
+  (pt+ (origin q) (anchor->point q (end q) signal))) ; no offset because end-point is calculated without padding
 
 
 (define/contract (position q [previous-end-pt (pt 0 0)])

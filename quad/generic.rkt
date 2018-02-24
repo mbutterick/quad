@@ -7,8 +7,8 @@
   (end quad)
   (inner quad)
 
-  (size quad [condition])
-  (offset quad [condition])
+  (size quad [signal])
+  (offset quad [signal])
 
   (origin quad)
   (set-origin! quad where)
