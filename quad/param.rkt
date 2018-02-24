@@ -2,4 +2,4 @@
 (provide (all-defined-out))
 
 (define current-default-attrs (make-parameter (make-hasheq)))
-(define current-line-width (make-parameter 1))
+(define current-wrap-distance (make-parameter 1))

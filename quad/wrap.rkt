@@ -15,7 +15,7 @@
 
 
 (define+provide/contract (wrap xs
-                               [target-size (current-line-width)]
+                               [target-size (current-wrap-distance)]
                                [debug #f]
                                #:break-val [break-val 'break]
                                #:mandatory-break-proc [mandatory-break? (const #f)]
@@ -31,7 +31,7 @@
   (define last-optional-break-k #f)
   (call/prompt ;; continuation boundary for last-optional-break-k
    (thunk
-    (define (capture-optional-break-k!) (when debug (report 'capture)) (let/cc k (set! last-optional-break-k k) #f))
+    (define (capture-optional-break-k!) (let/cc k (set! last-optional-break-k k) #f))
     (for/fold ([segments null]
                [pieces null]
                [dist-so-far start-signal]
