@@ -5,9 +5,9 @@
 
 (define (default-size-proc q sig)
   (match (elems q)
-    [(list (? char-whitespace? c)) (case sig
-                              [(start end) '(0 0)]
-                              [else '(1 1)])]
+    [(list (? (λ (x) (and (char? x) (char-whitespace? x))) c)) (case sig
+                                                                 [(start end) '(0 0)]
+                                                                 [else '(1 1)])]
     [else '(1 1)]))
 
 (struct $quad (attrs elems) #:transparent #:mutable

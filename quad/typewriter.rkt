@@ -20,18 +20,12 @@
   (wrap xs size debug
         #:break-val (break #\newline)
         #:optional-break-proc optional-break?
-        #:size-proc (λ (q) (let ([val (hash-ref (attrs q) 'size (λ ()
-                                                                  (if (memv (car (elems q)) '(#\space))
-                                                                      (delay (values 0 7.2 0))
-                                                                      (delay (values 7.2 7.2 7.2)))))])
-                             (if (promise? val) (force val) (val))))
         #:finish-segment-proc (λ (pcs) (list ($line (hasheq) (map charify pcs))))))
 
 (define (pbs xs size [debug #f])
   (wrap xs size debug
         #:break-val (break #\page)
         #:optional-break-proc $break?
-        #:size-proc (λ (q) (force (hash-ref (attrs q) 'size (λ () (delay (values 12 12 12))))))
         #:finish-segment-proc (λ (pcs) (list ($page (hasheq) (filter-not $break? pcs))))))
 
 (define (typeset args)
