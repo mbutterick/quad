@@ -36,22 +36,22 @@
   point/c
   (pt+ (origin q) (anchor->point q (inner q) signal) (offset q)))
 
-(define/contract (start-point q [signal #f])
+(define/contract (in-point q [signal #f])
   point/c
-  (anchor->point q (start q) signal))
+  (anchor->point q (in q) signal))
 
-(define/contract (end-point q [signal #f])
+(define/contract (out-point q [signal #f])
   point/c
-  (pt+ (origin q) (anchor->point q (end q) signal))) ; no offset because end-point is calculated without padding
+  (pt+ (origin q) (anchor->point q (out q) signal))) ; no offset because end-point is calculated without padding
 
 
 (define/contract (position q [previous-end-pt (pt 0 0)])
   ((quad?) (point?) . ->* . quad?)
-  (set-origin! q (pt- previous-end-pt (start-point q)))
+  (set-origin! q (pt- previous-end-pt (in-point q)))
   (for/fold ([pt (inner-point q)])
             ([q (in-list (elems q))]
              #:when (quad? q))
-    (end-point (position q pt)))
+    (out-point (position q pt)))
   q)
 
 
@@ -61,14 +61,14 @@
    "origins"
    (define size (pt 10 10))
    (define orig (pt 5 5))
-   (check-equal? (origin (position (quad (hasheq 'start 'nw 'size size)) orig)) (pt 5 5))
-   (check-equal? (origin (position (quad (hasheq 'start 'n 'size size)) orig)) (pt 0 5))
-   (check-equal? (origin (position (quad (hasheq 'start 'ne 'size size)) orig)) (pt -5 5))
-   (check-equal? (origin (position (quad (hasheq 'start 'e 'size size)) orig)) (pt -5 0))
-   (check-equal? (origin (position (quad (hasheq 'start 'se 'size size)) orig)) (pt -5 -5))
-   (check-equal? (origin (position (quad (hasheq 'start 's 'size size)) orig)) (pt 0 -5))
-   (check-equal? (origin (position (quad (hasheq 'start 'sw 'size size)) orig)) (pt 5 -5))
-   (check-equal? (origin (position (quad (hasheq 'start 'w 'size size)) orig)) (pt 5 0)))
+   (check-equal? (origin (position (quad (hasheq 'in 'nw 'size size)) orig)) (pt 5 5))
+   (check-equal? (origin (position (quad (hasheq 'in 'n 'size size)) orig)) (pt 0 5))
+   (check-equal? (origin (position (quad (hasheq 'in 'ne 'size size)) orig)) (pt -5 5))
+   (check-equal? (origin (position (quad (hasheq 'in 'e 'size size)) orig)) (pt -5 0))
+   (check-equal? (origin (position (quad (hasheq 'in 'se 'size size)) orig)) (pt -5 -5))
+   (check-equal? (origin (position (quad (hasheq 'in 's 'size size)) orig)) (pt 0 -5))
+   (check-equal? (origin (position (quad (hasheq 'in 'sw 'size size)) orig)) (pt 5 -5))
+   (check-equal? (origin (position (quad (hasheq 'in 'w 'size size)) orig)) (pt 5 0)))
 
   (test-case
    "inner points"
@@ -99,10 +99,10 @@
 
   (test-case
    "folding positions"
-   (check-equal? (position (quad (quad '(end se) (quad) (quad) (quad))
-                                 (quad '(end se) (quad) (quad) (quad))
-                                 (quad '(end se) (quad) (quad) (quad))))
+   (check-equal? (position (quad (quad '(out se) (quad) (quad) (quad))
+                                 (quad '(out se) (quad) (quad) (quad))
+                                 (quad '(out se) (quad) (quad) (quad))))
                  (quad '(origin (0 0))
-                       (quad '(origin (0 0) end se) (quad '(origin (0 0))) (quad '(origin (1 0))) (quad '(origin (2 0))))
-                       (quad '(origin (1 1) end se) (quad '(origin (1 1))) (quad '(origin (2 1))) (quad '(origin (3 1))))
-                       (quad '(origin (2 2) end se) (quad '(origin (2 2))) (quad '(origin (3 2))) (quad '(origin (4 2))))))))
+                       (quad '(origin (0 0) out se) (quad '(origin (0 0))) (quad '(origin (1 0))) (quad '(origin (2 0))))
+                       (quad '(origin (1 1) out se) (quad '(origin (1 1))) (quad '(origin (2 1))) (quad '(origin (3 1))))
+                       (quad '(origin (2 2) out se) (quad '(origin (2 2))) (quad '(origin (3 2))) (quad '(origin (4 2))))))))

@@ -6,7 +6,7 @@
   ((any/c) (any/c) . ->* . real?)
   (cond
     [(quad? q)
-     (match-define (list ∆x ∆y) (map - (end-point q signal) (start-point q signal)))
+     (match-define (list ∆x ∆y) (map - (out-point q signal) (in-point q signal)))
      (cond
        [(zero? ∆x) ∆y]
        [(zero? ∆y) ∆x]
@@ -59,12 +59,13 @@
                  (add-to-segment)])]
         [(or at-start? underflow?) (when debug (report x 'add-ordinary-char))
                                    (add-to-segment)]
+        ;; overflow handlers
         [last-optional-break-k (when debug (report x 'invoking-last-breakpoint))
                                (last-optional-break-k #t)]
+        ;; fallback if no last-breakpoint-k exists
         [else (when debug (report x 'falling-back))
               (match-define-values (vals _ _) (insert-break))
-              (values vals (list x) (distance x 'start))]))))) ;; fallback if no last-breakpoint-k exists
-
+              (values vals (list x) (distance x 'start))])))))
 
 
 (define x (q #f #\x))
@@ -210,10 +211,10 @@
 (define (slug . xs) ($slug #f xs))
 (define (linewrap2 xs size [debug #f])
   (wrap xs size debug
-                 #:break-val 'lb
-                 #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (elems q)) '(#\newline))))
-                 #:optional-break-proc optional-break?
-                 #:finish-segment-proc (λ (pcs) (list ($slug #f pcs)))))
+        #:break-val 'lb
+        #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (elems q)) '(#\newline))))
+        #:optional-break-proc optional-break?
+        #:finish-segment-proc (λ (pcs) (list ($slug #f pcs)))))
 
 (module+ test
   (test-case

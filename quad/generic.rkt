@@ -3,8 +3,8 @@
 (provide (all-defined-out))
 
 (define-generics quad
-  (start quad)
-  (end quad)
+  (in quad)
+  (out quad)
   (inner quad)
 
   (size quad [signal])

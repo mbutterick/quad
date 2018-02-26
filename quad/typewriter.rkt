@@ -15,12 +15,12 @@
 (struct $page $quad () #:transparent)
 (struct $doc $quad () #:transparent)
 (struct $break $quad () #:transparent)
-(define (break . xs) ($break (hasheq 'size (delay (values 0 0 0))) xs))
+(define (break . xs) ($break (hasheq 'size '(0 0)) xs))
 (define (lbs xs size [debug #f])
   (wrap xs size debug
         #:break-val (break #\newline)
         #:optional-break-proc optional-break?
-        #:finish-segment-proc (λ (pcs) (list ($line (hasheq) (map charify pcs))))))
+        #:finish-segment-proc (λ (pcs) (list ($line (hasheq 'size '(0 12) 'out 'sw) (map charify pcs))))))
 
 (define (pbs xs size [debug #f])
   (wrap xs size debug
@@ -29,7 +29,7 @@
         #:finish-segment-proc (λ (pcs) (list ($page (hasheq) (filter-not $break? pcs))))))
 
 (define (typeset args)
-  (quad->qexpr ($doc (hasheq) (map position (filter-not $break? (pbs (lbs (atomize (apply quad #f args)) (* 3 7.2)) (* 2 12)))))))
+  ($doc (hasheq) (map position (filter-not $break? (pbs (lbs (atomize (apply quad #f args)) 3) (* 5 12))))))
 
 (define-syntax-rule (mb lang-line-config-arg . args)
   (#%module-begin

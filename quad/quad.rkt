@@ -14,9 +14,9 @@
   #:methods gen:quad
   [(define (elems q) ($quad-elems q))
    (define (attrs q) ($quad-attrs q))
-   (define (start q) (hash-ref (attrs q) 'start 'nw))
-   (define (end q) (hash-ref (attrs q) 'end 'ne))
-   (define (inner q) (hash-ref (attrs q) 'inner (λ () (start q))))
+   (define (in q) (hash-ref (attrs q) 'in 'nw))
+   (define (out q) (hash-ref (attrs q) 'out 'ne))
+   (define (inner q) (hash-ref (attrs q) 'inner (λ () (in q))))
    (define (size q [signal #f]) (let ([v (hash-ref (attrs q) 'size (λ () (default-size-proc q signal)))])
                                   (cond
                                     [(procedure? v) (v signal)]
