@@ -45,7 +45,7 @@
   (pt+ (origin q) (anchor->point q (out q) signal))) ; no offset because end-point is calculated without padding
 
 
-(define/contract (position q [previous-end-pt (pt 0 0)])
+(define/contract (position q [previous-end-pt (origin q)])
   ((quad?) (point?) . ->* . quad?)
   (set-origin! q (pt- previous-end-pt (in-point q)))
   (for/fold ([pt (inner-point q)])
