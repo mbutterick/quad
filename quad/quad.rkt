@@ -25,7 +25,10 @@
    (define (offset q [signal #f]) (hash-ref (attrs q) 'offset '(0 0)))
    (define (origin q) (hash-ref (attrs q) 'origin '(0 0)))
    (define (set-origin! q val) (set-$quad-attrs! q (hash-set (attrs q) 'origin val)))
-   (define (draw q [surface #f] [origin #f]) ((hash-ref (attrs q) 'draw (λ () (λ () (println "<no draw routine>"))))))])
+   (define (draw q [surface #f])
+     (define (default-draw-proc q surface)
+       (for-each (λ (e) (draw e surface)) (elems q)))
+     ((hash-ref (attrs q) 'draw (const default-draw-proc)) q surface))])
 
 (define (quad-attrs? x) (and (hash? x) (hash-eq? x)))
 (define (quad-elem? x) (or (char? x) (string? x) ($quad? x)))
@@ -59,5 +62,5 @@
                            'exit 10+10i
                            'inner 5+5i
                            'size 8+8i
-                           'draw (λ () (println "foo"))) '(#\H #\e #\l #\o)))
+                           'draw (λ (q doc) (println "foo"))) '(#\H #\e #\l #\o)))
   (draw x))
