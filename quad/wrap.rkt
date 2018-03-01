@@ -70,6 +70,7 @@
 
 (define x (q #f #\x))
 (define zwx (q (list 'size (pt 0 0)) #\z))
+(define hyph (q #f #\-))
 (define a (q #f #\a))
 (define b (q #f #\b))
 (define c (q #f #\c))
@@ -79,7 +80,7 @@
                               [(start end) (pt 0 0)]
                               [else (pt 1 1)]))) #\space))
 (define br (q (list 'size (pt 0 0)) #\newline))
-(define optional-break? (λ (q) (and (quad? q) (memv (car (elems q)) '(#\space)))))
+(define optional-break? (λ (q) (and (quad? q) (memv (car (elems q)) '(#\space #\-)))))
 
 (define (linewrap xs size [debug #f])
   (wrap xs size debug
@@ -117,6 +118,11 @@
    (check-equal? (linewrap (list sp x sp) 2) (list x))
    (check-equal? (linewrap (list sp sp x sp sp) 2) (list x))
    (check-equal? (linewrap (list sp sp x sp sp x sp) 1) (list x 'lb x)))
+
+  
+  (test-case
+   "hyphens"
+   (check-equal? (linewrap (list x x hyph x x) 4) (list x x hyph 'lb x x)))
 
   (test-case
    "zero width nonbreakers"
