@@ -133,7 +133,8 @@
   
   (test-case
    "hyphens, hard and soft"
-   (check-equal? (linewrap (list x x hyph x x) 1 42) (list x 'lb x 'lb hyph 'lb x 'lb x))
+   (check-equal? (linewrap (list x hyph x) 1 'debug) (list x 'lb hyph 'lb x))
+   #;(check-equal? (linewrap (list x x hyph x x) 1 'debug) (list x 'lb x 'lb hyph 'lb x 'lb x))
    #;(check-equal? (linewrap (list x x hyph x x) 2) (list x x 'lb hyph x 'lb x x))
    (check-equal? (linewrap (list x x hyph x x) 3) (list x x hyph 'lb x x))
    (check-equal? (linewrap (list x x hyph x x) 4) (list x x hyph 'lb x x))
