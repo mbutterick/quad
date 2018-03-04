@@ -20,14 +20,15 @@
                                #:break-val [break-val 'break]
                                #:mandatory-break-proc [mandatory-break? (const #f)]
                                #:optional-break-proc [optional-break? (const #f)]
-                               #:finish-segment-proc [finish-segment-proc values])
+                               #:finish-wrap-proc [finish-wrap-proc values])
   ((any/c) (real? any/c
                   #:break-val any/c
                   #:mandatory-break-proc procedure?
                   #:optional-break-proc procedure?
-                  #:finish-segment-proc procedure?) . ->* . (listof any/c))
+                  #:finish-wrap-proc procedure?) . ->* . (listof any/c))
   (define start-signal (gensym))
-  (define (finish-segment pieces) (finish-segment-proc (reverse (dropf pieces optional-break?))))
+  (define (nonprinting-at-end? x) (zero? (distance x 'end)))
+  (define (finish-wrap pieces) (finish-wrap-proc (reverse (dropf pieces (λ (x) (and (optional-break? x) (nonprinting-at-end? x)))))))
   (define last-optional-break-k #f)
   (call/prompt ;; continuation boundary for last-optional-break-k
    (thunk
@@ -35,17 +36,28 @@
     (for/fold ([segments null]
                [pieces null]
                [dist-so-far start-signal]
-               #:result (append* (reverse (cons (finish-segment pieces) segments))))
+               #:result (append* (reverse (cons (finish-wrap pieces) segments))))
               ([x (in-list xs)])
       (define at-start? (eq? dist-so-far start-signal))
       (define underflow? (and (not at-start?) (<= (+ dist-so-far (distance x 'end)) target-size)))
       (define (add-to-segment) (values segments (cons x pieces) (if at-start?
                                                                     (distance x 'start)
                                                                     (+ dist-so-far (distance x)))))
-      (define (insert-break)
-        ;; when break is found, q is omitted from accumulation
-        ;; and any preceding optional breaks are dropped (that would be trailing before the break)
-        (values (list* (list break-val) (finish-segment pieces) segments) null start-signal))
+      (define (insert-break [before? #f])
+        ;; a break can be inserted before or after the current quad.
+        ;; At an ordinary break (mandatory or optional) it goes after the wrap point.
+        ;; The wrap signal consumes the break if it's nonprinting (e.g., word space or hard break)
+        ;; but not if it's printing (e.g., hyphen).
+        ;; But if no ordinary break can be found for a line, the wrap will happen before the quad.
+        ;; The wrap signal will not consume the quad (rather, it will become the first quad in the next wrap)
+        ;; In both cases, the `finish-wrap` proc will strip off any trailing white breaks from the new segment.
+        (define-values (pieces-for-this-wrap pieces-for-next-wrap starting-distance-for-next-wrap)
+          (if before?
+              (values pieces (list x) (distance x 'start))
+              (values (if (nonprinting-at-end? x) pieces (cons x pieces)) null start-signal)))
+        (values (list* (list break-val) (finish-wrap pieces-for-this-wrap) segments)
+                pieces-for-next-wrap
+                starting-distance-for-next-wrap))
       (cond
         [(mandatory-break? x) (when debug (report x 'got-mandatory-break))
                               (insert-break)]
@@ -64,8 +76,7 @@
                                (last-optional-break-k #t)]
         ;; fallback if no last-breakpoint-k exists
         [else (when debug (report x 'falling-back))
-              (match-define-values (vals _ _) (insert-break))
-              (values vals (list x) (distance x 'start))])))))
+              (insert-break 'before)])))))
 
 
 (define x (q #f #\x))
@@ -121,8 +132,12 @@
 
   
   (test-case
-   "hyphens"
-   (check-equal? (linewrap (list x x hyph x x) 4) (list x x hyph 'lb x x)))
+   "hyphens, hard and soft"
+   (check-equal? (linewrap (list x x hyph x x) 1 42) (list x 'lb x 'lb hyph 'lb x 'lb x))
+   #;(check-equal? (linewrap (list x x hyph x x) 2) (list x x 'lb hyph x 'lb x x))
+   (check-equal? (linewrap (list x x hyph x x) 3) (list x x hyph 'lb x x))
+   (check-equal? (linewrap (list x x hyph x x) 4) (list x x hyph 'lb x x))
+   (check-equal? (linewrap (list x x hyph x x) 5) (list x x hyph x x)))
 
   (test-case
    "zero width nonbreakers"
@@ -156,9 +171,9 @@
 
   (define (visual-wrap str int [debug #f])
     (apply string (for/list ([b (in-list (linewrap (atomize str) int debug))])
-                    (cond
-                      [(quad? b) (car (elems b))]
-                      [else #\|]))))
+                            (cond
+                              [(quad? b) (car (elems b))]
+                              [else #\|]))))
 
   (test-case
    "visual breaks"
@@ -220,7 +235,7 @@
         #:break-val 'lb
         #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (elems q)) '(#\newline))))
         #:optional-break-proc optional-break?
-        #:finish-segment-proc (λ (pcs) (list ($slug #f pcs)))))
+        #:finish-wrap-proc (λ (pcs) (list ($slug #f pcs)))))
 
 (module+ test
   (test-case
