@@ -27,6 +27,8 @@
                   #:optional-break-proc procedure?
                   #:finish-wrap-proc procedure?) . ->* . (listof any/c))
   (define start-signal (gensym))
+  (define (nonprinting-at-start? x) (zero? (distance x 'start)))
+  (define (nonprinting-at-middle? x) (zero? (distance x)))
   (define (nonprinting-at-end? x) (zero? (distance x 'end)))
   (define (finish-wrap pieces) (finish-wrap-proc (reverse (dropf pieces (λ (x) (and (optional-break? x) (nonprinting-at-end? x)))))))
   (define last-optional-break-k #f)
@@ -59,29 +61,73 @@
                 pieces-for-next-wrap
                 starting-distance-for-next-wrap))
       (cond
-        [(mandatory-break? x) (when debug (report x 'got-mandatory-break))
-                              (insert-break)]
+        [(mandatory-break? x)
+         ;; easiest case. Always put a break where a mandatory break indicates (duh, or it's not mandatory)
+         (when debug (report x 'got-mandatory-break))
+         (insert-break)]
         [(optional-break? x)
+         ;; hardest case, because behavior of optional breaks depends on location in the wrap, and printability
          (cond
-           [at-start? (when debug (report x 'skipping-opt-break-at-beginning)) (values segments null dist-so-far)]
-           [(and underflow? (capture-optional-break-k!)) (when debug (report x 'resuming-breakpoint))
-                                                         (set! last-optional-break-k #f) ;; prevents continuation loop
-                                                         (insert-break)]
-           [else (when debug (report x 'add-optional-break))
-                 (add-to-segment)])]
-        [(or at-start? underflow?) (when debug (report x 'add-ordinary-char))
-                                   (add-to-segment)]
-        ;; overflow handlers
-        [last-optional-break-k (when debug (report x 'invoking-last-breakpoint))
-                               (last-optional-break-k #t)]
-        ;; fallback if no last-breakpoint-k exists
-        [else (when debug (report x 'falling-back))
-              (insert-break 'before)])))))
+           [(and at-start? (nonprinting-at-start? x))
+            ;; a nonprinting optional break is something like a word space
+            ;; we don't want to accumulate these at the front of a wrap. We want to start with a printable quad.
+            ;; So skip them.
+            (when debug (report x 'skipping-opt-break-at-beginning))
+            (values segments null dist-so-far)]
+           [(and underflow? (capture-optional-break-k!))
+            ;; This branch creates a continuation point for a later wrap.
+            ;; on the first pass, it just marks the optional break as a potential break location.
+            ;; if another optional break is encountered before a wrap is needed,
+            ;; then it becomes the captured break.
+            ;; Meaning, the continuation always points at the last available break.
+            ;; Then, in an overflow situation (handled later in this cond)
+            ;; the continuation is invoked, which causes the rest of this branch to be evaluated.
+            (when debug (report x 'resuming-breakpoint))
+            (set! last-optional-break-k #f) ;; prevents continuation loop
+            (insert-break)]
+           [(or underflow? (nonprinting-at-end? x))
+            ;; we do want to accumulate nonprinting optional breaks (like wordspaces) in the middle.
+            ;; in case we encounter a printing quad that fits on the line.
+            ;; if we don't (ie. the line overflows) then they will get stripped by `finish-wrap`
+            (when debug (report x 'add-optional-break-nonprinting-or-underflow))
+            (add-to-segment)]
+           [at-start?
+            ;; this branch is only reached if the first quad on the line causes an overflow
+            ;; That sounds weird, but maybe it's just really big.
+            (when debug (report x 'add-optional-break-overflow+printing+at-start))
+            (add-to-segment)]
+           [else
+            ;; this case is equivalent to the final case of the enclosing cond
+            ;; where we have an overflow and no available optional break
+            ;; so we just break before and move on
+            (when debug (report x 'add-optional-break-overflow+printing+not-at-start))
+            (insert-break 'before)])]
+        [(or at-start? underflow?)
+         ;; the easy case of accumulating quads in the middle of a wrap
+         (when debug (report x 'add-ordinary-quad))
+         (add-to-segment)]
+        ;; the previous branch will catch all `underflow?` cases
+        ;; therefore, in these last two cases, we have overflow
+        [last-optional-break-k ;; overflow implied
+         ;; if we have an optional break stored, we jump back and use it
+         ;; now that we know we need it.
+         (when debug (report x 'invoking-last-breakpoint))
+         (last-optional-break-k #t)]
+        [else ;; overflow implied
+         ;; if we don't have an optional break stored, we need to just end the wrap and move on
+         ;; we insert the break `before` so that the current quad is moved to the next wrap
+         ;; no, it's not going to look good, but if we reach this point, we are in weird conditions
+         (when debug (report x 'falling-back))
+         (insert-break 'before)])))))
 
 
 (define x (q #f #\x))
 (define zwx (q (list 'size (pt 0 0)) #\z))
 (define hyph (q #f #\-))
+(define shy (q (list 'size (λ (sig)
+                             (case sig
+                               [(end) (pt 1 1)]
+                               [else (pt 0 0)]))) #\-))
 (define a (q #f #\a))
 (define b (q #f #\b))
 (define c (q #f #\c))
@@ -132,13 +178,32 @@
 
   
   (test-case
-   "hyphens, hard and soft"
-   (check-equal? (linewrap (list x hyph x) 1 'debug) (list x 'lb hyph 'lb x))
-   #;(check-equal? (linewrap (list x x hyph x x) 1 'debug) (list x 'lb x 'lb hyph 'lb x 'lb x))
-   #;(check-equal? (linewrap (list x x hyph x x) 2) (list x x 'lb hyph x 'lb x x))
+   "hard hyphens"
+   (check-equal? (linewrap (list hyph) 1) (list hyph))
+   (check-equal? (linewrap (list hyph hyph) 1) (list hyph 'lb hyph))
+   (check-equal? (linewrap (list hyph hyph) 2) (list hyph hyph))
+   (check-equal? (linewrap (list hyph hyph hyph) 2) (list hyph hyph 'lb hyph))
+   (check-equal? (linewrap (list x hyph) 1) (list x 'lb hyph))
+   (check-equal? (linewrap (list x x hyph x x) 1) (list x 'lb x 'lb hyph 'lb x 'lb x))
+   (check-equal? (linewrap (list x x hyph x x) 2) (list x x 'lb hyph x 'lb x))
    (check-equal? (linewrap (list x x hyph x x) 3) (list x x hyph 'lb x x))
    (check-equal? (linewrap (list x x hyph x x) 4) (list x x hyph 'lb x x))
    (check-equal? (linewrap (list x x hyph x x) 5) (list x x hyph x x)))
+
+  (test-case
+   "soft hyphens"
+   (check-equal? (linewrap (list shy) 1) (list))
+   (check-equal? (linewrap (list shy shy) 2) (list))
+   (check-equal? (linewrap (list shy shy shy) 2) (list))
+   (check-equal? (linewrap (list x shy) 1 42) (list x))
+   #|
+   (check-equal? (linewrap (list x x shy x x) 1) (list x 'lb x 'lb shy 'lb x 'lb x))
+   (check-equal? (linewrap (list x x shy x x) 2) (list x x 'lb shy x 'lb x))
+   (check-equal? (linewrap (list x x shy x x) 3) (list x x shy 'lb x x))
+   (check-equal? (linewrap (list x x shy x x) 4) (list x x shy 'lb x x))
+   (check-equal? (linewrap (list x x shy x x) 5) (list x x shy x x))
+|#
+   )
 
   (test-case
    "zero width nonbreakers"
@@ -172,9 +237,9 @@
 
   (define (visual-wrap str int [debug #f])
     (apply string (for/list ([b (in-list (linewrap (atomize str) int debug))])
-                            (cond
-                              [(quad? b) (car (elems b))]
-                              [else #\|]))))
+                    (cond
+                      [(quad? b) (car (elems b))]
+                      [else #\|]))))
 
   (test-case
    "visual breaks"
