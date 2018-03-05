@@ -30,5 +30,5 @@ before_install:
 script:
  - cd ..   # Travis did a cd into the dir. Back up, for the next:
   # don't use package server because it points to #demo branch
- - travis_retry raco pkg install --deps search-auto https://github.com/mbutterick/quad.git
- - raco test -p quad
+# - travis_retry raco pkg install --deps search-auto https://github.com/mbutterick/quad.git
+# - raco test -p quad
