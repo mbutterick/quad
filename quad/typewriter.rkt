@@ -19,13 +19,13 @@
   (wrap xs size debug
         #:break-val (break #\newline)
         #:optional-break-proc optional-break?
-        #:finish-segment-proc (λ (pcs) (list ($line (hasheq 'size (list +inf.0 line-height) 'out 'sw) pcs)))))
+        #:finish-wrap-proc (λ (pcs) (list ($line (hasheq 'size (list +inf.0 line-height) 'out 'sw) pcs)))))
 
 (define (page-wrap xs size [debug #f])
   (wrap xs size debug
         #:break-val (break #\page)
         #:optional-break-proc $break?
-        #:finish-segment-proc (λ (pcs) (list ($page (hasheq) (filter-not $break? pcs))))))
+        #:finish-wrap-proc (λ (pcs) (list ($page (hasheq) (filter-not $break? pcs))))))
 
 (define (typeset args)
   (define chars 33)
@@ -34,10 +34,11 @@
   (position ($doc (hasheq 'origin '(36 36)) (page-wrap (line-wrap (map charify (atomize (apply quad #f args))) line-width) lines-per-page))))
 
 
+(require hyphenate)
 (define-macro (mb . ARGS)
   (with-pattern ([PS (syntax-property #'ARGS 'ps)])
     #'(#%module-begin
-       (define q (typeset (list . ARGS)))
+       (define q (typeset (map hyphenate (list . ARGS))))
        ;q
        (let ([doc (make-object PDFDocument
                     (hasheq 'compress #f
