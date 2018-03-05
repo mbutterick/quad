@@ -3,11 +3,17 @@
 (require pitfall/document)
 (provide (rename-out [mb #%module-begin]) (except-out (all-from-out br/quicklang) #%module-begin))
 
-(define optional-break? (λ (q) (and (quad? q) (memv (car (elems q)) '(#\space #\-)))))
+(define optional-break? (λ (q) (and (quad? q) (memv (car (elems q)) '(#\space #\- #\u00AD)))))
 (struct $shim $quad () #:transparent)
 (struct $char $quad () #:transparent)
-(define (charify q) ($char (hash-set* (attrs q) 'size (const '(7.2 12))
-                                      'draw (λ (q doc) (send/apply doc text (apply string (elems q)) (origin q)))) (elems q)))
+(define (charify q) 
+  ($char (hash-set* (attrs q)
+                    'size (if (equal? (elems q) '(#\u00AD))
+                              (λ (sig) (case sig
+                                         [(end) '(7.2 12)]
+                                         [else '(0 0)]))
+                              (const '(7.2 12)))
+                    'draw (λ (q doc) (send/apply doc text (apply string (elems q)) (origin q)))) (elems q)))
 (struct $line $quad () #:transparent)
 (struct $page $quad () #:transparent)
 (struct $doc $quad () #:transparent)
