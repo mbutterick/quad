@@ -6,19 +6,23 @@
 (define optional-break? (λ (q) (and (quad? q) (memv (car (elems q)) '(#\space #\- #\u00AD)))))
 (struct $shim $quad () #:transparent)
 (struct $char $quad () #:transparent)
-(define (charify q) 
+(define (charify q)
   ($char (hash-set* (attrs q)
-                    'size (if (equal? (elems q) '(#\u00AD))
-                              (λ (sig) (case sig
-                                         [(end) '(7.2 12)]
-                                         [else '(0 0)]))
-                              (const '(7.2 12)))
+                    'size (case (car (elems q))
+                            [(#\u00AD)
+                             (λ (sig) (case sig
+                                        [(end) '(7.2 12)]
+                                        [else #f]))]
+                            [(#\space) (λ (sig) (case sig
+                                                  [(start end) #f]
+                                                  [else '(7.2 12)]))]
+                            [else (const '(7.2 12))])
                     'draw (λ (q doc) (send/apply doc text (apply string (elems q)) (origin q)))) (elems q)))
 (struct $line $quad () #:transparent)
 (struct $page $quad () #:transparent)
 (struct $doc $quad () #:transparent)
 (struct $break $quad () #:transparent)
-(define (break . xs) ($break (hasheq 'size '(0 0)) xs))
+(define (break . xs) ($break (hasheq 'size #f) xs))
 
 (define line-height 16)
 (define (line-wrap xs size [debug #f])
