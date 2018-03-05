@@ -13,3 +13,9 @@ And update like so:
 
 
 Docs: http://docs.racket-lang.org/quad
+
+
+License
+---
+
+MIT
