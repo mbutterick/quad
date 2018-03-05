@@ -47,7 +47,6 @@
          (define at-start? (eq? dist-so-far start-signal))
          (define underflow? (and (not at-start?) (<= (+ dist-so-far (if (and (quad? x) (printable? x 'end)) (distance x) 0)) target-size)))
          (define (add-to-current-wrap)
-           
            (define printable (and (quad? x) (printable? x (and at-start? 'start)))) 
            (define dist (and printable (distance x)))
            (loop wraps
@@ -67,7 +66,7 @@
            (define-values (pieces-for-this-wrap next-xs)
              (if before?
                  (values wrap-pieces xs)
-                 (values (if (nonprinting-at-end? x) wrap-pieces (cons x wrap-pieces)) (cdr xs))))
+                 (values (if (and (quad? x) (nonprinting-at-end? x)) wrap-pieces (cons x wrap-pieces)) (cdr xs)))) ; omit nonprinting quad
            (loop (list* (list break-val) (finish-wrap pieces-for-this-wrap) wraps)
                  null
                  start-signal
