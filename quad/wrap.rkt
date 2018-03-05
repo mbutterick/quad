@@ -2,18 +2,16 @@
 (require racket/contract racket/list racket/match txexpr sugar/debug sugar/define sugar/list racket/promise racket/function (only-in racket/control call/prompt)
          "param.rkt" "qexpr.rkt" "atomize.rkt" "quad.rkt" "generic.rkt" "position.rkt")
 
-(define/contract (distance q [signal #f])
-  ((any/c) (any/c) . ->* . (or/c #f real?))
+(define/contract (distance q)
+  (any/c . -> . real?)
   ;; linear distance from in point to out point
-  ;; or #f if quad is nonprinting
   (cond
     [(quad? q)
-     (and (size q signal)
-          (match-let ([(list ∆x ∆y) (map - (out-point q signal) (in-point q signal))])
-            (cond
-              [(zero? ∆x) ∆y]
-              [(zero? ∆y) ∆x]
-              [else (sqrt (+ (* ∆x ∆x) (* ∆y ∆y)))])))]
+     (match-define (list ∆x ∆y) (map - (out-point q) (in-point q)))
+     (cond
+       [(zero? ∆x) ∆y]
+       [(zero? ∆y) ∆x]
+       [else (sqrt (+ (* ∆x ∆x) (* ∆y ∆y)))])]
     [else 0]))
 
 
@@ -30,12 +28,12 @@
                   #:optional-break-proc procedure?
                   #:finish-wrap-proc procedure?) . ->* . (listof any/c))
   (define start-signal (gensym))
-  (define (nonprinting-at-start? x) (not (distance x 'start)))
-  (define (nonprinting-at-end? x) (not (distance x 'end)))
+  (define (nonprinting-at-start? x) (if (quad? x) (not (printable? x 'start)) #t))
+  (define (nonprinting-at-end? x) (if (quad? x) (not (printable? x 'end)) #t))
   (define (finish-wrap pieces) (finish-wrap-proc (reverse (dropf pieces (λ (x) (and (optional-break? x)
                                                                                     (nonprinting-at-end? x)))))))
   (define last-optional-break-k #f)
-  (define (capture-optional-break-k!) (let/cc k (set! last-optional-break-k k) #f))
+  (define (capture-optional-break-k!) (when debug (report 'capturing-break)) (let/cc k (set! last-optional-break-k k) #f))
   (call/prompt ;; continuation boundary for last-optional-break-k
    (thunk
     (let loop ([wraps null][wrap-pieces null][dist-so-far start-signal][xs xs])
@@ -47,11 +45,13 @@
         [else
          (define x (car xs))
          (define at-start? (eq? dist-so-far start-signal))
-         (define underflow? (and (not at-start?) (<= (+ dist-so-far (or (distance x 'end) 0)) target-size)))
+         (define underflow? (and (not at-start?) (<= (+ dist-so-far (if (and (quad? x) (printable? x 'end)) (distance x) 0)) target-size)))
          (define (add-to-current-wrap)
-           (define dist (distance x (and at-start? 'start)))
+           
+           (define printable (and (quad? x) (printable? x (and at-start? 'start)))) 
+           (define dist (and printable (distance x)))
            (loop wraps
-                 (if dist (cons x wrap-pieces) wrap-pieces) ; omit nonprinting quad
+                 (if (and (quad? x) (not printable)) wrap-pieces (cons x wrap-pieces)) ; omit nonprinting quad
                  (if at-start? (or dist start-signal) (+ dist-so-far (or dist 0)))
                  (cdr xs)))
          (define (insert-break [before? #f])
@@ -115,19 +115,19 @@
 (define x (q #f #\x))
 (define zwx (q (list 'size (pt 0 0)) #\z))
 (define hyph (q #f #\-))
-(define shy (q (list 'size (λ (sig)
-                             (case sig
-                               [(end) (pt 1 1)]
-                               [else #f]))) #\-))
+(define shy (q (list 'size (pt 1 1) 'printable? (λ (sig)
+                                                  (case sig
+                                                    [(end) #t]
+                                                    [else #f]))) #\-))
 (define a (q #f #\a))
 (define b (q #f #\b))
 (define c (q #f #\c))
 (define d (q #f #\d))
-(define sp (q (list 'size (λ (sig)
-                            (case sig
-                              [(start end) #f]
-                              [else (pt 1 1)]))) #\space))
-(define br (q (list 'size #f) #\newline))
+(define sp (q (list 'size (pt 1 1) 'printable? (λ (sig)
+                                                 (case sig
+                                                   [(start end) #f]
+                                                   [else #t]))) #\space))
+(define br (q (list 'size (pt 0 0) 'printable? #f) #\newline))
 (define optional-break? (λ (q) (and (quad? q) (memv (car (elems q)) '(#\space #\-)))))
 
 (define (linewrap xs size [debug #f])
@@ -135,6 +135,7 @@
         #:break-val 'lb
         #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (elems q)) '(#\newline))))
         #:optional-break-proc optional-break?))
+
 
 (module+ test
   (require rackunit)
@@ -151,6 +152,7 @@
    (check-equal? (linewrap (list x x x x x) 1) (list x 'lb x 'lb x 'lb x 'lb x))
    (check-equal? (linewrap (list x x x x x) 10) (list x x x x x)))
 
+
   (test-case
    "chars and spaces"
    (check-equal? (linewrap (list x sp x) 1) (list x 'lb x))
@@ -158,6 +160,7 @@
    (check-equal? (linewrap (list a sp b) 3) (list a sp b))
    (check-equal? (linewrap (list x sp x x) 3) (list x 'lb x x)))
 
+  
   (test-case
    "leading & trailing spaces"
    (check-equal? (linewrap (list sp x) 2) (list x))
@@ -166,7 +169,6 @@
    (check-equal? (linewrap (list sp sp x sp sp) 2) (list x))
    (check-equal? (linewrap (list sp sp x sp sp x sp) 1) (list x 'lb x)))
 
-  
   (test-case
    "hard hyphens"
    (check-equal? (linewrap (list hyph) 1) (list hyph))
@@ -222,20 +224,17 @@
    (check-equal? (linewrap (list a sp b sp sp br sp c) 3) (list a sp b 'lb c))
    (check-equal? (linewrap (list x x x x) 3) (list x x x 'lb x))
    (check-equal? (linewrap (list x x x sp x x) 2) (list x x 'lb x 'lb x x))
-   (check-equal? (linewrap (list x x x sp x x) 3) (list x x x 'lb x x)))
+   (check-equal? (linewrap (list x x x sp x x) 3) (list x x x 'lb x x))))
 
   (define (visual-wrap str int [debug #f])
     (apply string (for/list ([b (in-list (linewrap (atomize str) int debug))])
                             (cond
                               [(quad? b) (car (elems b))]
                               [else #\|]))))
-
-  (check-equal? (visual-wrap "M d" 1 1) "M|d")
-
-      #|
-(test-case
+(module+ test
+  (test-case
    "visual breaks"
-   (check-equal? (visual-wrap "My dog has fleas" 1 1) "M|y|d|o|g|h|a|s|f|l|e|a|s")
+   (check-equal? (visual-wrap "My dog has fleas" 1) "M|y|d|o|g|h|a|s|f|l|e|a|s")
    (check-equal? (visual-wrap "My dog has fleas" 2) "My|do|g|ha|s|fl|ea|s")
    (check-equal? (visual-wrap "My dog has fleas" 3) "My|dog|has|fle|as")
    (check-equal? (visual-wrap "My dog has fleas" 4) "My|dog|has|flea|s")
@@ -250,7 +249,7 @@
    (check-equal? (visual-wrap "My dog has fleas" 13) "My dog has|fleas")
    (check-equal? (visual-wrap "My dog has fleas" 14) "My dog has|fleas")
    (check-equal? (visual-wrap "My dog has fleas" 15) "My dog has|fleas")
-   (check-equal? (visual-wrap "My dog has fleas" 16) "My dog has fleas"))
+   (check-equal? (visual-wrap "My dog has fleas" 16) "My dog has fleas")))
 
 
   (define (pagewrap xs size [debug #f])
@@ -260,6 +259,7 @@
           #:optional-break-proc (λ (x) (eq? x 'lb))))
   (define pbr (q '(size #f) #\page))
 
+(module+ test
   (test-case
    "soft page breaks"
    (check-equal? (pagewrap null 2) null)
@@ -278,7 +278,6 @@
    (check-equal? (pagewrap (list x pbr pbr x x) 1) (list x 'pb 'pb x 'pb x))
    (check-equal? (pagewrap (list x pbr pbr x x) 2) (list x 'pb 'pb x x))
    (check-equal? (pagewrap (list 'lb x 'lb 'lb pbr 'lb x x 'lb) 2) (list x 'pb x x)))
-
   (test-case
    "composed line breaks and page breaks"
    (check-equal? (pagewrap (linewrap null 1) 2) null)
@@ -305,7 +304,4 @@
    (check-equal? (linewrap2 (list a sp b sp sp br sp c) 3) (list (slug a sp b) 'lb (slug c)))
    (check-equal? (linewrap2 (list x x x x) 3) (list (slug x x x) 'lb (slug x)))
    (check-equal? (linewrap2 (list x x x sp x x) 2) (list (slug x x) 'lb (slug x) 'lb (slug x x)))
-   (check-equal? (linewrap2 (list x x x sp x x) 3) (list (slug x x x) 'lb (slug x x))))
-|#
-
-  )
+   (check-equal? (linewrap2 (list x x x sp x x) 3) (list (slug x x x) 'lb (slug x x)))))

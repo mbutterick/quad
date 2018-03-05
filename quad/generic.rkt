@@ -7,8 +7,9 @@
   (out quad)
   (inner quad)
 
-  (size quad [signal])
-  (offset quad [signal])
+  (printable? quad [signal])
+  (size quad)
+  (offset quad)
 
   (origin quad)
   (set-origin! quad where)

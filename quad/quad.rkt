@@ -3,12 +3,12 @@
 (provide (all-defined-out))
 (module+ test (require rackunit))
 
-(define (default-size-proc q sig)
+(define (default-visibility-proc q sig)
   (match (elems q)
     [(list (? (λ (x) (and (char? x) (char-whitespace? x))) c)) (case sig
-                                                                 [(start end) '(0 0)]
-                                                                 [else '(1 1)])]
-    [else '(1 1)]))
+                                                                 [(start end) #f]
+                                                                 [else #t])]
+    [else #t]))
 
 (struct $quad (attrs elems) #:transparent #:mutable
   #:methods gen:quad
@@ -17,11 +17,17 @@
    (define (in q) (hash-ref (attrs q) 'in 'nw))
    (define (out q) (hash-ref (attrs q) 'out 'ne))
    (define (inner q) (hash-ref (attrs q) 'inner (λ () (in q))))
-   (define (size q [signal #f]) (let ([v (hash-ref (attrs q) 'size (λ () (default-size-proc q signal)))])
-                                  (cond
-                                    [(procedure? v) (v signal)]
-                                    [(promise? v) (force v)]
-                                    [else v])))
+   (define (printable? q [signal #f]) 
+     (let ([v (hash-ref (attrs q) 'printable? (λ () (default-visibility-proc q signal)))])
+       (cond
+         [(procedure? v) (v signal)]
+         [(promise? v) (force v)]
+         [else v])))
+   (define (size q) (let ([v (hash-ref (attrs q) 'size '(1 1))])
+                      (cond
+                        [(procedure? v) (v)]
+                        [(promise? v) (force v)]
+                        [else v])))
    (define (offset q [signal #f]) (hash-ref (attrs q) 'offset '(0 0)))
    (define (origin q) (hash-ref (attrs q) 'origin '(0 0)))
    (define (set-origin! q val) (set-$quad-attrs! q (hash-set (attrs q) 'origin val)))
@@ -38,7 +44,7 @@
     [(list #f xs ...) (apply quad #:type type (hasheq) xs)]
     [(list (list (? symbol? sym) rest ...) (? quad-elem? elems) ...) (type (apply hasheq (cons sym rest)) elems)]
     [(list (? dict? attrs) (? quad-elem? elems) ...) (type (for/hasheq ([(k v) (in-dict attrs)])
-                                                             (values k v)) elems)]
+                                                                       (values k v)) elems)]
     [(list (? quad-attrs? attrs) (? quad-elem? elems) ...) (type attrs elems)]
     [(list (? quad-elem? elems) ...) (apply quad #:type type #f elems)]
     [else (error 'bad-quad-input)]))
