@@ -26,11 +26,19 @@
 (define (break . xs) ($break (hasheq 'printable? #f) xs))
 
 (define line-height 16)
+(define consolidate-into-runs? #t)
 (define (line-wrap xs size [debug #f])
   (wrap xs size debug
         #:break-val (break #\newline)
         #:optional-break-proc optional-break?
-        #:finish-wrap-proc (λ (pcs) (list ($line (hasheq 'size (list +inf.0 line-height) 'out 'sw) pcs)))))
+        #:finish-wrap-proc (λ (pcs) (list ($line (hasheq 'size (list +inf.0 line-height) 'out 'sw)
+                                                 ;; consolidate chars into a single run (naively)
+                                                 ;; by taking attributes from first (including origin)
+                                                 ;; this only works because there's only one run per line
+                                                 ;; that is, it suffices to position the first letter
+                                                 (if consolidate-into-runs?
+                                                     (list ($char (attrs (car pcs)) (append-map elems pcs)))
+                                                     pcs))))))
 
 (define (page-wrap xs size [debug #f])
   (wrap xs size debug
@@ -52,7 +60,7 @@
        (define q (typeset (map hyphenate (list . ARGS))))
        ;q
        (let ([doc (make-object PDFDocument
-                    (hasheq 'compress #f
+                    (hasheq 'compress #t
                             'size '(300 400)))])
          (send* doc
            [pipe (open-output-file PS #:exists 'replace)]
