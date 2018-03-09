@@ -1,5 +1,3 @@
 #lang quad/typewriter
 
-To get started with Racket, download it from the web page and install it. If you are a beginner or would like to use a graphical environment to run programs, run the DrRacket executable. Otherwise, the racket executable will run a command-line Read-Eval-Print-Loop (REPL).
-
-@(number->string (current-seconds))
+An expression that is not a value can always be partitioned into two parts: a redex, which is the part that changed in a single-step simplification (highlighted), and the continuation, which is the evaluation context surrounding an expression. In (- 4 (+ 1 1)), the redex is (+ 1 1), and the continuation is (- 4 []), where [] takes the place of the redex. That is, the continuation says how to "continue" after the redex is reduced to a value.

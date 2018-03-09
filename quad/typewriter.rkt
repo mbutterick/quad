@@ -10,20 +10,18 @@
   ($char (hash-set* (attrs q)
                     'size (const '(7.2 12))
                     'printable? (case (car (elems q))
-                                  [(#\u00AD)
-                                   (λ (sig) (case sig
-                                              [(end) #t]
-                                              [else #f]))]
-                                  [(#\space) (λ (sig) (case sig
-                                                        [(start end) #f]
-                                                        [else #t]))]
+                                  [(#\u00AD) (λ (sig) (memq sig '(end)))]
+                                  [(#\space) (λ (sig) (not (memq sig '(start end))))]
                                   [else #t])
-                    'draw (λ (q doc) (send/apply doc text (apply string (elems q)) (origin q)))) (elems q)))
+                    'draw (λ (q doc)
+                            (send doc fontSize 12)
+                            (send/apply doc text (apply string (elems q)) (origin q)))) (elems q)))
 (struct $line $quad () #:transparent)
 (struct $page $quad () #:transparent)
 (struct $doc $quad () #:transparent)
 (struct $break $quad () #:transparent)
-(define (break . xs) ($break (hasheq 'printable? #f) xs))
+(define page-count 1)
+(define (break . xs) ($break (hasheq 'printable? #f 'size '(0 0)) xs))
 
 (define line-height 16)
 (define consolidate-into-runs? #t)
@@ -39,32 +37,42 @@
                                                  (if consolidate-into-runs?
                                                      (list ($char (attrs (car pcs)) (append-map elems pcs)))
                                                      pcs))))))
-
+(define pb ($break (hasheq 'printable? #f
+                           'size '(0 0)
+                           'draw (λ (q doc)
+                                   (send doc addPage)
+                                   (send doc fontSize 10)
+                                   (send doc text (string-append "page " (number->string page-count)) 10 10)
+                                   (set! page-count (add1 page-count)))) '(#\page)))
 (define (page-wrap xs size [debug #f])
   (wrap xs size debug
-        #:break-val (break #\page)
+        #:break-before? #t
+        #:break-val pb
         #:optional-break-proc $break?
         #:finish-wrap-proc (λ (pcs) (list ($page (hasheq) (filter-not $break? pcs))))))
 
 (define (typeset args)
-  (define chars 33)
+  (define chars 25)
   (define line-width (* 7.2 chars))
-  (define lines-per-page (* 40 line-height))
+  (define lines-per-page (* 4 line-height))
   (position ($doc (hasheq 'origin '(36 36)) (page-wrap (line-wrap (map charify (atomize (apply quad #f args))) line-width) lines-per-page))))
 
 
-(require hyphenate)
+(require hyphenate racket/runtime-path pollen/unstable/typography)
+(define-runtime-path fira-mono "FiraMono-Regular.ttf")
 (define-macro (mb . ARGS)
   (with-pattern ([PS (syntax-property #'ARGS 'ps)])
     #'(#%module-begin
-       (define q (typeset (map hyphenate (list . ARGS))))
+       (define q (typeset (map hyphenate (map smart-quotes (list . ARGS)))))
        ;q
        (let ([doc (make-object PDFDocument
                     (hasheq 'compress #t
+                            'autoFirstPage #f
                             'size '(300 400)))])
          (send* doc
            [pipe (open-output-file PS #:exists 'replace)]
-           [font "Courier"]
+           [registerFont "Fira-Mono" (path->string fira-mono)]
+           [font "Fira-Mono"]
            [fontSize 12])
          (draw q doc)
          (send doc end))

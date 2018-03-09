@@ -14,6 +14,9 @@
   #:methods gen:quad
   [(define (elems q) ($quad-elems q))
    (define (attrs q) ($quad-attrs q))
+   ;; why 'nw and 'ne as defaults for in and out points
+   ;; if size is '(0 0), the points are the same, and everything piles up at the origin
+   ;; if size is otherwise, the items don't pile up (but rather lay out in a row)
    (define (in q) (hash-ref (attrs q) 'in 'nw))
    (define (out q) (hash-ref (attrs q) 'out 'ne))
    (define (inner q) (hash-ref (attrs q) 'inner (λ () (in q))))
@@ -23,7 +26,7 @@
          [(procedure? v) (v signal)]
          [(promise? v) (force v)]
          [else v])))
-   (define (size q) (let ([v (hash-ref (attrs q) 'size '(1 1))])
+   (define (size q) (let ([v (hash-ref (attrs q) 'size '(0 0))])
                       (cond
                         [(procedure? v) (v)]
                         [(promise? v) (force v)]

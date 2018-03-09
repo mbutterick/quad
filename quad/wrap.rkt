@@ -19,11 +19,15 @@
                                [target-size (current-wrap-distance)]
                                [debug #f]
                                #:break-val [break-val 'break]
+                               #:break-before? [break-before? #f]
+                               #:break-after? [break-after? #f]
                                #:mandatory-break-proc [mandatory-break? (const #f)]
                                #:optional-break-proc [optional-break? (const #f)]
                                #:finish-wrap-proc [finish-wrap-proc values])
   ((any/c) (real? any/c
                   #:break-val any/c
+                  #:break-before? boolean?
+                  #:break-after? boolean?
                   #:mandatory-break-proc procedure?
                   #:optional-break-proc procedure?
                   #:finish-wrap-proc procedure?) . ->* . (listof any/c))
@@ -41,7 +45,8 @@
         [(null? xs)
          ;; combine the segments into a flat list, and drop any trailing breaks
          ;; (on the idea that breaks should separate things, and there's nothing left to separate)
-         (dropf-right (append* (reverse (cons (finish-wrap wrap-pieces) wraps))) (λ (x) (eq? x break-val)))]
+         (define results (dropf-right (append* (reverse (cons (finish-wrap wrap-pieces) wraps))) (λ (x) (eq? x break-val))))
+         (append (if break-before? (list break-val) empty) results (if break-after? (list break-val) empty))]
         [else
          (define x (car xs))
          (define at-start? (eq? dist-so-far start-signal))
@@ -111,17 +116,17 @@
             (insert-break 'before)])])))))
 
 
-(define x (q #f #\x))
+(define x (q (list 'size (pt 1 1)) #\x))
 (define zwx (q (list 'size (pt 0 0)) #\z))
-(define hyph (q #f #\-))
+(define hyph (q (list 'size (pt 1 1)) #\-))
 (define shy (q (list 'size (pt 1 1) 'printable? (λ (sig)
                                                   (case sig
                                                     [(end) #t]
                                                     [else #f]))) #\-))
-(define a (q #f #\a))
-(define b (q #f #\b))
-(define c (q #f #\c))
-(define d (q #f #\d))
+(define a (q (list 'size (pt 1 1)) #\a))
+(define b (q (list 'size (pt 1 1)) #\b))
+(define c (q (list 'size (pt 1 1)) #\c))
+(define d (q (list 'size (pt 1 1)) #\d))
 (define sp (q (list 'size (pt 1 1) 'printable? (λ (sig)
                                                  (case sig
                                                    [(start end) #f]
@@ -225,11 +230,13 @@
    (check-equal? (linewrap (list x x x sp x x) 2) (list x x 'lb x 'lb x x))
    (check-equal? (linewrap (list x x x sp x x) 3) (list x x x 'lb x x))))
 
-  (define (visual-wrap str int [debug #f])
-    (apply string (for/list ([b (in-list (linewrap (atomize str) int debug))])
-                            (cond
-                              [(quad? b) (car (elems b))]
-                              [else #\|]))))
+(define (visual-wrap str int [debug #f])
+  (apply string (for/list ([b (in-list (linewrap (for/list ([atom (atomize str)])
+                                                           ($quad (hash-set (attrs atom) 'size '(1 1))
+                                                              (elems atom))) int debug))])
+                          (cond
+                            [(quad? b) (car (elems b))]
+                            [else #\|]))))
 (module+ test
   (test-case
    "visual breaks"
@@ -251,39 +258,40 @@
    (check-equal? (visual-wrap "My dog has fleas" 16) "My dog has fleas")))
 
 
-  (define (pagewrap xs size [debug #f])
-    (wrap xs size debug
-          #:break-val 'pb
-          #:mandatory-break-proc (λ (x) (and (quad? x) (memv (car (elems x)) '(#\page))))
-          #:optional-break-proc (λ (x) (eq? x 'lb))))
-  (define pbr (q '(size #f) #\page))
+(define (pagewrap xs size [debug #f])
+  (wrap xs size debug
+        #:break-val 'pb
+        #:break-before? #t
+        #:mandatory-break-proc (λ (x) (and (quad? x) (memv (car (elems x)) '(#\page))))
+        #:optional-break-proc (λ (x) (eq? x 'lb))))
+(define pbr (q '(size #f) #\page))
 
 (module+ test
   (test-case
    "soft page breaks"
-   (check-equal? (pagewrap null 2) null)
-   (check-equal? (pagewrap (list x) 2) (list x))
-   (check-equal? (pagewrap (list x x) 2) (list x x))
-   (check-equal? (pagewrap (list x x x) 1) (list x 'pb x 'pb x))
-   (check-equal? (pagewrap (list x x x) 2) (list x x 'pb x))
-   (check-equal? (pagewrap (list x x x) 3) (list x x x))
-   (check-equal? (pagewrap (list x x x) 4) (list x x x))
-   (check-equal? (pagewrap (list x 'lb x x) 2) (list x 'pb x x)))
+   (check-equal? (pagewrap null 2) '(pb))
+   (check-equal? (pagewrap (list x) 2) (list 'pb x))
+   (check-equal? (pagewrap (list x x) 2) (list 'pb x x))
+   (check-equal? (pagewrap (list x x x) 1) (list 'pb x 'pb x 'pb x))
+   (check-equal? (pagewrap (list x x x) 2) (list 'pb x x 'pb x))
+   (check-equal? (pagewrap (list x x x) 3) (list 'pb x x x))
+   (check-equal? (pagewrap (list x x x) 4) (list 'pb x x x))
+   (check-equal? (pagewrap (list x 'lb x x) 2) (list 'pb x 'pb x x)))
 
   (test-case
    "hard page breaks"
-   (check-equal? (pagewrap (list x pbr x x) 2) (list x 'pb x x))
-   (check-equal? (pagewrap (list x pbr x x) 1) (list x 'pb x 'pb x))
-   (check-equal? (pagewrap (list x pbr pbr x x) 1) (list x 'pb 'pb x 'pb x))
-   (check-equal? (pagewrap (list x pbr pbr x x) 2) (list x 'pb 'pb x x))
-   (check-equal? (pagewrap (list 'lb x 'lb 'lb pbr 'lb x x 'lb) 2) (list x 'pb x x)))
+   (check-equal? (pagewrap (list x pbr x x) 2) (list 'pb x 'pb x x))
+   (check-equal? (pagewrap (list x pbr x x) 1) (list 'pb x 'pb x 'pb x))
+   (check-equal? (pagewrap (list x pbr pbr x x) 1) (list 'pb x 'pb 'pb x 'pb x))
+   (check-equal? (pagewrap (list x pbr pbr x x) 2) (list 'pb x 'pb 'pb x x))
+   (check-equal? (pagewrap (list 'lb x 'lb 'lb pbr 'lb x x 'lb) 2) (list 'pb x 'pb x x)))
   (test-case
    "composed line breaks and page breaks"
-   (check-equal? (pagewrap (linewrap null 1) 2) null)
-   (check-equal? (pagewrap (linewrap (list x) 1) 2) (list x))
-   (check-equal? (pagewrap (linewrap (list x x x) 1) 2) (list x 'lb x 'pb x))
-   (check-equal? (pagewrap (linewrap (list x x x) 2) 2) (list x x 'pb x))
-   (check-equal? (pagewrap (linewrap (list x x x) 2) 1) (list x 'pb x 'pb x))))
+   (check-equal? (pagewrap (linewrap null 1) 2) '(pb) )
+   (check-equal? (pagewrap (linewrap (list x) 1) 2) (list 'pb x))
+   (check-equal? (pagewrap (linewrap (list x x x) 1) 2) (list 'pb x 'lb x 'pb x))
+   (check-equal? (pagewrap (linewrap (list x x x) 2) 2) (list 'pb x x 'pb x))
+   (check-equal? (pagewrap (linewrap (list x x x) 2) 1) (list 'pb x 'pb x 'pb x))))
 
 (struct $slug $quad () #:transparent)
 (define (slug . xs) ($slug #f xs))
