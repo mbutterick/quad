@@ -34,8 +34,6 @@
   (define start-signal (gensym))
   (define (nonprinting-at-start? x) (if (quad? x) (not (printable? x 'start)) #t))
   (define (nonprinting-at-end? x) (if (quad? x) (not (printable? x 'end)) #t))
-  (define (finish-wrap pieces) (finish-wrap-proc (reverse (dropf pieces (λ (x) (and (optional-break? x)
-                                                                                    (nonprinting-at-end? x)))))))
   (define last-optional-break-k #f)
   (define (capture-optional-break-k!) (when debug (report 'capturing-break)) (let/cc k (set! last-optional-break-k k) #f))
   (call/prompt ;; continuation boundary for last-optional-break-k
@@ -45,7 +43,22 @@
         [(null? xs)
          ;; combine the segments into a flat list, and drop any trailing breaks
          ;; (on the idea that breaks should separate things, and there's nothing left to separate)
-         (define results (dropf-right (append* (reverse (cons (finish-wrap wrap-pieces) wraps))) (λ (x) (eq? x break-val))))
+         (define results
+           (dropf-right
+            (append*
+             (reverse
+              ;; wraps alternate with breaks
+              ;; so we can process wraps with even/odd check
+              (for/list ([pcs (in-list (cons wrap-pieces wraps))]
+                         [proc (in-cycle (list 
+                                          ;; pieces will have been accumulated in reverse order
+                                          ;; dropf drops from beginning of list (representing the end of the wrap)
+                  
+                                          (λ (pcs) (finish-wrap-proc (reverse (dropf pcs (λ (x) (and (optional-break? x) (nonprinting-at-end? x)))))))
+                                          values))])
+                (proc pcs))))
+            (λ (x) (equal? x break-val))))
+         ;; prepend & append bumpers, if needed
          (append (if break-before? (list break-val) empty) results (if break-after? (list break-val) empty))]
         [else
          (define x (car xs))
@@ -72,7 +85,7 @@
              (if before?
                  (values wrap-pieces xs)
                  (values (if (and (quad? x) (nonprinting-at-end? x)) wrap-pieces (cons x wrap-pieces)) (cdr xs)))) ; omit nonprinting quad
-           (loop (list* (list break-val) (finish-wrap pieces-for-this-wrap) wraps)
+           (loop (list* (list break-val) pieces-for-this-wrap wraps)
                  null
                  start-signal
                  next-xs))
@@ -232,11 +245,11 @@
 
 (define (visual-wrap str int [debug #f])
   (apply string (for/list ([b (in-list (linewrap (for/list ([atom (atomize str)])
-                                                           ($quad (hash-set (attrs atom) 'size '(1 1))
-                                                              (elems atom))) int debug))])
-                          (cond
-                            [(quad? b) (car (elems b))]
-                            [else #\|]))))
+                                                   ($quad (hash-set (attrs atom) 'size '(1 1))
+                                                          (elems atom))) int debug))])
+                  (cond
+                    [(quad? b) (car (elems b))]
+                    [else #\|]))))
 (module+ test
   (test-case
    "visual breaks"
