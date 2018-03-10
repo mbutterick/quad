@@ -31,6 +31,33 @@
                   #:mandatory-break-proc procedure?
                   #:optional-break-proc procedure?
                   #:finish-wrap-proc procedure?) . ->* . (listof any/c))
+  (define (cleanup-wraplist wraps) (dropf-right (append* (reverse wraps)) (λ (x) (equal? x break-val))))
+  (define wraps
+    (for/fold ([wraps null]
+               [xs (dropf xs mandatory-break?)]
+               #:result wraps)
+              ([i (in-naturals)]
+               #:break (null? xs))
+      (cond
+        [(mandatory-break? (car xs))
+         (values (cons (list break-val) wraps) (cdr xs))]
+        [else
+         (define-values (head tail) (splitf-at xs (λ (x) (not (mandatory-break? x)))))
+         (values (cons (cleanup-wraplist (wrap-optionals head
+                                                         target-size
+                                                         debug
+                                                         break-val
+                                                         optional-break?
+                                                         finish-wrap-proc)) wraps) tail)])))
+  (append (if break-before? (list break-val) empty) (cleanup-wraplist wraps) (if break-after? (list break-val) empty)))
+
+
+(define (wrap-optionals xs
+                        target-size
+                        debug
+                        break-val
+                        optional-break?
+                        finish-wrap-proc)
   (define start-signal (gensym))
   (define (nonprinting-at-start? x) (if (quad? x) (not (printable? x 'start)) #t))
   (define (nonprinting-at-end? x) (if (quad? x) (not (printable? x 'end)) #t))
@@ -43,23 +70,15 @@
         [(null? xs)
          ;; combine the segments into a flat list, and drop any trailing breaks
          ;; (on the idea that breaks should separate things, and there's nothing left to separate)
-         (define results
-           (dropf-right
-            (append*
-             (reverse
-              ;; wraps alternate with breaks
-              ;; so we can process wraps with even/odd check
-              (for/list ([pcs (in-list (cons wrap-pieces wraps))]
-                         [proc (in-cycle (list 
-                                          ;; pieces will have been accumulated in reverse order
-                                          ;; dropf drops from beginning of list (representing the end of the wrap)
+         ;; wraps alternate with breaks
+         (for/list ([pcs (in-list (cons wrap-pieces wraps))]
+                    [proc (in-cycle (list 
+                                     ;; pieces will have been accumulated in reverse order
+                                     ;; dropf drops from beginning of list (representing the end of the wrap)
                   
-                                          (λ (pcs) (finish-wrap-proc (reverse (dropf pcs (λ (x) (and (optional-break? x) (nonprinting-at-end? x)))))))
-                                          values))])
-                (proc pcs))))
-            (λ (x) (equal? x break-val))))
-         ;; prepend & append bumpers, if needed
-         (append (if break-before? (list break-val) empty) results (if break-after? (list break-val) empty))]
+                                     (λ (pcs) (finish-wrap-proc (reverse (dropf pcs (λ (x) (and (optional-break? x) (nonprinting-at-end? x)))))))
+                                     values))])
+           (proc pcs))]
         [else
          (define x (car xs))
          (define at-start? (eq? dist-so-far start-signal))
@@ -94,9 +113,6 @@
            [(and at-start? (optional-break? x) (nonprinting-at-start? x))
             (when debug (report x 'skipping-optional-break-at-beginning))
             (skip)]
-           [(mandatory-break? x)
-            (when debug (report x 'got-mandatory-break))
-            (insert-break)]
            [(and underflow? (optional-break? x) (capture-optional-break-k!))
             (when debug (report x 'resuming-break-from-continuation))
             (insert-break)]
@@ -298,6 +314,7 @@
    (check-equal? (pagewrap (list x pbr pbr x x) 1) (list 'pb x 'pb 'pb x 'pb x))
    (check-equal? (pagewrap (list x pbr pbr x x) 2) (list 'pb x 'pb 'pb x x))
    (check-equal? (pagewrap (list 'lb x 'lb 'lb pbr 'lb x x 'lb) 2) (list 'pb x 'pb x x)))
+
   (test-case
    "composed line breaks and page breaks"
    (check-equal? (pagewrap (linewrap null 1) 2) '(pb) )
