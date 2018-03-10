@@ -6,9 +6,13 @@
 (define optional-break? (λ (q) (and (quad? q) (memv (car (elems q)) '(#\space #\- #\u00AD)))))
 (struct $shim $quad () #:transparent)
 (struct $char $quad () #:transparent)
+(define util-doc (make-object PDFDocument))
 (define (charify q)
   ($char (hash-set* (attrs q)
-                    'size (const '(7.2 12))
+                    'size (delay (send util-doc fontSize 12)
+                                 (list
+                                 (send util-doc widthOfString (apply string (elems q)))
+                                 (send util-doc currentLineHeight)))
                     'printable? (case (car (elems q))
                                   [(#\u00AD) (λ (sig) (memq sig '(end)))]
                                   [(#\space) (λ (sig) (not (memq sig '(start end))))]
@@ -42,7 +46,14 @@
                            'draw (λ (q doc)
                                    (send doc addPage)
                                    (send doc fontSize 10)
-                                   (send doc text (string-append "page " (number->string page-count)) 10 10)
+                                   (define str (string-append "page " (number->string page-count)))
+                                   (send doc save)
+                                   (send doc fillColor "blue")
+                                   (send doc text str 10 10)
+                                   (send doc restore)
+                                   (define width (send doc widthOfString str))
+                                   (define height (send doc currentLineHeight))
+                                   (send doc link 10 10 width height "https://beautifulracket.com")
                                    (set! page-count (add1 page-count)))) '(#\page)))
 (define (page-wrap xs size [debug #f])
   (wrap xs size debug
@@ -59,7 +70,7 @@
 
 
 (require hyphenate racket/runtime-path pollen/unstable/typography)
-(define-runtime-path fira-mono "FiraMono-Regular.ttf")
+(define-runtime-path fira "fira.ttf")
 (define-macro (mb . ARGS)
   (with-pattern ([PS (syntax-property #'ARGS 'ps)])
     #'(#%module-begin
@@ -71,8 +82,8 @@
                             'size '(300 400)))])
          (send* doc
            [pipe (open-output-file PS #:exists 'replace)]
-           [registerFont "Fira-Mono" (path->string fira-mono)]
-           [font "Fira-Mono"]
+           [registerFont "Fira" (path->string fira)]
+           [font "Fira"]
            [fontSize 12])
          (draw q doc)
          (send doc end))
