@@ -7,12 +7,15 @@
 (struct $shim $quad () #:transparent)
 (struct $char $quad () #:transparent)
 (define util-doc (make-object PDFDocument))
+(define char-sizes (make-hasheqv))
 (define (charify q)
   ($char (hash-set* (attrs q)
-                    'size (delay (send util-doc fontSize 12)
-                                 (list
-                                 (send util-doc widthOfString (apply string (elems q)))
-                                 (send util-doc currentLineHeight)))
+                    'size (hash-ref! char-sizes (car (elems q))
+                                     (λ ()
+                                       (send util-doc fontSize 12)
+                                       (list
+                                        (send util-doc widthOfString (apply string (elems q)))
+                                        (send util-doc currentLineHeight))))
                     'printable? (case (car (elems q))
                                   [(#\u00AD) (λ (sig) (memq sig '(end)))]
                                   [(#\space) (λ (sig) (not (memq sig '(start end))))]
