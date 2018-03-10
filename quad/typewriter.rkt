@@ -22,7 +22,13 @@
                                   [else #t])
                     'draw (λ (q doc)
                             (send doc fontSize 12)
-                            (send/apply doc text (apply string (elems q)) (origin q)))) (elems q)))
+                            (let ([str (apply string (elems q))])
+                              (cond
+                                [(hash-ref (attrs q) 'link #f)
+                                 =>
+                                 (λ (url-str) (apply as-link doc str url-str (origin q)))]
+                                [else
+                                 (send/apply doc text str (origin q))])))) (elems q)))
 (struct $line $quad () #:transparent)
 (struct $page $quad () #:transparent)
 (struct $doc $quad () #:transparent)
@@ -44,19 +50,23 @@
                                                  (if consolidate-into-runs?
                                                      (list ($char (attrs (car pcs)) (append-map elems pcs)))
                                                      pcs))))))
+
+(define (as-link doc str url-str [x 0] [y 0])
+  (send doc save)
+  (send doc fillColor "blue")
+  (define width (send doc widthOfString str))
+  (define height (send doc currentLineHeight))
+  (send doc text str x y)
+  (send doc link x y width height "https://beautifulracket.com")
+  (send doc restore))
+
 (define pb ($break (hasheq 'printable? #f
                            'size '(0 0)
                            'draw (λ (q doc)
                                    (send doc addPage)
                                    (send doc fontSize 10)
                                    (define str (string-append "page " (number->string page-count)))
-                                   (send doc save)
-                                   (send doc fillColor "blue")
-                                   (send doc text str 10 10)
-                                   (send doc restore)
-                                   (define width (send doc widthOfString str))
-                                   (define height (send doc currentLineHeight))
-                                   (send doc link 10 10 width height "https://beautifulracket.com")
+                                   (as-link doc str "https://beautifulracket.com" 10 10)
                                    (set! page-count (add1 page-count)))) '(#\page)))
 (define (page-wrap xs size [debug #f])
   (wrap xs size debug
@@ -77,7 +87,7 @@
 (define-macro (mb . ARGS)
   (with-pattern ([PS (syntax-property #'ARGS 'ps)])
     #'(#%module-begin
-       (define q (typeset (map hyphenate (map smart-quotes (list . ARGS)))))
+       (define q (typeset (list . ARGS)))
        ;q
        (let ([doc (make-object PDFDocument
                     (hasheq 'compress #t
@@ -86,7 +96,7 @@
          (send* doc
            [pipe (open-output-file PS #:exists 'replace)]
            [registerFont "Fira" (path->string fira)]
-           [font "Fira"]
+           [font "Courier"]
            [fontSize 12])
          (draw q doc)
          (send doc end))
