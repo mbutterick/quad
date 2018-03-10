@@ -1,5 +1,5 @@
 #lang debug racket/base
-(require racket/contract racket/list racket/match txexpr sugar/debug sugar/define sugar/list racket/promise racket/function (only-in racket/control call/prompt)
+(require racket/contract racket/list racket/match txexpr sugar/debug sugar/define sugar/list racket/promise racket/function (only-in racket/control call/prompt) racket/future 
          "param.rkt" "qexpr.rkt" "atomize.rkt" "quad.rkt" "generic.rkt" "position.rkt")
 
 (define/contract (distance q)
@@ -32,47 +32,47 @@
                   #:mandatory-break-proc procedure?
                   #:optional-break-proc procedure?
                   #:finish-wrap-proc procedure?) . ->* . (listof any/c))
-  (wrap-mandatory xs
-                  target-size
-                  debug
-                  break-val
-                  break-before?
-                  break-after?
-                  mandatory-break?
-                  optional-break?
-                  finish-wrap-proc))
+  (wrap-private xs
+                target-size
+                debug
+                break-val
+                break-before?
+                break-after?
+                mandatory-break?
+                optional-break?
+                finish-wrap-proc))
 
-;; the mandatory breaks can be used to divide the wrap territory into smaller chunks
+;; the mandatory breaks are used to divide the wrap territory into smaller chunks
 ;; that can be cached, parallelized, etc.
-(define (wrap-mandatory xs
-                        target-size
-                        debug
-                        break-val
-                        break-before?
-                        break-after?
-                        mandatory-break?
-                        optional-break?
-                        finish-wrap-proc)
+(define (wrap-private xs
+                      target-size
+                      debug
+                      break-val
+                      break-before?
+                      break-after?
+                      mandatory-break?
+                      optional-break?
+                      finish-wrap-proc)
   (define break-val-equal? (if (symbol? break-val) eq? equal?))
   (define (cleanup-wraplist xs) (dropf-right (append* (reverse xs)) (λ (x) (break-val-equal? break-val x))))
   (define wraps
     (for/fold ([wraps null]
                [xs (dropf xs mandatory-break?)]
-               #:result wraps)
+               #:result (map touch wraps))
               ([i (in-naturals)]
                #:break (null? xs))
       (cond
         [(mandatory-break? (car xs))
          (when debug (report x 'mandatory-break))
-         (values (cons (list break-val) wraps) (cdr xs))]
+         (values (cons (future (λ () (list break-val))) wraps) (cdr xs))]
         [else
          (define-values (head tail) (splitf-at xs (λ (x) (not (mandatory-break? x)))))
-         (values (cons (cleanup-wraplist (wrap-optionals head
-                                                         target-size
-                                                         debug
-                                                         break-val
-                                                         optional-break?
-                                                         finish-wrap-proc)) wraps) tail)])))
+         (values (cons (future (λ () (cleanup-wraplist (wrap-optionals head
+                                                                       target-size
+                                                                       debug
+                                                                       break-val
+                                                                       optional-break?
+                                                                       finish-wrap-proc)))) wraps) tail)])))
   (append (if break-before? (list break-val) empty) (cleanup-wraplist wraps) (if break-after? (list break-val) empty)))
 
 
