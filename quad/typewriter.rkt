@@ -3,7 +3,7 @@
 (require pitfall/document)
 (provide (rename-out [mb #%module-begin]) (except-out (all-from-out br/quicklang) #%module-begin))
 
-(define optional-break? (λ (q) (and (quad? q) (memv (car (elems q)) '(#\space #\- #\u00AD)))))
+(define soft-break? (λ (q) (and (quad? q) (memv (car (elems q)) '(#\space #\- #\u00AD)))))
 (struct $shim $quad () #:transparent)
 (struct $char $quad () #:transparent)
 (define util-doc (make-object PDFDocument))
@@ -41,7 +41,7 @@
 (define (line-wrap xs size [debug #f])
   (break xs size debug
         #:break-val (make-break #\newline)
-        #:optional-break-proc optional-break?
+        #:soft-break-proc soft-break?
         #:finish-wrap-proc (λ (pcs) (list ($line (hasheq 'size (list +inf.0 line-height) 'out 'sw)
                                                  ;; consolidate chars into a single run (naively)
                                                  ;; by taking attributes from first (including origin)
@@ -72,7 +72,7 @@
   (break xs size debug
         #:break-before? #t
         #:break-val pb
-        #:optional-break-proc $break?
+        #:soft-break-proc $break?
         #:finish-wrap-proc (λ (pcs) (list ($page (hasheq) (filter-not $break? pcs))))))
 
 (define (typeset args)

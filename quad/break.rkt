@@ -21,15 +21,15 @@
                                 #:break-val [break-val 'break]
                                 #:break-before? [break-before? #f]
                                 #:break-after? [break-after? #f]
-                                #:mandatory-break-proc [mandatory-break? (const #f)]
-                                #:optional-break-proc [optional-break? (const #f)]
+                                #:hard-break-proc [hard-break? (const #f)]
+                                #:soft-break-proc [soft-break? (const #f)]
                                 #:finish-wrap-proc [finish-wrap-proc values])
   ((any/c) (real? any/c
                   #:break-val any/c
                   #:break-before? boolean?
                   #:break-after? boolean?
-                  #:mandatory-break-proc procedure?
-                  #:optional-break-proc procedure?
+                  #:hard-break-proc procedure?
+                  #:soft-break-proc procedure?
                   #:finish-wrap-proc procedure?) . ->* . (listof any/c))
   (break-private xs
                  target-size
@@ -37,11 +37,11 @@
                  break-val
                  break-before?
                  break-after?
-                 mandatory-break?
-                 optional-break?
+                 hard-break?
+                 soft-break?
                  finish-wrap-proc))
 
-;; the mandatory breaks are used to divide the wrap territory into smaller chunks
+;; the hard breaks are used to divide the wrap territory into smaller chunks
 ;; that can be cached, parallelized, etc.
 (define (break-private xs
                        target-size
@@ -49,46 +49,46 @@
                        break-val
                        break-before?
                        break-after?
-                       mandatory-break?
-                       optional-break?
+                       hard-break?
+                       soft-break?
                        finish-wrap-proc)
   (define break-val-equal? (if (symbol? break-val) eq? equal?))
   (define (cleanup-wraplist xs) (dropf-right (append* (reverse xs)) (λ (x) (break-val-equal? break-val x))))
   (define wraps
     (for/fold ([wraps null]
-               [xs (dropf xs mandatory-break?)]
+               [xs (dropf xs hard-break?)]
                #:result (map touch wraps))
               ([i (in-naturals)]
                #:break (null? xs))
       (cond
-        [(mandatory-break? (car xs))
-         (when debug (report x 'mandatory-break))
+        [(hard-break? (car xs))
+         (when debug (report x 'hard-break))
          (values (cons (future (λ () (list break-val))) wraps) (cdr xs))]
         [else
-         (define-values (head tail) (splitf-at xs (λ (x) (not (mandatory-break? x)))))
-         (values (cons (future (λ () (cleanup-wraplist (break-optionals head
+         (define-values (head tail) (splitf-at xs (λ (x) (not (hard-break? x)))))
+         (values (cons (future (λ () (cleanup-wraplist (break-softs head
                                                                         target-size
                                                                         debug
                                                                         break-val
-                                                                        optional-break?
+                                                                        soft-break?
                                                                         finish-wrap-proc)))) wraps) tail)])))
   (append (if break-before? (list break-val) empty) (cleanup-wraplist wraps) (if break-after? (list break-val) empty)))
 
 
 (define (nonprinting-at-start? x) (if (quad? x) (not (printable? x 'start)) #t))
 (define (nonprinting-at-end? x) (if (quad? x) (not (printable? x 'end)) #t))
-(define (break-optionals xs
+(define (break-softs xs
                          target-size
                          debug
                          break-val
-                         optional-break?
+                         soft-break?
                          finish-wrap-proc)
   (define start-signal (gensym))
-  (define last-optional-break-k #f)
-  (define (capture-optional-break-k!)
+  (define last-soft-break-k #f)
+  (define (capture-soft-break-k!)
     (when debug (report 'capturing-break))
-    (let/cc k (set! last-optional-break-k k) #f))
-  (call/prompt ;; continuation boundary for last-optional-break-k
+    (let/cc k (set! last-soft-break-k k) #f))
+  (call/prompt ;; continuation boundary for last-soft-break-k
    (thunk
     (let loop ([wraps null][wrap-pieces null][dist-so-far start-signal][xs xs])
       (cond
@@ -101,7 +101,7 @@
                                      ;; pieces will have been accumulated in reverse order
                                      ;; dropf drops from beginning of list (representing the end of the wrap)
                   
-                                     (λ (pcs) (finish-wrap-proc (reverse (dropf pcs (λ (x) (and (optional-break? x) (nonprinting-at-end? x)))))))
+                                     (λ (pcs) (finish-wrap-proc (reverse (dropf pcs (λ (x) (and (soft-break? x) (nonprinting-at-end? x)))))))
                                      values))])
            (proc pcs))]
         [else
@@ -110,24 +110,24 @@
          (define underflow? (and (not at-start?) (<= (+ dist-so-far (if (and (quad? x) (printable? x 'end)) (distance x) 0)) target-size)))
          (define (values-for-insert-break [before? #f])
            ;; a break can be inserted before or after the current quad.
-           ;; At an ordinary break (mandatory or optional) it goes after the wrap point.
+           ;; At an ordinary break (hard or soft) it goes after the wrap point.
            ;; The wrap signal consumes the break if it's nonprinting (e.g., word space or hard break)
            ;; but not if it's printing (e.g., hyphen).
            ;; But if no ordinary break can be found for a line, the wrap will happen before the quad.
            ;; The wrap signal will not consume the quad (rather, it will become the first quad in the next wrap)
            ;; (we do this by resetting next-xs to the whole xs list)
            ;; In both cases, the `finish-wrap` proc will strip off any trailing white breaks from the new segment.
-           (set! last-optional-break-k #f) ;; prevents continuation loop
+           (set! last-soft-break-k #f) ;; prevents continuation loop
            (if before?
                (values wrap-pieces xs)
                ; omit nonprinting quad
                (values (if (and (quad? x) (nonprinting-at-end? x)) wrap-pieces (cons x wrap-pieces)) (cdr xs))))
          (cond
-           [(and at-start? (optional-break? x) (nonprinting-at-start? x))
-            (when debug (report x 'skipping-optional-break-at-beginning))
+           [(and at-start? (soft-break? x) (nonprinting-at-start? x))
+            (when debug (report x 'skipping-soft-break-at-beginning))
             ;; skip it
             (loop wraps null dist-so-far (cdr xs))]
-           [(and underflow? (optional-break? x) (capture-optional-break-k!))
+           [(and underflow? (soft-break? x) (capture-soft-break-k!))
             (when debug (report x 'resuming-break-from-continuation))
             (define-values (pieces-for-this-wrap next-xs) (values-for-insert-break))
             (loop (list* (list break-val) pieces-for-this-wrap wraps)
@@ -140,10 +140,10 @@
                 ;; this branch reached if the first quad on the line causes an overflow
                 ;; That sounds weird, but maybe it's just really big.
                 (and at-start? (when debug (report x 'add-at-start)) #t)
-                ;; we do want to accumulate nonprinting optional breaks (like wordspaces and soft hyphens) in the middle.
+                ;; we do want to accumulate nonprinting soft breaks (like wordspaces and soft hyphens) in the middle.
                 ;; in case we eventually encounter a printing quad that fits on the line.
                 ;; if we don't (ie. the line overflows) then they will get stripped by `finish-wrap`
-                (and (optional-break? x) (nonprinting-at-end? x) (when debug (report x 'add-nonprinting-optional-break)) #t))
+                (and (soft-break? x) (nonprinting-at-end? x) (when debug (report x 'add-nonprinting-soft-break)) #t))
             (define printable (and (quad? x) (printable? x (and at-start? 'start)))) 
             (define dist (and printable (distance x)))
             (loop wraps
@@ -152,13 +152,13 @@
                   (cdr xs))]
            ;; the previous branch will catch all `underflow?` cases
            ;; therefore, in these last two cases, we have overflow
-           [last-optional-break-k ;; overflow implied
-            ;; if we have an optional break stored, we jump back and use it
+           [last-soft-break-k ;; overflow implied
+            ;; if we have an soft break stored, we jump back and use it
             ;; now that we know we need it.
             (when debug (report x 'invoking-last-breakpoint))
-            (last-optional-break-k #t)]
+            (last-soft-break-k #t)]
            [else ;; overflow implied
-            ;; if we don't have an optional break stored, we need to just end the wrap and move on
+            ;; if we don't have an soft break stored, we need to just end the wrap and move on
             ;; we insert the break `before` so that the current quad is moved to the next wrap
             ;; no, it's not going to look good, but if we reach this point, we are in weird conditions
             (when debug (report x 'falling-back))
@@ -185,13 +185,13 @@
                                                    [(start end) #f]
                                                    [else #t]))) #\space))
 (define br (q (list 'size (pt 0 0) 'printable? #f) #\newline))
-(define optional-break? (λ (q) (and (quad? q) (memv (car (elems q)) '(#\space #\-)))))
+(define soft-break? (λ (q) (and (quad? q) (memv (car (elems q)) '(#\space #\-)))))
 
 (define (linewrap xs size [debug #f])
   (break xs size debug
          #:break-val 'lb
-         #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (elems q)) '(#\newline))))
-         #:optional-break-proc optional-break?))
+         #:hard-break-proc (λ (q) (and (quad? q) (memv (car (elems q)) '(#\newline))))
+         #:soft-break-proc soft-break?))
 
 
 (module+ test
@@ -262,7 +262,7 @@
    (check-equal? (linewrap (list sp sp zwx sp sp zwx sp) 2) (list zwx sp sp zwx)))
 
   (test-case
-   "mandatory breaks"
+   "hard breaks"
    (check-equal? (linewrap (list br) 2) (list)) ;; only insert a break if it's between things
    (check-equal? (linewrap (list a br b) 2) (list a 'lb b))
    (check-equal? (linewrap (list a b br) 2) (list a b))
@@ -274,7 +274,7 @@
    (check-equal? (linewrap (list x x x sp x x) 3) (list x x x 'lb x x)))
 
   (test-case
-   "mandatory breaks and spurious spaces"
+   "hard breaks and spurious spaces"
    (check-equal? (linewrap (list a sp sp sp br b) 2) (list a 'lb b))
    (check-equal? (linewrap (list x sp br sp sp x x sp) 3) (list x 'lb x x))
    (check-equal? (linewrap (list sp sp x x sp sp br sp sp sp x) 3) (list x x 'lb x))
@@ -315,8 +315,8 @@
   (break xs size debug
          #:break-val 'pb
          #:break-before? #t
-         #:mandatory-break-proc (λ (x) (and (quad? x) (memv (car (elems x)) '(#\page))))
-         #:optional-break-proc (λ (x) (eq? x 'lb))))
+         #:hard-break-proc (λ (x) (and (quad? x) (memv (car (elems x)) '(#\page))))
+         #:soft-break-proc (λ (x) (eq? x 'lb))))
 (define pbr (q '(size #f) #\page))
 
 (module+ test
@@ -352,13 +352,13 @@
 (define (linewrap2 xs size [debug #f])
   (break xs size debug
          #:break-val 'lb
-         #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (elems q)) '(#\newline))))
-         #:optional-break-proc optional-break?
+         #:hard-break-proc (λ (q) (and (quad? q) (memv (car (elems q)) '(#\newline))))
+         #:soft-break-proc soft-break?
          #:finish-wrap-proc (λ (pcs) (list ($slug #f pcs)))))
 
 (module+ test
   (test-case
-   "mandatory breaks and spurious spaces with slugs"
+   "hard breaks and spurious spaces with slugs"
    (check-equal? (linewrap2 (list a sp sp sp br b) 2) (list (slug a) 'lb (slug b)))
    (check-equal? (linewrap2 (list x sp br sp sp x x sp) 3) (list (slug x) 'lb (slug x x)))
    (check-equal? (linewrap2 (list sp sp x x sp sp br sp sp sp x) 3) (list (slug x x) 'lb (slug x)))
