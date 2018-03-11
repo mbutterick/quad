@@ -15,7 +15,6 @@
     [else 0]))
 
 
-
 (define+provide/contract (wrap xs
                                [target-size (current-wrap-distance)]
                                [debug #f]
@@ -76,6 +75,8 @@
   (append (if break-before? (list break-val) empty) (cleanup-wraplist wraps) (if break-after? (list break-val) empty)))
 
 
+(define (nonprinting-at-start? x) (if (quad? x) (not (printable? x 'start)) #t))
+(define (nonprinting-at-end? x) (if (quad? x) (not (printable? x 'end)) #t))
 (define (wrap-optionals xs
                         target-size
                         debug
@@ -83,10 +84,10 @@
                         optional-break?
                         finish-wrap-proc)
   (define start-signal (gensym))
-  (define (nonprinting-at-start? x) (if (quad? x) (not (printable? x 'start)) #t))
-  (define (nonprinting-at-end? x) (if (quad? x) (not (printable? x 'end)) #t))
   (define last-optional-break-k #f)
-  (define (capture-optional-break-k!) (when debug (report 'capturing-break)) (let/cc k (set! last-optional-break-k k) #f))
+  (define (capture-optional-break-k!)
+    (when debug (report 'capturing-break))
+    (let/cc k (set! last-optional-break-k k) #f))
   (call/prompt ;; continuation boundary for last-optional-break-k
    (thunk
     (let loop ([wraps null][wrap-pieces null][dist-so-far start-signal][xs xs])
@@ -107,14 +108,7 @@
          (define x (car xs))
          (define at-start? (eq? dist-so-far start-signal))
          (define underflow? (and (not at-start?) (<= (+ dist-so-far (if (and (quad? x) (printable? x 'end)) (distance x) 0)) target-size)))
-         (define (add-to-current-wrap)
-           (define printable (and (quad? x) (printable? x (and at-start? 'start)))) 
-           (define dist (and printable (distance x)))
-           (loop wraps
-                 (if (and (quad? x) (not printable)) wrap-pieces (cons x wrap-pieces)) ; omit nonprinting quad
-                 (if at-start? (or dist start-signal) (+ dist-so-far (or dist 0)))
-                 (cdr xs)))
-         (define (insert-break [before? #f])
+         (define (values-for-insert-break [before? #f])
            ;; a break can be inserted before or after the current quad.
            ;; At an ordinary break (mandatory or optional) it goes after the wrap point.
            ;; The wrap signal consumes the break if it's nonprinting (e.g., word space or hard break)
@@ -124,36 +118,38 @@
            ;; (we do this by resetting next-xs to the whole xs list)
            ;; In both cases, the `finish-wrap` proc will strip off any trailing white breaks from the new segment.
            (set! last-optional-break-k #f) ;; prevents continuation loop
-           (define-values (pieces-for-this-wrap next-xs)
-             (if before?
-                 (values wrap-pieces xs)
-                 (values (if (and (quad? x) (nonprinting-at-end? x)) wrap-pieces (cons x wrap-pieces)) (cdr xs)))) ; omit nonprinting quad
-           (loop (list* (list break-val) pieces-for-this-wrap wraps)
-                 null
-                 start-signal
-                 next-xs))
-         (define (skip) (loop wraps null dist-so-far (cdr xs)))
+           (if before?
+               (values wrap-pieces xs)
+               ; omit nonprinting quad
+               (values (if (and (quad? x) (nonprinting-at-end? x)) wrap-pieces (cons x wrap-pieces)) (cdr xs))))
          (cond
            [(and at-start? (optional-break? x) (nonprinting-at-start? x))
             (when debug (report x 'skipping-optional-break-at-beginning))
-            (skip)]
+            ;; skip it
+            (loop wraps null dist-so-far (cdr xs))]
            [(and underflow? (optional-break? x) (capture-optional-break-k!))
             (when debug (report x 'resuming-break-from-continuation))
-            (insert-break)]
-           [underflow? ; the easy case of accumulating quads in the middle of a wrap
-            (when debug (report x 'add-underflow))
-            (add-to-current-wrap)]
-           [at-start? ;; assume printing (nonprinting were handled in first case)
-            ;; this branch reached if the first quad on the line causes an overflow
-            ;; That sounds weird, but maybe it's just really big.
-            (when debug (report x 'add-at-start))
-            (add-to-current-wrap)]
-           [(and (optional-break? x) (nonprinting-at-end? x))
-            ;; we do want to accumulate nonprinting optional breaks (like wordspaces and soft hyphens) in the middle.
-            ;; in case we eventually encounter a printing quad that fits on the line.
-            ;; if we don't (ie. the line overflows) then they will get stripped by `finish-wrap`
-            (when debug (report x 'add-nonprinting-optional-break))
-            (add-to-current-wrap)]
+            (define-values (pieces-for-this-wrap next-xs) (values-for-insert-break))
+            (loop (list* (list break-val) pieces-for-this-wrap wraps)
+                  null
+                  start-signal
+                  next-xs)]
+           ;; the easy case of accumulating quads in the middle of a wrap
+           [(or (and underflow? (when debug (report x 'add-underflow)) #t) 
+                ;; assume printing (nonprinting were handled in first case)
+                ;; this branch reached if the first quad on the line causes an overflow
+                ;; That sounds weird, but maybe it's just really big.
+                (and at-start? (when debug (report x 'add-at-start)) #t)
+                ;; we do want to accumulate nonprinting optional breaks (like wordspaces and soft hyphens) in the middle.
+                ;; in case we eventually encounter a printing quad that fits on the line.
+                ;; if we don't (ie. the line overflows) then they will get stripped by `finish-wrap`
+                (and (optional-break? x) (nonprinting-at-end? x) (when debug (report x 'add-nonprinting-optional-break)) #t))
+            (define printable (and (quad? x) (printable? x (and at-start? 'start)))) 
+            (define dist (and printable (distance x)))
+            (loop wraps
+                  (if (and (quad? x) (not printable)) wrap-pieces (cons x wrap-pieces)) ; omit nonprinting quad
+                  (if at-start? (or dist start-signal) (+ dist-so-far (or dist 0)))
+                  (cdr xs))]
            ;; the previous branch will catch all `underflow?` cases
            ;; therefore, in these last two cases, we have overflow
            [last-optional-break-k ;; overflow implied
@@ -166,7 +162,11 @@
             ;; we insert the break `before` so that the current quad is moved to the next wrap
             ;; no, it's not going to look good, but if we reach this point, we are in weird conditions
             (when debug (report x 'falling-back))
-            (insert-break 'before)])])))))
+            (define-values (pieces-for-this-wrap next-xs) (values-for-insert-break 'before))
+            (loop (list* (list break-val) pieces-for-this-wrap wraps)
+                  null
+                  start-signal
+                  next-xs)])])))))
 
 
 (define x (q (list 'size (pt 1 1)) #\x))
