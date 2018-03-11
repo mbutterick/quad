@@ -1,5 +1,5 @@
 #lang debug br/quicklang
-(require racket/promise racket/list sugar/list sugar/debug "quad.rkt" "atomize.rkt" "wrap.rkt" "qexpr.rkt" "generic.rkt" "position.rkt")
+(require racket/promise racket/list sugar/list sugar/debug "quad.rkt" "atomize.rkt" "break.rkt" "qexpr.rkt" "generic.rkt" "position.rkt")
 (require pitfall/document)
 (provide (rename-out [mb #%module-begin]) (except-out (all-from-out br/quicklang) #%module-begin))
 
@@ -34,13 +34,13 @@
 (struct $doc $quad () #:transparent)
 (struct $break $quad () #:transparent)
 (define page-count 1)
-(define (break . xs) ($break (hasheq 'printable? #f 'size '(0 0)) xs))
+(define (make-break . xs) ($break (hasheq 'printable? #f 'size '(0 0)) xs))
 
 (define line-height 16)
 (define consolidate-into-runs? #t)
 (define (line-wrap xs size [debug #f])
-  (wrap xs size debug
-        #:break-val (break #\newline)
+  (break xs size debug
+        #:break-val (make-break #\newline)
         #:optional-break-proc optional-break?
         #:finish-wrap-proc (λ (pcs) (list ($line (hasheq 'size (list +inf.0 line-height) 'out 'sw)
                                                  ;; consolidate chars into a single run (naively)
@@ -69,7 +69,7 @@
                                    (as-link doc str "https://beautifulracket.com" 10 10)
                                    (set! page-count (add1 page-count)))) '(#\page)))
 (define (page-wrap xs size [debug #f])
-  (wrap xs size debug
+  (break xs size debug
         #:break-before? #t
         #:break-val pb
         #:optional-break-proc $break?

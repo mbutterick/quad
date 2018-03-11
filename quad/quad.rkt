@@ -61,10 +61,11 @@
   (check-true (atomic-quad? ($quad '#hasheq() '(#\H))))
   (check-true (atomic-quads? (list ($quad '#hasheq() '(#\H))))))
 
-
+#|
 (struct $break $quad () #:transparent)
 (define (break . xs) (apply quad #:type $break xs))
 (define b break)
+|#
 
 (module+ test
   (define x ($quad (hasheq 'entrance 0

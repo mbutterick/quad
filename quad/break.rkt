@@ -15,15 +15,15 @@
     [else 0]))
 
 
-(define+provide/contract (wrap xs
-                               [target-size (current-wrap-distance)]
-                               [debug #f]
-                               #:break-val [break-val 'break]
-                               #:break-before? [break-before? #f]
-                               #:break-after? [break-after? #f]
-                               #:mandatory-break-proc [mandatory-break? (const #f)]
-                               #:optional-break-proc [optional-break? (const #f)]
-                               #:finish-wrap-proc [finish-wrap-proc values])
+(define+provide/contract (break xs
+                                [target-size (current-wrap-distance)]
+                                [debug #f]
+                                #:break-val [break-val 'break]
+                                #:break-before? [break-before? #f]
+                                #:break-after? [break-after? #f]
+                                #:mandatory-break-proc [mandatory-break? (const #f)]
+                                #:optional-break-proc [optional-break? (const #f)]
+                                #:finish-wrap-proc [finish-wrap-proc values])
   ((any/c) (real? any/c
                   #:break-val any/c
                   #:break-before? boolean?
@@ -31,27 +31,27 @@
                   #:mandatory-break-proc procedure?
                   #:optional-break-proc procedure?
                   #:finish-wrap-proc procedure?) . ->* . (listof any/c))
-  (wrap-private xs
-                target-size
-                debug
-                break-val
-                break-before?
-                break-after?
-                mandatory-break?
-                optional-break?
-                finish-wrap-proc))
+  (break-private xs
+                 target-size
+                 debug
+                 break-val
+                 break-before?
+                 break-after?
+                 mandatory-break?
+                 optional-break?
+                 finish-wrap-proc))
 
 ;; the mandatory breaks are used to divide the wrap territory into smaller chunks
 ;; that can be cached, parallelized, etc.
-(define (wrap-private xs
-                      target-size
-                      debug
-                      break-val
-                      break-before?
-                      break-after?
-                      mandatory-break?
-                      optional-break?
-                      finish-wrap-proc)
+(define (break-private xs
+                       target-size
+                       debug
+                       break-val
+                       break-before?
+                       break-after?
+                       mandatory-break?
+                       optional-break?
+                       finish-wrap-proc)
   (define break-val-equal? (if (symbol? break-val) eq? equal?))
   (define (cleanup-wraplist xs) (dropf-right (append* (reverse xs)) (λ (x) (break-val-equal? break-val x))))
   (define wraps
@@ -66,23 +66,23 @@
          (values (cons (future (λ () (list break-val))) wraps) (cdr xs))]
         [else
          (define-values (head tail) (splitf-at xs (λ (x) (not (mandatory-break? x)))))
-         (values (cons (future (λ () (cleanup-wraplist (wrap-optionals head
-                                                                       target-size
-                                                                       debug
-                                                                       break-val
-                                                                       optional-break?
-                                                                       finish-wrap-proc)))) wraps) tail)])))
+         (values (cons (future (λ () (cleanup-wraplist (break-optionals head
+                                                                        target-size
+                                                                        debug
+                                                                        break-val
+                                                                        optional-break?
+                                                                        finish-wrap-proc)))) wraps) tail)])))
   (append (if break-before? (list break-val) empty) (cleanup-wraplist wraps) (if break-after? (list break-val) empty)))
 
 
 (define (nonprinting-at-start? x) (if (quad? x) (not (printable? x 'start)) #t))
 (define (nonprinting-at-end? x) (if (quad? x) (not (printable? x 'end)) #t))
-(define (wrap-optionals xs
-                        target-size
-                        debug
-                        break-val
-                        optional-break?
-                        finish-wrap-proc)
+(define (break-optionals xs
+                         target-size
+                         debug
+                         break-val
+                         optional-break?
+                         finish-wrap-proc)
   (define start-signal (gensym))
   (define last-optional-break-k #f)
   (define (capture-optional-break-k!)
@@ -188,10 +188,10 @@
 (define optional-break? (λ (q) (and (quad? q) (memv (car (elems q)) '(#\space #\-)))))
 
 (define (linewrap xs size [debug #f])
-  (wrap xs size debug
-        #:break-val 'lb
-        #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (elems q)) '(#\newline))))
-        #:optional-break-proc optional-break?))
+  (break xs size debug
+         #:break-val 'lb
+         #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (elems q)) '(#\newline))))
+         #:optional-break-proc optional-break?))
 
 
 (module+ test
@@ -312,11 +312,11 @@
 
 
 (define (pagewrap xs size [debug #f])
-  (wrap xs size debug
-        #:break-val 'pb
-        #:break-before? #t
-        #:mandatory-break-proc (λ (x) (and (quad? x) (memv (car (elems x)) '(#\page))))
-        #:optional-break-proc (λ (x) (eq? x 'lb))))
+  (break xs size debug
+         #:break-val 'pb
+         #:break-before? #t
+         #:mandatory-break-proc (λ (x) (and (quad? x) (memv (car (elems x)) '(#\page))))
+         #:optional-break-proc (λ (x) (eq? x 'lb))))
 (define pbr (q '(size #f) #\page))
 
 (module+ test
@@ -350,11 +350,11 @@
 (struct $slug $quad () #:transparent)
 (define (slug . xs) ($slug #f xs))
 (define (linewrap2 xs size [debug #f])
-  (wrap xs size debug
-        #:break-val 'lb
-        #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (elems q)) '(#\newline))))
-        #:optional-break-proc optional-break?
-        #:finish-wrap-proc (λ (pcs) (list ($slug #f pcs)))))
+  (break xs size debug
+         #:break-val 'lb
+         #:mandatory-break-proc (λ (q) (and (quad? q) (memv (car (elems q)) '(#\newline))))
+         #:optional-break-proc optional-break?
+         #:finish-wrap-proc (λ (pcs) (list ($slug #f pcs)))))
 
 (module+ test
   (test-case
