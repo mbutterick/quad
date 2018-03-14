@@ -12,7 +12,8 @@
   ($char (hash-set* (attrs q)
                     'size (hash-ref! char-sizes (car (elems q))
                                      (λ ()
-                                       (send util-doc fontSize 12)
+                                       (send util-doc fontSize (string->number (hash-ref (attrs q) 'fontsize "12")))
+                                       (send util-doc font "Courier")
                                        (list
                                         (send util-doc widthOfString (apply string (elems q)))
                                         (send util-doc currentLineHeight))))
@@ -21,7 +22,7 @@
                                   [(#\space) (λ (sig) (not (memq sig '(start end))))]
                                   [else #t])
                     'draw (λ (q doc)
-                            (send doc fontSize 12)
+                            (send doc fontSize (string->number (hash-ref (attrs q) 'fontsize "12")))
                             (let ([str (apply string (elems q))])
                               (cond
                                 [(hash-ref (attrs q) 'link #f)
@@ -36,6 +37,23 @@
 (define page-count 1)
 (define (make-break . xs) ($break (hasheq 'printable? #f 'size '(0 0)) xs))
 
+(define (run-attrs-match left right)
+  (define missing (gensym))
+  (for/and ([k (in-list '(link weight fontsize))])
+    (equal? (hash-ref (attrs left) k missing) (hash-ref (attrs right) k missing))))
+
+(define (consolidate-runs pcs)
+  (for/fold ([runs empty]
+             [pcs pcs]
+             #:result (reverse runs))
+            ([i (in-naturals)]
+             #:break (empty? pcs))
+    (define-values (run-pcs rest) (splitf-at pcs (λ (p) (run-attrs-match (car pcs) p))))
+    (define new-run ($char (hash-set (attrs (car pcs))
+                                     'size (delay (apply map + (map size run-pcs))))
+                           (append-map elems run-pcs)))
+    (values (cons new-run runs) rest)))
+
 (define line-height 16)
 (define consolidate-into-runs? #t)
 (define (line-wrap xs size [debug #f])
@@ -48,7 +66,7 @@
                                                   ;; this only works because there's only one run per line
                                                   ;; that is, it suffices to position the first letter
                                                   (if consolidate-into-runs?
-                                                      (list ($char (attrs (car pcs)) (append-map elems pcs)))
+                                                      (consolidate-runs pcs)
                                                       pcs))))))
 
 (define (as-link doc str url-str [x 0] [y 0])
@@ -57,7 +75,7 @@
   (define width (send doc widthOfString str))
   (define height (send doc currentLineHeight))
   (send doc text str x y)
-  (send doc link x y width height "https://beautifulracket.com")
+  (send doc link x y width height url-str)
   (send doc restore))
 
 (define pb ($break (hasheq 'printable? #f
@@ -66,7 +84,7 @@
                                    (send doc addPage)
                                    (send doc fontSize 10)
                                    (define str (string-append "page " (number->string page-count)))
-                                   (as-link doc str "https://beautifulracket.com" 10 10)
+                                   (as-link doc str "https://practicaltypography.com" 10 10)
                                    (set! page-count (add1 page-count)))) '(#\page)))
 (define (page-wrap xs size [debug #f])
   (break xs size debug
