@@ -40,16 +40,16 @@
 (define consolidate-into-runs? #t)
 (define (line-wrap xs size [debug #f])
   (break xs size debug
-        #:break-val (make-break #\newline)
-        #:soft-break-proc soft-break?
-        #:finish-wrap-proc (λ (pcs) (list ($line (hasheq 'size (list +inf.0 line-height) 'out 'sw)
-                                                 ;; consolidate chars into a single run (naively)
-                                                 ;; by taking attributes from first (including origin)
-                                                 ;; this only works because there's only one run per line
-                                                 ;; that is, it suffices to position the first letter
-                                                 (if consolidate-into-runs?
-                                                     (list ($char (attrs (car pcs)) (append-map elems pcs)))
-                                                     pcs))))))
+         #:break-val (make-break #\newline)
+         #:soft-break-proc soft-break?
+         #:finish-wrap-proc (λ (pcs) (list ($line (hasheq 'size (list +inf.0 line-height) 'out 'sw)
+                                                  ;; consolidate chars into a single run (naively)
+                                                  ;; by taking attributes from first (including origin)
+                                                  ;; this only works because there's only one run per line
+                                                  ;; that is, it suffices to position the first letter
+                                                  (if consolidate-into-runs?
+                                                      (list ($char (attrs (car pcs)) (append-map elems pcs)))
+                                                      pcs))))))
 
 (define (as-link doc str url-str [x 0] [y 0])
   (send doc save)
@@ -70,24 +70,28 @@
                                    (set! page-count (add1 page-count)))) '(#\page)))
 (define (page-wrap xs size [debug #f])
   (break xs size debug
-        #:break-before? #t
-        #:break-val pb
-        #:soft-break-proc $break?
-        #:finish-wrap-proc (λ (pcs) (list ($page (hasheq) (filter-not $break? pcs))))))
+         #:break-before? #t
+         #:break-val pb
+         #:soft-break-proc $break?
+         #:finish-wrap-proc (λ (pcs) (list ($page (hasheq) (filter-not $break? pcs))))))
 
-(define (typeset args)
+(define (typeset qarg)
   (define chars 25)
   (define line-width (* 7.2 chars))
   (define lines-per-page (* 4 line-height))
-  (position ($doc (hasheq 'origin '(36 36)) (page-wrap (line-wrap (map charify (atomize (apply quad #f args))) line-width) lines-per-page))))
+  (position ($doc (hasheq 'origin '(36 36)) (page-wrap (line-wrap (map charify (atomize qarg)) line-width) lines-per-page))))
 
 
-(require hyphenate racket/runtime-path pollen/unstable/typography)
+(require hyphenate racket/runtime-path pollen/unstable/typography pollen/tag)
+
+(provide quad)
+(define quad (default-tag-function 'quad))
+
 (define-runtime-path fira "fira.ttf")
 (define-macro (mb . ARGS)
   (with-pattern ([PS (syntax-property #'ARGS 'ps)])
     #'(#%module-begin
-       (define q (typeset (list . ARGS)))
+       (define q (typeset (qexpr->quad (quad . ARGS))))
        ;q
        (let ([doc (make-object PDFDocument
                     (hasheq 'compress #t
@@ -114,5 +118,6 @@
   (define (quad-read-syntax path-string p)
     (define quad-at-reader (make-at-reader
                             #:syntax? #t 
-                            #:inside? #t))
+                            #:inside? #t
+                            #:command-char #\◊))
     (syntax-property (quad-at-reader path-string p) 'ps (path-replace-extension path-string #".pdf"))))

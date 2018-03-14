@@ -61,6 +61,12 @@
       [(quad? x) (apply qexpr #:name (quad-name x) #:clean-attrs? #t (hash->qattrs (attrs x)) (map loop (elems x)))]
       [else x])))
 
+(define/contract (qexpr->quad x)
+  (qexpr? . -> . quad?)
+  (if (txexpr? x)
+      ($quad (attrs->hash (get-attrs x)) (map qexpr->quad (get-elements x)))
+      x))
+
 (define/contract (qml->qexpr x)
   (string? . -> . qexpr?)
   (parameterize ([permissive-xexprs #t]
