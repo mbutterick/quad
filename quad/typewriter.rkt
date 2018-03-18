@@ -10,6 +10,8 @@
 (define char-sizes (make-hasheqv))
 (define (charify q)
   ($char (hash-set* (attrs q)
+                    'in 'bi
+                    'out 'bo
                     'size (hash-ref! char-sizes (car (elems q))
                                      (λ ()
                                        (send util-doc fontSize (string->number (hash-ref (attrs q) 'fontsize "12")))

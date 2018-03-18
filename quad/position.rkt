@@ -11,11 +11,28 @@
 
 
 (define (valid-anchor? anchor)
-  (define valid-anchors '(nw n ne w c e sw s se))
+  (define valid-anchors '(nw n ne w c e sw s se bi bo))
   (and (memq anchor valid-anchors) #t))
 
 
 (define (coerce-int x) (if (integer? x) (inexact->exact x) x))
+
+(define/contract (ascender q)
+  (quad? . -> . real?)
+  (define p (hash-ref (attrs q) 'font "Courier"))
+  (unless p
+    (error 'ascender-no-font-key))
+  (ascent (openSync p)))
+
+(define/contract (units-per-em q)
+  (quad? . -> . real?)
+  (define p (hash-ref (attrs q) 'font "Courier"))
+  (unless p
+    (error 'units-per-em-no-font-key))
+  (unitsPerEm (openSync p)))
+
+(define (fontsize q)
+  (hash-ref (attrs q) 'fontsize 0))
 
 
 (define/contract (anchor->point q anchor)
@@ -26,7 +43,9 @@
     (case anchor
       [(nw) '(0 0  )] [(n) '(0.5 0  )] [(ne) '(1 0  )]
       [( w) '(0 0.5)] [(c) '(0.5 0.5)] [( e) '(1 0.5)]
-      [(sw) '(0 1  )] [(s) '(0.5 1  )] [(se) '(1 1  )]))
+      [(sw) '(0 1  )] [(s) '(0.5 1  )] [(se) '(1 1  )]
+      [(bi) (list 0 (* (/ (ascender q) (units-per-em q) 1.0) (fontsize q)))]
+      [(bo) (list 1 (* (/ (ascender q) (units-per-em q) 1.0) (fontsize q)))]))
   (match-define (list x y) (size q))
   (pt (coerce-int (* x x-fac)) (coerce-int (* y y-fac))))
 
@@ -99,10 +118,25 @@
 
   (test-case
    "folding positions"
-   (check-equal? (position (quad (quad '(out se) (quad) (quad) (quad))
-                                 (quad '(out se) (quad) (quad) (quad))
-                                 (quad '(out se) (quad) (quad) (quad))))
-                 (quad '(origin (0 0))
-                       (quad '(origin (0 0) out se) (quad '(origin (0 0))) (quad '(origin (1 0))) (quad '(origin (2 0))))
-                       (quad '(origin (1 1) out se) (quad '(origin (1 1))) (quad '(origin (2 1))) (quad '(origin (3 1))))
-                       (quad '(origin (2 2) out se) (quad '(origin (2 2))) (quad '(origin (3 2))) (quad '(origin (4 2))))))))
+   (define (unit [attrs null] . elems) (apply quad (append attrs '(size (1 1))) elems))
+   (check-equal? (position (unit null (unit '(out se) (unit) (unit) (unit))
+                                 (unit '(out se) (unit) (unit) (unit))
+                                 (unit '(out se) (unit) (unit) (unit))))
+                 (unit '(origin (0 0))
+                       (unit '(origin (0 0) out se)
+                             (unit '(origin (0 0))) (unit '(origin (1 0))) (unit '(origin (2 0))))
+                       (unit '(origin (1 1) out se)
+                             (unit '(origin (1 1))) (unit '(origin (2 1))) (unit '(origin (3 1))))
+                       (unit '(origin (2 2) out se)
+                             (unit '(origin (2 2))) (unit '(origin (3 2))) (unit '(origin (4 2))))))))
+
+
+(require racket/runtime-path fontkit/font)
+(define-runtime-path fira "fira.ttf")
+
+(module+ test
+  (define q (quad (list 'in 'bi 'out 'bo 'size '(1 1) 'font fira 'fontsize 72)))
+  (in-point q)
+  (out-point q)
+  (ascender q)
+  (units-per-em q))
