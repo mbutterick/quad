@@ -32,7 +32,8 @@
   (unitsPerEm (openSync p)))
 
 (define (fontsize q)
-  (hash-ref (attrs q) 'fontsize 0))
+  (define val (hash-ref (attrs q) 'fontsize 0))
+  ((if (number? val) values string->number) val))
 
 
 (define/contract (anchor->point q anchor)

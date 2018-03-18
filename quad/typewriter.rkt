@@ -1,7 +1,11 @@
 #lang debug br/quicklang
 (require racket/promise racket/list sugar/list sugar/debug "quad.rkt" "atomize.rkt" "break.rkt" "qexpr.rkt" "generic.rkt" "position.rkt")
 (require pitfall/document)
+(require hyphenate racket/runtime-path pollen/unstable/typography pollen/tag)
 (provide (rename-out [mb #%module-begin]) (except-out (all-from-out br/quicklang) #%module-begin))
+
+
+(define-runtime-path fira "fira.ttf")
 
 (define soft-break? (λ (q) (and (quad? q) (memv (car (elems q)) '(#\space #\- #\u00AD)))))
 (struct $shim $quad () #:transparent)
@@ -10,12 +14,13 @@
 (define char-sizes (make-hasheqv))
 (define (charify q)
   ($char (hash-set* (attrs q)
-                    'in 'bi
-                    'out 'bo
+                    'in 'nw
+                    'out 'ne
+                    'font fira
                     'size (hash-ref! char-sizes (car (elems q))
                                      (λ ()
                                        (send util-doc fontSize (string->number (hash-ref (attrs q) 'fontsize "12")))
-                                       (send util-doc font "Courier")
+                                       (send util-doc font fira)
                                        (list
                                         (send util-doc widthOfString (apply string (elems q)))
                                         (send util-doc currentLineHeight))))
@@ -102,12 +107,9 @@
   (position ($doc (hasheq 'origin '(36 36)) (page-wrap (line-wrap (map charify (atomize qarg)) line-width) lines-per-page))))
 
 
-(require hyphenate racket/runtime-path pollen/unstable/typography pollen/tag)
-
 (provide quad)
 (define quad (default-tag-function 'quad))
 
-(define-runtime-path fira "fira.ttf")
 (define-macro (mb . ARGS)
   (with-pattern ([PS (syntax-property #'ARGS 'ps)])
     #'(#%module-begin
@@ -120,7 +122,7 @@
          (send* doc
            [pipe (open-output-file PS #:exists 'replace)]
            [registerFont "Fira" (path->string fira)]
-           [font "Courier"]
+           [font "Fira"]
            [fontSize 12])
          (draw q doc)
          (send doc end))
