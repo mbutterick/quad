@@ -40,15 +40,17 @@
   (quad? symbol? . -> . point?)
   (unless (valid-anchor? anchor)
     (raise-argument-error 'relative-anchor-pt "valid anchor" anchor))
-  (match-define (list x-fac y-fac)
-    (case anchor
-      [(nw) '(0 0  )] [(n) '(0.5 0  )] [(ne) '(1 0  )]
-      [( w) '(0 0.5)] [(c) '(0.5 0.5)] [( e) '(1 0.5)]
-      [(sw) '(0 1  )] [(s) '(0.5 1  )] [(se) '(1 1  )]
-      [(bi) (list 0 (* (/ (ascender q) (units-per-em q) 1.0) (fontsize q)))]
-      [(bo) (list 1 (* (/ (ascender q) (units-per-em q) 1.0) (fontsize q)))]))
-  (match-define (list x y) (size q))
-  (pt (coerce-int (* x x-fac)) (coerce-int (* y y-fac))))
+  (cond
+    [(eq? anchor 'bi) (pt 0 (* (/ (ascender q) (units-per-em q) 1.0) (fontsize q)))]
+    [(eq? anchor 'bo) (pt (pt-x (size q)) (* (/ (ascender q) (units-per-em q) 1.0) (fontsize q)))]
+    [else
+     (match-define (list x-fac y-fac)
+       (case anchor
+         [(nw) '(0 0  )] [(n) '(0.5 0  )] [(ne) '(1 0  )]
+         [( w) '(0 0.5)] [(c) '(0.5 0.5)] [( e) '(1 0.5)]
+         [(sw) '(0 1  )] [(s) '(0.5 1  )] [(se) '(1 1  )]))
+     (match-define (list x y) (size q))
+     (pt (coerce-int (* x x-fac)) (coerce-int (* y y-fac)))]))
 
 (define point/c (quad? . -> . point?))
 
@@ -136,8 +138,10 @@
 (define-runtime-path fira "fira.ttf")
 
 (module+ test
-  (define q (quad (list 'in 'bi 'out 'bo 'size '(1 1) 'font fira 'fontsize 72)))
-  (in-point q)
-  (out-point q)
-  (ascender q)
-  (units-per-em q))
+  (require rackunit)
+  (define q (quad (list 'in 'bi 'out 'bo 'size '(10 10) 'font fira 'fontsize 12)))
+  (check-equal? (ascender q) 935)
+  (check-equal? (units-per-em q) 1000)
+  (define ascender-scaled (* (/ (ascender q) (units-per-em q)) (hash-ref (attrs q) 'fontsize) 1.0))
+  (check-equal? (in-point q) (list 0 ascender-scaled))
+  (check-equal? (out-point q) (list 10 ascender-scaled)))

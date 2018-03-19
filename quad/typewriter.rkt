@@ -62,7 +62,7 @@
     (values (cons new-run runs) rest)))
 
 (define line-height 16)
-(define consolidate-into-runs? #t)
+(define consolidate-into-runs? #f)
 (define (line-wrap xs size [debug #f])
   (break xs size debug
          #:break-val (make-break #\newline)
