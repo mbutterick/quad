@@ -10,7 +10,7 @@
 (define point? (list/c number? number?))
 
 
-  (define valid-anchors '(nw n ne w c e sw s se bi bo))
+(define valid-anchors '(nw n ne w c e sw s se bi bo))
 
 (define (valid-anchor? anchor)
   (and (memq anchor valid-anchors) #t))
@@ -42,23 +42,24 @@
   (define val (hash-ref (attrs q) 'fontsize 0))
   ((if (number? val) values string->number) val))
 
+(define (vertical-baseline-offset q)
+  (* (/ (ascender q) (units-per-em q) 1.0) (fontsize q)))
 
-(define/contract (anchor->point q anchor)
+(define/contract (anchor->local-point q anchor)
   (quad? symbol? . -> . point?)
-  ;; calculate the location of the anchor on the bounding box relative to '(0 0)
+  ;; calculate the location of the anchor on the bounding box relative to '(0 0) (aka "locally")
   (unless (valid-anchor? anchor)
     (raise-argument-error 'relative-anchor-pt "valid anchor" anchor))
-  (cond
-    [(eq? anchor 'bi) (pt 0 (* (/ (ascender q) (units-per-em q) 1.0) (fontsize q)))]
-    [(eq? anchor 'bo) (pt (pt-x (size q)) (* (/ (ascender q) (units-per-em q) 1.0) (fontsize q)))]
-    [else
-     (match-define (list x-fac y-fac)
-       (case anchor
-         [(nw) '(0 0  )] [(n) '(0.5 0  )] [(ne) '(1 0  )]
-         [( w) '(0 0.5)] [(c) '(0.5 0.5)] [( e) '(1 0.5)]
-         [(sw) '(0 1  )] [(s) '(0.5 1  )] [(se) '(1 1  )]))
-     (match-define (list x y) (size q))
-     (pt (coerce-int (* x x-fac)) (coerce-int (* y y-fac)))]))
+  (match-define (list x-fac y-fac)
+    (case anchor
+      [(nw) '(0 0  )] [(n) '(0.5 0  )] [(ne) '(1 0  )]
+      [( w) '(0 0.5)] [(c) '(0.5 0.5)] [( e) '(1 0.5)]
+      [(sw) '(0 1  )] [(s) '(0.5 1  )] [(se) '(1 1  )]
+      [(bi) '(0 0  )]                  [(bo) '(1 0  )]))
+  (for/list ([coord (size q)]
+             [fac (list x-fac y-fac)]
+             [offset (list 0 (if (memq anchor '(bi bo)) (vertical-baseline-offset q) 0))])
+            (coerce-int (+ (* coord fac) offset))))
 
 (define point/c (quad? . -> . point?))
 
@@ -67,21 +68,21 @@
   ;; calculate absolute location of inner-point
   ;; based on current origin and point type.
   ;; include offset, because it's intended to adjust inner 
-  (pt+ (origin q) (anchor->point q (inner q)) (offset q)))
+  (pt+ (origin q) (anchor->local-point q (inner q)) (offset q)))
 
 (define/contract (in-point q)
   point/c
   ;; calculate absolute location of in-point
   ;; based on current origin and point type.
   ;; don't include offset, so location is on bounding box
-  (pt+ (origin q) (anchor->point q (in q))))
+  (pt+ (origin q) (anchor->local-point q (in q))))
 
 (define/contract (out-point q)
   point/c
   ;; calculate absolute location of out-point
   ;; based on current origin and point type.
   ;; don't include offset, so location is on bounding box
-  (pt+ (origin q) (anchor->point q (out q))))
+  (pt+ (origin q) (anchor->local-point q (out q))))
 
 
 (define/contract (position q [previous-end-pt #f])
