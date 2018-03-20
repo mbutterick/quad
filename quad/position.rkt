@@ -10,10 +10,13 @@
 (define point? (list/c number? number?))
 
 
-(define (valid-anchor? anchor)
   (define valid-anchors '(nw n ne w c e sw s se bi bo))
+
+(define (valid-anchor? anchor)
   (and (memq anchor valid-anchors) #t))
 
+(define (random-anchor)
+  (list-ref valid-anchors (random (length valid-anchors))))
 
 (define (coerce-int x) (if (integer? x) (inexact->exact x) x))
 
@@ -34,12 +37,15 @@
   (unitsPerEm (hash-ref! fonts p (λ () (openSync p)))))
 
 (define (fontsize q)
+  ;; this needs to not default to 0
+  ;; needs parameter with default font size
   (define val (hash-ref (attrs q) 'fontsize 0))
   ((if (number? val) values string->number) val))
 
 
 (define/contract (anchor->point q anchor)
   (quad? symbol? . -> . point?)
+  ;; calculate the location of the anchor on the bounding box relative to '(0 0)
   (unless (valid-anchor? anchor)
     (raise-argument-error 'relative-anchor-pt "valid anchor" anchor))
   (cond
@@ -58,20 +64,33 @@
 
 (define/contract (inner-point q)
   point/c
+  ;; calculate absolute location of inner-point
+  ;; based on current origin and point type.
+  ;; include offset, because it's intended to adjust inner 
   (pt+ (origin q) (anchor->point q (inner q)) (offset q)))
 
 (define/contract (in-point q)
   point/c
+  ;; calculate absolute location of in-point
+  ;; based on current origin and point type.
+  ;; don't include offset, so location is on bounding box
   (pt+ (origin q) (anchor->point q (in q))))
 
 (define/contract (out-point q)
   point/c
-  (pt+ (origin q) (anchor->point q (out q)))) ; no offset because end-point is calculated without padding
+  ;; calculate absolute location of out-point
+  ;; based on current origin and point type.
+  ;; don't include offset, so location is on bounding box
+  (pt+ (origin q) (anchor->point q (out q))))
 
 
-(define/contract (position q [previous-end-pt (origin q)])
+(define/contract (position q [previous-end-pt #f])
   ((quad?) (point?) . ->* . quad?)
-  (set-origin! q (pt- previous-end-pt (in-point q)))
+  ;; recursively calculates coordinates for quad & subquads
+  ;; based on starting origin point
+  (set-origin! q (if previous-end-pt
+                     (pt- previous-end-pt (in-point q))
+                     (in-point q)))
   (for/fold ([pt (inner-point q)])
             ([q (in-list (elems q))]
              #:when (quad? q))

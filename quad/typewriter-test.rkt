@@ -1,3 +1,3 @@
 #lang quad/typewriter
 
-H◊quad[#:fontsize "32"]{H}◊quad[#:fontsize "8"]{H}
+◊quad[#:fontsize "18"]{Hel}◊quad[#:fontsize "32"]{Lo}◊quad[#:fontsize "8"]{ World}

@@ -15,13 +15,12 @@
   (send doc save)
   (send doc lineWidth 0.25)
   (send/apply doc rect (append (origin q) (size q)))
-  (send doc stroke)
-  #R (hash-ref (attrs q) 'in)
-  (send doc circle (+ (pt-x #R(origin q)) (pt-x #R(in-point q)))
-        (+ (pt-y (origin q)) (pt-y (in-point q))) 1)
-  (send doc circle (+ (pt-x (origin q)) (pt-x #R(out-point q)))
-        (+ (pt-y (origin q)) (pt-y (out-point q))) 1)
-  (send doc fill)
+  (send doc stroke "#fcc")
+  (send/apply doc rect (append (origin q) (size q)))
+  (send doc clip)
+  (send doc circle (pt-x (in-point q)) (pt-y (in-point q)) 1)
+  (send doc circle (pt-x (out-point q)) (pt-y (out-point q)) 1)
+  (send doc fill "#f99")  
   (send doc restore))
 
 (define char-sizes (make-hasheqv))
@@ -30,13 +29,12 @@
                     'in 'bi
                     'out 'bo
                     'font fira
-                    'size (hash-ref! char-sizes (car (elems q))
-                                     (λ ()
-                                       (send util-doc fontSize (string->number (hash-ref (attrs q) 'fontsize "12")))
-                                       (send util-doc font fira)
-                                       (list
-                                        (send util-doc widthOfString (apply string (elems q)))
-                                        (send util-doc currentLineHeight))))
+                    'size (λ ()
+                            (send util-doc fontSize (string->number (hash-ref (attrs q) 'fontsize "12")))
+                            (send util-doc font fira)
+                            (list
+                             (send util-doc widthOfString (apply string (elems q)))
+                             (send util-doc currentLineHeight)))
                     'printable? (case (car (elems q))
                                   [(#\u00AD) (λ (sig) (memq sig '(end)))]
                                   [(#\space) (λ (sig) (not (memq sig '(start end))))]
@@ -76,7 +74,7 @@
     (values (cons new-run runs) rest)))
 
 (define line-height 16)
-(define consolidate-into-runs? #t)
+(define consolidate-into-runs? #f)
 (define (line-wrap xs size [debug #f])
   (break xs size debug
          #:break-val (make-break #\newline)
