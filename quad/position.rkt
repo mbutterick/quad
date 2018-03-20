@@ -20,26 +20,29 @@
 
 (define (coerce-int x) (if (integer? x) (inexact->exact x) x))
 
-(define fonts (make-hash))
+
+(define (get-font p)
+  (define fonts (make-hash))
+  (hash-ref! fonts p (λ () (openSync p))))
 
 (define/contract (ascender q)
   (quad? . -> . real?)
   (define p (hash-ref (attrs q) 'font "Courier"))
   (unless p
     (error 'ascender-no-font-key))
-  (ascent (hash-ref! fonts p (λ () (openSync p)))))
+  (ascent (get-font p)))
 
 (define/contract (units-per-em q)
   (quad? . -> . real?)
   (define p (hash-ref (attrs q) 'font "Courier"))
   (unless p
     (error 'units-per-em-no-font-key))
-  (unitsPerEm (hash-ref! fonts p (λ () (openSync p)))))
+  (unitsPerEm (get-font p)))
 
 (define (fontsize q)
   ;; this needs to not default to 0
   ;; needs parameter with default font size
-  (define val (hash-ref (attrs q) 'fontsize 0))
+  (define val (hash-ref (attrs q) 'fontsize (λ () (error 'no-font-size))))
   ((if (number? val) values string->number) val))
 
 (define (vertical-baseline-offset q)
@@ -56,10 +59,9 @@
       [( w) '(0 0.5)] [(c) '(0.5 0.5)] [( e) '(1 0.5)]
       [(sw) '(0 1  )] [(s) '(0.5 1  )] [(se) '(1 1  )]
       [(bi) '(0 0  )]                  [(bo) '(1 0  )]))
-  (for/list ([coord (size q)]
-             [fac (list x-fac y-fac)]
-             [offset (list 0 (if (memq anchor '(bi bo)) (vertical-baseline-offset q) 0))])
-            (coerce-int (+ (* coord fac) offset))))
+  (match-define (list x y) (size q))
+  (pt (coerce-int (* x x-fac))
+      (coerce-int (+ (* y y-fac) (if (memq anchor '(bi bo)) (vertical-baseline-offset q) 0)))))
 
 (define point/c (quad? . -> . point?))
 
