@@ -17,19 +17,21 @@
 
 (define (coerce-int x) (if (integer? x) (inexact->exact x) x))
 
+(define fonts (make-hash))
+
 (define/contract (ascender q)
   (quad? . -> . real?)
   (define p (hash-ref (attrs q) 'font "Courier"))
   (unless p
     (error 'ascender-no-font-key))
-  (ascent (openSync p)))
+  (ascent (hash-ref! fonts p (λ () (openSync p)))))
 
 (define/contract (units-per-em q)
   (quad? . -> . real?)
   (define p (hash-ref (attrs q) 'font "Courier"))
   (unless p
     (error 'units-per-em-no-font-key))
-  (unitsPerEm (openSync p)))
+  (unitsPerEm (hash-ref! fonts p (λ () (openSync p)))))
 
 (define (fontsize q)
   (define val (hash-ref (attrs q) 'fontsize 0))
@@ -60,7 +62,7 @@
 
 (define/contract (in-point q)
   point/c
-  (anchor->point q (in q)))
+  (pt+ (origin q) (anchor->point q (in q))))
 
 (define/contract (out-point q)
   point/c
@@ -93,17 +95,41 @@
    (check-equal? (origin (position (quad (hasheq 'in 'w 'size size)) orig)) (pt 5 0)))
 
   (test-case
+   "in points"
+   (check-equal? (in-point (quad (hasheq 'in 'nw 'size '(10 10) 'origin '(5 5)))) (pt 5 5))
+   (check-equal? (in-point (quad (hasheq 'in 'n 'size '(10 10) 'origin '(5 5)))) (pt 10 5))
+   (check-equal? (in-point (quad (hasheq 'in 'ne 'size '(10 10) 'origin '(5 5)))) (pt 15 5))
+   (check-equal? (in-point (quad (hasheq 'in 'w 'size '(10 10) 'origin '(5 5)))) (pt 5 10))
+   (check-equal? (in-point (quad (hasheq 'in 'c 'size '(10 10) 'origin '(5 5)))) (pt 10 10))
+   (check-equal? (in-point (quad (hasheq 'in 'e 'size '(10 10) 'origin '(5 5)))) (pt 15 10))
+   (check-equal? (in-point (quad (hasheq 'in 'sw 'size '(10 10) 'origin '(5 5)))) (pt 5 15))
+   (check-equal? (in-point (quad (hasheq 'in 's 'size '(10 10) 'origin '(5 5)))) (pt 10 15))
+   (check-equal? (in-point (quad (hasheq 'in 'se 'size '(10 10) 'origin '(5 5)))) (pt 15 15)))
+
+  (test-case
+   "out points"
+   (check-equal? (out-point (quad (hasheq 'out 'nw 'size '(10 10) 'origin '(5 5)))) (pt 5 5))
+   (check-equal? (out-point (quad (hasheq 'out 'n 'size '(10 10) 'origin '(5 5)))) (pt 10 5))
+   (check-equal? (out-point (quad (hasheq 'out 'ne 'size '(10 10) 'origin '(5 5)))) (pt 15 5))
+   (check-equal? (out-point (quad (hasheq 'out 'w 'size '(10 10) 'origin '(5 5)))) (pt 5 10))
+   (check-equal? (out-point (quad (hasheq 'out 'c 'size '(10 10) 'origin '(5 5)))) (pt 10 10))
+   (check-equal? (out-point (quad (hasheq 'out 'e 'size '(10 10) 'origin '(5 5)))) (pt 15 10))
+   (check-equal? (out-point (quad (hasheq 'out 'sw 'size '(10 10) 'origin '(5 5)))) (pt 5 15))
+   (check-equal? (out-point (quad (hasheq 'out 's 'size '(10 10) 'origin '(5 5)))) (pt 10 15))
+   (check-equal? (out-point (quad (hasheq 'out 'se 'size '(10 10) 'origin '(5 5)))) (pt 15 15)))
+
+  (test-case
    "inner points"
-   (define size '(10 10))
-   (define orig '(0 0))
-   (check-equal? (inner-point (position (quad (hasheq 'size size 'inner 'nw)) orig)) (pt 0 0))
-   (check-equal? (inner-point (position (quad (hasheq 'size size 'inner 'n)) orig)) (pt 5 0))
-   (check-equal? (inner-point (position (quad (hasheq 'size size 'inner 'ne)) orig)) (pt 10 0))
-   (check-equal? (inner-point (position (quad (hasheq 'size size 'inner 'e)) orig)) (pt 10 5))
-   (check-equal? (inner-point (position (quad (hasheq 'size size 'inner 'se)) orig)) (pt 10 10))
-   (check-equal? (inner-point (position (quad (hasheq 'size size 'inner 's)) orig)) (pt 5 10))
-   (check-equal? (inner-point (position (quad (hasheq 'size size 'inner 'sw)) orig)) (pt 0 10))
-   (check-equal? (inner-point (position (quad (hasheq 'size size 'inner 'w)) orig)) (pt 0 5)))
+   (define size '(20 20))
+   (define orig '(10 10))
+   (check-equal? (inner-point (position (quad (hasheq 'size size 'inner 'nw)) orig)) (pt 10 10))
+   (check-equal? (inner-point (position (quad (hasheq 'size size 'inner 'n)) orig)) (pt 20 10))
+   (check-equal? (inner-point (position (quad (hasheq 'size size 'inner 'ne)) orig)) (pt 30 10))
+   (check-equal? (inner-point (position (quad (hasheq 'size size 'inner 'e)) orig)) (pt 30 20))
+   (check-equal? (inner-point (position (quad (hasheq 'size size 'inner 'se)) orig)) (pt 30 30))
+   (check-equal? (inner-point (position (quad (hasheq 'size size 'inner 's)) orig)) (pt 20 30))
+   (check-equal? (inner-point (position (quad (hasheq 'size size 'inner 'sw)) orig)) (pt 10 30))
+   (check-equal? (inner-point (position (quad (hasheq 'size size 'inner 'w)) orig)) (pt 10 20)))
 
   (test-case
    "inner points with offsets"
@@ -136,6 +162,12 @@
 
 (require racket/runtime-path fontkit/font)
 (define-runtime-path fira "fira.ttf")
+
+(define q1 (quad (list 'in 'bi 'out 'bo 'size '(10 10) 'font fira 'fontsize 12)))
+(define q2 (quad (list 'in 'bi 'out 'bo 'size '(10 10) 'font fira 'fontsize 24)))
+(define q3 (quad (list 'in 'bi 'out 'bo 'size '(10 10) 'font fira 'fontsize 6)))
+#;(position (quad #f q1 q2 q3))
+
 
 (module+ test
   (require rackunit)

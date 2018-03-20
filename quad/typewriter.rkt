@@ -11,11 +11,24 @@
 (struct $shim $quad () #:transparent)
 (struct $char $quad () #:transparent)
 (define util-doc (make-object PDFDocument))
+(define (draw-debug q doc)
+  (send doc save)
+  (send doc lineWidth 0.25)
+  (send/apply doc rect (append (origin q) (size q)))
+  (send doc stroke)
+  #R (hash-ref (attrs q) 'in)
+  (send doc circle (+ (pt-x #R(origin q)) (pt-x #R(in-point q)))
+        (+ (pt-y (origin q)) (pt-y (in-point q))) 1)
+  (send doc circle (+ (pt-x (origin q)) (pt-x #R(out-point q)))
+        (+ (pt-y (origin q)) (pt-y (out-point q))) 1)
+  (send doc fill)
+  (send doc restore))
+
 (define char-sizes (make-hasheqv))
 (define (charify q)
   ($char (hash-set* (attrs q)
-                    'in 'nw
-                    'out 'ne
+                    'in 'bi
+                    'out 'bo
                     'font fira
                     'size (hash-ref! char-sizes (car (elems q))
                                      (λ ()
@@ -29,6 +42,7 @@
                                   [(#\space) (λ (sig) (not (memq sig '(start end))))]
                                   [else #t])
                     'draw (λ (q doc)
+                            (draw-debug q doc)
                             (send doc fontSize (string->number (hash-ref (attrs q) 'fontsize "12")))
                             (let ([str (apply string (elems q))])
                               (cond
@@ -62,12 +76,13 @@
     (values (cons new-run runs) rest)))
 
 (define line-height 16)
-(define consolidate-into-runs? #f)
+(define consolidate-into-runs? #t)
 (define (line-wrap xs size [debug #f])
   (break xs size debug
          #:break-val (make-break #\newline)
          #:soft-break-proc soft-break?
-         #:finish-wrap-proc (λ (pcs) (list ($line (hasheq 'size (list +inf.0 line-height) 'out 'sw)
+         #:finish-wrap-proc (λ (pcs) (list ($line (hasheq 'size (list +inf.0 line-height)
+                                                          'out 'sw)
                                                   ;; consolidate chars into a single run (naively)
                                                   ;; by taking attributes from first (including origin)
                                                   ;; this only works because there's only one run per line
@@ -91,7 +106,8 @@
                                    (send doc addPage)
                                    (send doc fontSize 10)
                                    (define str (string-append "page " (number->string page-count)))
-                                   (as-link doc str "https://practicaltypography.com" 10 10)
+                                   ;; page number
+                                   #;(as-link doc str "https://practicaltypography.com" 10 10)
                                    (set! page-count (add1 page-count)))) '(#\page)))
 (define (page-wrap xs size [debug #f])
   (break xs size debug
@@ -118,7 +134,7 @@
        (let ([doc (make-object PDFDocument
                     (hasheq 'compress #t
                             'autoFirstPage #f
-                            'size '(300 400)))])
+                            'size '(150 150)))])
          (send* doc
            [pipe (open-output-file PS #:exists 'replace)]
            [registerFont "Fira" (path->string fira)]
