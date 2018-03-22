@@ -1,6 +1,6 @@
 #lang quad/typewriter
 
-◊quad[#:fontsize "11"]{Hello}
+◊quad[#:fontsize "11"]{Hello world}
 
 ◊;quad[#:fontsize "11"]{◊quad[#:link "http://beautifulracket.com"]{An expression that} is not a value can ◊quad[#:fontsize "22"]{always}  ◊quad[#:fontsize "7"]{be partitioned} into}
 
