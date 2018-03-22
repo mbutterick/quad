@@ -32,12 +32,12 @@
                     'size 
                     (delay
                       (let ([fontsize (string->number (hash-ref (attrs q) 'fontsize "12"))]
-                              [str (apply string (elems q))])
-                          (send util-doc fontSize (string->number (hash-ref (attrs q) 'fontsize "12")))
-                          (send util-doc font fira)
-                          (list
-                           (send util-doc widthOfString str)
-                           (send util-doc currentLineHeight))))
+                            [str (apply string (elems q))])
+                        (send util-doc fontSize (string->number (hash-ref (attrs q) 'fontsize "12")))
+                        (send util-doc font fira)
+                        (list
+                         (send util-doc widthOfString str)
+                         (send util-doc currentLineHeight))))
                     'printable? (case (car (elems q))
                                   [(#\u00AD) (λ (sig) (memq sig '(end)))]
                                   [(#\space) (λ (sig) (not (memq sig '(start end))))]
@@ -51,7 +51,8 @@
                                  =>
                                  (λ (url-str) (apply as-link doc str url-str (origin q)))]
                                 [else
-                                 (send/apply doc text str (origin q))])))) (elems q)))
+                                 (println str)
+                                 (time-name send-text (send/apply doc text str (origin q)))])))) (elems q)))
 (struct $line $quad () #:transparent)
 (struct $page $quad () #:transparent)
 (struct $doc $quad () #:transparent)
@@ -121,9 +122,9 @@
   (define chars 25)
   (define line-width (* 7.2 chars))
   (define lines-per-page (* 4 line-height))
-  (let* ([x (begin (report 'line-wrap) (time (line-wrap (map charify (atomize qarg)) line-width)))]
-         [x (begin (report 'page-wrap) (time (page-wrap x lines-per-page)))]
-         [x (begin (report 'position) (time (position ($doc (hasheq 'origin '(36 36)) x))))])
+  (let* ([x (time-name line-wrap (line-wrap (map charify (atomize qarg)) line-width))]
+         [x (time-name page-wrap (page-wrap x lines-per-page))]
+         [x (time-name position (position ($doc (hasheq 'origin '(36 36)) x)))])
     x))
 
 
@@ -133,20 +134,20 @@
 (define-macro (mb . ARGS)
   (with-pattern ([PS (syntax-property #'ARGS 'ps)])
     #'(#%module-begin
-       (define q (typeset (qexpr->quad (quad . ARGS))))
-       ;q
-       (report 'draw)
-       (time (let ([doc (make-object PDFDocument
-                          (hasheq 'compress #t
-                                  'autoFirstPage #f
-                                  'size '(300 200)))])
-               (send* doc
-                 [pipe (open-output-file PS #:exists 'replace)]
-                 [registerFont "Fira" (path->string fira)]
-                 [font "Fira"]
-                 [fontSize 12])
-               (draw q doc)
-               (send doc end)))
+       (let ([doc (time-name make-doc
+                             (make-object PDFDocument
+                               (hasheq 'compress #t
+                                       'autoFirstPage #f
+                                       'size '(300 200))))])
+         (time-name config-doc
+                    (send* doc
+                      [pipe (open-output-file PS #:exists 'replace)]
+                      [registerFont "Fira" (path->string fira)]
+                      [font "Fira"]
+                      [fontSize 12]))
+         (define q (typeset (qexpr->quad (quad . ARGS))))
+         (time-name draw (draw q doc))
+         (time-name end-doc (send doc end)))
        (void))))
 
 (module reader syntax/module-reader
