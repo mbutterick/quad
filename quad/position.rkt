@@ -25,19 +25,21 @@
   (define fonts (make-hash))
   (hash-ref! fonts p (λ () (openSync p))))
 
+(define ascender-cache (make-hash))
 (define/contract (ascender q)
   (quad? . -> . real?)
   (define p (hash-ref (attrs q) 'font "Courier"))
   (unless p
     (error 'ascender-no-font-key))
-  (ascent (get-font p)))
+  (hash-ref! ascender-cache p (λ () (ascent (get-font p)))))
 
+(define units-cache (make-hash))
 (define/contract (units-per-em q)
   (quad? . -> . real?)
   (define p (hash-ref (attrs q) 'font "Courier"))
   (unless p
     (error 'units-per-em-no-font-key))
-  (unitsPerEm (get-font p)))
+  (hash-ref! units-cache p (λ () (unitsPerEm (get-font p)))))
 
 (define (fontsize q)
   ;; this needs to not default to 0

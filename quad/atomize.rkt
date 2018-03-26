@@ -6,7 +6,8 @@
 
 (define (update-with base-hash . update-hashes)
   ;; starting with base-hash, add or update keys found in update-hashes
-  (apply hasheq (flatten (map hash->list (list* base-hash update-hashes)))))
+  (for/hasheq ([(k v) (in-dict (append-map hash->list (list* base-hash update-hashes)))])
+    (values k v)))
 
 (module+ test
   (check-equal?
@@ -39,7 +40,7 @@
   (define atomic-quads
     (let loop ([x (if (string? qx) (q qx) qx)][attrs (current-default-attrs)])
       (match x
-        [(? char? c) (list (q attrs c))]
+        [(? char? c) (list (q (hash-set attrs 'id (gensym)) c))]
         [(? string?) (append* (for/list ([c (in-string x)]) ;; strings are exploded
                                         (loop c attrs)))]
         [($quad this-attrs elems) ;; qexprs with attributes are recursed

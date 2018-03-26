@@ -2,17 +2,19 @@
 (require racket/contract racket/list racket/match txexpr sugar/debug sugar/define sugar/list racket/promise racket/function (only-in racket/control call/prompt) racket/future 
          "param.rkt" "qexpr.rkt" "atomize.rkt" "quad.rkt" "generic.rkt" "position.rkt")
 
+(define distance-cache (make-hasheq))
 (define/contract (distance q)
   (any/c . -> . real?)
-  ;; linear distance from in point to out point
-  (cond
-    [(quad? q)
-     (match-define (list ∆x ∆y) (map - (out-point q) (in-point q)))
-     (cond
-       [(zero? ∆x) ∆y]
-       [(zero? ∆y) ∆x]
-       [else (sqrt (+ (* ∆x ∆x) (* ∆y ∆y)))])]
-    [else 0]))
+  (hash-ref! distance-cache (hash-ref (attrs q) 'id q)
+             (λ ()
+               (cond
+                 [(quad? q)
+                  (match-define (list ∆x ∆y) (map - (out-point q) (in-point q)))
+                  (cond
+                    [(zero? ∆x) ∆y]
+                    [(zero? ∆y) ∆x]
+                    [else (sqrt (+ (* ∆x ∆x) (* ∆y ∆y)))])]
+                 [else 0]))))
 
 
 (define+provide/contract (break xs
@@ -67,22 +69,22 @@
         [else
          (define-values (head tail) (splitf-at xs (λ (x) (not (hard-break? x)))))
          (values (cons (future (λ () (cleanup-wraplist (break-softs head
-                                                                        target-size
-                                                                        debug
-                                                                        break-val
-                                                                        soft-break?
-                                                                        finish-wrap-proc)))) wraps) tail)])))
+                                                                    target-size
+                                                                    debug
+                                                                    break-val
+                                                                    soft-break?
+                                                                    finish-wrap-proc)))) wraps) tail)])))
   (append (if break-before? (list break-val) empty) (cleanup-wraplist wraps) (if break-after? (list break-val) empty)))
 
 
 (define (nonprinting-at-start? x) (if (quad? x) (not (printable? x 'start)) #t))
 (define (nonprinting-at-end? x) (if (quad? x) (not (printable? x 'end)) #t))
 (define (break-softs xs
-                         target-size
-                         debug
-                         break-val
-                         soft-break?
-                         finish-wrap-proc)
+                     target-size
+                     debug
+                     break-val
+                     soft-break?
+                     finish-wrap-proc)
   (define start-signal (gensym))
   (define last-soft-break-k #f)
   (define (capture-soft-break-k!)
