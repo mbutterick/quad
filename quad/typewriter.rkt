@@ -31,14 +31,14 @@
                     'font charter
                     'size 
                     (delay
-                      (let ([fontsize (string->number (hash-ref (attrs q) 'fontsize "12"))]
-                            [str (apply string (elems q))])
-                        (send* (current-doc)
-                          [fontSize (string->number (hash-ref (attrs q) 'fontsize "12"))]
-                          [font (path->string charter)])
-                        (list
-                         (send (current-doc) widthOfString str)
-                         (send (current-doc) currentLineHeight))))
+                      (define fontsize (string->number (hash-ref (attrs q) 'fontsize "12")))
+                      (define str (apply string (elems q)))
+                      (send* (current-doc)
+                        [fontSize fontsize]
+                        [font (path->string charter)])
+                      (list
+                       (send (current-doc) widthOfString str)
+                       (send (current-doc) currentLineHeight)))
                     'printable? (case (car (elems q))
                                   [(#\u00AD) (λ (sig) (memq sig '(end)))]
                                   [(#\space) (λ (sig) (not (memq sig '(start end))))]
