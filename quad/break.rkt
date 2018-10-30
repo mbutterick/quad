@@ -33,49 +33,50 @@
                   #:hard-break-proc procedure?
                   #:soft-break-proc procedure?
                   #:finish-wrap-proc procedure?) . ->* . (listof any/c))
-  (break-private xs
-                 target-size
-                 debug
-                 break-val
-                 break-before?
-                 break-after?
-                 hard-break?
-                 soft-break?
-                 finish-wrap-proc))
+  (break-hards xs
+               target-size
+               debug
+               break-val
+               break-before?
+               break-after?
+               hard-break?
+               soft-break?
+               finish-wrap-proc))
 
 ;; the hard breaks are used to divide the wrap territory into smaller chunks
 ;; that can be cached, parallelized, etc.
-(define (break-private xs
-                       target-size
-                       debug
-                       break-val
-                       break-before?
-                       break-after?
-                       hard-break?
-                       soft-break?
-                       finish-wrap-proc)
-  (define break-val-equal? (if (symbol? break-val) eq? equal?))
-  (define (cleanup-wraplist xs) (dropf-right (append* (reverse xs)) (λ (x) (break-val-equal? break-val x))))
+(define (break-hards xs
+                     target-size
+                     debug
+                     break-val
+                     break-before?
+                     break-after?
+                     hard-break?
+                     soft-break?
+                     finish-wrap-proc)
+  (define break-val=? (if (symbol? break-val) eq? equal?))
+  (define (cleanup-wraplist xs)
+    (dropf-right (append* (reverse xs)) (λ (x) (break-val=? break-val x))))
   (define wraps
     (for/fold ([wraps null]
-               [xs (dropf xs hard-break?)]
-               #:result (map touch wraps))
+               [xs xs]
+               #:result wraps)
               ([i (in-naturals)]
                #:break (null? xs))
-      (cond
-        [(hard-break? (car xs))
+      (match xs
+        [(cons (? hard-break?) rest)
          (when debug (report x 'hard-break))
-         (values (cons (future (λ () (list break-val))) wraps) (cdr xs))]
-        [else
-         (define-values (head tail) (splitf-at xs (λ (x) (not (hard-break? x)))))
-         (values (cons (future (λ () (cleanup-wraplist (break-softs head
-                                                                    target-size
-                                                                    debug
-                                                                    break-val
-                                                                    soft-break?
-                                                                    finish-wrap-proc)))) wraps) tail)])))
-  (append (if break-before? (list break-val) empty) (cleanup-wraplist wraps) (if break-after? (list break-val) empty)))
-
+         (values (cons (list break-val) wraps) rest)]
+        [_ (define-values (head tail) (splitf-at xs (λ (x) (not (hard-break? x)))))
+           (values (cons (cleanup-wraplist (break-softs head
+                                                        target-size
+                                                        debug
+                                                        break-val
+                                                        soft-break?
+                                                        finish-wrap-proc)) wraps) tail)])))
+  (append (if break-before? (list break-val) empty)
+          (cleanup-wraplist wraps)
+          (if break-after? (list break-val) empty)))
 
 (define (nonprinting-at-start? x) (if (quad? x) (not (printable? x 'start)) #t))
 (define (nonprinting-at-end? x) (if (quad? x) (not (printable? x 'end)) #t))
@@ -90,85 +91,81 @@
   (define (capture-soft-break-k!)
     (when debug (report 'capturing-break))
     (let/cc k (set! last-soft-break-k k) #f))
-  (call/prompt ;; continuation boundary for last-soft-break-k
-   (thunk
-    (let loop ([wraps null][wrap-pieces null][dist-so-far start-signal][xs xs])
-      (cond
-        [(null? xs)
-         ;; combine the segments into a flat list, and drop any trailing breaks
-         ;; (on the idea that breaks should separate things, and there's nothing left to separate)
-         ;; wraps alternate with breaks
-         (for/list ([pcs (in-list (cons wrap-pieces wraps))]
-                    [proc (in-cycle (list 
-                                     ;; pieces will have been accumulated in reverse order
-                                     ;; dropf drops from beginning of list (representing the end of the wrap)
-                  
-                                     (λ (pcs) (finish-wrap-proc (reverse (dropf pcs (λ (x) (and (soft-break? x) (nonprinting-at-end? x)))))))
-                                     values))])
-           (proc pcs))]
-        [else
-         (define x (car xs))
-         (define at-start? (eq? dist-so-far start-signal))
-         (define underflow? (and (not at-start?) (<= (+ dist-so-far (if (and (quad? x) (printable? x 'end)) (distance x) 0)) target-size)))
-         (define (values-for-insert-break [before? #f])
-           ;; a break can be inserted before or after the current quad.
-           ;; At an ordinary break (hard or soft) it goes after the wrap point.
-           ;; The wrap signal consumes the break if it's nonprinting (e.g., word space or hard break)
-           ;; but not if it's printing (e.g., hyphen).
-           ;; But if no ordinary break can be found for a line, the wrap will happen before the quad.
-           ;; The wrap signal will not consume the quad (rather, it will become the first quad in the next wrap)
-           ;; (we do this by resetting next-xs to the whole xs list)
-           ;; In both cases, the `finish-wrap` proc will strip off any trailing white breaks from the new segment.
-           (set! last-soft-break-k #f) ;; prevents continuation loop
-           (if before?
-               (values wrap-pieces xs)
-               ; omit nonprinting quad
-               (values (if (and (quad? x) (nonprinting-at-end? x)) wrap-pieces (cons x wrap-pieces)) (cdr xs))))
-         (cond
-           [(and at-start? (soft-break? x) (nonprinting-at-start? x))
-            (when debug (report x 'skipping-soft-break-at-beginning))
-            ;; skip it
-            (loop wraps null dist-so-far (cdr xs))]
-           [(and underflow? (soft-break? x) (capture-soft-break-k!))
-            (when debug (report x 'resuming-break-from-continuation))
-            (define-values (pieces-for-this-wrap next-xs) (values-for-insert-break))
-            (loop (list* (list break-val) pieces-for-this-wrap wraps)
-                  null
-                  start-signal
-                  next-xs)]
-           ;; the easy case of accumulating quads in the middle of a wrap
-           [(or (and underflow? (when debug (report x 'add-underflow)) #t) 
-                ;; assume printing (nonprinting were handled in first case)
-                ;; this branch reached if the first quad on the line causes an overflow
-                ;; That sounds weird, but maybe it's just really big.
-                (and at-start? (when debug (report x 'add-at-start)) #t)
-                ;; we do want to accumulate nonprinting soft breaks (like wordspaces and soft hyphens) in the middle.
-                ;; in case we eventually encounter a printing quad that fits on the line.
-                ;; if we don't (ie. the line overflows) then they will get stripped by `finish-wrap`
-                (and (soft-break? x) (nonprinting-at-end? x) (when debug (report x 'add-nonprinting-soft-break)) #t))
-            (define printable (and (quad? x) (printable? x (and at-start? 'start)))) 
-            (define dist (and printable (distance x)))
-            (loop wraps
-                  (if (and (quad? x) (not printable)) wrap-pieces (cons x wrap-pieces)) ; omit nonprinting quad
-                  (if at-start? (or dist start-signal) (+ dist-so-far (or dist 0)))
-                  (cdr xs))]
-           ;; the previous branch will catch all `underflow?` cases
-           ;; therefore, in these last two cases, we have overflow
-           [last-soft-break-k ;; overflow implied
-            ;; if we have an soft break stored, we jump back and use it
-            ;; now that we know we need it.
-            (when debug (report x 'invoking-last-breakpoint))
-            (last-soft-break-k #t)]
-           [else ;; overflow implied
-            ;; if we don't have an soft break stored, we need to just end the wrap and move on
-            ;; we insert the break `before` so that the current quad is moved to the next wrap
-            ;; no, it's not going to look good, but if we reach this point, we are in weird conditions
-            (when debug (report x 'falling-back))
-            (define-values (pieces-for-this-wrap next-xs) (values-for-insert-break 'before))
-            (loop (list* (list break-val) pieces-for-this-wrap wraps)
-                  null
-                  start-signal
-                  next-xs)])])))))
+  (let loop ([wraps null][wrap-pieces null][dist-so-far start-signal][xs xs])
+    (match xs
+      [(== empty)
+       ;; combine the segments into a flat list, and drop any trailing breaks
+       ;; (on the idea that breaks should separate things, and there's nothing left to separate)
+       ;; wraps alternate with breaks
+       (for/list ([pcs (in-list (cons wrap-pieces wraps))])
+         (match pcs
+           [(list (? nonprinting-at-end?)) pcs] ; matches break signals
+           ;; pieces will have been accumulated in reverse order
+           ;; thus beginning of list represents the end of the wrap
+           [(list (? (conjoin soft-break? nonprinting-at-end?)) ... rest ...)
+            (finish-wrap-proc (reverse rest))]))]
+      [(cons x _)
+       (define at-start? (eq? dist-so-far start-signal))
+       (define underflow? (and (not at-start?) (<= (+ dist-so-far (if (and (quad? x) (printable? x 'end)) (distance x) 0)) target-size)))
+       (define (values-for-insert-break [before? #f])
+         ;; a break can be inserted before or after the current quad.
+         ;; At an ordinary break (hard or soft) it goes after the wrap point.
+         ;; The wrap signal consumes the break if it's nonprinting (e.g., word space or hard break)
+         ;; but not if it's printing (e.g., hyphen).
+         ;; But if no ordinary break can be found for a line, the wrap will happen before the quad.
+         ;; The wrap signal will not consume the quad (rather, it will become the first quad in the next wrap)
+         ;; (we do this by resetting next-xs to the whole xs list)
+         ;; In both cases, the `finish-wrap` proc will strip off any trailing white breaks from the new segment.
+         (set! last-soft-break-k #f) ;; prevents continuation loop
+         (if before?
+             (values wrap-pieces xs)
+             ; omit nonprinting quad
+             (values (if (and (quad? x) (nonprinting-at-end? x)) wrap-pieces (cons x wrap-pieces)) (cdr xs))))
+       (cond
+         [(and at-start? (soft-break? x) (nonprinting-at-start? x))
+          (when debug (report x 'skipping-soft-break-at-beginning))
+          ;; skip it
+          (loop wraps null dist-so-far (cdr xs))]
+         [(and underflow? (soft-break? x) (capture-soft-break-k!))
+          (when debug (report x 'resuming-break-from-continuation))
+          (define-values (pieces-for-this-wrap next-xs) (values-for-insert-break))
+          (loop (list* (list break-val) pieces-for-this-wrap wraps)
+                null
+                start-signal
+                next-xs)]
+         ;; the easy case of accumulating quads in the middle of a wrap
+         [(or (and underflow? (when debug (report x 'add-underflow)) #t) 
+              ;; assume printing (nonprinting were handled in first case)
+              ;; this branch reached if the first quad on the line causes an overflow
+              ;; That sounds weird, but maybe it's just really big.
+              (and at-start? (when debug (report x 'add-at-start)) #t)
+              ;; we do want to accumulate nonprinting soft breaks (like wordspaces and soft hyphens) in the middle.
+              ;; in case we eventually encounter a printing quad that fits on the line.
+              ;; if we don't (ie. the line overflows) then they will get stripped by `finish-wrap`
+              (and (soft-break? x) (nonprinting-at-end? x) (when debug (report x 'add-nonprinting-soft-break)) #t))
+          (define printable (and (quad? x) (printable? x (and at-start? 'start)))) 
+          (define dist (and printable (distance x)))
+          (loop wraps
+                (if (and (quad? x) (not printable)) wrap-pieces (cons x wrap-pieces)) ; omit nonprinting quad
+                (if at-start? (or dist start-signal) (+ dist-so-far (or dist 0)))
+                (cdr xs))]
+         ;; the previous branch will catch all `underflow?` cases
+         ;; therefore, in these last two cases, we have overflow
+         [last-soft-break-k ;; overflow implied
+          ;; if we have an soft break stored, we jump back and use it
+          ;; now that we know we need it.
+          (when debug (report x 'invoking-last-breakpoint))
+          (last-soft-break-k #t)]
+         [else ;; overflow implied
+          ;; if we don't have an soft break stored, we need to just end the wrap and move on
+          ;; we insert the break `before` so that the current quad is moved to the next wrap
+          ;; no, it's not going to look good, but if we reach this point, we are in weird conditions
+          (when debug (report x 'falling-back))
+          (define-values (pieces-for-this-wrap next-xs) (values-for-insert-break 'before))
+          (loop (list* (list break-val) pieces-for-this-wrap wraps)
+                null
+                start-signal
+                next-xs)])])))
 
 
 (define x (q (list 'size (pt 1 1)) #\x))
