@@ -12,7 +12,7 @@
   (any/c . -> . real?)
   (hash-ref! distance-cache (cond
                               [(quad? q)
-                                (hash-ref (attrs q) 'id q)]
+                               (hash-ref (attrs q) 'id q)]
                               [(symbol? q) q])
              (λ ()
                (cond
@@ -64,6 +64,8 @@
                      finish-wrap-proc)
   (define break-val=? (if (symbol? break-val) eq? equal?))
   (define (cleanup-wraplist xs)
+    ;; combine the segments into a flat list, and drop any trailing breaks
+    ;; (on the idea that breaks should separate things, and there's nothing left to separate)
     (dropf-right (append* (reverse xs)) (λ (x) (break-val=? break-val x))))
   (define wraps
     (for/fold ([wraps null]
@@ -96,111 +98,90 @@
    [((== empty) _) wrap]
    [(partial (list (? nonprinting-in-middle-soft-break?) ... rest ...)) (append (or partial null) rest)]))
 
+
+(define (finish-wraps wraps wrap-proc soft-break?)
+  (for/list ([wrap (in-list wraps)])
+    (match wrap
+      [(list (? nonprinting-at-end?)) wrap] ; matches break signals
+      ;; pieces will have been accumulated in reverse order
+      ;; thus beginning of list represents the end of the wrap
+      [(list (? (conjoin soft-break? nonprinting-at-end?)) ... rest ...)
+       (wrap-proc (reverse rest))])))
+
 (define (break-softs qs
                      target-size
                      debug
                      break-val
                      soft-break?
                      finish-wrap-proc)
-  (define start-signal (gensym))
-  ;; qs = list of quads
-  ;; current-dist = integer
-  ;; current-wrap = list of quads ending in previous `soft-break?`
-  ;; current-partial = list of unbreakable quads
-  ;; wraps = list of (list of quads)
-  (let loop ([wraps null][current-wrap null][current-partial null][current-dist start-signal][qs qs])
-    (match qs
-      [(== empty)
-       (when debug (report 'all-quads-wrapped))
-       ;; combine the segments into a flat list, and drop any trailing breaks
-       ;; (on the idea that breaks should separate things, and there's nothing left to separate)
-       ;; wraps alternate with breaks
-       (debug-report wraps)
-       ;; use false as signal to indicate the end
-       (define last-wrap (append-to-wrap #false (append-to-wrap current-partial current-wrap)))
-       (for/list ([wrap (in-list (cons last-wrap wraps))])
-         (match wrap
-           [(list (? nonprinting-at-end?)) wrap] ; matches break signals
-           ;; pieces will have been accumulated in reverse order
-           ;; thus beginning of list represents the end of the wrap
-           [(list (? (conjoin soft-break? nonprinting-at-end?)) ... rest ...)
-            (debug-report (finish-wrap-proc (reverse rest)))
-            (finish-wrap-proc (reverse rest))]))]
-      [(cons q other-qs)
-       (debug-report q 'next-q)
-       (define at-start? (eq? current-dist start-signal))
-       (cond
-         [at-start?
-          (cond
-            [(and (soft-break? q) (nonprinting-at-start? q))
-             (debug-report q 'skipping-soft-break-at-beginning)
-             ;; skip it
-             (loop wraps
-                   current-wrap
-                   current-partial
-                   current-dist
-                   other-qs)]
-            [else ; printing quad
-             (debug-report 'hard-quad-at-start)
-             (loop wraps
-                   current-wrap
-                   (cons q current-partial)
-                   (distance q)
-                   other-qs)])]
-         [else
-          (define dist (if (and (quad? q) (printable? q)) (distance q) 0))
-          (debug-report current-dist)
-          (debug-report dist)
-          (define would-overflow? (> (+ dist current-dist) target-size))
-          (cond
-            [would-overflow?
-             (cond
-               [(and (soft-break? q) (nonprinting-at-end? q))
-                (debug-report 'would-overflow-soft-nonprinting)
-                ;; a break is inevitable but we want to wait to finish the wrap until we see a hard quad
-                ;; but we can move the current-partial into the current-wrap
-                (loop wraps
-                      (append-to-wrap (cons q current-partial) current-wrap)
-                      null
-                      (+ dist current-dist)
-                      other-qs)]
-               [else
-                (debug-report 'would-overflow-hard)
-                (debug-report (empty? current-wrap))
-                ;; finish the wrap & reset the line without consuming a quad
-                (if (empty? current-wrap) ; means we have not captured a soft break
-                    (loop (list* (list break-val) current-partial wraps)
-                          current-wrap ; which is empty
-                          null
-                          start-signal
-                          qs)
-                    (loop (list* (list break-val) current-wrap wraps)
-                          null
-                          current-partial
-                          (apply + (map distance current-partial))
-                          qs))])]
-            [else
-             (cond
-               [(soft-break? q) ; printing soft break, like a hyphen
-                (debug-report 'would-not-overflow-soft)
-                ;; a soft break that fits, so move it on top of the current-wrap with the current-partial
-                (cond
-                  [else
-                   (loop wraps
-                         (append-to-wrap (cons q current-partial) current-wrap)
-                         null
-                         (+ dist current-dist)
-                         other-qs)])]
-               [else
-                (debug-report 'would-not-overflow)
-                ;; add to partial
-                (loop wraps
-                      current-wrap
-                      (cons q current-partial)
-                      (+ dist current-dist)
-                      other-qs)])])
-
-          ])])))
+  (for/fold ([wraps null] ; list of (list of quads)
+             [current-wrap null] ; list of quads ending in previous `soft-break?`
+             [current-partial null] ; list of unbreakable quads
+             [current-dist #false] ; #false (to indicate start) or integer
+             [qs qs] ; list of quads
+             #:result (let ()
+                        (define last-wrap (append-to-wrap #false (append-to-wrap current-partial current-wrap)))
+                        (finish-wraps (cons last-wrap wraps) finish-wrap-proc soft-break?)))
+            ([i (in-naturals)]
+             #:break (empty? qs))
+    (match-define (cons q other-qs) qs)
+    (debug-report q 'next-q)
+    (define at-start? (not current-dist))
+    (define dist (if (and (quad? q) (printable? q)) (distance q) 0))
+    (define would-overflow? (and current-dist (> (+ dist current-dist) target-size)))
+    (cond
+      [(and at-start? (soft-break? q) (nonprinting-at-start? q))
+       (debug-report q 'skipping-soft-break-at-beginning)
+       (values wraps
+               current-wrap
+               current-partial
+               current-dist
+               other-qs)]
+      [at-start?
+       (debug-report 'hard-quad-at-start)
+       (values wraps
+               current-wrap
+               (list q)
+               (distance q)
+               other-qs)]
+      [(and would-overflow? (soft-break? q) (nonprinting-at-end? q))
+       (debug-report 'would-overflow-soft-nonprinting)
+       ;; a break is inevitable but we want to wait to finish the wrap until we see a hard quad
+       ;; but we can move the current-partial into the current-wrap
+       (values wraps
+               (append-to-wrap (cons q current-partial) current-wrap)
+               null
+               (+ dist current-dist)
+               other-qs)]
+      [(and would-overflow? (empty? current-wrap))
+       (debug-report 'would-overflow-hard-without-captured-break)
+       (values (list* (list break-val) current-partial wraps)
+               null
+               null
+               #false
+               qs)]
+      [would-overflow? ; finish the wrap & reset the line without consuming a quad
+       (values (list* (list break-val) current-wrap wraps)
+               null
+               current-partial
+               (apply + (map distance current-partial))
+               qs)]
+      [(soft-break? q) ; printing soft break, like a hyphen
+       (debug-report 'would-not-overflow-soft)
+       ;; a soft break that fits, so move it on top of the current-wrap with the current-partial
+       (values wraps
+               (append-to-wrap (cons q current-partial) current-wrap)
+               null
+               (+ dist current-dist)
+               other-qs)]
+      [else
+       (debug-report 'would-not-overflow)
+       ;; add to partial
+       (values wraps
+               current-wrap
+               (cons q current-partial)
+               (+ dist current-dist)
+               other-qs)])))
 
 
 (define x (q (list 'size (pt 1 1)) #\x))
@@ -293,37 +274,37 @@
    ))
 
 (module+ test
-    (test-case
-     "zero width nonbreakers"
-     (check-equal? (linewrap (list sp zwx) 2) (list zwx))
-     (check-equal? (linewrap (list zwx sp) 2) (list zwx))
-     (check-equal? (linewrap (list sp zwx sp) 2) (list zwx))
-     (check-equal? (linewrap (list sp sp zwx sp sp) 2) (list zwx))
-     (check-equal? (linewrap (list sp sp zwx sp sp zwx sp) 2) (list zwx sp sp zwx))))
+  (test-case
+   "zero width nonbreakers"
+   (check-equal? (linewrap (list sp zwx) 2) (list zwx))
+   (check-equal? (linewrap (list zwx sp) 2) (list zwx))
+   (check-equal? (linewrap (list sp zwx sp) 2) (list zwx))
+   (check-equal? (linewrap (list sp sp zwx sp sp) 2) (list zwx))
+   (check-equal? (linewrap (list sp sp zwx sp sp zwx sp) 2) (list zwx sp sp zwx))))
 
 (module+ test
-    (test-case
-     "hard breaks"
-     (check-equal? (linewrap (list br) 2) (list)) ;; only insert a break if it's between things
-     (check-equal? (linewrap (list a br b) 2) (list a 'lb b))
-     (check-equal? (linewrap (list a b br) 2) (list a b))
-     (check-equal? (linewrap (list a b br br) 2) (list a b))
-     (check-equal? (linewrap (list x br x x) 3) (list x 'lb x x))
-     (check-equal? (linewrap (list x x br x) 3) (list x x 'lb x))
-     (check-equal? (linewrap (list x x x x) 3) (list x x x 'lb x))
-     (check-equal? (linewrap (list x x x sp x x) 2) (list x x 'lb x 'lb x x))
-     (check-equal? (linewrap (list x x x sp x x) 3) (list x x x 'lb x x))))
+  (test-case
+   "hard breaks"
+   (check-equal? (linewrap (list br) 2) (list)) ;; only insert a break if it's between things
+   (check-equal? (linewrap (list a br b) 2) (list a 'lb b))
+   (check-equal? (linewrap (list a b br) 2) (list a b))
+   (check-equal? (linewrap (list a b br br) 2) (list a b))
+   (check-equal? (linewrap (list x br x x) 3) (list x 'lb x x))
+   (check-equal? (linewrap (list x x br x) 3) (list x x 'lb x))
+   (check-equal? (linewrap (list x x x x) 3) (list x x x 'lb x))
+   (check-equal? (linewrap (list x x x sp x x) 2) (list x x 'lb x 'lb x x))
+   (check-equal? (linewrap (list x x x sp x x) 3) (list x x x 'lb x x))))
 
 (module+ test
-    (test-case
-     "hard breaks and spurious spaces"
-     (check-equal? (linewrap (list a sp sp sp br b) 2) (list a 'lb b))
-     (check-equal? (linewrap (list x sp br sp sp x x sp) 3) (list x 'lb x x))
-     (check-equal? (linewrap (list sp sp x x sp sp br sp sp sp x) 3) (list x x 'lb x))
-     (check-equal? (linewrap (list a sp b sp sp br sp c) 3) (list a sp b 'lb c))
-     (check-equal? (linewrap (list x x x x) 3) (list x x x 'lb x))
-     (check-equal? (linewrap (list x x x sp x x) 2) (list x x 'lb x 'lb x x))
-     (check-equal? (linewrap (list x x x sp x x) 3) (list x x x 'lb x x))))
+  (test-case
+   "hard breaks and spurious spaces"
+   (check-equal? (linewrap (list a sp sp sp br b) 2) (list a 'lb b))
+   (check-equal? (linewrap (list x sp br sp sp x x sp) 3) (list x 'lb x x))
+   (check-equal? (linewrap (list sp sp x x sp sp br sp sp sp x) 3) (list x x 'lb x))
+   (check-equal? (linewrap (list a sp b sp sp br sp c) 3) (list a sp b 'lb c))
+   (check-equal? (linewrap (list x x x x) 3) (list x x x 'lb x))
+   (check-equal? (linewrap (list x x x sp x x) 2) (list x x 'lb x 'lb x x))
+   (check-equal? (linewrap (list x x x sp x x) 3) (list x x x 'lb x x))))
 
 (define (visual-wrap str int [debug #f])
   (apply string (for/list ([b (in-list (linewrap (for/list ([atom (atomize str)])
@@ -334,24 +315,24 @@
                     [else #\|]))))
 
 (module+ test
-    (test-case
-     "visual breaks"
-     (check-equal? (visual-wrap "My dog has fleas" 1) "M|y|d|o|g|h|a|s|f|l|e|a|s")
-     (check-equal? (visual-wrap "My dog has fleas" 2) "My|do|g|ha|s|fl|ea|s")
-     (check-equal? (visual-wrap "My dog has fleas" 3) "My|dog|has|fle|as")
-     (check-equal? (visual-wrap "My dog has fleas" 4) "My|dog|has|flea|s")
-     (check-equal? (visual-wrap "My dog has fleas" 5) "My|dog|has|fleas")
-     (check-equal? (visual-wrap "My dog has fleas" 6) "My dog|has|fleas")
-     (check-equal? (visual-wrap "My dog has fleas" 7) "My dog|has|fleas")
-     (check-equal? (visual-wrap "My dog has fleas" 8) "My dog|has|fleas")
-     (check-equal? (visual-wrap "My dog has fleas" 9) "My dog|has fleas")
-     (check-equal? (visual-wrap "My dog has fleas" 10) "My dog has|fleas")
-     (check-equal? (visual-wrap "My dog has fleas" 11) "My dog has|fleas")
-     (check-equal? (visual-wrap "My dog has fleas" 12) "My dog has|fleas")
-     (check-equal? (visual-wrap "My dog has fleas" 13) "My dog has|fleas")
-     (check-equal? (visual-wrap "My dog has fleas" 14) "My dog has|fleas")
-     (check-equal? (visual-wrap "My dog has fleas" 15) "My dog has|fleas")
-     (check-equal? (visual-wrap "My dog has fleas" 16) "My dog has fleas")))
+  (test-case
+   "visual breaks"
+   (check-equal? (visual-wrap "My dog has fleas" 1) "M|y|d|o|g|h|a|s|f|l|e|a|s")
+   (check-equal? (visual-wrap "My dog has fleas" 2) "My|do|g|ha|s|fl|ea|s")
+   (check-equal? (visual-wrap "My dog has fleas" 3) "My|dog|has|fle|as")
+   (check-equal? (visual-wrap "My dog has fleas" 4) "My|dog|has|flea|s")
+   (check-equal? (visual-wrap "My dog has fleas" 5) "My|dog|has|fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 6) "My dog|has|fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 7) "My dog|has|fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 8) "My dog|has|fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 9) "My dog|has fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 10) "My dog has|fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 11) "My dog has|fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 12) "My dog has|fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 13) "My dog has|fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 14) "My dog has|fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 15) "My dog has|fleas")
+   (check-equal? (visual-wrap "My dog has fleas" 16) "My dog has fleas")))
 
 
 (define (pagewrap xs size [debug #f])
@@ -363,34 +344,34 @@
 (define pbr (q '(size #f) #\page))
 
 (module+ test
-    (test-case
-     "soft page breaks"
-     (check-equal? (pagewrap null 2) '(pb))
-     (check-equal? (pagewrap (list x) 2) (list 'pb x))
-     (check-equal? (pagewrap (list x x) 2) (list 'pb x x))
-     (check-equal? (pagewrap (list x x x) 1) (list 'pb x 'pb x 'pb x))
-     (check-equal? (pagewrap (list x x x) 2) (list 'pb x x 'pb x))
-     (check-equal? (pagewrap (list x x x) 3) (list 'pb x x x))
-     (check-equal? (pagewrap (list x x x) 4) (list 'pb x x x))
-     (check-equal? (pagewrap (list x 'lb x x) 2) (list 'pb x 'pb x x))))
+  (test-case
+   "soft page breaks"
+   (check-equal? (pagewrap null 2) '(pb))
+   (check-equal? (pagewrap (list x) 2) (list 'pb x))
+   (check-equal? (pagewrap (list x x) 2) (list 'pb x x))
+   (check-equal? (pagewrap (list x x x) 1) (list 'pb x 'pb x 'pb x))
+   (check-equal? (pagewrap (list x x x) 2) (list 'pb x x 'pb x))
+   (check-equal? (pagewrap (list x x x) 3) (list 'pb x x x))
+   (check-equal? (pagewrap (list x x x) 4) (list 'pb x x x))
+   (check-equal? (pagewrap (list x 'lb x x) 2) (list 'pb x 'pb x x))))
 
 (module+ test
-    (test-case
-     "hard page breaks"
-     (check-equal? (pagewrap (list x pbr x x) 2) (list 'pb x 'pb x x))
-     (check-equal? (pagewrap (list x pbr x x) 1) (list 'pb x 'pb x 'pb x))
-     (check-equal? (pagewrap (list x pbr pbr x x) 1) (list 'pb x 'pb 'pb x 'pb x))
-     (check-equal? (pagewrap (list x pbr pbr x x) 2) (list 'pb x 'pb 'pb x x))
-     (check-equal? (pagewrap (list 'lb x 'lb 'lb pbr 'lb x x 'lb) 2) (list 'pb x 'pb x x))))
+  (test-case
+   "hard page breaks"
+   (check-equal? (pagewrap (list x pbr x x) 2) (list 'pb x 'pb x x))
+   (check-equal? (pagewrap (list x pbr x x) 1) (list 'pb x 'pb x 'pb x))
+   (check-equal? (pagewrap (list x pbr pbr x x) 1) (list 'pb x 'pb 'pb x 'pb x))
+   (check-equal? (pagewrap (list x pbr pbr x x) 2) (list 'pb x 'pb 'pb x x))
+   (check-equal? (pagewrap (list 'lb x 'lb 'lb pbr 'lb x x 'lb) 2) (list 'pb x 'pb x x))))
 
 (module+ test
-    (test-case
-     "composed line breaks and page breaks"
-     (check-equal? (pagewrap (linewrap null 1) 2) '(pb) )
-     (check-equal? (pagewrap (linewrap (list x) 1) 2) (list 'pb x))
-     (check-equal? (pagewrap (linewrap (list x x x) 1) 2) (list 'pb x 'lb x 'pb x))
-     (check-equal? (pagewrap (linewrap (list x x x) 2) 2) (list 'pb x x 'pb x))
-     (check-equal? (pagewrap (linewrap (list x x x) 2) 1) (list 'pb x 'pb x 'pb x))))
+  (test-case
+   "composed line breaks and page breaks"
+   (check-equal? (pagewrap (linewrap null 1) 2) '(pb) )
+   (check-equal? (pagewrap (linewrap (list x) 1) 2) (list 'pb x))
+   (check-equal? (pagewrap (linewrap (list x x x) 1) 2) (list 'pb x 'lb x 'pb x))
+   (check-equal? (pagewrap (linewrap (list x x x) 2) 2) (list 'pb x x 'pb x))
+   (check-equal? (pagewrap (linewrap (list x x x) 2) 1) (list 'pb x 'pb x 'pb x))))
 
 (struct $slug $quad () #:transparent)
 (define (slug . xs) ($slug #f xs))
@@ -402,12 +383,12 @@
          #:finish-wrap-proc (λ (pcs) (list ($slug #f pcs)))))
 
 (module+ test
-    (test-case
-     "hard breaks and spurious spaces with slugs"
-     (check-equal? (linewrap2 (list a sp sp sp br b) 2) (list (slug a) 'lb (slug b)))
-     (check-equal? (linewrap2 (list x sp br sp sp x x sp) 3) (list (slug x) 'lb (slug x x)))
-     (check-equal? (linewrap2 (list sp sp x x sp sp br sp sp sp x) 3) (list (slug x x) 'lb (slug x)))
-     (check-equal? (linewrap2 (list a sp b sp sp br sp c) 3) (list (slug a sp b) 'lb (slug c)))
-     (check-equal? (linewrap2 (list x x x x) 3) (list (slug x x x) 'lb (slug x)))
-     (check-equal? (linewrap2 (list x x x sp x x) 2) (list (slug x x) 'lb (slug x) 'lb (slug x x)))
-     (check-equal? (linewrap2 (list x x x sp x x) 3) (list (slug x x x) 'lb (slug x x)))))
+  (test-case
+   "hard breaks and spurious spaces with slugs"
+   (check-equal? (linewrap2 (list a sp sp sp br b) 2) (list (slug a) 'lb (slug b)))
+   (check-equal? (linewrap2 (list x sp br sp sp x x sp) 3) (list (slug x) 'lb (slug x x)))
+   (check-equal? (linewrap2 (list sp sp x x sp sp br sp sp sp x) 3) (list (slug x x) 'lb (slug x)))
+   (check-equal? (linewrap2 (list a sp b sp sp br sp c) 3) (list (slug a sp b) 'lb (slug c)))
+   (check-equal? (linewrap2 (list x x x x) 3) (list (slug x x x) 'lb (slug x)))
+   (check-equal? (linewrap2 (list x x x sp x x) 2) (list (slug x x) 'lb (slug x) 'lb (slug x x)))
+   (check-equal? (linewrap2 (list x x x sp x x) 3) (list (slug x x x) 'lb (slug x x)))))
