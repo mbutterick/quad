@@ -136,10 +136,8 @@
                            current-wrap
                            (cons q current-wrap)) (cdr qs))))
        
-       (define dist (and (quad? q) (printable? q (and at-start? 'start)) (distance q)))
-       
        (cond
-         [at-start? ; assume printing char
+         [at-start?
           (cond
             [(and (soft-break? q) (nonprinting-at-start? q))
              (debug-report q 'skipping-soft-break-at-beginning)
@@ -149,14 +147,16 @@
                    current-partial
                    current-dist
                    (cdr qs))]
-            [else
-             (debug-report 'at-start)
+            [else ; printing quad
+             (debug-report 'hard-quad-at-start)
              (loop wraps
                    current-wrap
                    (cons q current-partial)
-                   dist
+                   (distance q)
                    (cdr qs))])]
          [else
+          (define dist (and (quad? q) (or (printable? q) (printable? q 'end)) (distance q)))
+          (debug-report dist)
           (define would-overflow? (> (+ dist current-dist) target-size))
           (cond
             [would-overflow?
@@ -173,7 +173,7 @@
                [else
                 (debug-report 'would-overflow-hard)
                 ;; finish the wrap & reset the line without consuming a quad
-                (if (empty? current-wrap)
+                (if (empty? current-wrap) ; means we have not captured a soft break
                     (loop (list* (list break-val) current-partial wraps)
                           current-wrap ; which is empty
                           null
@@ -286,7 +286,6 @@
    (check-equal? (linewrap (list x x x x x) 1) (list x 'lb x 'lb x 'lb x 'lb x))
    (check-equal? (linewrap (list x x x x x) 10) (list x x x x x))))
 
-
 (module+ test
   (test-case
    "chars and spaces"
@@ -318,20 +317,24 @@
    (check-equal? (linewrap (list x x hyph x x) 4) (list x x hyph 'lb x x))
    (check-equal? (linewrap (list x x hyph x x) 5) (list x x hyph x x))))
 
-#;(module+ test
-    (test-case
-     "soft hyphens"
-     (check-equal? (linewrap (list shy) 1) (list))
-     (check-equal? (linewrap (list shy shy) 2) (list))
-     (check-equal? (linewrap (list shy shy shy) 2) (list))
-     (check-equal? (linewrap (list x shy) 1) (list x))
-     (check-equal? (linewrap (list x shy shy shy shy) 1) (list x))
-     (check-equal? (linewrap (list x x shy x x) 1) (list x 'lb x 'lb x 'lb x))
-     (check-equal? (linewrap (list x x shy x x) 2) (list x x 'lb x x))
-     (check-equal? (linewrap (list x x shy x x) 3) (list x x shy 'lb x x))
-     (check-equal? (linewrap (list x x shy x x) 4) (list x x x x))
-     (check-equal? (linewrap (list x x shy x x) 5) (list x x x x))
-     (check-equal? (linewrap (list x x shy x sp x) 4) (list x x x 'lb x))))
+(linewrap (list a b shy c d) 4 #t)
+;(check-equal? (linewrap (list x x shy x x) 4) (list x x x x))
+
+(module+ test
+  (test-case
+   "soft hyphens"
+   (check-equal? (linewrap (list shy) 1) (list))
+   (check-equal? (linewrap (list shy shy) 2) (list))
+   (check-equal? (linewrap (list shy shy shy) 2) (list))
+   (check-equal? (linewrap (list x shy) 1) (list x))
+   (check-equal? (linewrap (list x shy shy shy shy) 1) (list x))
+   (check-equal? (linewrap (list x x shy x x) 1) (list x 'lb x 'lb x 'lb x))
+   (check-equal? (linewrap (list x x shy x x) 2) (list x x 'lb x x))
+   (check-equal? (linewrap (list x x shy x x) 3) (list x x shy 'lb x x))
+   ;(check-equal? (linewrap (list x x shy x x) 4) (list x x x x))
+   ;(check-equal? (linewrap (list x x shy x x) 5) (list x x x x))
+   ;(check-equal? (linewrap (list x x shy x sp x) 4) (list x x x 'lb x))
+   ))
 
 #;(module+ test
     (test-case
