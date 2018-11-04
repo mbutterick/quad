@@ -10,7 +10,10 @@
 (define distance-cache (make-hasheq))
 (define/contract (distance q)
   (any/c . -> . real?)
-  (hash-ref! distance-cache (hash-ref (attrs q) 'id q)
+  (hash-ref! distance-cache (cond
+                              [(quad? q)
+                                (hash-ref (attrs q) 'id q)]
+                              [(symbol? q) q])
              (λ ()
                (cond
                  [(quad? q)
@@ -85,7 +88,7 @@
 
 (define (nonprinting-at-start? x) (if (quad? x) (not (printable? x 'start)) #t))
 (define (nonprinting-at-end? x) (if (quad? x) (not (printable? x 'end)) #t))
-(define (nonprinting-in-middle-soft-break? x) (and (not (printable? x)) (soft-break? x)))
+(define (nonprinting-in-middle-soft-break? x) (and (quad? x) (not (printable? x)) (soft-break? x)))
 
 (define (append-to-wrap partial wrap)
   (match/values
@@ -145,7 +148,7 @@
                    (distance q)
                    other-qs)])]
          [else
-          (define dist (and (quad? q) (if (printable? q) (distance q) 0)))
+          (define dist (if (and (quad? q) (printable? q)) (distance q) 0))
           (debug-report current-dist)
           (debug-report dist)
           (define would-overflow? (> (+ dist current-dist) target-size))
@@ -359,7 +362,7 @@
          #:soft-break-proc (λ (x) (eq? x 'lb))))
 (define pbr (q '(size #f) #\page))
 
-#;(module+ test
+(module+ test
     (test-case
      "soft page breaks"
      (check-equal? (pagewrap null 2) '(pb))
@@ -371,7 +374,7 @@
      (check-equal? (pagewrap (list x x x) 4) (list 'pb x x x))
      (check-equal? (pagewrap (list x 'lb x x) 2) (list 'pb x 'pb x x))))
 
-#;(module+ test
+(module+ test
     (test-case
      "hard page breaks"
      (check-equal? (pagewrap (list x pbr x x) 2) (list 'pb x 'pb x x))
@@ -380,7 +383,7 @@
      (check-equal? (pagewrap (list x pbr pbr x x) 2) (list 'pb x 'pb 'pb x x))
      (check-equal? (pagewrap (list 'lb x 'lb 'lb pbr 'lb x x 'lb) 2) (list 'pb x 'pb x x))))
 
-#;(module+ test
+(module+ test
     (test-case
      "composed line breaks and page breaks"
      (check-equal? (pagewrap (linewrap null 1) 2) '(pb) )
@@ -398,7 +401,7 @@
          #:soft-break-proc soft-break?
          #:finish-wrap-proc (λ (pcs) (list ($slug #f pcs)))))
 
-#;(module+ test
+(module+ test
     (test-case
      "hard breaks and spurious spaces with slugs"
      (check-equal? (linewrap2 (list a sp sp sp br b) 2) (list (slug a) 'lb (slug b)))
