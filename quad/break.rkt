@@ -92,7 +92,7 @@
 (define (nonprinting-at-end? x) (if (quad? x) (not (printable? x 'end)) #t))
 (define (nonprinting-in-middle-soft-break? x) (and (quad? x) (not (printable? x)) (soft-break? x)))
 
-(define (append-to-wrap partial wrap)
+(define (wrap-append partial wrap)
   (match/values
    (values partial wrap)
    [((== empty) _) wrap]
@@ -115,12 +115,12 @@
                      soft-break?
                      finish-wrap-proc)
   (for/fold ([wraps null] ; list of (list of quads)
-             [current-wrap null] ; list of quads ending in previous `soft-break?`
-             [current-partial null] ; list of unbreakable quads
+             [next-wrap-head null] ; list of quads ending in previous `soft-break?`
+             [next-wrap-tail null] ; list of unbreakable quads
              [current-dist #false] ; #false (to indicate start) or integer
              [qs qs] ; list of quads
              #:result (let ()
-                        (define last-wrap (append-to-wrap #false (append-to-wrap current-partial current-wrap)))
+                        (define last-wrap (wrap-append #false (wrap-append next-wrap-tail next-wrap-head)))
                         (finish-wraps (cons last-wrap wraps) finish-wrap-proc soft-break?)))
             ([i (in-naturals)]
              #:break (empty? qs))
@@ -133,14 +133,14 @@
       [(and at-start? (soft-break? q) (nonprinting-at-start? q))
        (debug-report q 'skipping-soft-break-at-beginning)
        (values wraps
-               current-wrap
-               current-partial
+               next-wrap-head
+               next-wrap-tail
                current-dist
                other-qs)]
       [at-start?
        (debug-report 'hard-quad-at-start)
        (values wraps
-               current-wrap
+               next-wrap-head
                (list q)
                (distance q)
                other-qs)]
@@ -149,28 +149,28 @@
        ;; a break is inevitable but we want to wait to finish the wrap until we see a hard quad
        ;; but we can move the current-partial into the current-wrap
        (values wraps
-               (append-to-wrap (cons q current-partial) current-wrap)
+               (wrap-append (cons q next-wrap-tail) next-wrap-head)
                null
                (+ dist current-dist)
                other-qs)]
-      [(and would-overflow? (empty? current-wrap))
+      [(and would-overflow? (empty? next-wrap-head))
        (debug-report 'would-overflow-hard-without-captured-break)
-       (values (list* (list break-val) current-partial wraps)
+       (values (list* (list break-val) next-wrap-tail wraps)
                null
                null
                #false
                qs)]
       [would-overflow? ; finish the wrap & reset the line without consuming a quad
-       (values (list* (list break-val) current-wrap wraps)
+       (values (list* (list break-val) next-wrap-head wraps)
                null
-               current-partial
-               (apply + (map distance current-partial))
+               next-wrap-tail
+               (apply + (map distance next-wrap-tail))
                qs)]
       [(soft-break? q) ; printing soft break, like a hyphen
        (debug-report 'would-not-overflow-soft)
-       ;; a soft break that fits, so move it on top of the current-wrap with the current-partial
+       ;; a soft break that fits, so move it on top of the next-wrap-head with the next-wrap-tail
        (values wraps
-               (append-to-wrap (cons q current-partial) current-wrap)
+               (wrap-append (cons q next-wrap-tail) next-wrap-head)
                null
                (+ dist current-dist)
                other-qs)]
@@ -178,8 +178,8 @@
        (debug-report 'would-not-overflow)
        ;; add to partial
        (values wraps
-               current-wrap
-               (cons q current-partial)
+               next-wrap-head
+               (cons q next-wrap-tail)
                (+ dist current-dist)
                other-qs)])))
 
