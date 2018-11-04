@@ -1,6 +1,11 @@
-#lang debug racket/base
+#lang debug racket
 (require racket/contract racket/list racket/match txexpr sugar/debug sugar/define sugar/list racket/promise racket/function (only-in racket/control call/prompt) racket/future 
          "param.rkt" "qexpr.rkt" "atomize.rkt" "quad.rkt" "generic.rkt" "position.rkt")
+
+(define-syntax (debug-report stx)
+  (syntax-case stx ()
+    [(_ EXPR ...) (with-syntax ([debug (datum->syntax stx 'debug)])
+                    #'(when debug (report EXPR ...)))]))
 
 (define distance-cache (make-hasheq))
 (define/contract (distance q)
@@ -65,7 +70,7 @@
                #:break (null? xs))
       (match xs
         [(cons (? hard-break?) rest)
-         (when debug (report x 'hard-break))
+         (debug-report x 'hard-break)
          (values (cons (list break-val) wraps) rest)]
         [_ (define-values (head tail) (splitf-at xs (λ (x) (not (hard-break? x)))))
            (values (cons (cleanup-wraplist (break-softs head
@@ -104,9 +109,11 @@
                    [(list (? nonprinting-at-end?)) wrap] ; matches break signals
                    ;; pieces will have been accumulated in reverse order
                    ;; thus beginning of list represents the end of the wrap
-                   [(list (? (conjoin soft-break? nonprinting-at-end?)) ... rest ...) (finish-wrap-proc (reverse rest))]))]
+                   [(list (? (conjoin soft-break? nonprinting-at-end?)) ... rest ...)
+                    (debug-report (finish-wrap-proc (reverse rest)))
+                    (finish-wrap-proc (reverse rest))]))]
       [(cons q other-qs)
-       (when debug (report q 'next-q))
+       (debug-report q 'next-q)
        (define at-start? (eq? current-dist start-signal))
        #;(define underflow?
            (and (not at-start?)
@@ -130,24 +137,35 @@
                            (cons q current-wrap)) (cdr qs))))
        
        (define dist (and (quad? q) (printable? q (and at-start? 'start)) (distance q)))
-       #R dist
+       (debug-report dist)
        (cond
          [at-start? ; assume printing char
-          (when debug (report 'at-start))
+          (debug-report 'at-start)
           (loop wraps current-wrap (cons q current-partial) dist (cdr qs))]
          [else
           (define would-overflow? (> (+ dist current-dist) target-size))
           (cond
             [would-overflow?
-             (when debug (report 'would-overflow))
-             ;; finish the wrap & reset the line without consuming a q
-             (loop (list* (list break-val) (append current-partial current-wrap) wraps)
-                   null
-                   null
-                   start-signal
-                   qs)]
+             (cond
+               [(soft-break? q)
+                (debug-report 'would-overflow-soft)
+                ;; a break is inevitable but we want to wait to finish the wrap until we see a hard quad
+                ;; but we can move the current-partial into the current-wrap
+                (loop wraps
+                      (append (cons q current-partial) current-wrap)
+                      null
+                      (+ dist current-dist)
+                      other-qs)]
+               [else
+                (debug-report 'would-overflow-hard)
+                ;; finish the wrap & reset the line without consuming a quad
+                (loop (list* (list break-val) (append current-partial current-wrap) wraps)
+                      null
+                      null
+                      start-signal
+                      qs)])]
             [else
-             (when debug (report 'would-not-overflow))
+             (debug-report 'would-not-overflow)
              ;; add to partial
              (loop wraps
                    current-wrap
@@ -230,25 +248,26 @@
 (require rackunit)
 
 (module+ test
-    (test-case
-     "chars"
-     (check-equal? (linewrap (list) 1) null)  
-     (check-equal? (linewrap (list a) 1) (list a))
-     (check-equal? (linewrap (list a b) 1) (list a 'lb b))
-     (check-equal? (linewrap (list a b c) 1) (list a 'lb b 'lb c))
-     (check-equal? (linewrap (list a b c) 2) (list a b 'lb c))
-     (check-equal? (linewrap (list x x x x) 2) (list x x 'lb x x))
-     (check-equal? (linewrap (list x x x x x) 3) (list x x x 'lb x x))
-     (check-equal? (linewrap (list x x x x x) 1) (list x 'lb x 'lb x 'lb x 'lb x))
-     (check-equal? (linewrap (list x x x x x) 10) (list x x x x x))))
+  (test-case
+   "chars"
+   (check-equal? (linewrap (list) 1) null)  
+   (check-equal? (linewrap (list a) 1) (list a))
+   (check-equal? (linewrap (list a b) 1) (list a 'lb b))
+   (check-equal? (linewrap (list a b c) 1) (list a 'lb b 'lb c))
+   (check-equal? (linewrap (list a b c) 2) (list a b 'lb c))
+   (check-equal? (linewrap (list x x x x) 2) (list x x 'lb x x))
+   (check-equal? (linewrap (list x x x x x) 3) (list x x x 'lb x x))
+   (check-equal? (linewrap (list x x x x x) 1) (list x 'lb x 'lb x 'lb x 'lb x))
+   (check-equal? (linewrap (list x x x x x) 10) (list x x x x x))))
 
-#;(module+ test
+
+(module+ test
     (test-case
      "chars and spaces"
-     (check-equal? (linewrap (list x sp x) 1) (list x 'lb x))
-     (check-equal? (linewrap (list x x sp x) 2) (list x x 'lb x))
+     (check-equal? (linewrap (list a sp b) 1) (list a 'lb b))
+     (check-equal? (linewrap (list a b sp c) 2) (list a b 'lb c))
      (check-equal? (linewrap (list a sp b) 3) (list a sp b))
-     (check-equal? (linewrap (list a sp b c) 3) (list a 'lb b c))))
+     (check-equal? (linewrap (list a sp b c) 3) (list a sp b 'lb c))))
 
   
 #;(module+ test
