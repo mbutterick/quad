@@ -137,7 +137,7 @@
                            (cons q current-wrap)) (cdr qs))))
        
        (define dist (and (quad? q) (printable? q (and at-start? 'start)) (distance q)))
-       (debug-report dist)
+       
        (cond
          [at-start? ; assume printing char
           (cond
@@ -161,8 +161,8 @@
           (cond
             [would-overflow?
              (cond
-               [(soft-break? q)
-                (debug-report 'would-overflow-soft)
+               [(and (soft-break? q) (nonprinting-at-end? q))
+                (debug-report 'would-overflow-soft-nonprinting)
                 ;; a break is inevitable but we want to wait to finish the wrap until we see a hard quad
                 ;; but we can move the current-partial into the current-wrap
                 (loop wraps
@@ -173,19 +173,35 @@
                [else
                 (debug-report 'would-overflow-hard)
                 ;; finish the wrap & reset the line without consuming a quad
-                (loop (list* (list break-val) (append current-partial current-wrap) wraps)
-                      null
-                      null
-                      start-signal
-                      qs)])]
+                (if (empty? current-wrap)
+                    (loop (list* (list break-val) current-partial wraps)
+                          current-wrap ; which is empty
+                          null
+                          start-signal
+                          qs)
+                    (loop (list* (list break-val) current-wrap wraps)
+                          null
+                          current-partial
+                          start-signal
+                          qs))])]
             [else
-             (debug-report 'would-not-overflow)
-             ;; add to partial
-             (loop wraps
-                   current-wrap
-                   (cons q current-partial)
-                   (+ dist current-dist)
-                   other-qs)])
+             (cond
+               [(soft-break? q) ; printing soft break, like a hyphen
+                (debug-report 'would-not-overflow-soft)
+                ;; a soft break that fits, so move it on top of the current-wrap with the current-partial
+                (loop wraps
+                      (append (cons q current-partial) current-wrap)
+                      null
+                      (+ dist current-dist)
+                      other-qs)]
+               [else
+                (debug-report 'would-not-overflow)
+                ;; add to partial
+                (loop wraps
+                      current-wrap
+                      (cons q current-partial)
+                      (+ dist current-dist)
+                      other-qs)])])
 
           ])
        #;[(and underflow? (soft-break? q))
@@ -277,7 +293,7 @@
    (check-equal? (linewrap (list a sp b) 1) (list a 'lb b))
    (check-equal? (linewrap (list a b sp c) 2) (list a b 'lb c))
    (check-equal? (linewrap (list a sp b) 3) (list a sp b))
-   (check-equal? (linewrap (list a sp b c) 3) (list a sp b 'lb c))))
+   (check-equal? (linewrap (list a sp b c) 3) (list a 'lb b c))))
   
 (module+ test
   (test-case
@@ -288,19 +304,19 @@
    (check-equal? (linewrap (list sp sp x sp sp) 2) (list x))
    (check-equal? (linewrap (list sp sp x sp sp x sp) 1) (list x 'lb x))))
 
-#;(module+ test
-    (test-case
-     "hard hyphens"
-     (check-equal? (linewrap (list hyph) 1) (list hyph))
-     (check-equal? (linewrap (list hyph hyph) 1) (list hyph 'lb hyph))
-     (check-equal? (linewrap (list hyph hyph) 2) (list hyph hyph))
-     (check-equal? (linewrap (list hyph hyph hyph) 2) (list hyph hyph 'lb hyph))
-     (check-equal? (linewrap (list x hyph) 1) (list x 'lb hyph))
-     (check-equal? (linewrap (list x x hyph x x) 1) (list x 'lb x 'lb hyph 'lb x 'lb x))
-     (check-equal? (linewrap (list x x hyph x x) 2) (list x x 'lb hyph x 'lb x))
-     (check-equal? (linewrap (list x x hyph x x) 3) (list x x hyph 'lb x x))
-     (check-equal? (linewrap (list x x hyph x x) 4) (list x x hyph 'lb x x))
-     (check-equal? (linewrap (list x x hyph x x) 5) (list x x hyph x x))))
+(module+ test
+  (test-case
+   "hard hyphens"
+   (check-equal? (linewrap (list hyph) 1) (list hyph))
+   (check-equal? (linewrap (list hyph hyph) 1) (list hyph 'lb hyph))
+   (check-equal? (linewrap (list hyph hyph) 2) (list hyph hyph))
+   (check-equal? (linewrap (list hyph hyph hyph) 2) (list hyph hyph 'lb hyph))
+   (check-equal? (linewrap (list x hyph) 1) (list x 'lb hyph))
+   (check-equal? (linewrap (list a b hyph c d) 1) (list a 'lb b 'lb hyph 'lb c 'lb d))
+   (check-equal? (linewrap (list a b hyph c d) 2) (list a b 'lb hyph c 'lb d))
+   (check-equal? (linewrap (list a b hyph c d) 3) (list a b hyph 'lb c d))
+   (check-equal? (linewrap (list x x hyph x x) 4) (list x x hyph 'lb x x))
+   (check-equal? (linewrap (list x x hyph x x) 5) (list x x hyph x x))))
 
 #;(module+ test
     (test-case
