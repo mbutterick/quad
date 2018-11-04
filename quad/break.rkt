@@ -140,8 +140,22 @@
        (debug-report dist)
        (cond
          [at-start? ; assume printing char
-          (debug-report 'at-start)
-          (loop wraps current-wrap (cons q current-partial) dist (cdr qs))]
+          (cond
+            [(and (soft-break? q) (nonprinting-at-start? q))
+             (debug-report q 'skipping-soft-break-at-beginning)
+             ;; skip it
+             (loop wraps
+                   current-wrap
+                   current-partial
+                   current-dist
+                   (cdr qs))]
+            [else
+             (debug-report 'at-start)
+             (loop wraps
+                   current-wrap
+                   (cons q current-partial)
+                   dist
+                   (cdr qs))])]
          [else
           (define would-overflow? (> (+ dist current-dist) target-size))
           (cond
@@ -174,10 +188,6 @@
                    other-qs)])
 
           ])
-       #;[(and at-start? (soft-break? q) (nonprinting-at-start? q))
-          (when debug (report q 'skipping-soft-break-at-beginning))
-          ;; skip it
-          (loop wraps null null current-dist (cdr qs))]
        #;[(and underflow? (soft-break? q))
           (when debug (report q 'underflow-soft-break))
           (loop (list* (list break-val) pieces-for-this-wrap wraps)
@@ -262,22 +272,21 @@
 
 
 (module+ test
-    (test-case
-     "chars and spaces"
-     (check-equal? (linewrap (list a sp b) 1) (list a 'lb b))
-     (check-equal? (linewrap (list a b sp c) 2) (list a b 'lb c))
-     (check-equal? (linewrap (list a sp b) 3) (list a sp b))
-     (check-equal? (linewrap (list a sp b c) 3) (list a sp b 'lb c))))
-
+  (test-case
+   "chars and spaces"
+   (check-equal? (linewrap (list a sp b) 1) (list a 'lb b))
+   (check-equal? (linewrap (list a b sp c) 2) (list a b 'lb c))
+   (check-equal? (linewrap (list a sp b) 3) (list a sp b))
+   (check-equal? (linewrap (list a sp b c) 3) (list a sp b 'lb c))))
   
-#;(module+ test
-    (test-case
-     "leading & trailing spaces"
-     (check-equal? (linewrap (list sp x) 2) (list x))
-     (check-equal? (linewrap (list x sp) 2) (list x))
-     (check-equal? (linewrap (list sp x sp) 2) (list x))
-     (check-equal? (linewrap (list sp sp x sp sp) 2) (list x))
-     (check-equal? (linewrap (list sp sp x sp sp x sp) 1) (list x 'lb x))))
+(module+ test
+  (test-case
+   "leading & trailing spaces"
+   (check-equal? (linewrap (list sp x) 2) (list x))
+   (check-equal? (linewrap (list x sp) 2) (list x))
+   (check-equal? (linewrap (list sp x sp) 2) (list x))
+   (check-equal? (linewrap (list sp sp x sp sp) 2) (list x))
+   (check-equal? (linewrap (list sp sp x sp sp x sp) 1) (list x 'lb x))))
 
 #;(module+ test
     (test-case
