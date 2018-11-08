@@ -1,5 +1,6 @@
 #lang debug racket
 (require sugar/debug)
+(provide (all-defined-out))
 
 (define words "This tutorial provides a brief introduction to the Racket programming language by using one of its picture-drawing libraries. Even if you don’t intend to use Racket for your artistic endeavours, the picture library supports interesting and enlightening examples. After all, a picture is worth five hundred “hello world”s.")
 
@@ -8,20 +9,15 @@
 
 (define wws (string->widths words))
 
-(define (greedy-split xs width)
+(define (greedy-split xs width #:key [keyproc values])
   (for/fold ([xss null]
              [xs null]
-             #:result (reverse (cons xs xss)))
+             #:result (reverse (cons (reverse xs) xss)))
             ([x (in-list xs)])
     (define next-xs (cons x xs))
-    (if (<= (apply + next-xs) width)
+    (if (<= (apply + (map keyproc next-xs)) width)
         (values xss next-xs)
         (values (cons (reverse xs) xss) (list x)))))
-
-wws
-(require rackunit)
-(define width 30)
-(greedy-split wws width)
 
 (define (optimal-score xs width)
   (cond
@@ -41,7 +37,13 @@ wws
                (cons next-xscore xscores)
                (cons next-width widths)))]))
 
-(optimal-score wws width)
+(module+ test
+(require rackunit)
+(define width 30)
+(greedy-split wws width)
+
+
+#;(optimal-score wws width)
 
 #;(time-avg 100 (void (check-equal? (greedy-split (string->widths
                                                    "The make-object procedure creates a new object with by-position initialization arguments, the new form creates a new object with by-name initialization arguments, and the instantiate form creates a new object with both by-position and by-name initialization arguments. All fields in the newly created object are initially bound to the special #<undefined> value (see Void). Initialization variables with default value expressions (and no provided value) are also initialized to #<undefined>. After argument values are assigned to initialization variables, expressions in field clauses, init-field clauses with no provided argument, init clauses with no provided argument, private field definitions, and other expressions are evaluated. Those expressions are evaluated as they appear in the class expression, from left to right. Sometime during the evaluation of the expressions, superclass-declared initializations must be evaluated once by using the super-make-object procedure, super-new form, or super-instantiate form. By-name initialization arguments to a class that have no matching initialization variable are implicitly added as by-name arguments to a super-make-object, super-new, or super-instantiate invocation, after the explicit arguments. If multiple initialization arguments are provided for the same name, the first (if any) is used, and the unused arguments are propagated to the superclass. (Note that converted by-position arguments are always placed before explicit by-name arguments.) The initialization procedure for the object% class accepts zero initialization arguments; if it receives any by-name initialization arguments, then exn:fail:object exception is raised. If the end of initialization is reached for any class in the hierarchy without invoking the superclass’s initialization, the exn:fail:object exception is raised. Also, if superclass initialization is invoked more than once, the exn:fail:object exception is raised. Fields inherited from a superclass are not initialized until the superclass’s initialization procedure is invoked. In contrast, all methods are available for an object as soon as the object is created; the overriding of methods is not affected by initialization (unlike objects in C++).") 30)
@@ -128,4 +130,4 @@ wws
                                       (9 1 3 1 2 1 6 1 2 1)
                                       (4 1 2 1 3 1 6 1 2 1 8)
                                       (1 3 1 10 1 2 1 7 1 2 1)
-                                      (3 1 8 1 2 1 14)))))
+                                      (3 1 8 1 2 1 14))))))

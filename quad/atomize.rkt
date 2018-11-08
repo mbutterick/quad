@@ -40,13 +40,13 @@
   (define atomic-quads
     (let loop ([x (if (string? qx) (q qx) qx)][attrs (current-default-attrs)])
       (match x
-        [(? char? c) (list (q (hash-set attrs 'id (gensym)) c))]
+        [(? char? c) (list (q attrs c))]
         [(? string?) (append* (for/list ([c (in-string x)]) ;; strings are exploded
-                                        (loop c attrs)))]
+                                (loop c attrs)))]
         [($quad this-attrs elems) ;; qexprs with attributes are recursed
          (define merged-attrs (attrs . update-with . this-attrs))
          (append* (for/list ([elem (in-list elems)])
-                            (loop elem merged-attrs)))]
+                    (loop elem merged-attrs)))]
         [else (raise-argument-error 'atomize "valid item" x)])))
   (merge-whitespace atomic-quads))
 
@@ -76,3 +76,38 @@
                  ($quad '#hasheq((k1 . "v2") (k2 . 42) (k3 . "foo")) '(#\Y))
                  ($quad '#hasheq((k1 . "v2") (k2 . 42) (k3 . "foo")) '(#\o))
                  ($quad '#hasheq((k1 . "v2") (k2 . 42) (k3 . "foo")) '(#\u)))))
+
+(define whitespace-pat #px"\\s+")
+(define (merge-white str) (regexp-replace* whitespace-pat str " "))
+
+(define (isolate-white str)
+  (for/list ([m (in-list (regexp-match* " " str #:gap-select? #t))]
+             #:when (positive? (string-length m)))
+    m))
+
+(define (merge-adjacent-strings xs [acc null])
+  (match xs
+    [(== empty) (reverse acc)]
+    [(list (? string? strs) ..1 others ...)
+     (merge-adjacent-strings others (append (reverse (isolate-white (merge-white (apply string-append strs)))) acc))]
+    [(cons x others) (merge-adjacent-strings others (cons x acc))]))
+  
+(define (runify qx)
+  ;; runify a quad by reducing it to a series of "runs",
+  ;; which are multi-character quads with the same formatting.
+  (dropf
+   (let loop ([x (if (string? qx) (q qx) qx)][attrs (current-default-attrs)])
+     (match x
+       [($quad this-attrs elems) ;; qexprs with attributes are recursed
+        (define merged-attrs (attrs . update-with . this-attrs))
+        (append* (for/list ([elem (in-list (merge-adjacent-strings elems))])
+                   (if (string? elem)
+                       (list (q merged-attrs elem))
+                       (loop elem merged-attrs))))]))
+   (λ (q) (string=? " " (car (elems q))))))
+
+(module+ test
+  (check-equal?
+   (runify  (q (hasheq 'foo 42) (q "Hi" "    idiot" (q (hasheq 'bar 84) "There") "Eve" "ry" "one")))
+   (list (q (hasheq 'foo 42) "Hi") (q (hasheq 'foo 42) " ") (q (hasheq 'foo 42) "idiot") (q (hasheq 'foo 42 'bar 84) "There") (q (hasheq 'foo 42) "Everyone"))))
+   

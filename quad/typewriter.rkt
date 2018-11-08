@@ -32,7 +32,8 @@
                     'size 
                     (delay
                       (define fontsize (string->number (hash-ref (attrs q) 'fontsize "12")))
-                      (define str (apply string (elems q)))
+                      (define str (car (elems q)))
+                      #R str
                       (send* (current-doc)
                         [fontSize fontsize]
                         [font (path->string charter)])
@@ -46,7 +47,7 @@
                     'draw (λ (q doc)
                             (draw-debug q doc)
                             (send doc fontSize (string->number (hash-ref (attrs q) 'fontsize "12")))
-                            (let ([str (apply string (elems q))])
+                            (let ([str (car (elems q))])
                               (cond
                                 [(hash-ref (attrs q) 'link #f)
                                  =>
@@ -124,7 +125,9 @@
   (define chars 25)
   (define line-width (* 7.2 chars))
   (define lines-per-page (* 4 line-height))
-  (let* ([x (time-name line-wrap (line-wrap (map charify (atomize qarg)) line-width))]
+  (let* ([x (time-name runify #R (runify qarg))]
+         [x (time-name charify (map charify x))]
+         [x (time-name line-wrap (line-wrap x line-width))]
          [x (time-name page-wrap (page-wrap x lines-per-page))]
          [x (time-name position (position ($doc (hasheq) x)))])
     x))
