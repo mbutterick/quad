@@ -7,7 +7,7 @@
 (define (update-with base-hash . update-hashes)
   ;; starting with base-hash, add or update keys found in update-hashes
   (for/hasheq ([(k v) (in-dict (append-map hash->list (list* base-hash update-hashes)))])
-    (values k v)))
+              (values k v)))
 
 (module+ test
   (check-equal?
@@ -42,11 +42,11 @@
       (match x
         [(? char? c) (list (q attrs c))]
         [(? string?) (append* (for/list ([c (in-string x)]) ;; strings are exploded
-                                (loop c attrs)))]
+                                        (loop c attrs)))]
         [($quad this-attrs elems) ;; qexprs with attributes are recursed
          (define merged-attrs (attrs . update-with . this-attrs))
          (append* (for/list ([elem (in-list elems)])
-                    (loop elem merged-attrs)))]
+                            (loop elem merged-attrs)))]
         [else (raise-argument-error 'atomize "valid item" x)])))
   (merge-whitespace atomic-quads))
 
@@ -83,14 +83,17 @@
 (define (isolate-white str)
   (for/list ([m (in-list (regexp-match* " " str #:gap-select? #t))]
              #:when (positive? (string-length m)))
-    m))
+            m))
 
-(define (merge-adjacent-strings xs [acc null])
-  (match xs
-    [(== empty) (reverse acc)]
-    [(list (? string? strs) ..1 others ...)
-     (merge-adjacent-strings others (append (reverse (isolate-white (merge-white (apply string-append strs)))) acc))]
-    [(cons x others) (merge-adjacent-strings others (cons x acc))]))
+(define (merge-adjacent-strings xs [isolate-white? #false])
+  (let loop ([xs xs][acc null])
+    (match xs
+      [(== empty) (reverse acc)]
+      [(list (? string? strs) ..1 others ...)
+       (loop others (append (reverse ((if isolate-white?
+                                           (compose1 isolate-white merge-white)
+                                           list) (apply string-append strs))) acc))]
+      [(cons x others) (loop others (cons x acc))])))
   
 (define (runify qx)
   ;; runify a quad by reducing it to a series of "runs",
@@ -100,10 +103,10 @@
      (match x
        [($quad this-attrs elems) ;; qexprs with attributes are recursed
         (define merged-attrs (attrs . update-with . this-attrs))
-        (append* (for/list ([elem (in-list (merge-adjacent-strings elems))])
-                   (if (string? elem)
-                       (list (q merged-attrs elem))
-                       (loop elem merged-attrs))))]))
+        (append* (for/list ([elem (in-list (merge-adjacent-strings elems 'merge-white))])
+                           (if (string? elem)
+                               (list (q merged-attrs elem))
+                               (loop elem merged-attrs))))]))
    (λ (q) (string=? " " (car (elems q))))))
 
 (module+ test

@@ -24,6 +24,7 @@
   (send doc restore))
 
 (define char-sizes (make-hash))
+(define string-widths (make-hash))
 (define (charify q)
   ($char (hash-set* (attrs q)
                     'in 'bi
@@ -33,12 +34,11 @@
                     (delay
                       (define fontsize (string->number (hash-ref (attrs q) 'fontsize "12")))
                       (define str (car (elems q)))
-                      #R str
                       (send* (current-doc)
                         [fontSize fontsize]
                         [font (path->string charter)])
                       (list
-                       (send (current-doc) widthOfString str)
+                       (hash-ref! string-widths str (λ () (send (current-doc) widthOfString str)))
                        (send (current-doc) currentLineHeight)))
                     'printable? (case (car (elems q))
                                   [(#\u00AD) (λ (sig) (memq sig '(end)))]
@@ -65,7 +65,7 @@
 (define (run-attrs-match left right)
   (define missing (gensym))
   (for/and ([k (in-list '(link weight fontsize))])
-    (equal? (hash-ref (attrs left) k missing) (hash-ref (attrs right) k missing))))
+           (equal? (hash-ref (attrs left) k missing) (hash-ref (attrs right) k missing))))
 
 (define (consolidate-runs pcs)
   (for/fold ([runs empty]
@@ -75,9 +75,9 @@
              #:break (empty? pcs))
     (define-values (run-pcs rest) (splitf-at pcs (λ (p) (run-attrs-match (car pcs) p))))
     (define new-run ($char (hash-set (attrs (car pcs))
-                                     'size (delay (list (pt-x (apply map + (map size run-pcs)))
-                                                        (pt-y (size (car pcs))))))
-                           (append-map elems run-pcs)))
+                                     'size (list (pt-x (apply map + (map size run-pcs)))
+                                                        (pt-y (size (car pcs)))))
+                           (merge-adjacent-strings (append-map elems run-pcs))))
     (values (cons new-run runs) rest)))
 
 (define line-height 16)
@@ -125,7 +125,7 @@
   (define chars 25)
   (define line-width (* 7.2 chars))
   (define lines-per-page (* 4 line-height))
-  (let* ([x (time-name runify #R (runify qarg))]
+  (let* ([x (time-name runify (runify qarg))]
          [x (time-name charify (map charify x))]
          [x (time-name line-wrap (line-wrap x line-width))]
          [x (time-name page-wrap (page-wrap x lines-per-page))]
@@ -154,9 +154,9 @@
 
 (define-macro (mb . ARGS)
   (with-pattern ([PS (syntax-property #'ARGS 'ps)])
-    #'(#%module-begin
-       (run (qexpr->quad (quad . ARGS)) PS)
-       (void))))
+                #'(#%module-begin
+                   (run (qexpr->quad (quad . ARGS)) PS)
+                   (void))))
 
 (module reader syntax/module-reader
   quad/typewriter
