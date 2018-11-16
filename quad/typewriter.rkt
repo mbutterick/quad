@@ -45,7 +45,7 @@
                                   [(#\space) (λ (sig) (not (memq sig '(start end))))]
                                   [else #t])
                     'draw (λ (q doc)
-                            #;(draw-debug q doc)
+                            (draw-debug q doc)
                             (send doc fontSize (string->number (hash-ref (attrs q) 'fontsize "12")))
                             (let ([str (car (elems q))])
                               (cond
