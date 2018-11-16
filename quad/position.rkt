@@ -184,7 +184,7 @@
                              (unit '(origin (2 2))) (unit '(origin (3 2))) (unit '(origin (4 2))))))))
 
 
-(require racket/runtime-path fontkit/font)
+(require racket/runtime-path fontland/font)
 (define-runtime-path fira "fira.ttf")
 
 (define q1 (quad (list 'in 'bi 'out 'bo 'size '(10 10) 'font fira 'fontsize 12)))

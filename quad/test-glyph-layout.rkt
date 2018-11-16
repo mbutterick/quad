@@ -1,5 +1,5 @@
 #lang br
-(require fontkit/font)
+(require fontland/font)
 
 (define f (openSync "fira.ttf"))
 
