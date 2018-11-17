@@ -25,6 +25,7 @@
 
 (define char-sizes (make-hash))
 (define string-widths (make-hash))
+(define draw-counter 0)
 (define (charify q)
   ($char (hash-set* (attrs q)
                     'in 'bi
@@ -45,6 +46,7 @@
                                   [(#\space) (λ (sig) (not (memq sig '(start end))))]
                                   [else #t])
                     'draw (λ (q doc)
+                            (set! draw-counter (add1 draw-counter ))
                             (draw-debug q doc)
                             (send doc fontSize (string->number (hash-ref (attrs q) 'fontsize "12")))
                             (let ([str (car (elems q))])
@@ -123,9 +125,9 @@
          #:finish-wrap-proc (λ (pcs) (list ($page (hasheq 'offset '(36 36)) (filter-not $break? pcs))))))
 
 (define (typeset qarg)
-  (define chars 25)
+  (define chars 65)
   (define line-width (* 7.2 chars))
-  (define lines-per-page (* 4 line-height))
+  (define lines-per-page (* 40 line-height))
   (let* ([x (time-name runify (runify qarg))]
          [x (time-name charify (map charify x))]
          [x (time-name line-wrap (line-wrap x line-width))]
@@ -141,8 +143,7 @@
   (define doc (time-name make-doc
                          (make-object PDFDocument
                            (hasheq 'compress #t
-                                   'autoFirstPage #f
-                                   'size '(300 200)))))
+                                   'autoFirstPage #f))))
   (parameterize ([current-doc doc])
     (time-name config-doc
                (send* doc
@@ -150,13 +151,17 @@
                  [font (path->string charter)]
                  [fontSize 12]))
     (define q (typeset qin))
+    (report draw-counter)
     (time-name draw (draw q doc))
+    (report draw-counter)
     (time-name end-doc (send doc end))))
 
 (define-macro (mb . ARGS)
   (with-pattern ([PS (syntax-property #'ARGS 'ps)])
                 #'(#%module-begin
-                   (run (qexpr->quad (quad . ARGS)) PS)
+                   (define qs (list . ARGS))
+                   (define lotsa-qs (append* (make-list 75 qs)))
+                   (run (qexpr->quad (apply quad #:fontsize "12" lotsa-qs)) PS)
                    (void))))
 
 (module reader syntax/module-reader
