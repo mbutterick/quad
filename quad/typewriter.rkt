@@ -1,13 +1,16 @@
 #lang debug br/quicklang
 (require racket/promise racket/list sugar/list sugar/debug "quad.rkt" "atomize.rkt" "break.rkt" "qexpr.rkt" "generic.rkt" "position.rkt")
-(require pitfall/document)
+(require pitfall/document fontland/font)
 (require hyphenate racket/runtime-path pollen/unstable/typography pollen/tag)
 (provide (rename-out [mb #%module-begin]) (except-out (all-from-out br/quicklang) #%module-begin))
 
 
 (define-runtime-path charter "charter.ttf")
 
-(define soft-break? (λ (q) (and (quad? q) (memv (car (elems q)) '(#\space #\- #\u00AD)))))
+(define (soft-break? q)
+  (and (quad? q)
+       (or (memv (car (elems q)) '(#\space #\- #\u00AD))
+           (member  (car (elems q)) (map string '(#\space #\- #\u00AD))))))
 (struct $shim $quad () #:transparent)
 (struct $char $quad () #:transparent)
 (define current-doc (make-parameter #f))
@@ -40,9 +43,9 @@
                        (send (current-doc) widthOfString str)
                        (send (current-doc) currentLineHeight)))
                     'printable? (case (car (elems q))
-                                  [(#\u00AD) (λ (sig) (memq sig '(end)))]
-                                  [(#\space) (λ (sig) (not (memq sig '(start end))))]
-                                  [else #t])
+                                  [(" " #\u00AD) (λ (sig) (memq sig '(end)))]
+                                  [(" " #\space) (λ (sig) (not (memq sig '(start end))))]
+                                  [else #true])
                     'draw (λ (q doc)
                             (set! draw-counter (add1 draw-counter ))
                             #;(draw-debug q doc)
@@ -77,7 +80,7 @@
     (define-values (run-pcs rest) (splitf-at pcs (λ (p) (run-attrs-match (car pcs) p))))
     (define new-run ($char (hash-set (attrs (car pcs))
                                      'size (list (pt-x (apply map + (map size run-pcs)))
-                                                        (pt-y (size (car pcs)))))
+                                                 (pt-y (size (car pcs)))))
                            (merge-adjacent-strings (append-map elems run-pcs))))
     (values (cons new-run runs) rest)))
 
@@ -123,6 +126,7 @@
          #:finish-wrap-proc (λ (pcs) (list ($page (hasheq 'offset '(36 36)) (filter-not $break? pcs))))))
 
 (define (typeset qarg)
+  (current-layout-caching #true) ; from fontland/font
   (define chars 65)
   (define line-width (* 7.2 chars))
   (define lines-per-page (* 40 line-height))
@@ -156,12 +160,12 @@
 
 (define-macro (mb . ARGS)
   (with-syntax ([PS (syntax-property #'ARGS 'ps)]
-                 [(REP . QS) #'ARGS])
-                #'(#%module-begin
-                   (define qs (list . QS))
-                   (define lotsa-qs (append* (make-list (string->number (string-trim REP)) qs)))
-                   (run (qexpr->quad (apply quad #:fontsize "12" lotsa-qs)) PS)
-                   (void))))
+                [(REP . QS) #'ARGS])
+    #'(#%module-begin
+       (define qs (list . QS))
+       (define lotsa-qs (append* (make-list (string->number (string-trim REP)) qs)))
+       (run (qexpr->quad (apply quad #:fontsize "12" lotsa-qs)) PS)
+       (void))))
 
 (module reader syntax/module-reader
   quad/typewriter
