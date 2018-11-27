@@ -23,8 +23,6 @@
   (send doc fill "#f99")  
   (send doc restore))
 
-(define char-sizes (make-hash))
-(define string-widths (make-hash))
 (define draw-counter 0)
 (define (charify q)
   ($char (hash-set* (attrs q)
@@ -39,7 +37,7 @@
                         [fontSize fontsize]
                         [font (path->string charter)])
                       (list
-                       (hash-ref! string-widths str (λ () (send (current-doc) widthOfString str)))
+                       (send (current-doc) widthOfString str)
                        (send (current-doc) currentLineHeight)))
                     'printable? (case (car (elems q))
                                   [(#\u00AD) (λ (sig) (memq sig '(end)))]
@@ -47,7 +45,7 @@
                                   [else #t])
                     'draw (λ (q doc)
                             (set! draw-counter (add1 draw-counter ))
-                            (draw-debug q doc)
+                            #;(draw-debug q doc)
                             (send doc fontSize (string->number (hash-ref (attrs q) 'fontsize "12")))
                             (let ([str (car (elems q))])
                               (cond
@@ -157,10 +155,11 @@
     (time-name end-doc (send doc end))))
 
 (define-macro (mb . ARGS)
-  (with-pattern ([PS (syntax-property #'ARGS 'ps)])
+  (with-syntax ([PS (syntax-property #'ARGS 'ps)]
+                 [(REP . QS) #'ARGS])
                 #'(#%module-begin
-                   (define qs (list . ARGS))
-                   (define lotsa-qs (append* (make-list 75 qs)))
+                   (define qs (list . QS))
+                   (define lotsa-qs (append* (make-list (string->number (string-trim REP)) qs)))
                    (run (qexpr->quad (apply quad #:fontsize "12" lotsa-qs)) PS)
                    (void))))
 
