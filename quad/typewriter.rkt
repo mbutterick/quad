@@ -126,7 +126,6 @@
          #:finish-wrap-proc (λ (pcs) (list ($page (hasheq 'offset '(36 36)) (filter-not $break? pcs))))))
 
 (define (typeset qarg)
-  (current-layout-caching #true) ; from fontland/font
   (define chars 65)
   (define line-width (* 7.2 chars))
   (define lines-per-page (* 40 line-height))
@@ -152,11 +151,13 @@
                  [pipe (open-output-file path #:exists 'replace)]
                  [font (path->string charter)]
                  [fontSize 12]))
-    (define q (typeset qin))
-    (report draw-counter)
-    (time-name draw (draw q doc))
-    (report draw-counter)
-    (time-name end-doc (send doc end))))
+    ;; 181127: with layout caching, draw takes about 1.5x linebreak; without, about 2x 
+    (parameterize ([current-layout-caching #true]) ; from fontland/font
+      (define q (typeset qin))
+      (report draw-counter)
+      (time-name draw (draw q doc))
+      (report draw-counter)
+      (time-name end-doc (send doc end)))))
 
 (define-macro (mb . ARGS)
   (with-syntax ([PS (syntax-property #'ARGS 'ps)]
