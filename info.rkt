@@ -8,5 +8,6 @@
                "pollen"
                "rackunit-lib"
                "sugar"
-               "txexpr"))
+               "txexpr"
+               "csp"))
 (define build-deps '("debug"))
