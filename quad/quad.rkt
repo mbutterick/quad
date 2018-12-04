@@ -37,7 +37,7 @@
    (define (draw q [surface #f])
      (define (default-draw-proc q surface)
        (for-each (λ (e) (draw e surface)) (elems q)))
-     ((hash-ref (attrs q) 'draw (const default-draw-proc)) q surface))])
+     ((hash-ref (attrs q) 'draw (λ () default-draw-proc)) q surface))])
 
 (define (quad-attrs? x) (and (hash? x) (hash-eq? x)))
 (define (quad-elem? x) (or (char? x) (string? x) ($quad? x)))
