@@ -1,9 +1,6 @@
 #lang debug br/quicklang
-(require racket/promise racket/list sugar/list sugar/debug "quad.rkt" "atomize.rkt" "break.rkt" "qexpr.rkt" "generic.rkt" "position.rkt")
-(require pitfall/document fontland/font)
-(require hyphenate racket/runtime-path pollen/unstable/typography pollen/tag)
+(require racket/promise racket/list sugar/debug "quad.rkt" "atomize.rkt" "break.rkt" "qexpr.rkt" "generic.rkt" "position.rkt" pitfall/document fontland/font racket/runtime-path pollen/tag)
 (provide (rename-out [mb #%module-begin]) (except-out (all-from-out br/quicklang) #%module-begin))
-
 
 (define-runtime-path charter "charter.ttf")
 
@@ -52,9 +49,8 @@
                             (send doc fontSize (string->number (hash-ref (attrs q) 'fontsize "12")))
                             (let ([str (car (elems q))])
                               (cond
-                                [(hash-ref (attrs q) 'link #f)
-                                 =>
-                                 (λ (url-str) (apply as-link doc str url-str (origin q)))]
+                                [(hash-has-key? (attrs q) 'link)
+                                 (apply as-link doc str (hash-ref (attrs q) 'link) (origin q))]
                                 [else
                                  #;(println str)
                                  (void)
@@ -66,10 +62,7 @@
 (define page-count 1)
 (define (make-break . xs) ($break (hasheq 'printable? #f 'size '(0 0)) xs))
 
-(define (run-attrs-match left right)
-  (define missing (gensym))
-  (for/and ([k (in-list '(link weight fontsize))])
-           (equal? (hash-ref (attrs left) k missing) (hash-ref (attrs right) k missing))))
+
 
 (define (consolidate-runs pcs)
   (for/fold ([runs empty]
@@ -77,10 +70,10 @@
              #:result (reverse runs))
             ([i (in-naturals)]
              #:break (empty? pcs))
-    (define-values (run-pcs rest) (splitf-at pcs (λ (p) (run-attrs-match (car pcs) p))))
+    (define-values (run-pcs rest) (splitf-at pcs (λ (p) (same-run? (car pcs) p))))
     (define new-run ($char (hash-set (attrs (car pcs))
-                                     'size (list (pt-x (apply map + (map size run-pcs)))
-                                                 (pt-y (size (car pcs)))))
+                                     'size (delay (list (pt-x (apply map + (map size run-pcs)))
+                                                        (pt-y (size (car pcs))))))
                            (merge-adjacent-strings (append-map elems run-pcs))))
     (values (cons new-run runs) rest)))
 
