@@ -6,13 +6,15 @@
 
 (define (update-with base-hash . update-hashes)
   ;; starting with base-hash, add or update keys found in update-hashes
-  (for/hasheq ([(k v) (in-dict (append-map hash->list (list* base-hash update-hashes)))])
-              (values k v)))
+  (define h (make-hasheq))
+  (for ([(k v) (in-dict (append-map hash->list (list* base-hash update-hashes)))])
+    (hash-set! h k v))
+  h)
 
 (module+ test
   (check-equal?
    ((hasheq 'foo "bar" 'zim "zam") . update-with .  (hasheq 'zim "BANG") (hasheq 'toe "jam") (hasheq 'foo "zay"))
-   '#hasheq((zim . "BANG") (foo . "zay") (toe . "jam"))))
+   (make-hasheq '((zim . "BANG") (foo . "zay") (toe . "jam")))))
 
 (define (merge-whitespace aqs [white-aq? (λ (aq) (char-whitespace? (car (elems aq))))])
   ;; collapse each sequence of whitespace aqs to the first one, and make it a space
@@ -42,11 +44,11 @@
       (match x
         [(? char? c) (list (q attrs c))]
         [(? string?) (append* (for/list ([c (in-string x)]) ;; strings are exploded
-                                        (loop c attrs)))]
+                                (loop c attrs)))]
         [($quad this-attrs elems) ;; qexprs with attributes are recursed
          (define merged-attrs (attrs . update-with . this-attrs))
          (append* (for/list ([elem (in-list elems)])
-                            (loop elem merged-attrs)))]
+                    (loop elem merged-attrs)))]
         [else (raise-argument-error 'atomize "valid item" x)])))
   (merge-whitespace atomic-quads))
 
@@ -83,7 +85,7 @@
 (define (isolate-white str)
   (for/list ([m (in-list (regexp-match* " " str #:gap-select? #t))]
              #:when (positive? (string-length m)))
-            m))
+    m))
 
 (define (merge-adjacent-strings xs [isolate-white? #false])
   (let loop ([xs xs][acc null])
@@ -91,25 +93,38 @@
       [(== empty) (reverse acc)]
       [(list (? string? strs) ..1 others ...)
        (loop others (append (reverse ((if isolate-white?
-                                           (compose1 isolate-white merge-white)
-                                           list) (apply string-append strs))) acc))]
+                                          (compose1 isolate-white merge-white)
+                                          list) (apply string-append strs))) acc))]
       [(cons x others) (loop others (cons x acc))])))
-  
+
+(define run-key 'run)
+
+(define (same-run? qa qb)
+  (eq? (hash-ref (attrs qa) run-key) (hash-ref (attrs qb) run-key)))
+
 (define (runify qx)
   ;; runify a quad by reducing it to a series of "runs",
   ;; which are multi-character quads with the same formatting.
+  (define first-key (gensym))
+  (define first-attrs (hash-copy (current-default-attrs)))
+  (hash-set! first-attrs 'idx first-key)
   (dropf
-   (let loop ([x (if (string? qx) (q qx) qx)][attrs (current-default-attrs)])
+   (let loop ([x (if (string? qx) (q qx) qx)]
+              [attrs first-attrs]
+              [key first-key])
      (match x
        [($quad this-attrs elems) ;; qexprs with attributes are recursed
-        (define merged-attrs (attrs . update-with . this-attrs))
+        (define next-key (if (hash-empty? this-attrs) key (gensym)))
+        (define next-attrs (if (hash-empty? this-attrs) attrs (attrs . update-with . this-attrs)))
+        (unless (hash-empty? this-attrs) (hash-set! next-attrs run-key next-key))
         (append* (for/list ([elem (in-list (merge-adjacent-strings elems 'merge-white))])
-                           (if (string? elem)
-                               (list (q merged-attrs elem))
-                               (loop elem merged-attrs))))]))
+                   (if (string? elem)
+                       (list (q next-attrs elem))
+                       (loop elem next-attrs next-key))))]))
    (λ (q) (string=? " " (car (elems q))))))
 
 (module+ test
+
   (check-equal?
    (runify  (q (hasheq 'foo 42) (q "Hi" "    idiot" (q (hasheq 'bar 84) "There") "Eve" "ry" "one")))
    (list (q (hasheq 'foo 42) "Hi") (q (hasheq 'foo 42) " ") (q (hasheq 'foo 42) "idiot") (q (hasheq 'foo 42 'bar 84) "There") (q (hasheq 'foo 42) "Everyone"))))
