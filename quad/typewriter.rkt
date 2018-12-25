@@ -34,11 +34,11 @@
                       (define fontsize (string->number (hash-ref (attrs q) 'fontsize "12")))
                       (define str (car (elems q)))
                       (send* (current-doc)
-                        [fontSize fontsize]
+                        [font-size fontsize]
                         [font (path->string charter)])
                       (list
-                       (send (current-doc) widthOfString str)
-                       (send (current-doc) currentLineHeight)))
+                       (send (current-doc) string-width str)
+                       (send (current-doc) current-line-height)))
                     'printable? (case (car (elems q))
                                   [(" " #\u00AD) (λ (sig) (memq sig '(end)))]
                                   [(" " #\space) (λ (sig) (not (memq sig '(start end))))]
@@ -46,7 +46,7 @@
                     'draw (λ (q doc)
                             (set! draw-counter (add1 draw-counter ))
                             #;(draw-debug q doc)
-                            (send doc fontSize (string->number (hash-ref (attrs q) 'fontsize "12")))
+                            (send doc font-size (string->number (hash-ref (attrs q) 'fontsize "12")))
                             (let ([str (car (elems q))])
                               (cond
                                 [(hash-has-key? (attrs q) 'link)
@@ -95,9 +95,9 @@
 
 (define (as-link doc str url-str [x 0] [y 0])
   (send doc save)
-  (send doc fillColor "blue")
-  (define width (send doc widthOfString str))
-  (define height (send doc currentLineHeight))
+  (send doc fill-color "blue")
+  (define width (send doc string-width str))
+  (define height (send doc current-line-height))
   (send doc text str x y)
   (send doc link x y width height url-str)
   (send doc restore))
@@ -105,8 +105,8 @@
 (define pb ($break (hasheq 'printable? #f
                            'size '(0 0)
                            'draw (λ (q doc)
-                                   (send doc addPage)
-                                   (send doc fontSize 10)
+                                   (send doc add-page)
+                                   (send doc font-size 10)
                                    (define str (string-append "page " (number->string page-count)))
                                    ;; page number
                                    (as-link doc str "https://practicaltypography.com" 10 10)
@@ -141,16 +141,20 @@
   (parameterize ([current-doc doc])
     (time-name config-doc
                (send* doc
-                 [pipe (open-output-file path #:exists 'replace)]
+                 #;[pipe (open-output-file path #:exists 'replace)]
                  [font (path->string charter)]
-                 [fontSize 12]))
+                 [font-size 12]))
     ;; 181127: with layout caching, draw takes about 1.5x linebreak; without, about 2x 
     (parameterize ([current-layout-caching #true]) ; from fontland/font
       (define q (typeset qin))
       (report draw-counter)
-      (time-name draw (draw q doc))
-      (report draw-counter)
-      (time-name end-doc (send doc end)))))
+      (time-name draw
+                 (with-output-to-file path
+                   (λ ()
+                     (draw q doc)
+                     (send doc end))
+                   #:exists 'replace))
+      (report draw-counter))))
 
 (define-macro (mb . ARGS)
   (with-syntax ([PS (syntax-property #'ARGS 'ps)]
