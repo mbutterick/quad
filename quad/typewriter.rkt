@@ -151,8 +151,9 @@
       (time-name draw
                  (with-output-to-file path
                    (λ ()
+                     (send doc start-doc)
                      (draw q doc)
-                     (send doc end))
+                     (send doc end-doc))
                    #:exists 'replace))
       (report draw-counter))))
 
