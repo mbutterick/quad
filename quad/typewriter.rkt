@@ -1,5 +1,5 @@
 #lang debug br/quicklang
-(require racket/promise racket/list sugar/debug "quad.rkt" "atomize.rkt" "break.rkt" "qexpr.rkt" "generic.rkt" "position.rkt" pitfall/document fontland/font racket/runtime-path pollen/tag)
+(require racket/promise racket/list sugar/debug "quad.rkt" "atomize.rkt" "break.rkt" "qexpr.rkt" "generic.rkt" "position.rkt" pitfall/document pitfall/vector pitfall/fonts pitfall/annotations pitfall/color pitfall/text fontland/font racket/runtime-path pollen/tag)
 (provide (rename-out [mb #%module-begin]) (except-out (all-from-out br/quicklang) #%module-begin))
 
 (define-runtime-path charter "charter.ttf")
@@ -12,16 +12,16 @@
 (struct $char $quad () #:transparent)
 (define current-doc (make-parameter #f))
 (define (draw-debug q doc)
-  (send doc save)
-  (send doc lineWidth 0.25)
-  (send/apply doc rect (append (origin q) (size q)))
-  (send doc stroke "#fcc")
-  (send/apply doc rect (append (origin q) (size q)))
-  (send doc clip)
-  (send doc circle (pt-x (in-point q)) (pt-y (in-point q)) 1)
-  (send doc circle (pt-x (out-point q)) (pt-y (out-point q)) 1)
-  (send doc fill "#f99")  
-  (send doc restore))
+  (save doc)
+  (line-width doc 0.25)
+  (apply rect doc (append (origin q) (size q)))
+  (stroke doc "#fcc")
+  (apply rect doc (append (origin q) (size q)))
+  (clip doc)
+  (circle doc (pt-x (in-point q)) (pt-y (in-point q)) 1)
+  (circle doc (pt-x (out-point q)) (pt-y (out-point q)) 1)
+  (fill doc "#f99")  
+  (restore doc))
 
 (define draw-counter 0)
 (define (charify q)
@@ -33,12 +33,11 @@
                     (delay
                       (define fontsize (string->number (hash-ref (attrs q) 'fontsize "12")))
                       (define str (car (elems q)))
-                      (send* (current-doc)
-                        [font-size fontsize]
-                        [font (path->string charter)])
+                      [font-size (current-doc) fontsize]
+                      [font (current-doc) (path->string charter)]
                       (list
-                       (send (current-doc) string-width str)
-                       (send (current-doc) current-line-height)))
+                       (string-width (current-doc)  str)
+                       (current-line-height (current-doc))))
                     'printable? (case (car (elems q))
                                   [(" " #\u00AD) (λ (sig) (memq sig '(end)))]
                                   [(" " #\space) (λ (sig) (not (memq sig '(start end))))]
@@ -46,7 +45,7 @@
                     'draw (λ (q doc)
                             (set! draw-counter (add1 draw-counter ))
                             #;(draw-debug q doc)
-                            (send doc font-size (string->number (hash-ref (attrs q) 'fontsize "12")))
+                            (font-size doc (string->number (hash-ref (attrs q) 'fontsize "12")))
                             (let ([str (car (elems q))])
                               (cond
                                 [(hash-has-key? (attrs q) 'link)
@@ -54,7 +53,7 @@
                                 [else
                                  #;(println str)
                                  (void)
-                                 (send/apply doc text str (origin q))])))) (elems q)))
+                                 (apply text doc str (origin q))])))) (elems q)))
 (struct $line $quad () #:transparent)
 (struct $page $quad () #:transparent)
 (struct $doc $quad () #:transparent)
@@ -94,19 +93,19 @@
                                                       pcs))))))
 
 (define (as-link doc str url-str [x 0] [y 0])
-  (send doc save)
-  (send doc fill-color "blue")
-  (define width (send doc string-width str))
-  (define height (send doc current-line-height))
-  (send doc text str x y)
-  (send doc link x y width height url-str)
-  (send doc restore))
+  (save doc)
+  (fill-color doc "blue")
+  (define width (string-width doc str))
+  (define height (current-line-height doc))
+  (text doc str x y)
+  (link doc x y width height url-str)
+  (restore doc))
 
 (define pb ($break (hasheq 'printable? #f
                            'size '(0 0)
                            'draw (λ (q doc)
-                                   (send doc add-page)
-                                   (send doc font-size 10)
+                                   (add-page doc)
+                                   (font-size doc 10)
                                    (define str (string-append "page " (number->string page-count)))
                                    ;; page number
                                    (as-link doc str "https://practicaltypography.com" 10 10)
@@ -135,15 +134,13 @@
 
 (define (run qin [path "test.pdf"])
   (define doc (time-name make-doc
-                         (make-object PDFDocument
-                           (hasheq 'compress #t
-                                   'autoFirstPage #f))))
+                         (make-$doc
+                          (hasheq 'compress #t
+                                  'autoFirstPage #f))))
   (parameterize ([current-doc doc])
     (time-name config-doc
-               (send* doc
-                 #;[pipe (open-output-file path #:exists 'replace)]
-                 [font (path->string charter)]
-                 [font-size 12]))
+               [font doc (path->string charter)]
+               [font-size doc 12])
     ;; 181127: with layout caching, draw takes about 1.5x linebreak; without, about 2x 
     (parameterize ([current-layout-caching #true]) ; from fontland/font
       (define q (typeset qin))
@@ -151,9 +148,9 @@
       (time-name draw
                  (with-output-to-file path
                    (λ ()
-                     (send doc start-doc)
+                     (start-doc doc)
                      (draw q doc)
-                     (send doc end-doc))
+                     (end-doc doc))
                    #:exists 'replace))
       (report draw-counter))))
 
