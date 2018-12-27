@@ -10,7 +10,6 @@
            (member  (car (elems q)) (map string '(#\space #\- #\u00AD))))))
 (struct $shim $quad () #:transparent)
 (struct $char $quad () #:transparent)
-(define current-doc (make-parameter #f))
 (define (draw-debug q doc)
   (save doc)
   (line-width doc 0.25)
@@ -24,7 +23,7 @@
   (restore doc))
 
 (define draw-counter 0)
-(define (charify q)
+(define (charify doc q)
   ($char (hash-set* (attrs q)
                     'in 'bi
                     'out 'bo
@@ -33,11 +32,11 @@
                     (delay
                       (define fontsize (string->number (hash-ref (attrs q) 'fontsize "12")))
                       (define str (car (elems q)))
-                      [font-size (current-doc) fontsize]
-                      [font (current-doc) (path->string charter)]
+                      [font-size doc fontsize]
+                      [font doc (path->string charter)]
                       (list
-                       (string-width (current-doc)  str)
-                       (current-line-height (current-doc))))
+                       (string-width doc  str)
+                       (current-line-height doc)))
                     'printable? (case (car (elems q))
                                   [(" " #\u00AD) (λ (sig) (memq sig '(end)))]
                                   [(" " #\space) (λ (sig) (not (memq sig '(start end))))]
@@ -117,12 +116,12 @@
          #:soft-break-proc $break?
          #:finish-wrap-proc (λ (pcs) (list ($page (hasheq 'offset '(36 36)) (filter-not $break? pcs))))))
 
-(define (typeset qarg)
+(define (typeset doc qarg)
   (define chars 65)
   (define line-width (* 7.2 chars))
   (define lines-per-page (* 40 line-height))
   (let* ([x (time-name runify (runify qarg))]
-         [x (time-name charify (map charify x))]
+         [x (time-name charify (map (λ (x) (charify doc x)) x))]
          [x (time-name line-wrap (line-wrap x line-width))]
          [x (time-name page-wrap (page-wrap x lines-per-page))]
          [x (time-name position (position ($doc (hasheq) x)))])
@@ -137,13 +136,12 @@
                          (make-$doc
                           (hasheq 'compress #t
                                   'autoFirstPage #f))))
-  (parameterize ([current-doc doc])
-    (time-name config-doc
+  (time-name config-doc
                [font doc (path->string charter)]
                [font-size doc 12])
     ;; 181127: with layout caching, draw takes about 1.5x linebreak; without, about 2x 
     (parameterize ([current-layout-caching #true]) ; from fontland/font
-      (define q (typeset qin))
+      (define q (typeset doc qin))
       (report draw-counter)
       (time-name draw
                  (with-output-to-file path
@@ -152,7 +150,7 @@
                      (draw q doc)
                      (end-doc doc))
                    #:exists 'replace))
-      (report draw-counter))))
+      (report draw-counter)))
 
 (define-macro (mb . ARGS)
   (with-syntax ([PS (syntax-property #'ARGS 'ps)]
