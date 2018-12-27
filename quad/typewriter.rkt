@@ -35,7 +35,7 @@
                       [font-size doc fontsize]
                       [font doc (path->string charter)]
                       (list
-                       (string-width doc str)
+                       (string-width doc  str)
                        (current-line-height doc)))
                     'printable? (case (car (elems q))
                                   [(" " #\u00AD) (λ (sig) (memq sig '(end)))]
@@ -128,7 +128,7 @@
     x))
 
 
-(provide quad)
+(provide quad run qexpr->quad)
 (define quad (default-tag-function 'quad))
 
 (define (run qin [path "test.pdf"])
