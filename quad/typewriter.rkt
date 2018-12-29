@@ -2,7 +2,7 @@
 (require racket/promise racket/list sugar/debug "quad.rkt" "atomize.rkt" "break.rkt" "qexpr.rkt" "generic.rkt" "position.rkt" pitfall/document pitfall/vector pitfall/font pitfall/annotation pitfall/color pitfall/text fontland/font racket/runtime-path pollen/tag)
 (provide (rename-out [mb #%module-begin]) (except-out (all-from-out br/quicklang) #%module-begin))
 
-(define-runtime-path charter "charter.ttf")
+(define-runtime-path charter "../qtest/fonts/charter.ttf")
 
 (define (soft-break? q)
   (and (quad? q)
