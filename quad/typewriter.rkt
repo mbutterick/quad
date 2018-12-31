@@ -47,7 +47,7 @@
                             (let ([str (car (elems q))])
                               (cond
                                 [(hash-has-key? (attrs q) 'link)
-                                 (apply as-link doc str (hash-ref (attrs q) 'link) (origin q))]
+                                 (text doc str (first (origin q)) (second (origin q)) (hasheq 'link (hash-ref (attrs q) 'link)))]
                                 [else
                                  #;(println str)
                                  (void)
@@ -90,15 +90,6 @@
                                                       (consolidate-runs pcs)
                                                       pcs))))))
 
-(define (as-link doc str url-str [x 0] [y 0])
-  (save doc)
-  (fill-color doc "blue")
-  (define width (string-width doc str))
-  (define height (current-line-height doc))
-  (text doc str x y)
-  (link doc x y width height url-str)
-  (restore doc))
-
 (define pb ($break (hasheq 'printable? #f
                            'size '(0 0)
                            'draw (λ (q doc)
@@ -106,7 +97,7 @@
                                    (font-size doc 10)
                                    (define str (string-append "page " (number->string page-count)))
                                    ;; page number
-                                   (as-link doc str "https://practicaltypography.com" 10 10)
+                                   (text doc str 10 10 (hasheq 'link "https://practicaltypography.com"))
                                    (set! page-count (add1 page-count)))) '(#\page)))
 (define (page-wrap xs size [debug #f])
   (break xs size debug
