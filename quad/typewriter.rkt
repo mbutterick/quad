@@ -47,7 +47,10 @@
                             (let ([str (car (elems q))])
                               (cond
                                 [(hash-has-key? (attrs q) 'link)
-                                 (text doc str (first (origin q)) (second (origin q)) (hasheq 'link (hash-ref (attrs q) 'link)))]
+                                 (save doc)
+                                 (fill-color doc "blue")
+                                 (text doc str (first (origin q)) (second (origin q)) (hasheq 'link (hash-ref (attrs q) 'link)))
+                                 (restore doc)]
                                 [else
                                  #;(println str)
                                  (void)
@@ -58,7 +61,6 @@
 (struct $break $quad () #:transparent)
 (define page-count 1)
 (define (make-break . xs) ($break (hasheq 'printable? #f 'size '(0 0)) xs))
-
 
 
 (define (consolidate-runs pcs)
@@ -90,6 +92,8 @@
                                                       (consolidate-runs pcs)
                                                       pcs))))))
 
+;; 181231 it's weird that setup work for page is in the page break,
+;; which is between pages, not associated with either
 (define pb ($break (hasheq 'printable? #f
                            'size '(0 0)
                            'draw (λ (q doc)
@@ -97,7 +101,10 @@
                                    (font-size doc 10)
                                    (define str (string-append "page " (number->string page-count)))
                                    ;; page number
+                                   (save doc)
+                                   (fill-color doc "blue")
                                    (text doc str 10 10 (hasheq 'link "https://practicaltypography.com"))
+                                   (restore doc)
                                    (set! page-count (add1 page-count)))) '(#\page)))
 (define (page-wrap xs size [debug #f])
   (break xs size debug
