@@ -68,22 +68,19 @@
     ;; (on the idea that breaks should separate things, and there's nothing left to separate)
     (dropf-right (append* (reverse xs)) (λ (x) (break-val=? break-val x))))
   (define wraps
-    (for/fold ([wraps null]
-               [xs xs]
-               #:result wraps)
-              ([i (in-naturals)]
-               #:break (null? xs))
+    (let loop ([wraps null][xs xs])
       (match xs
+        [(? null?) wraps]
         [(cons (? hard-break?) rest)
          (debug-report x 'hard-break)
-         (values (cons (list break-val) wraps) rest)]
+         (loop (cons (list break-val) wraps) rest)]
         [_ (define-values (head tail) (splitf-at xs (λ (x) (not (hard-break? x)))))
-           (values (cons (cleanup-wraplist (break-softs head
-                                                        target-size
-                                                        debug
-                                                        break-val
-                                                        soft-break?
-                                                        finish-wrap-proc)) wraps) tail)])))
+           (loop (cons (cleanup-wraplist (break-softs head
+                                                      target-size
+                                                      debug
+                                                      break-val
+                                                      soft-break?
+                                                      finish-wrap-proc)) wraps) tail)])))
   (append (if break-before? (list break-val) empty)
           (cleanup-wraplist wraps)
           (if break-after? (list break-val) empty)))
@@ -114,12 +111,12 @@
                         (define last-wrap (wrap-append #false (wrap-append next-wrap-tail next-wrap-head)))
                         (define finished-wraps
                           (for/list ([wrap (in-list (cons last-wrap wraps))])
-                            (match wrap
-                              [(list (? nonprinting-at-end?)) wrap] ; matches break signals
-                              ;; pieces will have been accumulated in reverse order
-                              ;; thus beginning of list represents the end of the wrap
-                              [(list (? (conjoin soft-break? nonprinting-at-end?)) ... rest ...)
-                               (finish-wrap-proc (reverse rest))])))
+                                    (match wrap
+                                      [(list (? nonprinting-at-end?)) wrap] ; matches break signals
+                                      ;; pieces will have been accumulated in reverse order
+                                      ;; thus beginning of list represents the end of the wrap
+                                      [(list (? (conjoin soft-break? nonprinting-at-end?)) ... rest ...)
+                                       (finish-wrap-proc (reverse rest))])))
                         (add-between finished-wraps (list break-val))))
             ([i (in-naturals)]
              #:break (empty? qs))
@@ -185,17 +182,17 @@
 
 (require "subsequence.rkt")
 (define (break-softs1 qs
-                     target-size
-                     debug
-                     break-val
-                     soft-break?
-                     finish-wrap-proc)
+                      target-size
+                      debug
+                      break-val
+                      soft-break?
+                      finish-wrap-proc)
   (define finished-wraps
     (for/list ([wrap (in-list (greedy-split qs target-size #:key distance))])
-      (match wrap
-        [(list (? nonprinting-at-end?)) wrap] ; matches break signals
-        [(list (? soft-break?) ... rest ... (? (conjoin soft-break? nonprinting-at-end?)) ...)
-         (finish-wrap-proc rest)])))
+              (match wrap
+                [(list (? nonprinting-at-end?)) wrap] ; matches break signals
+                [(list (? soft-break?) ... rest ... (? (conjoin soft-break? nonprinting-at-end?)) ...)
+                 (finish-wrap-proc rest)])))
   (reverse (add-between finished-wraps (list break-val))))
 
 
@@ -323,11 +320,11 @@
 
 (define (visual-wrap str int [debug #f])
   (apply string (for/list ([b (in-list (linewrap (for/list ([atom (atomize str)])
-                                                   ($quad (hash-set (attrs atom) 'size '(1 1))
-                                                          (elems atom))) int debug))])
-                  (cond
-                    [(quad? b) (car (elems b))]
-                    [else #\|]))))
+                                                           ($quad (hash-set (attrs atom) 'size '(1 1))
+                                                                  (elems atom))) int debug))])
+                          (cond
+                            [(quad? b) (car (elems b))]
+                            [else #\|]))))
 
 (module+ test
   (test-case
