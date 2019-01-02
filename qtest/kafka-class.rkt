@@ -1,3 +1,5 @@
+#lang quad/typewriter-class 1
+
 Metamorphosis
 Franz Kafka
 Translated by David Wyllie

@@ -73,14 +73,11 @@
   (check-true (atomic-quad? (make-object quad% '#hasheq() '(#\H))))
   (check-true (atomic-quads? (list (make-object quad% '#hasheq() '(#\H))))))
 
-
-
-
+#|
 (define break% (class quad% (super-new)))
 (define (break . xs) (apply quad #:type break% xs))
 (define b break)
-
-
+|#
 
 (module+ test
   (define x (make-object

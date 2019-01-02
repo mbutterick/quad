@@ -3,9 +3,11 @@
 (provide (all-defined-out))
 
 (define-generics quad
-  (start quad) ; called before draw (?)
+  #|
+(start quad) ; called before draw (?)
   (end quad) ; called after draw (?)
-  (break quad) ; called if quad is not clipping (?)
+  (wrap quad) ; called if quad is not clipping (?)
+|#
   
   (in quad) ; returns inbound connection point
   (out quad) ; returns outbound connection point
