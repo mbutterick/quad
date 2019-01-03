@@ -8,8 +8,7 @@
                     #'(when debug (report EXPR ...)))]))
 
 (define distance-cache (make-hasheq))
-(define/contract (distance q)
-  (any/c . -> . real?)
+(define (distance q)
   (hash-ref! distance-cache (cond
                               [(quad? q)
                                (hash-ref (send q attrs) 'id q)]
