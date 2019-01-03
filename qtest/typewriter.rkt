@@ -23,22 +23,12 @@
   (restore doc))
 
 (define draw-counter 0)
-(define quadify%
+(define textish%
   (class quad%
     (super-new)
-    (init-field doc)
     (inherit-field @size @elems @attrs @origin @in @out)
     (set! @in 'bi)
     (set! @out 'bo)
-    (set! @size
-          (delay
-            (define fontsize (string->number (hash-ref @attrs 'fontsize "12")))
-            (define str (car @elems))
-            (font-size doc fontsize)
-            (font doc (path->string charter))
-            (list
-             (string-width doc str)
-             (current-line-height doc))))
                  
     (define/override (printable? [sig #f])
       (case (car @elems)
@@ -60,6 +50,21 @@
            #;(println str)
            (void)
            (apply text doc str @origin)])))))
+  
+(define quadify%
+  (class textish%
+    (super-new)
+    (init-field doc)
+    (inherit-field @size @elems @attrs)
+    (set! @size
+          (delay
+            (define fontsize (string->number (hash-ref @attrs 'fontsize "12")))
+            (define str (car @elems))
+            (font-size doc fontsize)
+            (font doc (path->string charter))
+            (list
+             (string-width doc str)
+             (current-line-height doc))))))
 
 (define (quadify doc q)
   (make-object quadify%  doc (hash-set* (send q attrs) 'font charter) (send q elems)))
@@ -81,12 +86,10 @@
             ([i (in-naturals)]
              #:break (empty? pcs))
     (define-values (run-pcs rest) (splitf-at pcs (λ (p) (same-run? (car pcs) p))))
-    (define new-run (car pcs))
-    (set-field! @size new-run (list (for/sum ([pc (in-list run-pcs)])
-                                             (pt-x (send pc size)))
-                                    (pt-y (send (car pcs) size))))
-    (set-field! @elems new-run (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
-                                                                               (send pc elems)))))
+    (define new-run (make-object textish% (send (car pcs) attrs) (send (car pcs) elems)))
+    (set-field! @size new-run (delay (list (for/sum ([pc (in-list run-pcs)])
+                                                    (pt-x (send pc size)))
+                                           (pt-y (send (car pcs) size)))))
     (values (cons new-run runs) rest)))
 
 (define line-height 16)
