@@ -1,6 +1,6 @@
 #lang debug racket
 (require quad racket/class)
-(require racket/promise racket/list sugar/debug pitfall/document pitfall/vector pitfall/font pitfall/annotation pitfall/color pitfall/text fontland/font racket/runtime-path pollen/tag)
+(require racket/promise racket/list sugar/debug pitfall/pdf pitfall/vector pitfall/font pitfall/annotation pitfall/color pitfall/text fontland/font racket/runtime-path pollen/tag)
 (provide (rename-out [mb #%module-begin]) (except-out (all-from-out racket) #%module-begin))
 
 (define-runtime-path charter "fonts/charter.ttf")
@@ -70,15 +70,27 @@
 (define (quadify doc q)
   (make-object quadify%  doc (hash-set* (get-field attrs q) 'font charter) (get-field elems q)))
 
-(define $line (class quad% (super-new)
+(define line% (class quad% (super-new)
                 (set-field! size this (list +inf.0 line-height))
                 (set-field! out this 'sw)))
-(define $page (class quad% (super-new)
-                (set-field! offset this'(36 36))))
-(define $doc (class quad% (super-new)))
-(define $break (class quad% (super-new)))
+(define page% (class quad% (super-new)
+                (set-field! offset this'(36 36))
+                (define/override (start doc)
+                  (add-page doc)
+                  (font-size doc 10)
+                  (define str (string-append "page " (number->string page-count)))
+                  ;; page number
+                  (save doc)
+                  (fill-color doc "blue")
+                  (text doc str 10 10 (hasheq 'link "https://practicaltypography.com"))
+                  (restore doc)
+                  (set! page-count (add1 page-count)))))
+(define doc% (class quad% (super-new)
+               (define/override (start doc) (start-doc doc))
+               (define/override (end doc) (end-doc doc))))
+(define break% (class quad% (super-new)))
 (define page-count 1)
-(define (make-break . xs) (make-object $break (hasheq 'printable? #f 'size '(0 0)) xs))
+(define (make-break . xs) (make-object break% (hasheq 'printable? #f 'size '(0 0)) xs))
 
 (define (consolidate-runs pcs)
   (for/fold ([runs empty]
@@ -89,10 +101,10 @@
     (define-values (run-pcs rest) (splitf-at pcs (λ (p) (same-run? (car pcs) p))))
     (define new-run (make-object textish% (get-field attrs (car pcs)) (get-field elems (car pcs))))
     (set-field! size new-run (delay (list (for/sum ([pc (in-list run-pcs)])
-                                                    (pt-x (send pc size)))
-                                           (pt-y (send (car pcs) size)))))
+                                                   (pt-x (send pc size)))
+                                          (pt-y (send (car pcs) size)))))
     (set-field! elems new-run (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
-                                                                               (get-field elems pc)))))
+                                                                              (get-field elems pc)))))
     (values (cons new-run runs) rest)))
 
 (define line-height 16)
@@ -101,7 +113,7 @@
   (break xs size debug
          #:break-val (make-break #\newline)
          #:soft-break-proc soft-break?
-         #:finish-wrap-proc (λ (pcs) (list (make-object $line (hasheq)
+         #:finish-wrap-proc (λ (pcs) (list (make-object line% (hasheq)
                                              ;; consolidate chars into a single run (naively)
                                              ;; by taking attributes from first (including origin)
                                              ;; this only works because there's only one run per line
@@ -112,59 +124,40 @@
 
 ;; 181231 it's weird that setup work for page is in the page break,
 ;; which is between pages, not associated with either
-(define pb (make-object (let ([pb (class $break
+(define pb (make-object (let ([pb (class break%
                                     (super-new)
                                     (define/override (printable?) #f)
                                     (inherit-field (@size size))
-                                    (set! @size '(0 0))
-                                    (define/override (draw doc)
-                                      (add-page doc)
-                                      (font-size doc 10)
-                                      (define str (string-append "page " (number->string page-count)))
-                                      ;; page number
-                                      (save doc)
-                                      (fill-color doc "blue")
-                                      (text doc str 10 10 (hasheq 'link "https://practicaltypography.com"))
-                                      (restore doc)
-                                      (set! page-count (add1 page-count))))])
+                                    (set! @size '(0 0)))])
                           pb) '(#\page)))
 
-(define ($break? x) (is-a? x $break))
+(define ($break? x) (is-a? x break%))
 (define (page-wrap xs size [debug #f])
   (break xs size debug
          #:break-before? #t
          #:break-val pb
          #:soft-break-proc $break?
-         #:finish-wrap-proc (λ (pcs) (list (make-object $page (hasheq) (filter-not $break? pcs))))))
+         #:finish-wrap-proc (λ (pcs) (list (make-object page% (hasheq) (filter-not $break? pcs))))))
 
-(define (typeset doc qarg)
+(define (typeset pdf qarg)
   (define chars 65)
   (define line-width (* 7.2 chars))
   (define lines-per-page (* 40 line-height))
+  (time-name config-pdf
+             [font pdf (path->string charter)]
+             [font-size pdf 12])
   (let* ([x (time-name runify (runify qarg))]
-         [x (time-name quadify (map (λ (x) (quadify doc x)) x))]
+         [x (time-name quadify (map (λ (x) (quadify pdf x)) x))]
          [x (time-name line-wrap (line-wrap x line-width))]
          [x (time-name page-wrap (page-wrap x lines-per-page))]
-         [x (time-name position (position (make-object $doc (hasheq) x)))])
+         [x (time-name position (position (make-object doc% (hasheq) x)))])
     x))
 
 (define (run qin [path "test.pdf"])
-  (define doc (time-name make-doc
-                         (make-$doc
-                          (hasheq 'compress #t
-                                  'autoFirstPage #f))))
-  (time-name config-doc
-             [font doc (path->string charter)]
-             [font-size doc 12])
-  (define q (typeset doc qin))
+  (define pdf (time-name make-pdf (make-pdf #:compress #t)))
+  (define q (typeset pdf qin))
   (report draw-counter)
-  (time-name draw
-             (with-output-to-file path
-               (λ ()
-                 (start-doc doc)
-                 (send q draw doc)
-                 (end-doc doc))
-               #:exists 'replace))
+  (time-name draw (with-output-to-file path (λ () (send q draw pdf)) #:exists 'replace))
   (report draw-counter))
 
 (define-syntax (mb stx)
