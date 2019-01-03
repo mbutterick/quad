@@ -1,4 +1,4 @@
-#lang quad/typewriter-class 1
+#lang qtest/typewriter 1
 
 Metamorphosis
 Franz Kafka

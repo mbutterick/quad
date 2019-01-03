@@ -1,9 +1,9 @@
 #lang debug racket
-(require "quad-class.rkt" racket/class)
-(require racket/promise racket/list sugar/debug "atomize.rkt" "break.rkt" "qexpr.rkt" "position.rkt" pitfall/document pitfall/vector pitfall/font pitfall/annotation pitfall/color pitfall/text fontland/font racket/runtime-path pollen/tag)
+(require quad racket/class)
+(require racket/promise racket/list sugar/debug pitfall/document pitfall/vector pitfall/font pitfall/annotation pitfall/color pitfall/text fontland/font racket/runtime-path pollen/tag)
 (provide (rename-out [mb #%module-begin]) (except-out (all-from-out racket) #%module-begin))
 
-(define-runtime-path charter "../qtest/fonts/charter.ttf")
+(define-runtime-path charter "fonts/charter.ttf")
 
 (define (soft-break? q)
   (and (quad? q)
@@ -26,50 +26,55 @@
 (define (quadify% doc)
   (class quad%
     (super-new)
-    (define/override (size)
-      (delay
-        (define fontsize (string->number (hash-ref (send this attrs) 'fontsize "12")))
-        (define str (car (send this elems)))
-        (font-size doc fontsize)
-        (font doc (path->string charter))
-        (list
-         (string-width doc str)
-         (current-line-height doc))))
+    (inherit-field @size @elems @attrs @origin)
+    (set! @size
+          (delay
+            (define fontsize (string->number (hash-ref (send this attrs) 'fontsize "12")))
+            (define str (car (send this elems)))
+            (font-size doc fontsize)
+            (font doc (path->string charter))
+            (list
+             (string-width doc str)
+             (current-line-height doc))))
                  
-    (define/override (printable?)
-      (case (car (send q elems))
+    (define/override (printable? [sig #f])
+      (case (car @elems)
         [(" " #\u00AD) (λ (sig) (memq sig '(end)))]
         [(" " #\space) (λ (sig) (not (memq sig '(start end))))]
         [else #true]))
 
     (define/override (draw doc)
       (set! draw-counter (add1 draw-counter ))
-      #;(draw-debug q doc)
-      (font-size doc (string->number (hash-ref (send q attrs) 'fontsize "12")))
-      (let ([str (car (send q elems))])
+      (font-size doc (string->number (hash-ref @attrs 'fontsize "12")))
+      (let ([str (car @elems)])
         (cond
-          [(hash-has-key? (send q attrs) 'link)
+          [(hash-has-key? @attrs 'link)
            (save doc)
            (fill-color doc "blue")
-           (text doc str (first (send q origin)) (second (send q origin)) (hasheq 'link (hash-ref (send q attrs) 'link)))
+           (text doc str (first @origin) (second @origin) (hasheq 'link (hash-ref @attrs 'link)))
            (restore doc)]
           [else
            #;(println str)
            (void)
-           (apply text doc str (send q origin))])))))
+           (apply text doc str @origin)])))))
 
 (define (quadify doc q)
   (make-object (quadify% doc) (hash-set* (send q attrs)
                                          'in 'bi
                                          'out 'bo
                                          'font charter) (send q elems)))
-(define $line (class quad% (super-new)))
-(define $page (class quad% (super-new)))
+
+(define $line (class quad% (super-new)
+                (inherit-field @size @out)
+                (set! @size (list +inf.0 line-height))
+                (set! @out 'sw)))
+(define $page (class quad% (super-new)
+                (inherit-field @offset)
+                (set! @offset '(36 36))))
 (define $doc (class quad% (super-new)))
 (define $break (class quad% (super-new)))
 (define page-count 1)
 (define (make-break . xs) (make-object $break (hasheq 'printable? #f 'size '(0 0)) xs))
-
 
 (define (consolidate-runs pcs)
   (for/fold ([runs empty]
@@ -78,45 +83,47 @@
             ([i (in-naturals)]
              #:break (empty? pcs))
     (define-values (run-pcs rest) (splitf-at pcs (λ (p) (same-run? (car pcs) p))))
-    (define new-run (make-object quad%
-                      (hash-set (send (car pcs) attrs)
-                                'size (delay (list (pt-x (for/sum ([pc (in-list run-pcs)])
-                                                           (send pc size)))
-                                                   (pt-y (send (car pcs) size)))))
-                      (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
-                                                              (send pc elems))))))
+    (define new-run (car pcs))
+    (set-field! @size new-run (delay (list (pt-x (for/sum ([pc (in-list run-pcs)])
+                                                          (send pc size)))
+                                           (pt-y (send (car pcs) size)))))
+    (set-field! @elems new-run (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
+                                                                               (send pc elems)))))
     (values (cons new-run runs) rest)))
 
 (define line-height 16)
-(define consolidate-into-runs? #t)
+(define consolidate-into-runs? #f)
 (define (line-wrap xs size [debug #f])
   (break xs size debug
          #:break-val (make-break #\newline)
          #:soft-break-proc soft-break?
-         #:finish-wrap-proc (λ (pcs) (list ($line (hasheq 'size (list +inf.0 line-height)
-                                                          'out 'sw)
-                                                  ;; consolidate chars into a single run (naively)
-                                                  ;; by taking attributes from first (including origin)
-                                                  ;; this only works because there's only one run per line
-                                                  ;; that is, it suffices to position the first letter
-                                                  (if consolidate-into-runs?
-                                                      (consolidate-runs pcs)
-                                                      pcs))))))
+         #:finish-wrap-proc (λ (pcs) (list (make-object $line (hasheq)
+                                             ;; consolidate chars into a single run (naively)
+                                             ;; by taking attributes from first (including origin)
+                                             ;; this only works because there's only one run per line
+                                             ;; that is, it suffices to position the first letter
+                                             (if consolidate-into-runs?
+                                                 (consolidate-runs pcs)
+                                                 pcs))))))
 
 ;; 181231 it's weird that setup work for page is in the page break,
 ;; which is between pages, not associated with either
-(define pb (make-object $break (hasheq 'printable? #f
-                           'size '(0 0)
-                           'draw (λ (q doc)
-                                   (add-page doc)
-                                   (font-size doc 10)
-                                   (define str (string-append "page " (number->string page-count)))
-                                   ;; page number
-                                   (save doc)
-                                   (fill-color doc "blue")
-                                   (text doc str 10 10 (hasheq 'link "https://practicaltypography.com"))
-                                   (restore doc)
-                                   (set! page-count (add1 page-count)))) '(#\page)))
+(define pb (make-object (let ([pb (class $break
+                                    (super-new)
+                                    (define/override (printable?) #f)
+                                    (inherit-field @size)
+                                    (set! @size '(0 0))
+                                    (define/override (draw doc)
+                                      (add-page doc)
+                                      (font-size doc 10)
+                                      (define str (string-append "page " (number->string page-count)))
+                                      ;; page number
+                                      (save doc)
+                                      (fill-color doc "blue")
+                                      (text doc str 10 10 (hasheq 'link "https://practicaltypography.com"))
+                                      (restore doc)
+                                      (set! page-count (add1 page-count))))])
+                          pb) '(#\page)))
 
 (define ($break? x) (is-a? x $break))
 (define (page-wrap xs size [debug #f])
@@ -124,7 +131,7 @@
          #:break-before? #t
          #:break-val pb
          #:soft-break-proc $break?
-         #:finish-wrap-proc (λ (pcs) (list ($page (hasheq 'offset '(36 36)) (filter-not $break? pcs))))))
+         #:finish-wrap-proc (λ (pcs) (list (make-object $page (hasheq) (filter-not $break? pcs))))))
 
 (define (typeset doc qarg)
   (define chars 65)
@@ -134,13 +141,8 @@
          [x (time-name quadify (map (λ (x) (quadify doc x)) x))]
          [x (time-name line-wrap (line-wrap x line-width))]
          [x (time-name page-wrap (page-wrap x lines-per-page))]
-         [x (time-name position (position ($doc (hasheq) x)))])
+         [x (time-name position (position (make-object $doc (hasheq) x)))])
     x))
-
-
-(provide quad run qexpr->quad)
-
-(define quad (default-tag-function 'quad))
 
 (define (run qin [path "test.pdf"])
   (define doc (time-name make-doc
@@ -169,11 +171,11 @@
        #'(#%module-begin
           (define qs (list . QS))
           (define lotsa-qs (append* (make-list (string->number (string-trim REP)) qs)))
-          (run (qexpr->quad (apply quad #:fontsize "12" lotsa-qs)) PS)
+          (run (apply quad (hasheq 'fontsize "12") lotsa-qs) PS)
           (void)))]))
 
 (module reader syntax/module-reader
-  quad/typewriter
+  qtest/typewriter
   #:read quad-read
   #:read-syntax quad-read-syntax
   #:whole-body-readers? #t ;; need this to make at-reader work
