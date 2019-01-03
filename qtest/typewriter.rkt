@@ -90,6 +90,8 @@
     (set-field! @size new-run (delay (list (for/sum ([pc (in-list run-pcs)])
                                                     (pt-x (send pc size)))
                                            (pt-y (send (car pcs) size)))))
+    (set-field! @elems new-run (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
+                                                                               (send pc elems)))))
     (values (cons new-run runs) rest)))
 
 (define line-height 16)
