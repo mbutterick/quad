@@ -26,16 +26,14 @@
   (hash-ref! fonts p (λ () (open-font p))))
 
 (define ascender-cache (make-hash))
-(define/contract (ascender q)
-  (quad? . -> . real?)
+(define (ascender q)
   (define p (hash-ref (send q attrs) 'font "Courier"))
   (unless p
     (error 'ascender-no-font-key))
   (hash-ref! ascender-cache p (λ () (font-ascent (get-font p)))))
 
 (define units-cache (make-hash))
-(define/contract (units-per-em q)
-  (quad? . -> . real?)
+(define (units-per-em q)
   (define p (hash-ref (send q attrs) 'font "Courier"))
   (unless p
     (error 'units-per-em-no-font-key))
@@ -50,8 +48,7 @@
 (define (vertical-baseline-offset q)
   (* (/ (ascender q) (units-per-em q) 1.0) (fontsize q)))
 
-(define/contract (anchor->local-point q anchor)
-  (quad? symbol? . -> . point?)
+(define (anchor->local-point q anchor)
   ;; calculate the location of the anchor on the bounding box relative to '(0 0) (aka "locally")
   (unless (valid-anchor? anchor)
     (raise-argument-error 'relative-anchor-pt "valid anchor" anchor))
@@ -65,32 +62,25 @@
   (pt (coerce-int (* x x-fac))
       (coerce-int (+ (* y y-fac) (if (memq anchor '(bi bo)) (vertical-baseline-offset q) 0)))))
 
-(define point/c (quad? . -> . point?))
-
-(define/contract (inner-point q)
-  point/c
+(define (inner-point q)
   ;; calculate absolute location of inner-point
   ;; based on current origin and point type.
   ;; include offset, because it's intended to adjust inner 
   (pt+ (send q origin) (anchor->local-point q (send q inner)) (send q offset)))
 
-(define/contract (in-point q)
-  point/c
+(define (in-point q)
   ;; calculate absolute location of in-point
   ;; based on current origin and point type.
   ;; don't include offset, so location is on bounding box
   (pt+ (send q origin) (anchor->local-point q (send q in))))
 
-(define/contract (out-point q)
-  point/c
+(define (out-point q)
   ;; calculate absolute location of out-point
   ;; based on current origin and point type.
   ;; don't include offset, so location is on bounding box
   (pt+ (send q origin) (anchor->local-point q (send q out))))
 
-
-(define/contract (position q [previous-end-pt #f])
-  ((quad?) (point?) . ->* . quad?)
+(define (position q [previous-end-pt #f])
   ;; recursively calculates coordinates for quad & subquads
   ;; based on starting origin point
   (send q set-origin! (if previous-end-pt
@@ -101,7 +91,6 @@
              #:when (quad? q))
     (out-point (position q pt)))
   q)
-
 
 (module+ test
   (require rackunit)

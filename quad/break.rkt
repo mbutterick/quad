@@ -123,7 +123,7 @@
     (match-define (cons q other-qs) qs)
     (debug-report q 'next-q)
     (define at-start? (not current-dist))
-    (define dist (if (and (quad? q) (send x printable? q)) (distance q) 0))
+    (define dist (if (and (quad? q) (send q printable?)) (distance q) 0))
     (define would-overflow? (and current-dist (> (+ dist current-dist) target-size)))
     (cond
       [(and at-start? (soft-break? q) (nonprinting-at-start? q))
