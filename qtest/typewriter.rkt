@@ -23,9 +23,10 @@
   (restore doc))
 
 (define draw-counter 0)
-(define (quadify% doc)
+(define quadify%
   (class quad%
     (super-new)
+    (init-field doc)
     (inherit-field @size @elems @attrs @origin)
     (set! @size
           (delay
@@ -59,7 +60,7 @@
            (apply text doc str @origin)])))))
 
 (define (quadify doc q)
-  (make-object (quadify% doc) (hash-set* (send q attrs)
+  (make-object quadify%  doc (hash-set* (send q attrs)
                                          'in 'bi
                                          'out 'bo
                                          'font charter) (send q elems)))
@@ -84,15 +85,15 @@
              #:break (empty? pcs))
     (define-values (run-pcs rest) (splitf-at pcs (λ (p) (same-run? (car pcs) p))))
     (define new-run (car pcs))
-    (set-field! @size new-run (delay (list (pt-x (for/sum ([pc (in-list run-pcs)])
-                                                          (send pc size)))
-                                           (pt-y (send (car pcs) size)))))
+    (set-field! @size new-run (list (for/sum ([pc (in-list run-pcs)])
+                                             (pt-x (send pc size)))
+                                    (pt-y (send (car pcs) size))))
     (set-field! @elems new-run (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
                                                                                (send pc elems)))))
     (values (cons new-run runs) rest)))
 
 (define line-height 16)
-(define consolidate-into-runs? #f)
+(define consolidate-into-runs? #t)
 (define (line-wrap xs size [debug #f])
   (break xs size debug
          #:break-val (make-break #\newline)
