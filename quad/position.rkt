@@ -27,14 +27,14 @@
 
 (define ascender-cache (make-hash))
 (define (ascender q)
-  (define p (hash-ref (send q attrs) 'font "Courier"))
+  (define p (hash-ref (get-field attrs q) 'font "Courier"))
   (unless p
     (error 'ascender-no-font-key))
   (hash-ref! ascender-cache p (λ () (font-ascent (get-font p)))))
 
 (define units-cache (make-hash))
 (define (units-per-em q)
-  (define p (hash-ref (send q attrs) 'font "Courier"))
+  (define p (hash-ref (get-field attrs q) 'font "Courier"))
   (unless p
     (error 'units-per-em-no-font-key))
   (hash-ref! units-cache p (λ () (font-units-per-em (get-font p)))))
@@ -42,7 +42,7 @@
 (define (fontsize q)
   ;; this needs to not default to 0
   ;; needs parameter with default font size
-  (define val (hash-ref (send q attrs) 'fontsize (λ () (error 'no-font-size))))
+  (define val (hash-ref (get-field attrs q) 'fontsize (λ () (error 'no-font-size))))
   ((if (number? val) values string->number) val))
 
 (define (vertical-baseline-offset q)
@@ -50,7 +50,7 @@
 
 (define (anchor->local-point q anchor)
   ;; calculate the location of the anchor on the bounding box relative to '(0 0) (aka "locally")
-  (unless (valid-anchor? anchor)
+  #(unless (valid-anchor? anchor)
     (raise-argument-error 'relative-anchor-pt "valid anchor" anchor))
   (match-define (list x-fac y-fac)
     (case anchor
@@ -66,28 +66,28 @@
   ;; calculate absolute location of inner-point
   ;; based on current origin and point type.
   ;; include offset, because it's intended to adjust inner 
-  (pt+ (send q origin) (anchor->local-point q (send q inner)) (send q offset)))
+  (pt+ (get-field origin q) (anchor->local-point q (get-field inner q)) (get-field offset q)))
 
 (define (in-point q)
   ;; calculate absolute location of in-point
   ;; based on current origin and point type.
   ;; don't include offset, so location is on bounding box
-  (pt+ (send q origin) (anchor->local-point q (send q in))))
+  (pt+ (get-field origin q) (anchor->local-point q (get-field in q))))
 
 (define (out-point q)
   ;; calculate absolute location of out-point
   ;; based on current origin and point type.
   ;; don't include offset, so location is on bounding box
-  (pt+ (send q origin) (anchor->local-point q (send q out))))
+  (pt+ (get-field origin q) (anchor->local-point q (get-field out q))))
 
 (define (position q [previous-end-pt #f])
   ;; recursively calculates coordinates for quad & subquads
   ;; based on starting origin point
-  (send q set-origin! (if previous-end-pt
+  (set-field! origin q (if previous-end-pt
                      (pt- previous-end-pt (in-point q))
                      (in-point q)))
   (for/fold ([pt (inner-point q)])
-            ([q (in-list (send q elems))]
+            ([q (in-list (get-field elems q))]
              #:when (quad? q))
     (out-point (position q pt)))
   q)
@@ -98,14 +98,14 @@
    "origins"
    (define size (pt 10 10))
    (define orig (pt 5 5))
-   (check-equal? (send q origin (position (quad (hasheq 'in 'nw 'size size)) orig)) (pt 5 5))
-   (check-equal? (send q origin (position (quad (hasheq 'in 'n 'size size)) orig)) (pt 0 5))
-   (check-equal? (send q origin (position (quad (hasheq 'in 'ne 'size size)) orig)) (pt -5 5))
-   (check-equal? (send q origin (position (quad (hasheq 'in 'e 'size size)) orig)) (pt -5 0))
-   (check-equal? (send q origin (position (quad (hasheq 'in 'se 'size size)) orig)) (pt -5 -5))
-   (check-equal? (send q origin (position (quad (hasheq 'in 's 'size size)) orig)) (pt 0 -5))
-   (check-equal? (send q origin (position (quad (hasheq 'in 'sw 'size size)) orig)) (pt 5 -5))
-   (check-equal? (send q origin (position (quad (hasheq 'in 'w 'size size)) orig)) (pt 5 0)))
+   (check-equal? (get-field origin q (position (quad (hasheq 'in 'nw 'size size)) orig)) (pt 5 5))
+   (check-equal? (get-field origin q (position (quad (hasheq 'in 'n 'size size)) orig)) (pt 0 5))
+   (check-equal? (get-field origin q (position (quad (hasheq 'in 'ne 'size size)) orig)) (pt -5 5))
+   (check-equal? (get-field origin q (position (quad (hasheq 'in 'e 'size size)) orig)) (pt -5 0))
+   (check-equal? (get-field origin q (position (quad (hasheq 'in 'se 'size size)) orig)) (pt -5 -5))
+   (check-equal? (get-field origin q (position (quad (hasheq 'in 's 'size size)) orig)) (pt 0 -5))
+   (check-equal? (get-field origin q (position (quad (hasheq 'in 'sw 'size size)) orig)) (pt 5 -5))
+   (check-equal? (get-field origin q (position (quad (hasheq 'in 'w 'size size)) orig)) (pt 5 0)))
 
   #;(test-case
    "in points"
@@ -187,6 +187,6 @@
   (define q (quad (list 'in 'bi 'out 'bo 'size '(10 10) 'font fira 'fontsize 12)))
   (check-equal? (ascender q) 935)
   (check-equal? (units-per-em q) 1000)
-  (define ascender-scaled (* (/ (ascender q) (units-per-em q)) (hash-ref (send q attrs) 'fontsize) 1.0))
+  (define ascender-scaled (* (/ (ascender q) (units-per-em q)) (hash-ref (get-field attrs q) 'fontsize) 1.0))
   (check-equal? (in-point q) (list 0 ascender-scaled))
   (check-equal? (out-point q) (list 10 ascender-scaled)))

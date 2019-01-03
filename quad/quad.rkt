@@ -6,26 +6,19 @@
 (define quad%
   (class* object% (equal<%>)
     (super-new)
-    (init-field [@attrs null] [@elems null])
+    (init-field [(@attrs attrs) null] [(@elems elems) null])
     ;; why 'nw and 'ne as defaults for in and out points:
     ;; if size is '(0 0), 'nw and 'ne are the same point,
     ;; and everything piles up at the origin
     ;; if size is otherwise, the items don't pile up (but rather lay out in a row)
-    (field [@in 'nw]
-           [@out 'ne]
-           [@inner #f]
+    (field [(@in in) 'nw]
+           [(@out out) 'ne]
+           [(@inner inner) #f]
            [@printable #f]
-           [@size '(0 0)]
-           [@offset '(0 0)]
-           [@origin '(0 0)])
-    
-    (define/public-final (elems) @elems)
-    (define/public-final (attrs) @attrs)
-    (define/public-final (in) @in)
-    (define/public-final (out) @out)
-    (define/public-final (inner) (or @inner (in)))
-    (define/public-final (origin) @origin)
-    (define/public-final (set-origin! val) (set! @origin val))
+           [(@size size) '(0 0)]
+           [(@offset offset) '(0 0)]
+           [(@origin origin) '(0 0)])
+
     (define/public (offset [signal #f]) @offset)
     
     (define/public (printable? [signal #f])
@@ -49,8 +42,8 @@
 
     ;; equal<%> interface
     (define/public-final (equal-to? other recur)
-      (define other-attrs (send other attrs))
-      (define other-elems (send other elems))
+      (define other-attrs (get-field attrs other))
+      (define other-elems (get-field elems other))
       (and (list? @attrs)
            (list? other-attrs)
            (= (length @attrs) (length other-attrs))
@@ -84,7 +77,7 @@
     [else (error 'bad-quad-input)]))
 (define q quad)
 (define (quads? xs) (andmap quad? xs))
-(define (atomic-quad? x) (and (quad? x) (match (send x elems)
+(define (atomic-quad? x) (and (quad? x) (match (get-field elems x)
                                           [(list (? char?)) #t]
                                           [else #f])))
 (define (atomic-quads? xs) (andmap atomic-quad? xs))

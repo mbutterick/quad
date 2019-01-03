@@ -16,7 +16,7 @@
    ((hasheq 'foo "bar" 'zim "zam") . update-with .  (hasheq 'zim "BANG") (hasheq 'toe "jam") (hasheq 'foo "zay"))
    (make-hasheq '((zim . "BANG") (foo . "zay") (toe . "jam")))))
 
-(define (merge-whitespace aqs [white-aq? (λ (aq) (char-whitespace? (car (send aq elems))))])
+(define (merge-whitespace aqs [white-aq? (λ (aq) (char-whitespace? (car (get-field elems aq))))])
   ;; collapse each sequence of whitespace aqs to the first one, and make it a space
   ;; also drop leading & trailing whitespaces
   ;; (same behavior as web browsers)
@@ -28,7 +28,7 @@
           (loop (list acc bs (if (and (pair? rest) ;; we precede bs (only #t if rest starts with bs, because we took the ws)
                                       (pair? bs) ;; we follow bs
                                       (pair? ws)) ;; we have ws
-                                 (quad (send (car ws) attrs) #\space)
+                                 (quad (get-field attrs (car ws)) #\space)
                                  null)) rest)))))
 
 #;(module+ test
@@ -45,8 +45,8 @@
         [(? string?) (append* (for/list ([c (in-string x)]) ;; strings are exploded
                                 (loop c attrs)))]
         [(? quad?) ;; qexprs with attributes are recursed
-         (define this-attrs (send x attrs))
-         (define elems (send x elems))
+         (define this-attrs (get-field attrs x))
+         (define elems (get-field elems x))
          (define merged-attrs (attrs . update-with . this-attrs))
          (append* (for/list ([elem (in-list elems)])
                     (loop elem merged-attrs)))]
@@ -101,7 +101,7 @@
 (define run-key 'run)
 
 (define (same-run? qa qb)
-  (eq? (hash-ref (send qa attrs) run-key) (hash-ref (send qb attrs) run-key)))
+  (eq? (hash-ref (get-field attrs qa) run-key) (hash-ref (get-field attrs qb) run-key)))
 
 (define (runify qx)
   ;; runify a quad by reducing it to a series of "runs",
@@ -115,8 +115,8 @@
               [key first-key])
      (match x
        [(? quad?) ;; qexprs with attributes are recursed
-        (define this-attrs (send x attrs))
-        (define elems (send x elems))
+        (define this-attrs (get-field attrs x))
+        (define elems (get-field elems x))
         (define next-key (if (hash-empty? this-attrs) key (gensym)))
         (define next-attrs (if (hash-empty? this-attrs) attrs (attrs . update-with . this-attrs)))
         (unless (hash-empty? this-attrs) (hash-set! next-attrs run-key next-key))
@@ -124,7 +124,7 @@
                            (if (string? elem)
                                (list (q next-attrs elem))
                                (loop elem next-attrs next-key))))]))
-   (λ (q) (string=? " " (car (send q elems))))))
+   (λ (q) (string=? " " (car (get-field elems q))))))
 
 #;(module+ test
 (check-equal?

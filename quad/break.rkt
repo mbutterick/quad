@@ -11,7 +11,7 @@
 (define (distance q)
   (hash-ref! distance-cache (cond
                               [(quad? q)
-                               (hash-ref (send q attrs) 'id q)]
+                               (hash-ref (get-field attrs q) 'id q)]
                               [(symbol? q) q])
              (λ ()
                (cond
@@ -179,8 +179,8 @@
                other-qs)])))
 
 
-(define q-zero (class quad% (super-new) (inherit-field @size) (set! @size (pt 0 0))))
-(define q-one (class quad% (super-new) (inherit-field @size) (set! @size (pt 1 1))))
+(define q-zero (class quad% (super-new) (inherit-field size) (set! size (pt 0 0))))
+(define q-one (class quad% (super-new) (inherit-field size) (set! size (pt 1 1))))
 
 (define x (quad #:type q-one null #\x))
 (define zwx (quad #:type q-zero #\z))
@@ -207,12 +207,12 @@
                  (class q-zero (super-new)
                    (define/override (printable? [sig #f]) #false))
                  #\newline))
-(define soft-break? (λ (q) (and (quad? q) (memv (car (send q elems)) '(#\space #\-)))))
+(define soft-break? (λ (q) (and (quad? q) (memv (car (get-field elems q)) '(#\space #\-)))))
 
 (define (linewrap xs size [debug #f])
   (break xs size debug
          #:break-val 'lb
-         #:hard-break-proc (λ (q) (and (quad? q) (memv (car (send q elems)) '(#\newline))))
+         #:hard-break-proc (λ (q) (and (quad? q) (memv (car (get-field elems q)) '(#\newline))))
          #:soft-break-proc soft-break?))
 
 (require rackunit)
@@ -313,10 +313,10 @@
 
 (define (visual-wrap str int [debug #f])
     (apply string (for/list ([b (in-list (linewrap (for/list ([atom (atomize str)])
-                                                             (apply quad #:type q-one (send atom attrs)
-                                                                    (send atom elems))) int debug))])
+                                                             (apply quad #:type q-one (get-field attrs atom)
+                                                                    (get-field elems atom))) int debug))])
                             (cond
-                              [(quad? b) (car (send b elems))]
+                              [(quad? b) (car (get-field elems b))]
                               [else #\|]))))
 
 (module+ test
@@ -344,9 +344,9 @@
   (break xs size debug
          #:break-val 'pb
          #:break-before? #t
-         #:hard-break-proc (λ (x) (and (quad? x) (memv (car (send x elems)) '(#\page))))
+         #:hard-break-proc (λ (x) (and (quad? x) (memv (car (get-field elems x)) '(#\page))))
          #:soft-break-proc (λ (x) (eq? x 'lb))))
-(define pbr (quad #:type (class quad% (super-new) (inherit-field @size) (set! @size #false)) #\page))
+(define pbr (quad #:type (class quad% (super-new) (inherit-field size) (set! size #false)) #\page))
 
 (module+ test
     (test-case
@@ -383,7 +383,7 @@
 (define (linewrap2 xs size [debug #f])
   (break xs size debug
          #:break-val 'lb
-         #:hard-break-proc (λ (q) (and (quad? q) (memv (car (send q elems)) '(#\newline))))
+         #:hard-break-proc (λ (q) (and (quad? q) (memv (car (get-field elems q)) '(#\newline))))
          #:soft-break-proc soft-break?
          #:finish-wrap-proc (λ (pcs) (list (apply slug pcs)))))
 

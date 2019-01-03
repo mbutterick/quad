@@ -7,8 +7,8 @@
 
 (define (soft-break? q)
   (and (quad? q)
-       (or (memv (car (send q elems)) '(#\space #\- #\u00AD))
-           (member  (car (send q elems)) (map string '(#\space #\- #\u00AD))))))
+       (or (memv (car (get-field elems q)) '(#\space #\- #\u00AD))
+           (member  (car (get-field elems q)) (map string '(#\space #\- #\u00AD))))))
 
 (define (draw-debug q doc)
   (save doc)
@@ -26,7 +26,8 @@
 (define textish%
   (class quad%
     (super-new)
-    (inherit-field @size @elems @attrs @origin @in @out)
+    (inherit-field [@size size] [@elems elems]
+                   [@attrs attrs] [@origin origin] [@in in] [@out out])
     (set! @in 'bi)
     (set! @out 'bo)
                  
@@ -55,7 +56,7 @@
   (class textish%
     (super-new)
     (init-field doc)
-    (inherit-field @size @elems @attrs)
+    (inherit-field [@size size] [@elems elems] [@attrs attrs])
     (set! @size
           (delay
             (define fontsize (string->number (hash-ref @attrs 'fontsize "12")))
@@ -67,13 +68,13 @@
              (current-line-height doc))))))
 
 (define (quadify doc q)
-  (make-object quadify%  doc (hash-set* (send q attrs) 'font charter) (send q elems)))
+  (make-object quadify%  doc (hash-set* (get-field attrs q) 'font charter) (get-field elems q)))
 
 (define $line (class quad% (super-new)
-                (set-field! @size this (list +inf.0 line-height))
-                (set-field! @out this 'sw)))
+                (set-field! size this (list +inf.0 line-height))
+                (set-field! out this 'sw)))
 (define $page (class quad% (super-new)
-                (set-field! @offset this'(36 36))))
+                (set-field! offset this'(36 36))))
 (define $doc (class quad% (super-new)))
 (define $break (class quad% (super-new)))
 (define page-count 1)
@@ -86,12 +87,12 @@
             ([i (in-naturals)]
              #:break (empty? pcs))
     (define-values (run-pcs rest) (splitf-at pcs (λ (p) (same-run? (car pcs) p))))
-    (define new-run (make-object textish% (send (car pcs) attrs) (send (car pcs) elems)))
-    (set-field! @size new-run (delay (list (for/sum ([pc (in-list run-pcs)])
+    (define new-run (make-object textish% (get-field attrs (car pcs)) (get-field elems (car pcs))))
+    (set-field! size new-run (delay (list (for/sum ([pc (in-list run-pcs)])
                                                     (pt-x (send pc size)))
                                            (pt-y (send (car pcs) size)))))
-    (set-field! @elems new-run (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
-                                                                               (send pc elems)))))
+    (set-field! elems new-run (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
+                                                                               (get-field elems pc)))))
     (values (cons new-run runs) rest)))
 
 (define line-height 16)
@@ -114,7 +115,7 @@
 (define pb (make-object (let ([pb (class $break
                                     (super-new)
                                     (define/override (printable?) #f)
-                                    (inherit-field @size)
+                                    (inherit-field (@size size))
                                     (set! @size '(0 0))
                                     (define/override (draw doc)
                                       (add-page doc)
