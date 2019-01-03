@@ -75,7 +75,7 @@
                 (set-field! out this 'sw)))
 (define page% (class quad% (super-new)
                 (set-field! offset this'(36 36))
-                (define/override (start doc)
+                (define/override (pre-draw doc)
                   (add-page doc)
                   (font-size doc 10)
                   (define str (string-append "page " (number->string page-count)))
@@ -86,8 +86,8 @@
                   (restore doc)
                   (set! page-count (add1 page-count)))))
 (define doc% (class quad% (super-new)
-               (define/override (start doc) (start-doc doc))
-               (define/override (end doc) (end-doc doc))))
+               (define/override (pre-draw doc) (start-doc doc))
+               (define/override (post-draw doc) (end-doc doc))))
 (define break% (class quad% (super-new)))
 (define page-count 1)
 (define (make-break . xs) (make-object break% (hasheq 'printable? #f 'size '(0 0)) xs))
@@ -122,20 +122,12 @@
                                                  (consolidate-runs pcs)
                                                  pcs))))))
 
-;; 181231 it's weird that setup work for page is in the page break,
-;; which is between pages, not associated with either
-(define pb (make-object (let ([pb (class break%
-                                    (super-new)
-                                    (define/override (printable?) #f)
-                                    (inherit-field (@size size))
-                                    (set! @size '(0 0)))])
-                          pb) '(#\page)))
 
 (define ($break? x) (is-a? x break%))
 (define (page-wrap xs size [debug #f])
   (break xs size debug
          #:break-before? #t
-         #:break-val pb
+         #:break-val (make-object break%)
          #:soft-break-proc $break?
          #:finish-wrap-proc (λ (pcs) (list (make-object page% (hasheq) (filter-not $break? pcs))))))
 
@@ -144,8 +136,8 @@
   (define line-width (* 7.2 chars))
   (define lines-per-page (* 40 line-height))
   (time-name config-pdf
-             [font pdf (path->string charter)]
-             [font-size pdf 12])
+             (font pdf (path->string charter))
+             (font-size pdf 12))
   (let* ([x (time-name runify (runify qarg))]
          [x (time-name quadify (map (λ (x) (quadify pdf x)) x))]
          [x (time-name line-wrap (line-wrap x line-width))]
@@ -154,10 +146,12 @@
     x))
 
 (define (run qin [path "test.pdf"])
-  (define pdf (time-name make-pdf (make-pdf #:compress #t)))
+  (define pdf (time-name make-pdf (make-pdf #:compress #t
+                                            #:auto-first-page #f
+                                            #:output-path path)))
   (define q (typeset pdf qin))
   (report draw-counter)
-  (time-name draw (with-output-to-file path (λ () (send q draw pdf)) #:exists 'replace))
+  (time-name draw (send q draw pdf))
   (report draw-counter))
 
 (define-syntax (mb stx)

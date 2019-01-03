@@ -37,13 +37,13 @@
         [(? promise? prom) (force prom)]
         [val val]))
     
-    (define/public (start surface) (void))
-    (define/public (end surface) (void))
+    (define/public (pre-draw surface) (void))
+    (define/public (post-draw surface) (void))
 
     (define/public (draw [surface #f])
-      (start surface)
+      (pre-draw surface)
       (for-each (λ (e) (send e draw surface)) @elems)
-      (end surface))
+      (post-draw surface))
 
     ;; equal<%> interface
     (define/public-final (equal-to? other recur)
