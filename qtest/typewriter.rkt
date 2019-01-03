@@ -27,11 +27,13 @@
   (class quad%
     (super-new)
     (init-field doc)
-    (inherit-field @size @elems @attrs @origin)
+    (inherit-field @size @elems @attrs @origin @in @out)
+    (set! @in 'bi)
+    (set! @out 'bo)
     (set! @size
           (delay
-            (define fontsize (string->number (hash-ref (send this attrs) 'fontsize "12")))
-            (define str (car (send this elems)))
+            (define fontsize (string->number (hash-ref @attrs 'fontsize "12")))
+            (define str (car @elems))
             (font-size doc fontsize)
             (font doc (path->string charter))
             (list
@@ -60,18 +62,13 @@
            (apply text doc str @origin)])))))
 
 (define (quadify doc q)
-  (make-object quadify%  doc (hash-set* (send q attrs)
-                                         'in 'bi
-                                         'out 'bo
-                                         'font charter) (send q elems)))
+  (make-object quadify%  doc (hash-set* (send q attrs) 'font charter) (send q elems)))
 
 (define $line (class quad% (super-new)
-                (inherit-field @size @out)
-                (set! @size (list +inf.0 line-height))
-                (set! @out 'sw)))
+                (set-field! @size this (list +inf.0 line-height))
+                (set-field! @out this 'sw)))
 (define $page (class quad% (super-new)
-                (inherit-field @offset)
-                (set! @offset '(36 36))))
+                (set-field! @offset this'(36 36))))
 (define $doc (class quad% (super-new)))
 (define $break (class quad% (super-new)))
 (define page-count 1)
