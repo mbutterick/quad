@@ -172,8 +172,11 @@
        #'(#%module-begin
           (define qs (list . QS))
           (define lotsa-qs (append* (make-list (string->number (string-trim REP)) qs)))
-          (run (apply quad (hasheq 'fontsize "12") lotsa-qs) PS)
+          (run (qexpr->quad (apply quad #:fontsize "12" lotsa-qs)) PS)
           (void)))]))
+
+(define quad (default-tag-function 'quad))
+(provide quad)
 
 (module reader syntax/module-reader
   qtest/typewriter
