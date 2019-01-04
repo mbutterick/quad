@@ -92,7 +92,7 @@
 (define (merge-adjacent-strings xs [isolate-white? #false])
   (let loop ([xs xs][acc null])
     (match xs
-      [(list) (reverse acc)]
+      [(== empty) (reverse acc)]
       [(list (? string? strs) ..1 others ...)
        (loop others (append (reverse ((if isolate-white?
                                           merge-and-isolate-white
@@ -107,18 +107,18 @@
 (define (runify qx)
   ;; runify a quad by reducing it to a series of "runs",
   ;; which are multi-character quads with the same formatting.
-  (define first-key (gensym))
+  (define first-key (eq-hash-code (current-default-attrs)))
   (define first-attrs (hash-copy (current-default-attrs)))
   (hash-set! first-attrs 'idx first-key)
   (dropf
-   (let loop ([x (if (string? qx) (q qx) qx)]
+   (let loop ([x (if (string? qx) (make-quad #f (list qx)) qx)]
               [attrs first-attrs]
               [key first-key])
      (match x
        [(? quad?) ;; qexprs with attributes are recursed
         (define this-attrs (quad-attrs x))
         (define elems (quad-elems x))
-        (define next-key (if (hash-empty? this-attrs) key (gensym)))
+        (define next-key (if (hash-empty? this-attrs) key (eq-hash-code this-attrs)))
         (define next-attrs (if (hash-empty? this-attrs) attrs (attrs . update-with . this-attrs)))
         (unless (hash-empty? this-attrs) (hash-set! next-attrs run-key next-key))
         (append* (for/list ([elem (in-list (merge-adjacent-strings elems 'merge-white))])
@@ -130,5 +130,9 @@
 #;(module+ test
     (check-equal?
      (runify (qqa (hasheq 'foo 42) (qq "Hi" "    idiot" (qqa (hasheq 'bar 84) "There") "Eve" "ry" "one")))
-     (list (qqa (hasheq 'foo 42) "Hi") (qqa (hasheq 'foo 42) " ") (qqa (hasheq 'foo 42) "idiot") (qqa (hasheq 'foo 42 'bar 84) "There") (qqa (hasheq 'foo 42) "Everyone"))))
+     (list (qqa (hasheq 'foo 42) "Hi")
+           (qqa (hasheq 'foo 42) " ")
+           (qqa (hasheq 'foo 42) "idiot")
+           (qqa (hasheq 'foo 42 'bar 84) "There")
+           (qqa (hasheq 'foo 42) "Everyone"))))
    
