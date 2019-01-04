@@ -1,5 +1,5 @@
 #lang debug racket/base
-(require racket/struct)
+(require racket/struct racket/dict racket/match)
 (provide (all-defined-out))
 (module+ test (require rackunit))
 
@@ -40,7 +40,11 @@
 
 (define (default-printable [sig #f]) #f)
 
-(define (make-quad [attrs #f] [elems null])
+;; todo: convert immutable hashes to mutable on input?
+(define make-quad
+  (match-lambda*
+    [(list (== #false) elems ...) elems (apply make-quad (make-hasheq) elems)]
+    [(list (? hash? attrs) elems ...)
   ;; why 'nw and 'ne as defaults for in and out points:
   ;; if size is '(0 0), 'nw and 'ne are the same point,
   ;; and everything piles up at the origin
@@ -69,7 +73,9 @@
         printable
         pre-draw
         post-draw
-        draw))
+        draw)]
+    [(list (? dict? assocs) elems ...) assocs (apply make-quad (make-hasheq assocs) elems)]
+    [(list elems ...) (apply make-quad #f elems)]))
 
 (define q make-quad)
 
