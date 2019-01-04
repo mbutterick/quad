@@ -11,7 +11,7 @@
 
 (define (printable? q [signal #f])
   (match (quad-printable q)
-    [(? procedure? proc) (proc signal)]
+    [(? procedure? proc) (proc q signal)]
     [val val]))
 
 (define (draw q [surface #f])
@@ -49,7 +49,7 @@
    (define (hash-proc h recur) (equal-hash-code h))
    (define (hash2-proc h recur) (equal-secondary-hash-code h))])
 
-(define (default-printable [sig #f]) #f)
+(define (default-printable q [sig #f]) #f)
 
 (define (default-draw q surface)
   ((quad-pre-draw q) q surface)
@@ -63,7 +63,8 @@
 
 
 ;; todo: convert immutable hashes to mutable on input?
-(define (make-quad 
+(define (make-quad
+         #:type [type quad]
          #:attrs [attrs (make-hasheq)]
          #:elems [elems null]
          #:size [size '(0 0)]
@@ -82,7 +83,7 @@
     [(list (? hash? attrs) elems ...) (make-quad #:attrs attrs #:elems elems)]
     [(list (? dict? assocs) elems ...) assocs (make-quad #:attrs (make-hasheq assocs) #:elems elems)]
     [(list elems ..1) (make-quad #:elems elems)]
-    [null (quad attrs
+    [null (type attrs
                 elems
                 size
                 in

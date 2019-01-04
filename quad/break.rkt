@@ -187,7 +187,7 @@
 (define zwx (struct-copy quad q-zero [elems '(#\z)]))
 (define hyph (struct-copy quad q-one [elems '(#\-)]))
 (define shy (struct-copy quad q-one
-                         [printable (λ ([sig #f])
+                         [printable (λ (q [sig #f])
                                       (case sig
                                         [(end) #t]
                                         [else #f]))]
@@ -197,13 +197,13 @@
 (define c (struct-copy quad q-one [elems '(#\c)]))
 (define d (struct-copy quad q-one [elems '(#\d)]))
 (define sp (struct-copy quad q-one
-                        [printable (λ ([sig #f])
+                        [printable (λ (q [sig #f])
                                      (case sig
                                        [(start end) #f]
                                        [else #t]))]
                         [elems '(#\space)]))
 (define br (struct-copy quad q-one
-                        [printable (λ ([sig #f]) #f)]
+                        [printable (λ (q [sig #f]) #f)]
                         [elems '(#\newline)]))
 (define soft-break? (λ (q) (and (quad? q) (memv (car (quad-elems q)) '(#\space #\-)))))
 

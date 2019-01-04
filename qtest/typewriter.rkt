@@ -23,74 +23,62 @@
   (restore doc))
 
 (define draw-counter 0)
-(define textish%
-  (class quad%
-    (super-new)
-    (inherit-field [@size size] [@elems elems]
-                   [@attrs attrs] [@origin origin] [@in in] [@out out])
-    (set! @in 'bi)
-    (set! @out 'bo)
-                 
-    (define/override (printable? [sig #f])
-      (case (car @elems)
-        [(" " #\u00AD) (λ (sig) (memq sig '(end)))]
-        [(" " #\space) (λ (sig) (not (memq sig '(start end))))]
-        [else #true]))
-
-    (define/override (draw doc)
-      (set! draw-counter (add1 draw-counter ))
-      (font-size doc (string->number (hash-ref @attrs 'fontsize "12")))
-      (let ([str (car @elems)])
-        (cond
-          [(hash-has-key? @attrs 'link)
-           (save doc)
-           (fill-color doc "blue")
-           (text doc str (first @origin) (second @origin) (hasheq 'link (hash-ref @attrs 'link)))
-           (restore doc)]
-          [else
-           #;(println str)
-           (void)
-           (apply text doc str @origin)])))))
+(define $textish (q #:in 'bi
+                    #:out 'bo
+                    #:printable (λ (q [sig #f])
+                                  (case (car (quad-elems q))
+                                    [(" " #\u00AD) (λ (sig) (memq sig '(end)))]
+                                    [(" " #\space) (λ (sig) (not (memq sig '(start end))))]
+                                    [else #true]))
+                    #:draw (λ (q doc)
+                             (set! draw-counter (add1 draw-counter ))
+                             (font-size doc (string->number (hash-ref (quad-attrs q) 'fontsize "12")))
+                             (let ([str (car (quad-elems q))])
+                               (cond
+                                 [(hash-has-key? (quad-attrs q) 'link)
+                                  (save doc)
+                                  (fill-color doc "blue")
+                                  (text doc str (first  (quad-origin q)) (second (quad-origin q)) (hasheq 'link (hash-ref (quad-attrs q) 'link)))
+                                  (restore doc)]
+                                 [else
+                                  #;(println str)
+                                  (void)
+                                  (apply text doc str  (quad-origin q))])))))
   
-(define quadify%
-  (class textish%
-    (super-new)
-    (init-field doc)
-    (inherit-field [@size size] [@elems elems] [@attrs attrs])
-    (set! @size
-          (delay
-            (define fontsize (string->number (hash-ref @attrs 'fontsize "12")))
-            (define str (car @elems))
-            (font-size doc fontsize)
-            (font doc (path->string charter))
-            (list
-             (string-width doc str)
-             (current-line-height doc))))))
-
 (define (quadify doc q)
-  (make-object quadify%  doc (hash-set* (get-field attrs q) 'font charter) (get-field elems q)))
+  (struct-copy quad $textish
+               [attrs (quad-attrs q)]
+               [elems (quad-elems q)]
+               [size (delay
+                       (define fontsize (string->number (hash-ref (quad-attrs q) 'fontsize "12")))
+                       (define str (car (quad-elems q)))
+                       (font-size doc fontsize)
+                       (font doc (path->string charter))
+                       (list
+                        (string-width doc str)
+                        (current-line-height doc)))]))
 
-(define line% (class quad% (super-new)
-                (set-field! size this (list +inf.0 line-height))
-                (set-field! out this 'sw)))
-(define page% (class quad% (super-new)
-                (set-field! offset this'(36 36))
-                (define/override (pre-draw doc)
-                  (add-page doc)
-                  (font-size doc 10)
-                  (define str (string-append "page " (number->string page-count)))
-                  ;; page number
-                  (save doc)
-                  (fill-color doc "blue")
-                  (text doc str 10 10 (hasheq 'link "https://practicaltypography.com"))
-                  (restore doc)
-                  (set! page-count (add1 page-count)))))
-(define doc% (class quad% (super-new)
-               (define/override (pre-draw doc) (start-doc doc))
-               (define/override (post-draw doc) (end-doc doc))))
-(define break% (class quad% (super-new)))
+(define line-height 16)
+(define $line (q #:size (list +inf.0 line-height) #:out 'sw))
+(define $page (q #:offset '(36 36)
+                 #:pre-draw (λ (q doc)
+                              (add-page doc)
+                              (font-size doc 10)
+                              (define str (string-append "page " (number->string page-count)))
+                              ;; page number
+                              (save doc)
+                              (fill-color doc "blue")
+                              (text doc str 10 10 (hasheq 'link "https://practicaltypography.com"))
+                              (restore doc)
+                              (set! page-count (add1 page-count)))))
+(define doc% (q #:pre-draw (λ (q doc) (start-doc doc))
+                #:post-draw (λ (q doc) (end-doc doc))))
+(struct $break quad ())
 (define page-count 1)
-(define (make-break . xs) (make-object break% (hasheq 'printable? #f 'size '(0 0)) xs))
+(define (make-break . xs) (q #:type $break
+                             #:printable #f
+                             #:size '(0 0)
+                             #:elems xs))
 
 (define (consolidate-runs pcs)
   (for/fold ([runs empty]
@@ -99,7 +87,9 @@
             ([i (in-naturals)]
              #:break (empty? pcs))
     (define-values (run-pcs rest) (splitf-at pcs (λ (p) (same-run? (car pcs) p))))
-    (define new-run (make-object textish% (get-field attrs (car pcs)) (get-field elems (car pcs))))
+    (define new-run (struct-copy quad $textish
+                                 [attrs (quad-attrs (car pcs))]
+                                 [elems (quad-elems (car pcs))]))
     (set-field! size new-run (delay (list (for/sum ([pc (in-list run-pcs)])
                                                    (pt-x (send pc size)))
                                           (pt-y (send (car pcs) size)))))
@@ -107,13 +97,13 @@
                                                                               (get-field elems pc)))))
     (values (cons new-run runs) rest)))
 
-(define line-height 16)
+
 (define consolidate-into-runs? #t)
 (define (line-wrap xs size [debug #f])
   (break xs size debug
          #:break-val (make-break #\newline)
          #:soft-break-proc soft-break?
-         #:finish-wrap-proc (λ (pcs) (list (make-object line% (hasheq)
+         #:finish-wrap-proc (λ (pcs) (list (make-object $line (hasheq)
                                              ;; consolidate chars into a single run (naively)
                                              ;; by taking attributes from first (including origin)
                                              ;; this only works because there's only one run per line
@@ -122,14 +112,12 @@
                                                  (consolidate-runs pcs)
                                                  pcs))))))
 
-
-(define ($break? x) (is-a? x break%))
 (define (page-wrap xs size [debug #f])
   (break xs size debug
          #:break-before? #t
-         #:break-val (make-object break%)
+         #:break-val (make-object $break)
          #:soft-break-proc $break?
-         #:finish-wrap-proc (λ (pcs) (list (make-object page% (hasheq) (filter-not $break? pcs))))))
+         #:finish-wrap-proc (λ (pcs) (list (make-object $page (hasheq) (filter-not $break? pcs))))))
 
 (define (typeset pdf qarg)
   (define chars 65)
@@ -139,7 +127,7 @@
              (font pdf (path->string charter))
              (font-size pdf 12))
   (let* ([x (time-name runify (runify qarg))]
-         [x (time-name quadify (map (λ (x) (quadify pdf x)) x))]
+         [x (time-name quadify #R (map (λ (x) (quadify pdf x)) x))]
          [x (time-name line-wrap (line-wrap x line-width))]
          [x (time-name page-wrap (page-wrap x lines-per-page))]
          [x (time-name position (position (make-object doc% (hasheq) x)))])
@@ -161,12 +149,13 @@
                    [(REP . QS) #'ARGS])
        #'(#%module-begin
           (define qs (list . QS))
+          (require pollen/tag)
+          (define quad (default-tag-function 'quad))
           (define lotsa-qs (append* (make-list (string->number (string-trim REP)) qs)))
           (run (qexpr->quad (apply quad #:fontsize "12" lotsa-qs)) PS)
           (void)))]))
 
-(define quad (default-tag-function 'quad))
-(provide quad)
+
 
 (module reader syntax/module-reader
   qtest/typewriter

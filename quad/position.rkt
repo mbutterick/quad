@@ -19,10 +19,9 @@
 
 (define (coerce-int x) (if (integer? x) (inexact->exact x) x))
 
-
+(define font-cache (make-hash))
 (define (get-font p)
-  (define fonts (make-hash))
-  (hash-ref! fonts p (λ () (open-font p))))
+  (hash-ref! font-cache p (λ () (open-font p))))
 
 (define ascender-cache (make-hash))
 (define (ascender q)

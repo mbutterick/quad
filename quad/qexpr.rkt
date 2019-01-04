@@ -65,7 +65,8 @@
 (define/contract (qexpr->quad x)
   (qexpr? . -> . quad?)
   (if (txexpr? x)
-      (make-object quad% (attrs->hash (get-attrs x)) (map qexpr->quad (get-elements x)))
+      (q #:attrs (attrs->hash (get-attrs x))
+         #:elems (map qexpr->quad (get-elements x)))
       x))
 
 (define/contract (qml->qexpr x)
