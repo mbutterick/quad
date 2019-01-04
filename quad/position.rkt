@@ -159,21 +159,7 @@
    (check-equal? (inner-point (position (q #:size size #:inner 'se #:offset off) orig)) (pt+ '(10 10) off))
    (check-equal? (inner-point (position (q #:size size #:inner 's #:offset off) orig)) (pt+ '(5 10) off))
    (check-equal? (inner-point (position (q #:size size #:inner 'sw #:offset off) orig)) (pt+ '(0 10) off))
-   (check-equal? (inner-point (position (q #:size size #:inner 'w #:offset off) orig)) (pt+ '(0 5) off)))
-
-  #;(test-case
-     "folding positions"
-     (define (unit [attrs null] . elems) (apply quad (append attrs '(size (1 1))) elems))
-     (check-equal? (position (unit null (unit '(out se) (unit) (unit) (unit))
-                                   (unit '(out se) (unit) (unit) (unit))
-                                   (unit '(out se) (unit) (unit) (unit))))
-                   (unit '(origin (0 0))
-                         (unit '(origin (0 0) out se)
-                               (unit '(origin (0 0))) (unit '(origin (1 0))) (unit '(origin (2 0))))
-                         (unit '(origin (1 1) out se)
-                               (unit '(origin (1 1))) (unit '(origin (2 1))) (unit '(origin (3 1))))
-                         (unit '(origin (2 2) out se)
-                               (unit '(origin (2 2))) (unit '(origin (3 2))) (unit '(origin (4 2))))))))
+   (check-equal? (inner-point (position (q #:size size #:inner 'w #:offset off) orig)) (pt+ '(0 5) off))))
 
 (module+ test
   (require racket/runtime-path fontland/font)
@@ -182,7 +168,7 @@
   (define q1 (q (list 'in 'bi 'out 'bo 'size '(10 10) 'font fira 'fontsize 12)))
   (define q2 (q (list 'in 'bi 'out 'bo 'size '(10 10) 'font fira 'fontsize 24)))
   (define q3 (q (list 'in 'bi 'out 'bo 'size '(10 10) 'font fira 'fontsize 6)))
-  (position (q #f q1 q2 q3)))
+  #;(position (q #f q1 q2 q3)))
 
 
 #;(module+ test

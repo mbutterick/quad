@@ -121,6 +121,7 @@
              #:break (empty? qs))
     (match-define (cons q other-qs) qs)
     (debug-report q 'next-q)
+    (debug-report (quad-elems q) 'next-q-elems)
     (define at-start? (not current-dist))
     (define dist (if (and (quad? q) (printable? q)) (distance q) 0))
     (define would-overflow? (and current-dist (> (+ dist current-dist) target-size)))
@@ -211,6 +212,9 @@
          #:break-val 'lb
          #:hard-break-proc (λ (q) (and (quad? q) (memv (car (quad-elems q)) '(#\newline))))
          #:soft-break-proc soft-break?))
+
+(module+ test
+  (require rackunit))
 
 (module+ test
   (require rackunit)
@@ -307,13 +311,15 @@
    (check-equal? (linewrap (list x x x sp x x) 3) (list x x x 'lb x x))))
 
 (define (visual-wrap str int [debug #f])
-  (apply string (for/list ([b (in-list (linewrap (for/list ([atom (atomize str)])
-                                                   (struct-copy quad q-one
-                                                                [attrs (quad-attrs atom)]
-                                                                [elems (quad-elems atom)])) int debug))])
-                  (cond
-                    [(quad? b) (car (quad-elems b))]
-                    [else #\|]))))
+  (apply string
+         (for/list ([b (in-list (linewrap (for/list ([atom (atomize str)])
+                                            (if (equal? (quad-elems atom) '(#\space))
+                                                (struct-copy quad sp)
+                                                (struct-copy quad q-one
+                                                             [attrs (quad-attrs atom)]
+                                                             [elems (quad-elems atom)]))) int debug))])
+           (if (quad? b) (car (quad-elems b)) #\|))))
+
 (module+ test
   (test-case
    "visual breaks"
@@ -343,6 +349,7 @@
 (define pbr (q #:size #false #:elems '(#\page)))
 
 (module+ test
+  (require rackunit)
   (test-case
    "soft page breaks"
    (check-equal? (pagewrap null 2) '(pb))
@@ -380,7 +387,7 @@
          #:soft-break-proc soft-break?
          #:finish-wrap-proc (λ (pcs) (list (apply slug pcs)))))
 
-#;(module+ test
+(module+ test
   (test-case
    "hard breaks and spurious spaces with slugs"
    (check-equal? (linewrap2 (list a sp sp sp br b) 2) (list (slug a) 'lb (slug b)))

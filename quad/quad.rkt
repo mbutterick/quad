@@ -43,7 +43,7 @@
               printable
               pre-draw
               post-draw
-              draw) #:mutable
+              draw) #:mutable #:transparent
   #:methods gen:equal+hash
   [(define equal-proc quad=?)
    (define (hash-proc h recur) (equal-hash-code h))
