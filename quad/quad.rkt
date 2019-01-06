@@ -43,7 +43,7 @@
               printable
               pre-draw
               post-draw
-              draw) #:mutable #:transparent
+              draw)
   #:methods gen:equal+hash
   [(define equal-proc quad=?)
    (define (hash-proc h recur) (equal-hash-code h))
@@ -105,5 +105,6 @@
   (check-true (equal? q1 q1))
   (check-true (equal? q1 q2))
   (check-false (equal? q1 q3))
-  (set-quad-draw! q1 (λ (q surface) "foo"))
-  (check-equal? (draw q1) "foo"))
+  (define q4 (struct-copy quad q1
+                          [draw (λ (q surface) "foo")]))
+  (check-equal? (draw q4) "foo"))

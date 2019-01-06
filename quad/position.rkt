@@ -1,5 +1,5 @@
 #lang debug br
-(require racket/contract "quad.rkt" fontland)
+(require "quad.rkt" "param.rkt" fontland)
 (provide (all-defined-out))
 
 (define pt-x first)
@@ -7,40 +7,31 @@
 (define (pt x y) (list x y))
 (define (pt+ . pts) (apply map + pts))
 (define (pt- . pts) (apply map - pts))
-(define point? (list/c number? number?))
 
 (define valid-anchors '(nw n ne w c e sw s se bi bo))
-
-(define (valid-anchor? anchor)
-  (and (memq anchor valid-anchors) #t))
-
-(define (random-anchor)
-  (list-ref valid-anchors (random (length valid-anchors))))
 
 (define (coerce-int x) (if (integer? x) (inexact->exact x) x))
 
 (define font-cache (make-hash))
-(define (get-font p)
-  (hash-ref! font-cache p (λ () (open-font p))))
+(define (get-font font-name)
+  (hash-ref! font-cache font-name (λ () (open-font font-name))))
 
 (define ascender-cache (make-hash))
 (define (ascender q)
-  (define p (hash-ref (quad-attrs q) 'font "Courier"))
-  (unless p
+  (define font-key-val (hash-ref (quad-attrs q) 'font "Courier"))
+  (unless font-key-val
     (error 'ascender-no-font-key))
-  (hash-ref! ascender-cache p (λ () (font-ascent (get-font p)))))
+  (hash-ref! ascender-cache font-key-val (λ () (font-ascent (get-font font-key-val)))))
 
 (define units-cache (make-hash))
 (define (units-per-em q)
-  (define p (hash-ref (quad-attrs q) 'font "Courier"))
-  (unless p
+  (define font-key-val (hash-ref (quad-attrs q) 'font "Courier"))
+  (unless font-key-val
     (error 'units-per-em-no-font-key))
-  (hash-ref! units-cache p (λ () (font-units-per-em (get-font p)))))
+  (hash-ref! units-cache font-key-val (λ () (font-units-per-em (get-font font-key-val)))))
 
 (define (fontsize q)
-  ;; this needs to not default to 0
-  ;; needs parameter with default font size
-  (define val (hash-ref (quad-attrs q) 'fontsize (λ () (error 'no-font-size))))
+  (define val (hash-ref (quad-attrs q) 'fontsize current-default-font-size))
   ((if (number? val) values string->number) val))
 
 (define (vertical-baseline-offset q)
@@ -48,14 +39,13 @@
 
 (define (anchor->local-point q anchor)
   ;; calculate the location of the anchor on the bounding box relative to '(0 0) (aka "locally")
-  (unless (valid-anchor? anchor)
-    (raise-argument-error 'relative-anchor-pt "valid anchor" anchor))
   (match-define (list x-fac y-fac)
     (case anchor
       [(nw) '(0 0  )] [(n) '(0.5 0  )] [(ne) '(1 0  )]
       [( w) '(0 0.5)] [(c) '(0.5 0.5)] [( e) '(1 0.5)]
       [(sw) '(0 1  )] [(s) '(0.5 1  )] [(se) '(1 1  )]
-      [(bi) '(0 0  )]                  [(bo) '(1 0  )]))
+      [(bi) '(0 0  )]                  [(bo) '(1 0  )]
+      [else (raise-argument-error 'anchor->local-point (format "anchor value in ~v" valid-anchors) anchor)]))
   (match-define (list x y) (size q))
   (pt (coerce-int (* x x-fac))
       (coerce-int (+ (* y y-fac) (if (memq anchor '(bi bo)) (vertical-baseline-offset q) 0)))))
@@ -78,17 +68,18 @@
   ;; don't include offset, so location is on bounding box
   (pt+ (quad-origin q) (anchor->local-point q (quad-out q))))
 
-(define (position q [previous-end-pt #f])
+(define (position q [previous-end-pt (pt 0 0)])
   ;; recursively calculates coordinates for quad & subquads
   ;; based on starting origin point
-  (set-quad-origin! q (if previous-end-pt
-                          (pt- previous-end-pt (in-point q))
-                          (in-point q)))
-  (for/fold ([pt (inner-point q)]
-             #:result q)
-            ([q (in-list (quad-elems q))]
-             #:when (quad? q))
-    (out-point (position q pt))))
+  (define new-origin (pt- previous-end-pt (in-point q)))
+  (let ([q (struct-copy quad q [origin new-origin])])
+    (let loop ([pt (inner-point q)] [acc null] [elems (quad-elems q)])
+      (match elems
+        [(== empty) (struct-copy quad q [elems (reverse acc)])]
+        [(cons (? quad? q) rest)
+         (define new-q (position q pt))
+         (loop (out-point new-q) (cons new-q acc) rest)]
+        [(cons x rest) (loop pt (cons x acc) rest)]))))
 
 (module+ test
   (require rackunit)
