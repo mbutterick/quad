@@ -84,11 +84,11 @@
   (set-quad-origin! q (if previous-end-pt
                           (pt- previous-end-pt (in-point q))
                           (in-point q)))
-  (for/fold ([pt (inner-point q)])
+  (for/fold ([pt (inner-point q)]
+             #:result q)
             ([q (in-list (quad-elems q))]
              #:when (quad? q))
-    (out-point (position q pt)))
-  q)
+    (out-point (position q pt))))
 
 (module+ test
   (require rackunit)
