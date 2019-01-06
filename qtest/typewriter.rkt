@@ -104,7 +104,6 @@
 (define consolidate-into-runs? #t)
 (define (line-wrap xs size [debug #f])
   (break xs size debug
-         #:break-val (make-break #\newline)
          #:soft-break-proc soft-break?
          #:finish-wrap-proc (λ (pcs) (list (struct-copy quad $line
                                                   [elems
@@ -118,11 +117,8 @@
 
 (define (page-wrap xs size [debug #f])
   (break xs size debug
-         #:break-before? #t
-         #:break-val (q #:type $break)
-         #:soft-break-proc $break?
          #:finish-wrap-proc (λ (pcs) (list (struct-copy quad $page
-                                                  [elems (filter-not $break? pcs)])))))
+                                                  [elems pcs])))))
 
 (define (typeset pdf qarg)
   (define chars 65)
