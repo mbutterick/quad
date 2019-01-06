@@ -7,22 +7,13 @@
     [(_ EXPR ...) (with-syntax ([debug (datum->syntax stx 'debug)])
                     #'(when debug (report EXPR ...)))]))
 
-(define distance-cache (make-hasheq))
 (define (distance q)
-  (hash-ref! distance-cache (cond
-                              [(quad? q)
-                               (hash-ref (quad-attrs q) 'id q)]
-                              [(symbol? q) q])
-             (λ ()
-               (cond
-                 [(quad? q)
-                  (match-define (list ∆x ∆y) (map - (out-point q) (in-point q)))
-                  (cond
-                    [(zero? ∆x) ∆y]
-                    [(zero? ∆y) ∆x]
-                    [else (sqrt (+ (* ∆x ∆x) (* ∆y ∆y)))])]
-                 [else 0]))))
-
+  (if (quad? q)
+      (match (pt- (out-point q) (in-point q))
+        [(list (? zero?) ∆y) ∆y]
+        [(list ∆x (? zero?)) ∆x]
+        [(list ∆x ∆y) (sqrt (+ (* ∆x ∆x) (* ∆y ∆y)))])
+      0))
 
 (define+provide/contract (break xs
                                 [target-size (current-wrap-distance)]
