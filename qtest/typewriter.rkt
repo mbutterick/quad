@@ -54,13 +54,13 @@
                        (define str (car (quad-elems q)))
                        (font-size doc fontsize)
                        (font doc (path->string charter))
-                       (list
+                       (pt
                         (string-width doc str)
                         (current-line-height doc)))]))
 
 (define line-height 16)
 (define $line (q #:attrs (hasheq 'type "line")
-                 #:size (list +inf.0 line-height)
+                 #:size (pt +inf.0 line-height)
                  #:out 'sw
                  #:printable #true))
 (define $page (q #:attrs (hasheq 'type "page")
@@ -95,7 +95,7 @@
                                  [attrs (quad-attrs (car pcs))]
                                  [elems (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
                                                                                         (quad-elems pc))))]
-                                 [size (delay (list (for/sum ([pc (in-list run-pcs)])
+                                 [size (delay (pt (for/sum ([pc (in-list run-pcs)])
                                                              (pt-x (size pc)))
                                                     (pt-y (size (car pcs)))))]))
     (values (cons new-run runs) rest)))

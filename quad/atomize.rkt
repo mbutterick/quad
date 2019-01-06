@@ -104,13 +104,13 @@
 (define (runify qx)
   ;; runify a quad by reducing it to a series of "runs",
   ;; which are multi-character quads with the same formatting.
-  (define first-key (eq-hash-code (current-default-attrs)))
+  (define first-run-idx (eq-hash-code (current-default-attrs)))
   (define first-attrs (hash-copy (current-default-attrs)))
-  (hash-set! first-attrs 'idx first-key)
+  (hash-set! first-attrs run-key first-run-idx)
   (dropf
    (let loop ([x (if (string? qx) (make-quad #f (list qx)) qx)]
               [attrs first-attrs]
-              [key first-key])
+              [key first-run-idx])
      (match x
        [(? quad?) ;; qexprs with attributes are recursed
         (define this-attrs (quad-attrs x))
