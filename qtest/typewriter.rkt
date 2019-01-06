@@ -38,12 +38,12 @@
                                  [(hash-has-key? (quad-attrs q) 'link)
                                   (save doc)
                                   (fill-color doc "blue")
-                                  (text doc str (first  (quad-origin q)) (second (quad-origin q)) (hasheq 'link (hash-ref (quad-attrs q) 'link)))
+                                  (text doc str (pt-x (quad-origin q)) (pt-y (quad-origin q)) (hasheq 'link (hash-ref (quad-attrs q) 'link)))
                                   (restore doc)]
                                  [else
                                   #;(println str)
                                   (void)
-                                  (apply text doc str (quad-origin q))])))))
+                                  (text doc str (pt-x (quad-origin q)) (pt-y (quad-origin q)))])))))
   
 (define (quadify doc q)
   (struct-copy quad $textish
@@ -54,17 +54,17 @@
                        (define str (car (quad-elems q)))
                        (font-size doc fontsize)
                        (font doc (path->string charter))
-                       (list
+                       (pt
                         (string-width doc str)
                         (current-line-height doc)))]))
 
 (define line-height 16)
 (define $line (q #:attrs (hasheq 'type "line")
-                 #:size (list +inf.0 line-height)
+                 #:size (pt +inf.0 line-height)
                  #:out 'sw
                  #:printable #true))
 (define $page (q #:attrs (hasheq 'type "page")
-                 #:offset '(36 36)
+                 #:offset (pt 36 36)
                  #:pre-draw (λ (q doc)
                               (add-page doc)
                               (font-size doc 10)
@@ -81,7 +81,7 @@
 (define page-count 1)
 (define (make-break . xs) (q #:type $break
                              #:printable #f
-                             #:size '(0 0)
+                             #:size (pt 0 0)
                              #:elems xs))
 
 (define (consolidate-runs pcs)
@@ -95,7 +95,7 @@
                                  [attrs (quad-attrs (car pcs))]
                                  [elems (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
                                                                                         (quad-elems pc))))]
-                                 [size (delay (list (for/sum ([pc (in-list run-pcs)])
+                                 [size (delay (pt (for/sum ([pc (in-list run-pcs)])
                                                              (pt-x (size pc)))
                                                     (pt-y (size (car pcs)))))]))
     (values (cons new-run runs) rest)))

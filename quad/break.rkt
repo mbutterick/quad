@@ -16,7 +16,7 @@
              (λ ()
                (cond
                  [(quad? q)
-                  (match-define (list ∆x ∆y) (map - (out-point q) (in-point q)))
+                  (match-define (cons ∆x ∆y) (pt- (out-point q) (in-point q)))
                   (cond
                     [(zero? ∆x) ∆y]
                     [(zero? ∆y) ∆x]
