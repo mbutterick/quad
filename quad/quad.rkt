@@ -3,10 +3,6 @@
 (provide (all-defined-out))
 (module+ test (require rackunit))
 
-(define pt-x car)
-(define pt-y cdr)
-(define pt cons)
-
 (define (size q)
   (match (quad-size q)
     [(? procedure? proc) (proc q)]
@@ -61,7 +57,7 @@
   ((quad-post-draw q) q surface))
 
 ;; why 'nw and 'ne as defaults for in and out points:
-;; if size is (pt 0 0), 'nw and 'ne are the same point,
+;; if size is '(0 0), 'nw and 'ne are the same point,
 ;; and everything piles up at the origin
 ;; if size is otherwise, the items don't pile up (but rather lay out in a row)
 
@@ -71,12 +67,12 @@
          #:type [type quad]
          #:attrs [attrs (make-hasheq)]
          #:elems [elems null]
-         #:size [size (pt 0 0)]
+         #:size [size '(0 0)]
          #:in [in 'nw]
          #:out [out 'ne]
          #:inner [inner #f]
-         #:offset [offset (pt 0 0)]
-         #:origin [origin (pt 0 0)]
+         #:offset [offset '(0 0)]
+         #:origin [origin '(0 0)]
          #:printable [printable default-printable]
          #:pre-draw [pre-draw void]
          #:post-draw [post-draw void]
