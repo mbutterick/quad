@@ -8,12 +8,10 @@
                     #'(when debug (report EXPR ...)))]))
 
 (define (distance q)
-  (if (quad? q)
-      (match (pt- (out-point q) (in-point q))
-        [(list (? zero?) ∆y) ∆y]
-        [(list ∆x (? zero?)) ∆x]
-        [(list ∆x ∆y) (sqrt (+ (* ∆x ∆x) (* ∆y ∆y)))])
-      0))
+  (match (pt- (out-point q) (in-point q))
+    [(list (? zero?) ∆y) ∆y]
+    [(list ∆x (? zero?)) ∆x]
+    [(list ∆x ∆y) (sqrt (+ (* ∆x ∆x) (* ∆y ∆y)))]))
 
 (provide break)
 (define (break xs
@@ -92,7 +90,7 @@
        (debug-report q 'next-q)
        (debug-report (quad-elems q) 'next-q-elems)
        (define at-start? (not current-dist))
-       (define dist (if (and (quad? q) (printable? q)) (distance q) 0))
+       (define dist (if (printable? q) (distance q) 0))
        (define would-overflow? (and current-dist (> (+ dist current-dist) target-size)))
        (cond
          [at-start?
@@ -177,7 +175,7 @@
 (define br (struct-copy quad q-one
                         [printable (λ (q [sig #f]) #f)]
                         [elems '(#\newline)]))
-(define soft-break? (λ (q) (and (quad? q) (memv (car (quad-elems q)) '(#\space #\-)))))
+(define soft-break? (λ (q)  (memv (car (quad-elems q)) '(#\space #\-))))
 
 (define (linewrap xs size [debug #f])
   (break xs size debug
