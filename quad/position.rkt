@@ -81,6 +81,11 @@
          (loop (out-point new-q) (cons new-q acc) rest)]
         [(cons x rest) (loop pt (cons x acc) rest)]))))
 
+(define (distance q)
+  (match (pt- (out-point q) (in-point q))
+    [(list-no-order 0 val) val]
+    [(list ∆x ∆y) (sqrt (+ (expt ∆x 2) (expt ∆y 2)))]))
+
 (module+ test
   (require rackunit)
   (test-case
