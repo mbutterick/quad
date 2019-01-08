@@ -1,5 +1,5 @@
 #lang debug racket/base
-(require racket/struct racket/format racket/string racket/promise racket/dict racket/match)
+(require racket/struct racket/format racket/list racket/string racket/promise racket/dict racket/match)
 (provide (all-defined-out))
 (module+ test (require rackunit))
 
@@ -26,8 +26,8 @@
   (and
    ;; exclude attrs from initial comparison
    (for/and ([getter (in-list (list quad-elems quad-size quad-in quad-out quad-inner
-                              quad-offset quad-origin quad-printable
-                              quad-pre-draw quad-post-draw quad-draw))])
+                                    quad-offset quad-origin quad-printable
+                                    quad-pre-draw quad-post-draw quad-draw))])
      (equal? (getter q1) (getter q2)))
    ;; and compare them key-by-key
    (hashes-equal? (quad-attrs q1) (quad-attrs q2))))
@@ -44,8 +44,12 @@
               pre-draw
               post-draw
               draw)
-  #:property prop:custom-write (λ (v p w?) (display
-                                            (format "<quad ~a>" (string-join (map ~v (quad-elems v)) " ")) p))
+  #:property prop:custom-write
+  (λ (v p w?) (display
+               (format "<quad ~a~a>"
+                       (string-join (map ~v (flatten (hash->list (quad-attrs v))))
+                                    " " #:before-first "(" #:after-last ")")
+                       (string-join (map ~v (quad-elems v)) " " #:before-first " ")) p))
   #:methods gen:equal+hash
   [(define equal-proc quad=?)
    (define (hash-proc h recur) (equal-hash-code h))
