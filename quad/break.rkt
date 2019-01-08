@@ -28,8 +28,7 @@
   (let loop ([wraps null][qs qs])
     (match qs
       ;; ignore a trailing hard break
-      [(or (? null?) (list (? hard-break?)))
-       (append* (reverse wraps))]
+      [(or (? null?) (list (? hard-break?))) (append* (reverse wraps))]
       [(or (cons (? hard-break?) rest) rest)
        (define-values (head tail) (splitf-at rest (λ (x) (not (hard-break? x)))))
        ;; head will be empty (intentionally) if qs starts with two hard breaks
@@ -38,23 +37,20 @@
        (debug-report next-wrap)
        (loop (cons next-wrap wraps) tail)])))
 
-(define (nonprinting-at-start? x)
-  (not (printable? x 'start)))
-(define (nonprinting-at-end? x)
-  (not (printable? x 'end)))
-(define (nonprinting-in-middle-soft-break? x)
-  (and (not (printable? x)) (soft-break? x)))
+(define (nonprinting-at-start? x) (not (printable? x 'start)))
+(define (nonprinting-at-end? x) (not (printable? x 'end)))
+(define (nonprinting-soft-break-in-middle? x) (and (not (printable? x)) (soft-break? x)))
 
 (define (wrap-append partial wrap)
   ;; pieces will have been accumulated in reverse order
   ;; thus beginning of list represents the end of the wrap
-  (append partial (dropf wrap nonprinting-in-middle-soft-break?)))
+  (append partial (dropf wrap nonprinting-soft-break-in-middle?)))
 
 (define (break-softs qs
                      target-size
                      debug
                      soft-break?
-                     finish-wrap-proc)
+                     finish-wrap-proc) ; takes quads in wrap; returns list containing wrap (and maybe other things)
   (let loop ([wraps null] ; list of (list of quads)
              [next-wrap-head null] ; list of quads ending in previous `soft-break?`
              [next-wrap-tail null] ; list of unbreakable quads
@@ -62,8 +58,10 @@
              [qs qs]) ; list of quads
     (match qs
       [(== empty) (define last-wrap (wrap-append next-wrap-tail next-wrap-head))
-                  (append* (reverse
+                  (append* ; because `finish-wrap-proc` returns a spliceable list
+                   (reverse ; because wraps accumulated in reverse
                             (for/list ([wrap-qs (in-list (cons last-wrap wraps))])
+                              ;; reverse because quads accumulated in reverse
                               (finish-wrap-proc (reverse (dropf wrap-qs nonprinting-at-end?))))))]
       [(cons q other-qs)
        (debug-report q 'next-q)
@@ -128,34 +126,41 @@
                 (+ dist current-dist)
                 other-qs)])])))
 
-
 (define q-zero (q #:size (pt 0 0)))
+
 (define q-one (q #:size (pt 1 1) #:printable #t))
 
 (define x (struct-copy quad q-one [elems '(#\x)]))
+
 (define zwx (struct-copy quad q-zero
                          [printable (λ _ #t)]
                          [elems '(#\z)]))
+
 (define hyph (struct-copy quad q-one [elems '(#\-)]))
+
 (define shy (struct-copy quad q-one
                          [printable (λ (q [sig #f])
                                       (case sig
                                         [(end) #t]
                                         [else #f]))]
                          [elems '(#\-)]))
+
 (define a (struct-copy quad q-one [elems '(#\a)]))
 (define b (struct-copy quad q-one [elems '(#\b)]))
 (define c (struct-copy quad q-one [elems '(#\c)]))
 (define d (struct-copy quad q-one [elems '(#\d)]))
+
 (define sp (struct-copy quad q-one
                         [printable (λ (q [sig #f])
                                      (case sig
                                        [(start end) #f]
                                        [else #t]))]
                         [elems '(#\space)]))
+
 (define lbr (struct-copy quad q-one
                          [printable (λ _ #f)]
                          [elems '(#\newline)]))
+
 (define soft-break? (λ (q)  (memv (car (quad-elems q)) '(#\space #\-))))
 
 (define (linewrap xs size [debug #f])
@@ -168,7 +173,6 @@
   (require rackunit))
 
 (module+ test
-  (require rackunit)
   (test-case
    "chars"
    (check-equal? (linewrap (list) 1) (list))  
