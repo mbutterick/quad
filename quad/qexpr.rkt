@@ -59,7 +59,7 @@
   (quad? . -> . qexpr?)
   (let loop ([x q])
     (cond
-      [(quad? x) (apply qexpr #:name (quad-name x) #:clean-attrs? #t (hash->qattrs (send x attrs)) (map loop (send x elems)))]
+      [(quad? x) (apply qexpr #:name (quad-name x) #:clean-attrs? #t (hash->qattrs (quad-attrs x)) (map loop (quad-elems x)))]
       [else x])))
 
 (define/contract (qexpr->quad x)
