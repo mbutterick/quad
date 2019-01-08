@@ -27,11 +27,15 @@
 (define (break-hards qs target-size debug hard-break? soft-break? finish-wrap-proc)
   (let loop ([wraps null][qs qs])
     (match qs
-      [(? null?) (append* (reverse wraps))]
+      ;; ignore a trailing hard break
+      [(or (? null?) (list (? hard-break?)))
+       (append* (reverse wraps))]
       [(or (cons (? hard-break?) rest) rest)
        (define-values (head tail) (splitf-at rest (λ (x) (not (hard-break? x)))))
        ;; head will be empty (intentionally) if qs starts with two hard breaks
+       ;; because there should be a blank wrap in between
        (define next-wrap (break-softs head target-size debug soft-break? finish-wrap-proc))
+       (debug-report next-wrap)
        (loop (cons next-wrap wraps) tail)])))
 
 (define (nonprinting-at-start? x)
@@ -129,7 +133,9 @@
 (define q-one (q #:size (pt 1 1) #:printable #t))
 
 (define x (struct-copy quad q-one [elems '(#\x)]))
-(define zwx (struct-copy quad q-zero [elems '(#\z)]))
+(define zwx (struct-copy quad q-zero
+                         [printable (λ _ #t)]
+                         [elems '(#\z)]))
 (define hyph (struct-copy quad q-one [elems '(#\-)]))
 (define shy (struct-copy quad q-one
                          [printable (λ (q [sig #f])
@@ -147,16 +153,16 @@
                                        [(start end) #f]
                                        [else #t]))]
                         [elems '(#\space)]))
-(define br (struct-copy quad q-one
-                        [printable (λ (q [sig #f]) #f)]
-                        [elems '(#\newline)]))
+(define lbr (struct-copy quad q-one
+                         [printable (λ _ #f)]
+                         [elems '(#\newline)]))
 (define soft-break? (λ (q)  (memv (car (quad-elems q)) '(#\space #\-))))
 
 (define (linewrap xs size [debug #f])
-  (break xs size debug
-         #:finish-wrap-proc (λ (xs) (list (length xs)))
-         #:hard-break-proc (λ (q) (char=? (car (quad-elems q)) #\newline))
-         #:soft-break-proc soft-break?))
+  (add-between (break xs size debug
+                      #:finish-wrap-proc list
+                      #:hard-break-proc (λ (q) (char=? (car (quad-elems q)) #\newline))
+                      #:soft-break-proc soft-break?) lbr))
 
 (module+ test
   (require rackunit))
@@ -165,108 +171,109 @@
   (require rackunit)
   (test-case
    "chars"
-   (check-equal? (linewrap (list) 1) null)  
-   (check-equal? (linewrap (list a) 1) '(1))
-   (check-equal? (linewrap (list a b) 1) '(1 1))
-   (check-equal? (linewrap (list a b c) 1) '(1 1 1))
-   (check-equal? (linewrap (list a b c) 2) '(2 1))
-   (check-equal? (linewrap (list x x x x) 2) '(2 2))
-   (check-equal? (linewrap (list x x x x x) 3) '(3 2))
-   (check-equal? (linewrap (list x x x x x) 1) '(1 1 1 1 1))
-   (check-equal? (linewrap (list x x x x x) 10)  '(5))))
+   (check-equal? (linewrap (list) 1) (list))  
+   (check-equal? (linewrap (list a) 1) (list (list a)))
+   (check-equal? (linewrap (list a b) 1) (list (list a) lbr (list b)))
+   (check-equal? (linewrap (list a b c) 1) (list (list a) lbr (list b) lbr (list c)))
+   (check-equal? (linewrap (list a b c) 2) (list (list a b) lbr (list c)))
+   (check-equal? (linewrap (list x x x x) 2) (list (list x x) lbr (list x x)))
+   (check-equal? (linewrap (list x x x x x) 3) (list (list x x x) lbr (list x x)))
+   (check-equal? (linewrap (list x x x x x) 1)
+                 (list (list x) lbr (list x) lbr (list x) lbr (list x) lbr (list x)))
+   (check-equal? (linewrap (list x x x x x) 10) (list (list x x x x x)))))
 
 (module+ test
   (test-case
    "chars and spaces"
-   (check-equal? (linewrap (list a sp b) 1) '(1 1))
-   (check-equal? (linewrap (list a b sp c) 2) '(2 1))
-   (check-equal? (linewrap (list a sp b) 3) '(3))
-   (check-equal? (linewrap (list a sp b c) 3) '(1 2))))
+   (check-equal? (linewrap (list a sp b) 1) (list (list a) lbr (list b)))
+   (check-equal? (linewrap (list a b sp c) 2) (list (list a b) lbr (list c)))
+   (check-equal? (linewrap (list a sp b) 3) (list (list a sp b)))
+   (check-equal? (linewrap (list a sp b c) 3) (list (list a) lbr (list b c)))))
 
 (module+ test
   (test-case
    "leading & trailing spaces"
-   (check-equal? (linewrap (list sp x) 2) '(1))
-   (check-equal? (linewrap (list x sp) 2) '(1))
-   (check-equal? (linewrap (list sp x sp) 2) '(1))
-   (check-equal? (linewrap (list sp sp x sp sp) 2) '(1))
-   (check-equal? (linewrap (list sp sp x sp sp x sp) 1) '(1 1))))
+   (check-equal? (linewrap (list sp x) 2) (list (list x)))
+   (check-equal? (linewrap (list x sp) 2) (list (list x)))
+   (check-equal? (linewrap (list sp x sp) 2) (list (list x)))
+   (check-equal? (linewrap (list sp sp x sp sp) 2) (list (list x)))
+   (check-equal? (linewrap (list sp sp x sp sp x sp) 1) (list (list x) lbr (list x)))))
 
 (module+ test
   (test-case
    "hard hyphens"
-   (check-equal? (linewrap (list hyph) 1) '(1))
-   (check-equal? (linewrap (list hyph hyph) 1) '(1 1))
-   (check-equal? (linewrap (list hyph hyph) 2) '(2))
-   (check-equal? (linewrap (list hyph hyph hyph) 2) '(2 1))
-   (check-equal? (linewrap (list x hyph) 1) '(1 1))
-   (check-equal? (linewrap (list a b hyph c d) 1) '(1 1 1 1 1))
-   (check-equal? (linewrap (list a b hyph c d) 2) '(2 2 1))
-   (check-equal? (linewrap (list a b hyph c d) 3) '(3 2))
-   (check-equal? (linewrap (list x x hyph x x) 4) '(3 2))
-   (check-equal? (linewrap (list x x hyph x x) 5) '(5))))
+   (check-equal? (linewrap (list hyph) 1) (list (list hyph)))
+   (check-equal? (linewrap (list hyph hyph) 1) (list (list hyph) lbr (list hyph)))
+   (check-equal? (linewrap (list hyph hyph) 2) (list (list hyph hyph)))
+   (check-equal? (linewrap (list hyph hyph hyph) 2) (list (list hyph hyph) lbr (list hyph)))
+   (check-equal? (linewrap (list x hyph) 1) (list (list x) lbr (list hyph)))
+   (check-equal? (linewrap (list a b hyph c d) 1)
+                 (list (list a) lbr (list b) lbr (list hyph) lbr (list c) lbr (list d)))
+   (check-equal? (linewrap (list a b hyph c d) 2) (list (list a b) lbr (list hyph c) lbr (list d)))
+   (check-equal? (linewrap (list a b hyph c d) 3) (list (list a b hyph) lbr (list c d)))
+   (check-equal? (linewrap (list x x hyph x x) 4) (list (list x x hyph) lbr (list x x)))
+   (check-equal? (linewrap (list x x hyph x x) 5) (list (list x x hyph x x)))))
 
 (module+ test
   (test-case
    "soft hyphens"
-   (check-equal? (linewrap (list shy) 1) '(0))
-   (check-equal? (linewrap (list shy shy) 2) '(0))
-   (check-equal? (linewrap (list shy shy shy) 2) '(0))
-   (check-equal? (linewrap (list x shy) 1) '(1))
-   (check-equal? (linewrap (list x shy shy shy shy) 1) '(1))
+   (check-equal? (linewrap (list shy) 1) (list (list)))
+   (check-equal? (linewrap (list shy shy) 2) (list (list)))
+   (check-equal? (linewrap (list shy shy shy) 2) (list (list)))
+   (check-equal? (linewrap (list x shy) 1) (list (list x)))
+   (check-equal? (linewrap (list x shy shy shy shy) 1) (list (list x)))
    ;; todo: degenerate cases that don't work without continuations
-   ;(check-equal? (linewrap (list x x shy x x) 1) (list x 'lb x 'lb x 'lb x))
-   ;(check-equal? (linewrap (list x x shy x x) 2) (list x x 'lb x x))
-   (check-equal? (linewrap (list x x shy x x) 3) '(3 2))
-   (check-equal? (linewrap (list x x shy x x) 4) '(4))
-   (check-equal? (linewrap (list x x shy x x) 5) '(4))
-   (check-equal? (linewrap (list x x shy x sp x) 4) '(3 1))))
+   ;(check-equal? (linewrap (list x x shy x x) 1) (list x br x br x br x))
+   ;(check-equal? (linewrap (list x x shy x x) 2) (list x x br x x))
+   (check-equal? (linewrap (list x x shy x x) 3) (list (list x x shy) lbr (list x x)))
+   (check-equal? (linewrap (list x x shy x x) 4) (list (list x x x x)))
+   (check-equal? (linewrap (list x x shy x x) 5) (list (list x x x x)))
+   (check-equal? (linewrap (list x x shy x sp x) 4) (list (list x x x) lbr (list x)))))
 
-#|
 (module+ test
   (test-case
    "zero width nonbreakers"
-   ;; todo: fix
-   (check-equal? (linewrap (list sp zwx) 2) '(1))
-   (check-equal? (linewrap (list zwx sp) 2) '(1))
-   (check-equal? (linewrap (list sp zwx sp) 2) '(1))
-   (check-equal? (linewrap (list sp sp zwx sp sp) 2) '(1))
-   (check-equal? (linewrap (list sp sp zwx sp sp zwx sp) 2) '(4))))
-
+   (check-equal? (linewrap (list sp zwx) 2) (list (list zwx)))
+   (check-equal? (linewrap (list zwx sp) 2) (list (list zwx)))
+   (check-equal? (linewrap (list sp zwx sp) 2) (list (list zwx)))
+   (check-equal? (linewrap (list sp sp zwx sp sp) 2) (list (list zwx)))
+   (check-equal? (linewrap (list sp sp zwx sp sp zwx sp) 2) (list (list zwx sp sp zwx)))))
 
 (module+ test
   (test-case
    "hard breaks"
-   (check-equal? (linewrap (list br) 2) (list)) ;; only insert a break if it's between things
-   (check-equal? (linewrap (list a br b) 2) (list (list a) (list b)))
-   (check-equal? (linewrap (list a b br) 2) (list (list a b)))
-   (check-equal? (linewrap (list a b br br) 2) (list (list a b)))
-   (check-equal? (linewrap (list x br x x) 3) (list (list x) (list x x)))
-   (check-equal? (linewrap (list x x br x) 3) (list (list x x) (list x)))
-   (check-equal? (linewrap (list x x x x) 3) (list (list x x x) (list x)))
-   (check-equal? (linewrap (list x x x sp x x) 2) (list (list x x) (list x) (list x x)))
-   (check-equal? (linewrap (list x x x sp x x) 3) (list (list x x x) (list x x)))))
+   (check-equal? (linewrap (list lbr) 2) (list)) ;; only insert a break if it's between things
+   (check-equal? (linewrap (list a lbr b) 2) (list (list a) lbr (list b)))
+   (check-equal? (linewrap (list a b lbr) 2) (list (list a b)))
+   (check-equal? (linewrap (list a b lbr lbr) 2) (list (list a b) lbr (list)))
+   (check-equal? (linewrap (list x lbr x x) 3) (list (list x) lbr (list x x)))
+   (check-equal? (linewrap (list x x lbr x) 3) (list (list x x) lbr (list x)))
+   (check-equal? (linewrap (list x x x x) 3) (list (list x x x) lbr (list x)))
+   (check-equal? (linewrap (list x x x sp x x) 2) (list (list x x) lbr (list x) lbr (list x x)))
+   (check-equal? (linewrap (list x x x sp x x) 3) (list (list x x x) lbr (list x x)))))
 
 (module+ test
   (test-case
    "hard breaks and spurious spaces"
-   (check-equal? (linewrap (list a sp sp sp br b) 2) (list (list a) (list b)))
-   (check-equal? (linewrap (list x sp br sp sp x x sp) 3) (list (list x) (list x x)))
-   (check-equal? (linewrap (list sp sp x x sp sp br sp sp sp x) 3) (list (list x x) (list x)))
-   (check-equal? (linewrap (list a sp b sp sp br sp c) 3) (list (list a sp b) (list c)))
-   (check-equal? (linewrap (list x x x x) 3) (list (list x x x) (list x)))
-   (check-equal? (linewrap (list x x x sp x x) 2) (list (list x x) (list x) (list x x)))
-   (check-equal? (linewrap (list x x x sp x x) 3) (list (list x x x) (list x x)))))
+   (check-equal? (linewrap (list a sp sp sp lbr b) 2) (list (list a) lbr (list b)))
+   (check-equal? (linewrap (list x sp lbr sp sp x x sp) 3) (list (list x) lbr (list x x)))
+   (check-equal? (linewrap (list sp sp x x sp sp lbr sp sp sp x) 3) (list (list x x) lbr (list x)))
+   (check-equal? (linewrap (list a sp b sp sp lbr sp c) 3) (list (list a sp b) lbr (list c)))
+   (check-equal? (linewrap (list x x x x) 3) (list (list x x x) lbr (list x)))
+   (check-equal? (linewrap (list x x x sp x x) 2) (list (list x x) lbr (list x) lbr (list x x)))
+   (check-equal? (linewrap (list x x x sp x x) 3) (list (list x x x) lbr (list x x)))))
 
 (define (visual-wrap str int [debug #f])
   (string-join
-   (for/list ([qs (in-list (linewrap (for/list ([atom (atomize str)])
-                                       (if (equal? (quad-elems atom) '(#\space))
-                                           (struct-copy quad sp)
-                                           (struct-copy quad q-one
-                                                        [attrs (quad-attrs atom)]
-                                                        [elems (quad-elems atom)]))) int debug))])
-     (list->string (map (λ (q) (car (quad-elems q))) qs))) "|"))
+   (for/list ([x (in-list (linewrap (for/list ([atom (atomize str)])
+                                      (if (equal? (quad-elems atom) '(#\space))
+                                          (struct-copy quad sp)
+                                          (struct-copy quad q-one
+                                                       [attrs (quad-attrs atom)]
+                                                       [elems (quad-elems atom)]))) int debug))]
+              #:when (and (list? x) (andmap quad? x)))
+     (list->string (map car (map quad-elems x))))
+   "|"))
 
 (module+ test
   (test-case
@@ -289,9 +296,10 @@
    (check-equal? (visual-wrap "My dog has fleas" 16) "My dog has fleas")))
 
 (define (pagewrap xs size [debug #f])
-  (break xs size debug
-         #:hard-break-proc (λ (x) (and (quad? x) (memv (car (quad-elems x)) '(#\page))))
-         #:soft-break-proc (λ (x) (eq? x 'lb))))
+  (add-between
+   (break (flatten xs) size debug
+          #:hard-break-proc (λ (x) (and (quad? x) (memv (car (quad-elems x)) '(#\page))))
+          #:soft-break-proc (λ (x) (and (quad? x) (eq? x lbr)))) pbr))
 (define pbr (q #:size #false #:elems '(#\page)))
 
 (module+ test
@@ -301,51 +309,45 @@
    (check-equal? (pagewrap null 2) (list))
    (check-equal? (pagewrap (list x) 2) (list (list x)))
    (check-equal? (pagewrap (list x x) 2) (list (list x x)))
-   (check-equal? (pagewrap (list x x x) 1) (list (list x) (list x) (list x)))
-   (check-equal? (pagewrap (list x x x) 2) (list (list x x) (list x)))
+   (check-equal? (pagewrap (list x x x) 1) (list (list x) pbr (list x) pbr (list x)))
+   (check-equal? (pagewrap (list x x x) 2) (list (list x x) pbr (list x)))
    (check-equal? (pagewrap (list x x x) 3) (list (list x x x)))
    (check-equal? (pagewrap (list x x x) 4) (list (list x x x)))
-   (check-equal? (pagewrap (list x 'lb x x) 2) (list (list x) (list x x)))))
+   (check-equal? (pagewrap (list x lbr x x) 2) (list (list x) pbr (list x x)))))
 
 (module+ test
   (test-case
    "hard page breaks"
-   (check-equal? (pagewrap (list x pbr x x) 2) (list (list x) (list x x)))
-   (check-equal? (pagewrap (list x pbr x x) 1) (list (list x) (list x) (list x)))
-   ; todo: fix double breaks
-   #;(check-equal? (pagewrap (list x pbr pbr x x) 1) (list (list x) (list) (list x) (list x)))
-   #;(check-equal? (pagewrap (list x pbr pbr x x) 2) (list (list x) (list) (list x x)))
-   (check-equal? (pagewrap (list 'lb x 'lb 'lb pbr 'lb x x 'lb) 2) (list (list x) (list x x)))))
-
+   (check-equal? (pagewrap (list x pbr x x) 2) (list (list x) pbr (list x x)))
+   (check-equal? (pagewrap (list x pbr x x) 1) (list (list x) pbr (list x) pbr (list x)))
+   (check-equal? (pagewrap (list x pbr pbr x x) 1) (list (list x) pbr (list) pbr (list x) pbr (list x)))
+   (check-equal? (pagewrap (list x pbr pbr x x) 2) (list (list x) pbr (list) pbr (list x x)))
+   (check-equal? (pagewrap (list lbr x lbr lbr pbr lbr x x lbr) 2) (list (list x) pbr (list x x)))))
 
 (module+ test
   (test-case
    "composed line breaks and page breaks"
-   ; todo: fix empty test
-   #;(check-equal? (pagewrap (linewrap null 1) 2) (list (list (list))))
-   (check-equal? (pagewrap (linewrap (list x) 1) 2) (list (list (list x))))
-   (check-equal? (pagewrap (linewrap (list x x x) 1) 2) (list (list (list x) (list x)) (list (list x))))
-   (check-equal? (pagewrap (linewrap (list x x x) 2) 2) (list (list (list x x)) (list (list x))))
-   (check-equal? (pagewrap (linewrap (list x x x) 2) 1) (list (list (list x)) (list (list x)) (list (list x))))))
+   (check-equal? (pagewrap (linewrap null 1) 2) (list))
+   (check-equal? (pagewrap (linewrap (list x) 1) 2) (list (list x)))
+   (check-equal? (pagewrap (linewrap (list x x x) 1) 2) (list (list x lbr x) pbr (list x)))
+   (check-equal? (pagewrap (linewrap (list x x x) 2) 2) (list (list x x) pbr (list x)))
+   (check-equal? (pagewrap (linewrap (list x x x) 2) 1) (list (list x) pbr (list x) pbr (list x)))))
 
-
-(define (slug . xs) (q #:attrs (hasheq) #:elems xs))
 (define (linewrap2 xs size [debug #f])
-  (break xs size debug
-         #:break-val 'lb
-         #:hard-break-proc (λ (q) (and (quad? q) (memv (car (quad-elems q)) '(#\newline))))
-         #:soft-break-proc soft-break?
-         #:finish-wrap-proc (λ (pcs) (list (apply slug pcs)))))
+  (add-between
+   (break xs size debug
+          #:hard-break-proc (λ (q) (memv (car (quad-elems q)) '(#\newline)))
+          #:soft-break-proc soft-break?
+          #:finish-wrap-proc (λ (pcs) (list (apply q pcs))))
+   lbr))
 
 (module+ test
   (test-case
    "hard breaks and spurious spaces with slugs"
-   (check-equal? (linewrap2 (list a sp sp sp br b) 2) (list (slug a) 'lb (slug b)))
-   (check-equal? (linewrap2 (list x sp br sp sp x x sp) 3) (list (slug x) 'lb (slug x x)))
-   (check-equal? (linewrap2 (list sp sp x x sp sp br sp sp sp x) 3) (list (slug x x) 'lb (slug x)))
-   (check-equal? (linewrap2 (list a sp b sp sp br sp c) 3) (list (slug a sp b) 'lb (slug c)))
-   (check-equal? (linewrap2 (list x x x x) 3) (list (slug x x x) 'lb (slug x)))
-   (check-equal? (linewrap2 (list x x x sp x x) 2) (list (slug x x) 'lb (slug x) 'lb (slug x x)))
-   (check-equal? (linewrap2 (list x x x sp x x) 3) (list (slug x x x) 'lb (slug x x)))))
-
-|#
+   (check-equal? (linewrap2 (list a sp sp sp lbr b) 2) (list (q a) lbr (q b)))
+   (check-equal? (linewrap2 (list x sp lbr sp sp x x sp) 3) (list (q x) lbr (q x x)))
+   (check-equal? (linewrap2 (list sp sp x x sp sp lbr sp sp sp x) 3) (list (q x x) lbr (q x)))
+   (check-equal? (linewrap2 (list a sp b sp sp lbr sp c) 3) (list (q a sp b) lbr (q c)))
+   (check-equal? (linewrap2 (list x x x x) 3) (list (q x x x) lbr (q x)))
+   (check-equal? (linewrap2 (list x x x sp x x) 2) (list (q x x) lbr (q x) lbr (q x x)))
+   (check-equal? (linewrap2 (list x x x sp x x) 3) (list (q x x x) lbr (q x x)))))

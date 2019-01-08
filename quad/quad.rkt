@@ -1,5 +1,5 @@
 #lang debug racket/base
-(require racket/struct racket/promise racket/dict racket/match)
+(require racket/struct racket/format racket/string racket/promise racket/dict racket/match)
 (provide (all-defined-out))
 (module+ test (require rackunit))
 
@@ -44,6 +44,8 @@
               pre-draw
               post-draw
               draw)
+  #:property prop:custom-write (λ (v p w?) (display
+                                            (format "<quad ~a>" (string-join (map ~v (quad-elems v)) " ")) p))
   #:methods gen:equal+hash
   [(define equal-proc quad=?)
    (define (hash-proc h recur) (equal-hash-code h))
