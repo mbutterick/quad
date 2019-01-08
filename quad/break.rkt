@@ -17,8 +17,8 @@
   #;((listof quad?)
      (real?
       any/c
-      #:hard-break-proc (any/c . -> . any/c)
-      #:soft-break-proc (any/c . -> . any/c)
+      #:hard-break-proc (quad? . -> . any/c)
+      #:soft-break-proc (quad? . -> . any/c)
       #:finish-wrap-proc ((listof any/c) . -> . (listof any/c))) . ->* . (listof any/c))
   (break-hards xs target-size debug hard-break? soft-break? finish-wrap-proc))
 
@@ -60,15 +60,13 @@
       [(== empty) (define last-wrap (wrap-append next-wrap-tail next-wrap-head))
                   (append* ; because `finish-wrap-proc` returns a spliceable list
                    (reverse ; because wraps accumulated in reverse
-                            (for/list ([wrap-qs (in-list (cons last-wrap wraps))])
-                              ;; reverse because quads accumulated in reverse
-                              (finish-wrap-proc (reverse (dropf wrap-qs nonprinting-at-end?))))))]
+                    (for/list ([wrap-qs (in-list (cons last-wrap wraps))])
+                      ;; reverse because quads accumulated in reverse
+                      (finish-wrap-proc (reverse (dropf wrap-qs nonprinting-at-end?))))))]
       [(cons q other-qs)
        (debug-report q 'next-q)
        (debug-report (quad-elems q) 'next-q-elems)
        (define at-start? (not current-dist))
-       (define dist (if (printable? q) (distance q) 0))
-       (define would-overflow? (and current-dist (> (+ dist current-dist) target-size)))
        (cond
          [at-start?
           (match q
@@ -85,46 +83,50 @@
                      (list q)
                      (distance q)
                      other-qs)])]
-         [would-overflow?
-          (match q
-            [(and (? soft-break?) (? nonprinting-at-end?))
-             (debug-report 'would-overflow-soft-nonprinting)
-             ;; a break is inevitable but we want to wait to finish the wrap until we see a hard quad
-             ;; but we can move the current-partial into the current-wrap
+         [else ; cases that require computing distance
+          (define dist (if (printable? q) (distance q) 0))
+          (define would-overflow? (and current-dist (> (+ dist current-dist) target-size)))
+          (cond
+            [would-overflow?
+             (match q
+               [(and (? soft-break?) (? nonprinting-at-end?))
+                (debug-report 'would-overflow-soft-nonprinting)
+                ;; a break is inevitable but we want to wait to finish the wrap until we see a hard quad
+                ;; but we can move the current-partial into the current-wrap
+                (loop wraps
+                      (wrap-append (cons q next-wrap-tail) next-wrap-head)
+                      null
+                      (+ dist current-dist)
+                      other-qs)]
+               [_ #:when (empty? next-wrap-head)
+                  (debug-report 'would-overflow-hard-without-captured-break)
+                  (loop (cons next-wrap-tail wraps)
+                        null
+                        null
+                        #false
+                        qs)]
+               [_ ; finish the wrap & reset the line without consuming a quad
+                (loop (cons next-wrap-head wraps)
+                      null
+                      next-wrap-tail
+                      (apply + (map distance next-wrap-tail))
+                      qs)])]         
+            [(soft-break? q) ; printing soft break, like a hyphen
+             (debug-report 'would-not-overflow-soft)
+             ;; a soft break that fits, so move it on top of the next-wrap-head with the next-wrap-tail
              (loop wraps
                    (wrap-append (cons q next-wrap-tail) next-wrap-head)
                    null
                    (+ dist current-dist)
                    other-qs)]
-            [_ #:when (empty? next-wrap-head)
-               (debug-report 'would-overflow-hard-without-captured-break)
-               (loop (cons next-wrap-tail wraps)
-                     null
-                     null
-                     #false
-                     qs)]
-            [_ ; finish the wrap & reset the line without consuming a quad
-             (loop (cons next-wrap-head wraps)
-                   null
-                   next-wrap-tail
-                   (apply + (map distance next-wrap-tail))
-                   qs)])]         
-         [(soft-break? q) ; printing soft break, like a hyphen
-          (debug-report 'would-not-overflow-soft)
-          ;; a soft break that fits, so move it on top of the next-wrap-head with the next-wrap-tail
-          (loop wraps
-                (wrap-append (cons q next-wrap-tail) next-wrap-head)
-                null
-                (+ dist current-dist)
-                other-qs)]
-         [else
-          (debug-report 'would-not-overflow)
-          ;; add to partial
-          (loop wraps
-                next-wrap-head
-                (cons q next-wrap-tail)
-                (+ dist current-dist)
-                other-qs)])])))
+            [else
+             (debug-report 'would-not-overflow)
+             ;; add to partial
+             (loop wraps
+                   next-wrap-head
+                   (cons q next-wrap-tail)
+                   (+ dist current-dist)
+                   other-qs)])])])))
 
 (define q-zero (q #:size (pt 0 0)))
 
