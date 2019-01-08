@@ -8,6 +8,12 @@
 (define-syntax-rule (p attrs . exprs)
   (list 'q 'attrs . exprs))
 
+(define-syntax-rule (strong attrs . exprs)
+  (list 'q (cons '(font "charter-bold") 'attrs)  . exprs))
+
+(define-syntax-rule (em attrs . exprs)
+  (list 'q (cons '(font "charter-italic") 'attrs)  . exprs))
+
 (define q:string (q #:in 'bi #:out 'bo ;; align to baseline
                     ;; printable unless single space, which is not printable at start or end
                     #:printable (λ (q [sig #f])
@@ -16,10 +22,13 @@
                                     [else #true]))
                     ;; draw with pdf text routine
                     #:draw (λ (q doc)
+                             (font doc (path->string (hash-ref (quad-attrs q) 'font)))
                              (define str (car (quad-elems q)))
                              (apply text doc str (quad-origin q)))))
 
 (define-runtime-path charter "fonts/charter.ttf")
+(define-runtime-path charter-bold "fonts/charter-bold.ttf")
+(define-runtime-path charter-italic "fonts/charter-italic.ttf")
 (define-runtime-path fira "fonts/fira.ttf")
 
 (define (->string-quad doc q)
@@ -33,6 +42,8 @@
                                                                val
                                                                (match (string-downcase val)
                                                                  ["charter" charter]
+                                                                 ["charter-bold" charter-bold]
+                                                                 ["charter-italic" charter-italic]
                                                                  ["fira" fira]))))
                         attrs)]
                [elems (quad-elems q)]
@@ -68,8 +79,16 @@
                                                   (pt-y (size (car pcs)))))]))
     (values (cons new-run runs) rest)))
 
+;; 190108 feels like this needs separate finish-wraps for soft and hard.
+;; and maybe pass in the quad that triggered the wrap.
+;; otherwise within line-wrap, the finish-wrap-proc can't tell the difference between
+;; 1) ordinary word space (permits wrap to next line)
+;; 2) hard line break (forces wrap to next line)
+;; 3) paragraph break (forces wrap to next line and also triggers first-line behavior,
+;; e.g., more space above or first-line indent.)
 (define (line-wrap xs size)
   (break xs size
+         #:hard-break-proc (λ (q) (equal? "¶" (car (quad-elems q))))
          #:soft-break-proc soft-break-for-line?
          #:finish-wrap-proc (λ (pcs) (list (struct-copy quad q:line
                                                         [elems (consolidate-runs pcs)])))))
@@ -110,7 +129,7 @@
   #:read quad-read
   #:read-syntax quad-read-syntax
   #:whole-body-readers? #t ;; need this to make at-reader work
-  (require scribble/reader markdown pollen/private/splice)
+  (require scribble/reader markdown pollen/private/splice racket/list quad)
   
   (define (quad-read p) (syntax->datum (quad-read-syntax (object-name p) p)))
   
@@ -120,5 +139,5 @@
                             #:inside? #t
                             #:command-char #\◊))
     (define stx (quad-at-reader path-string p))
-    (define parsed-stx (datum->syntax stx (parse-markdown (apply string-append (syntax->datum stx)))))
+    (define parsed-stx (datum->syntax stx (add-between (parse-markdown (apply string-append (syntax->datum stx))) '(quad "¶"))))
     (syntax-property parsed-stx 'ps (path-replace-extension path-string #".pdf"))))
