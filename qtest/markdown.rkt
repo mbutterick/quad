@@ -58,6 +58,9 @@
 (define q:line (q #:size (pt +inf.0 line-height)
                   #:out 'sw
                   #:printable #true))
+(define q:line-spacer (q #:size (pt +inf.0 (/ line-height 2))
+                  #:out 'sw
+                  #:printable #true))
 
 (define softies (map string '(#\space #\- #\u00AD)))
 (define (soft-break-for-line? q)
@@ -90,8 +93,11 @@
   (break xs size
          #:hard-break-proc (λ (q) (equal? "¶" (car (quad-elems q))))
          #:soft-break-proc soft-break-for-line?
-         #:finish-wrap-proc (λ (pcs) (list (struct-copy quad q:line
-                                                        [elems (consolidate-runs pcs)])))))
+         #:finish-wrap-proc (λ (pcs q idx)
+                              (append
+                               (if (= idx 1) (list q:line-spacer) null)
+                               (list (struct-copy quad q:line
+                                                        [elems (consolidate-runs pcs)]))))))
 
 (define q:page (q #:offset '(36 36)
                   #:pre-draw (λ (q doc) (add-page doc))))
@@ -101,14 +107,14 @@
 
 
 (define (page-wrap xs vertical-height)
-  (break xs vertical-height #:finish-wrap-proc (λ (pcs) (list (struct-copy quad q:page [elems pcs])))))
+  (break xs vertical-height #:finish-wrap-proc (λ (pcs q idx) (list (struct-copy quad q:page [elems pcs])))))
 
 (define (run xs path)
   (define pdf (time-name make-pdf (make-pdf #:compress #t
                                             #:auto-first-page #f
                                             #:output-path path)))
   (define line-width 200)
-  (define vertical-height 200)
+  (define vertical-height 400)
   (let* ([x (time-name runify (runify (qexpr->quad xs)))]
          [x (time-name ->string-quad (map (λ (x) (->string-quad pdf x)) x))]
          [x (time-name line-wrap (line-wrap x line-width))]

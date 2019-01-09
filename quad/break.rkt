@@ -13,13 +13,13 @@
                [debug #f]
                #:hard-break-proc [hard-break? (λ (x) #f)]
                #:soft-break-proc [soft-break? (λ (x) #f)]
-               #:finish-wrap-proc [finish-wrap-proc list])
+               #:finish-wrap-proc [finish-wrap-proc (λ (xs q idx) (list xs))])
   #;((listof quad?)
      (real?
       any/c
       #:hard-break-proc (quad? . -> . any/c)
       #:soft-break-proc (quad? . -> . any/c)
-      #:finish-wrap-proc ((listof any/c) . -> . (listof any/c))) . ->* . (listof any/c))
+      #:finish-wrap-proc ((listof any/c) quad? natural? . -> . (listof any/c))) . ->* . (listof any/c))
   (break-hards xs target-size debug hard-break? soft-break? finish-wrap-proc))
 
 ;; the hard breaks are used to divide the wrap territory into smaller chunks
@@ -50,19 +50,24 @@
                      target-size
                      debug
                      soft-break?
-                     finish-wrap-proc) ; takes quads in wrap; returns list containing wrap (and maybe other things)
+                     finish-wrap-proc) ; takes quads in wrap, triggering quad, and wrap idx; returns list containing wrap (and maybe other things)
+  (define (finish-wrap qs wrap-idx [wrap-triggering-q (car qs)])
+    ;; reverse because quads accumulated in reverse
+    ;; wrap-triggering-q is ordinarily the last accumulated q
+    ;; unless it's the last wrap, in which case it's #f
+    ;; but we capture it separately because it's likely to get trimmed away by `nonprinting-at-end?`
+    (finish-wrap-proc (reverse (dropf qs nonprinting-at-end?)) wrap-triggering-q wrap-idx))
   (let loop ([wraps null] ; list of (list of quads)
+             [wrap-idx 1] ; wrap count
              [next-wrap-head null] ; list of quads ending in previous `soft-break?`
              [next-wrap-tail null] ; list of unbreakable quads
              [current-dist #false] ; #false (to indicate start) or integer
              [qs qs]) ; list of quads
     (match qs
-      [(== empty) (define last-wrap (wrap-append next-wrap-tail next-wrap-head))
-                  (append* ; because `finish-wrap-proc` returns a spliceable list
-                   (reverse ; because wraps accumulated in reverse
-                    (for/list ([wrap-qs (in-list (cons last-wrap wraps))])
-                      ;; reverse because quads accumulated in reverse
-                      (finish-wrap-proc (reverse (dropf wrap-qs nonprinting-at-end?))))))]
+      [(== empty) (define last-wrap (finish-wrap (wrap-append next-wrap-tail next-wrap-head) wrap-idx #f))
+                  ; append* because `finish-wrap-proc` returns a spliceable list
+                  ; reverse because wraps accumulated in reverse
+                  (append* (reverse (cons last-wrap wraps)))]
       [(cons q other-qs)
        (debug-report q 'next-q)
        (debug-report (quad-elems q) 'next-q-elems)
@@ -73,12 +78,14 @@
             [(and (? soft-break?) (? nonprinting-at-start?))
              (debug-report q 'skipping-soft-break-at-beginning)
              (loop wraps
+                   wrap-idx
                    next-wrap-head
                    next-wrap-tail
                    current-dist
                    other-qs)]
             [_ (debug-report 'hard-quad-at-start)
                (loop wraps
+                     wrap-idx
                      next-wrap-head
                      (list q)
                      (distance q)
@@ -94,19 +101,22 @@
                 ;; a break is inevitable but we want to wait to finish the wrap until we see a hard quad
                 ;; but we can move the current-partial into the current-wrap
                 (loop wraps
+                      wrap-idx
                       (wrap-append (cons q next-wrap-tail) next-wrap-head)
                       null
                       (+ dist current-dist)
                       other-qs)]
                [_ #:when (empty? next-wrap-head)
                   (debug-report 'would-overflow-hard-without-captured-break)
-                  (loop (cons next-wrap-tail wraps)
+                  (loop (cons (finish-wrap next-wrap-tail wrap-idx) wraps)
+                        (add1 wrap-idx)
                         null
                         null
                         #false
                         qs)]
                [_ ; finish the wrap & reset the line without consuming a quad
-                (loop (cons next-wrap-head wraps)
+                (loop (cons (finish-wrap next-wrap-head wrap-idx) wraps)
+                      (add1 wrap-idx)
                       null
                       next-wrap-tail
                       (apply + (map distance next-wrap-tail))
@@ -115,6 +125,7 @@
              (debug-report 'would-not-overflow-soft)
              ;; a soft break that fits, so move it on top of the next-wrap-head with the next-wrap-tail
              (loop wraps
+                   wrap-idx
                    (wrap-append (cons q next-wrap-tail) next-wrap-head)
                    null
                    (+ dist current-dist)
@@ -123,6 +134,7 @@
              (debug-report 'would-not-overflow)
              ;; add to partial
              (loop wraps
+                   wrap-idx
                    next-wrap-head
                    (cons q next-wrap-tail)
                    (+ dist current-dist)
@@ -167,7 +179,7 @@
 
 (define (linewrap xs size [debug #f])
   (add-between (break xs size debug
-                      #:finish-wrap-proc list
+                      #:finish-wrap-proc (λ (xs . _) (list xs))
                       #:hard-break-proc (λ (q) (char=? (car (quad-elems q)) #\newline))
                       #:soft-break-proc soft-break?) lbr))
 
@@ -344,7 +356,7 @@
    (break xs size debug
           #:hard-break-proc (λ (q) (memv (car (quad-elems q)) '(#\newline)))
           #:soft-break-proc soft-break?
-          #:finish-wrap-proc (λ (pcs) (list (apply q pcs))))
+          #:finish-wrap-proc (λ (pcs . _) (list (apply q pcs))))
    lbr))
 
 (module+ test
