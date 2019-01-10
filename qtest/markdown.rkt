@@ -1,31 +1,36 @@
 #lang debug racket/base
-(require (for-syntax racket/base) racket/runtime-path racket/string racket/promise racket/match racket/list
-         pitfall quad sugar/debug markdown pollen/tag (prefix-in pt: pollen/top))
-(provide (except-out (all-from-out racket/base) #%module-begin #%top)
-         (rename-out [mb #%module-begin][pt:#%top #%top])
-         (all-defined-out))
+(require (for-syntax racket/base) txexpr racket/runtime-path racket/string racket/promise racket/match racket/list
+         pitfall quad sugar/debug pollen/tag)
+(provide (except-out (all-from-out racket/base) #%module-begin)
+         (rename-out [mb #%module-begin])
+         (all-defined-out) q-tag)
 
-(define-syntax-rule (p attrs . exprs)
-  (list 'q 'attrs . exprs))
+(define-tag-function (p attrs exprs)
+  (txexpr 'q attrs exprs))
 
+(define id (default-tag-function 'id))
 
-(define-syntax-rule (h1 attrs . exprs)
-  (list 'q (list* '(font "fira") '(fontsize "36") '(line-height "48") 'attrs)  . exprs))
+(define q-tag (default-tag-function 'q))
 
-(define-syntax-rule (h2 attrs . exprs)
-  (list 'q (list* '(font "fira") '(fontsize "24") '(line-height "36") 'attrs)  . exprs))
+(define-tag-function (strong attrs exprs)
+  (txexpr 'q (cons '(font "charter-bold") attrs) exprs))
 
-(define-syntax-rule (code attrs . exprs)
-  (list 'q (list* '(font "fira-mono") '(fontsize "11") '(bg "aliceblue") 'attrs)  . exprs))
+(define-tag-function (em attrs exprs)
+  (txexpr 'q (cons '(font "charter-italic") attrs) exprs))
 
-(define-syntax-rule (pre attrs . exprs)
-  (list 'q 'attrs  . exprs))
+(define (attr-list . attrs) attrs)
 
-(define-syntax-rule (strong attrs . exprs)
-  (list 'q (cons '(font "charter-bold") 'attrs)  . exprs))
+(define-tag-function (h1 attrs exprs)
+  (txexpr 'q (append  '((font "fira")(fontsize "36")(line-height "48")) attrs) exprs))
 
-(define-syntax-rule (em attrs . exprs)
-  (list 'q (cons '(font "charter-italic") 'attrs)  . exprs))
+(define-tag-function (h2 attrs exprs)
+  (txexpr 'q (append '((font "fira")(fontsize "24")(line-height "36")) attrs)  exprs))
+
+(define-tag-function (code attrs exprs)
+  (txexpr 'q (append '((font "fira-mono")(fontsize "11")(bg "aliceblue")) attrs)  exprs))
+
+(define-tag-function (pre attrs exprs)
+  (txexpr 'q attrs exprs))
 
 (define q:string (q #:in 'bi #:out 'bo ;; align to baseline
                     ;; printable unless single space, which is not printable at start or end
@@ -140,7 +145,10 @@
                                                      (pt w (apply max (cons h line-heights))))]
                                              [elems (consolidate-runs pcs)]))))))
 
-(define q:page (q #:offset '(36 36)
+(define vert-margin 48)
+(define side-margin 120)
+(define page-offset (pt side-margin vert-margin))
+(define q:page (q #:offset page-offset
                   #:pre-draw (λ (q doc) (add-page doc))))
 
 (define q:doc (q #:pre-draw (λ (q doc) (start-doc doc))
@@ -155,9 +163,10 @@
 (define (run xs path)
   (define pdf (time-name make-pdf (make-pdf #:compress #t
                                             #:auto-first-page #f
-                                            #:output-path path)))
-  (define line-width 400)
-  (define vertical-height 600)
+                                            #:output-path path
+                                            #:size "legal")))
+  (define line-width (- (pdf-width pdf) (* 2 side-margin)))
+  (define vertical-height (- (pdf-height pdf) (* 2 vert-margin)))
   (let* ([x (time-name runify (runify (qexpr->quad xs)))]
          [x (time-name ->string-quad (map (λ (x) (->string-quad pdf x)) x))]
          [x (time-name line-wrap (line-wrap x line-width))]
@@ -173,14 +182,27 @@
           (define qx `(q ((font "Charter") (fontsize "12")) ,@(list . STRS)))
           (run qx PS)))]))
 
+
+
 (module reader syntax/module-reader
   qtest/markdown
   #:read quad-read
   #:read-syntax quad-read-syntax
   #:whole-body-readers? #t ;; need this to make at-reader work
-  (require scribble/reader markdown pollen/private/splice racket/list quad)
+  (require scribble/reader  (only-in markdown parse-markdown) racket/list quad)
   
   (define (quad-read p) (syntax->datum (quad-read-syntax (object-name p) p)))
+
+  (require racket/match txexpr)
+  (define (xexpr->parse-tree x)
+    ;; an ordinary txexpr can't serve as a parse tree because of the attrs list fails when passed to #%app.
+    ;; so stick an `attr-list` identifier on it which can hook into the expander.
+    ;; sort of SXML-ish.
+    (let loop ([x x])
+      (match x
+        [(txexpr tag attrs elems) (list* tag (cons 'attr-list attrs) (map loop elems))]
+        [(? list? xs) (map loop xs)]
+        [_ x])))
   
   (define (quad-read-syntax path-string p)
     (define quad-at-reader (make-at-reader
@@ -188,5 +210,5 @@
                             #:inside? #t
                             #:command-char #\◊))
     (define stx (quad-at-reader path-string p))
-    (define parsed-stx (datum->syntax stx (add-between (parse-markdown (apply string-append (syntax->datum stx))) '(quad "¶"))))
+    (define parsed-stx (datum->syntax stx (xexpr->parse-tree (add-between (parse-markdown (apply string-append (syntax->datum stx))) '(q-tag "¶")))))
     (syntax-property parsed-stx 'ps (path-replace-extension path-string #".pdf"))))

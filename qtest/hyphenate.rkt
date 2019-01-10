@@ -21,4 +21,3 @@ Hyphenate `xexpr` by calculating hyphenation points and inserting
 \(Unicode 00AD = decimal 173\). Words shorter than
 `#:min-length` `length` will not be hyphenated. To hyphenate words of
 any length, use `#:min-length` `#f`.
-
