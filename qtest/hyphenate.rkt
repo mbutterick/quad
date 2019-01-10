@@ -8,6 +8,12 @@ And now, for something __altogether__ the same.
 
 At the command line:
 
-`raco pkg install hyphenate`
+We said `raco pkg install hyphenate` dude
 
 What?!
+
+Hyphenate `xexpr` by calculating hyphenation points and inserting
+`joiner` at those points. By default, `joiner` is the soft hyphen
+\(Unicode 00AD = decimal 173\). Words shorter than
+`#:min-length` `length` will not be hyphenated. To hyphenate words of
+any length, use `#:min-length` `#f`.

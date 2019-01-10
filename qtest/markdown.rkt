@@ -9,7 +9,7 @@
   (list 'q 'attrs . exprs))
 
 (define-syntax-rule (code attrs . exprs)
-  (list 'q (list* '(font "fira-mono") '(bg "gray") 'attrs)  . exprs))
+  (list 'q (list* '(font "fira-mono") '(fontsize "11") '(bg "lightgray") 'attrs)  . exprs))
 
 (define-syntax-rule (strong attrs . exprs)
   (list 'q (cons '(font "charter-bold") 'attrs)  . exprs))
@@ -26,9 +26,10 @@
                     ;; draw with pdf text routine
                     #:draw (λ (q doc)
                              (font doc (path->string (hash-ref (quad-attrs q) 'font)))
+                             (font-size doc (string->number (hash-ref (quad-attrs q) 'fontsize "12")))
                              (match-define (list str) (quad-elems q))
                              (match-define (list x y) (quad-origin q))
-                             (text doc str x y))))
+                             (text doc str x y #:bg (hash-ref (quad-attrs q) 'bg #f)))))
 
 (define-runtime-path charter "fonts/charter.ttf")
 (define-runtime-path charter-bold "fonts/charter-bold.ttf")
@@ -97,10 +98,10 @@
          #:hard-break (λ (q) (equal? "¶" (car (quad-elems q))))
          #:soft-break soft-break-for-line?
          #:finish-wrap (λ (pcs q idx)
-                              (append
-                               (if (= idx 1) (list q:line-spacer) null)
-                               (list (struct-copy quad q:line
-                                                  [elems (consolidate-runs pcs)]))))))
+                         (append
+                          (if (= idx 1) (list q:line-spacer) null)
+                          (list (struct-copy quad q:line
+                                             [elems (consolidate-runs pcs)]))))))
 
 (define q:page (q #:offset '(36 36)
                   #:pre-draw (λ (q doc) (add-page doc))))
@@ -118,8 +119,8 @@
   (define pdf (time-name make-pdf (make-pdf #:compress #t
                                             #:auto-first-page #f
                                             #:output-path path)))
-  (define line-width 200)
-  (define vertical-height 400)
+  (define line-width 400)
+  (define vertical-height 600)
   (let* ([x (time-name runify (runify (qexpr->quad xs)))]
          [x (time-name ->string-quad (map (λ (x) (->string-quad pdf x)) x))]
          [x (time-name line-wrap (line-wrap x line-width))]
