@@ -156,24 +156,30 @@
 (define bottom-margin 120)
 (define side-margin 120)
 (define page-offset (pt side-margin top-margin))
+(require racket/date)
 (define q:page (q #:offset page-offset
                   #:pre-draw (λ (q doc) (add-page doc))
                   #:post-draw (λ (q doc)
-                                (text doc (format "— ~a —" (hash-ref (quad-attrs q) 'page-number))
-                                      200
+                                (font-size doc 10)
+                                (text doc (format "~a · ~a at ~a" (hash-ref (quad-attrs q) 'page-number)
+                                                  (hash-ref (quad-attrs q) 'doc-title)
+                                                  (date->string (current-date) #t))
+                                      side-margin
                                       (- (pdf-height doc) bottom-margin)))))
 
 (define q:doc (q #:pre-draw (λ (q doc) (start-doc doc))
                  #:post-draw (λ (q doc) (end-doc doc))))
 
-
-(define (page-wrap xs vertical-height)
+(define (page-wrap xs vertical-height path)
   (break xs vertical-height
          #:soft-break line-spacer?
          #:finish-wrap (λ (pcs q idx) (list (struct-copy quad q:page
                                                          [attrs (let ([page-number idx]
                                                                       [h (hash-copy (quad-attrs q:page))])
                                                                   (hash-set! h 'page-number page-number)
+                                                                  (define-values (dir name _)
+                                                                    (split-path (path-replace-extension path #"")))
+                                                                  (hash-set! h 'doc-title (string-titlecase (path->string name)))
                                                                   h)]
                                                          [elems pcs])))))
 
@@ -187,7 +193,7 @@
   (let* ([x (time-name runify (runify (qexpr->quad xs)))]
          [x (time-name ->string-quad (map (λ (x) (->string-quad pdf x)) x))]
          [x (time-name line-wrap (line-wrap x line-width))]
-         [x (time-name page-wrap (page-wrap x vertical-height))]
+         [x (time-name page-wrap (page-wrap x vertical-height path))]
          [x (time-name position (position (struct-copy quad q:doc [elems x])))])
     (time-name draw (draw x pdf))))
 
