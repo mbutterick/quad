@@ -11,15 +11,15 @@
 (define (break xs
                [target-size (current-wrap-distance)]
                [debug #f]
-               #:hard-break-proc [hard-break? (λ (x) #f)]
-               #:soft-break-proc [soft-break? (λ (x) #f)]
-               #:finish-wrap-proc [finish-wrap-proc (λ (xs q idx) (list xs))])
+               #:hard-break [hard-break? (λ (x) #f)]
+               #:soft-break [soft-break? (λ (x) #f)]
+               #:finish-wrap [finish-wrap-proc (λ (xs q idx) (list xs))])
   #;((listof quad?)
      (real?
       any/c
-      #:hard-break-proc (quad? . -> . any/c)
-      #:soft-break-proc (quad? . -> . any/c)
-      #:finish-wrap-proc ((listof any/c) quad? natural? . -> . (listof any/c))) . ->* . (listof any/c))
+      #:hard-break (quad? . -> . any/c)
+      #:soft-break (quad? . -> . any/c)
+      #:finish-wrap ((listof any/c) quad? natural? . -> . (listof any/c))) . ->* . (listof any/c))
   (break-hards xs target-size debug hard-break? soft-break? finish-wrap-proc))
 
 ;; the hard breaks are used to divide the wrap territory into smaller chunks
@@ -58,7 +58,7 @@
     ;; but we capture it separately because it's likely to get trimmed away by `nonprinting-at-end?`
     (finish-wrap-proc (reverse (dropf qs nonprinting-at-end?)) wrap-triggering-q wrap-idx))
   (let loop ([wraps null] ; list of (list of quads)
-             [wrap-idx 1] ; wrap count
+             [wrap-idx 1] ; wrap count (could be (length wraps) but we'd rather avoid `length`)
              [next-wrap-head null] ; list of quads ending in previous `soft-break?`
              [next-wrap-tail null] ; list of unbreakable quads
              [current-dist #false] ; #false (to indicate start) or integer
@@ -179,9 +179,9 @@
 
 (define (linewrap xs size [debug #f])
   (add-between (break xs size debug
-                      #:finish-wrap-proc (λ (xs . _) (list xs))
-                      #:hard-break-proc (λ (q) (char=? (car (quad-elems q)) #\newline))
-                      #:soft-break-proc soft-break?) lbr))
+                      #:finish-wrap (λ (xs . _) (list xs))
+                      #:hard-break (λ (q) (char=? (car (quad-elems q)) #\newline))
+                      #:soft-break soft-break?) lbr))
 
 (module+ test
   (require rackunit))
@@ -316,8 +316,8 @@
 (define (pagewrap xs size [debug #f])
   (add-between
    (break (flatten xs) size debug
-          #:hard-break-proc (λ (x) (and (quad? x) (memv (car (quad-elems x)) '(#\page))))
-          #:soft-break-proc (λ (x) (and (quad? x) (eq? x lbr)))) pbr))
+          #:hard-break (λ (x) (and (quad? x) (memv (car (quad-elems x)) '(#\page))))
+          #:soft-break (λ (x) (and (quad? x) (eq? x lbr)))) pbr))
 (define pbr (q #:size #false #:elems '(#\page)))
 
 (module+ test
@@ -354,9 +354,9 @@
 (define (linewrap2 xs size [debug #f])
   (add-between
    (break xs size debug
-          #:hard-break-proc (λ (q) (memv (car (quad-elems q)) '(#\newline)))
-          #:soft-break-proc soft-break?
-          #:finish-wrap-proc (λ (pcs . _) (list (apply q pcs))))
+          #:hard-break (λ (q) (memv (car (quad-elems q)) '(#\newline)))
+          #:soft-break soft-break?
+          #:finish-wrap (λ (pcs . _) (list (apply q pcs))))
    lbr))
 
 (module+ test

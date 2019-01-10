@@ -104,8 +104,8 @@
 (define consolidate-into-runs? #t)
 (define (line-wrap xs size [debug #f])
   (break xs size debug
-         #:soft-break-proc soft-break?
-         #:finish-wrap-proc (λ (pcs q idx) (list (struct-copy quad $line
+         #:soft-break soft-break?
+         #:finish-wrap (λ (pcs q idx) (list (struct-copy quad $line
                                                   [elems
                                                    ;; consolidate chars into a single run (naively)
                                                    ;; by taking attributes from first (including origin)
@@ -117,7 +117,7 @@
 
 (define (page-wrap xs size [debug #f])
   (break xs size debug
-         #:finish-wrap-proc (λ (pcs q idx) (list (struct-copy quad $page
+         #:finish-wrap (λ (pcs q idx) (list (struct-copy quad $page
                                                   [elems pcs])))))
 
 (define (typeset pdf qarg)

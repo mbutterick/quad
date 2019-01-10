@@ -94,9 +94,9 @@
 
 (define (line-wrap xs size)
   (break xs size
-         #:hard-break-proc (λ (q) (equal? "¶" (car (quad-elems q))))
-         #:soft-break-proc soft-break-for-line?
-         #:finish-wrap-proc (λ (pcs q idx)
+         #:hard-break (λ (q) (equal? "¶" (car (quad-elems q))))
+         #:soft-break soft-break-for-line?
+         #:finish-wrap (λ (pcs q idx)
                               (append
                                (if (= idx 1) (list q:line-spacer) null)
                                (list (struct-copy quad q:line
@@ -111,8 +111,8 @@
 
 (define (page-wrap xs vertical-height)
   (break xs vertical-height
-         #:soft-break-proc line-spacer?
-         #:finish-wrap-proc (λ (pcs q idx) (list (struct-copy quad q:page [elems pcs])))))
+         #:soft-break line-spacer?
+         #:finish-wrap (λ (pcs q idx) (list (struct-copy quad q:page [elems pcs])))))
 
 (define (run xs path)
   (define pdf (time-name make-pdf (make-pdf #:compress #t
