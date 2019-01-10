@@ -1,10 +1,14 @@
 #lang qtest/markdown
 
+# Hyphenate
+
 A simple _hyphenation engine_ that uses the Knuth–Liang hyphenation algorithm originally developed for TeX.
 
 I **have added little** to their work. Accordingly, I take no credit, except a spoonful of *snako-bits.*
 
 And now, for something __altogether__ the same.
+
+## 1. Installation
 
 At the command line:
 
@@ -17,3 +21,4 @@ Hyphenate `xexpr` by calculating hyphenation points and inserting
 \(Unicode 00AD = decimal 173\). Words shorter than
 `#:min-length` `length` will not be hyphenated. To hyphenate words of
 any length, use `#:min-length` `#f`.
+

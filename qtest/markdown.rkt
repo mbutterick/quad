@@ -1,6 +1,6 @@
 #lang debug racket/base
 (require (for-syntax racket/base) racket/runtime-path racket/string racket/promise racket/match racket/list
-         pitfall  quad sugar/debug markdown pollen/tag (prefix-in pt: pollen/top))
+         pitfall quad sugar/debug markdown pollen/tag (prefix-in pt: pollen/top))
 (provide (except-out (all-from-out racket/base) #%module-begin #%top)
          (rename-out [mb #%module-begin][pt:#%top #%top])
          (all-defined-out))
@@ -8,8 +8,18 @@
 (define-syntax-rule (p attrs . exprs)
   (list 'q 'attrs . exprs))
 
+
+(define-syntax-rule (h1 attrs . exprs)
+  (list 'q (list* '(font "fira") '(fontsize "36") '(line-height "48") 'attrs)  . exprs))
+
+(define-syntax-rule (h2 attrs . exprs)
+  (list 'q (list* '(font "fira") '(fontsize "24") '(line-height "36") 'attrs)  . exprs))
+
 (define-syntax-rule (code attrs . exprs)
-  (list 'q (list* '(font "fira-mono") '(fontsize "11") '(bg "lightgray") 'attrs)  . exprs))
+  (list 'q (list* '(font "fira-mono") '(fontsize "11") '(bg "aliceblue") 'attrs)  . exprs))
+
+(define-syntax-rule (pre attrs . exprs)
+  (list 'q 'attrs  . exprs))
 
 (define-syntax-rule (strong attrs . exprs)
   (list 'q (cons '(font "charter-bold") 'attrs)  . exprs))
@@ -34,40 +44,59 @@
 (define-runtime-path charter "fonts/charter.ttf")
 (define-runtime-path charter-bold "fonts/charter-bold.ttf")
 (define-runtime-path charter-italic "fonts/charter-italic.ttf")
-(define-runtime-path fira "fonts/fira.ttf")
+(define-runtime-path fira "fonts/fira-light.ttf")
 (define-runtime-path fira-mono "fonts/fira-mono.ttf")
 
 (define (->string-quad doc q)
-  (struct-copy quad q:string
-               [attrs (let ([attrs (quad-attrs q)])
-                        ;; attrs hashes are shared between many quads.
-                        ;; so the first update will change every reference to the shared hash
-                        ;; hence why we ignore if val is already a path
-                        ;; but this op should ideally happen earlier
-                        (hash-update! attrs 'font (λ (val) (if (path? val)
-                                                               val
-                                                               (match (string-downcase (string-replace val " " "-"))
-                                                                 ["charter" charter]
-                                                                 ["charter-bold" charter-bold]
-                                                                 ["charter-italic" charter-italic]
-                                                                 ["fira" fira]
-                                                                 ["fira-mono" fira-mono]))))
-                        attrs)]
-               [elems (quad-elems q)]
-               [size (delay
-                       (define fontsize (string->number (hash-ref (quad-attrs q) 'fontsize)))
-                       (font-size doc fontsize)
-                       (font doc (path->string (hash-ref (quad-attrs q) 'font)))
-                       (define str (car (quad-elems q)))
-                       (pt (string-width doc str) (current-line-height doc)))]))
+  (struct-copy
+   quad q:string
+   [attrs (let ([attrs (quad-attrs q)])
+            ;; attrs hashes are shared between many quads.
+            ;; so the first update will change every reference to the shared hash
+            ;; hence why we ignore if val is already a path
+            ;; but this op should ideally happen earlier
+            (hash-update! attrs 'font
+                          (λ (val) (if (path? val)
+                                       val
+                                       (match (string-downcase (string-replace val " " "-"))
+                                         ["charter" charter]
+                                         ["charter-bold" charter-bold]
+                                         ["charter-italic" charter-italic]
+                                         ["fira" fira]
+                                         ["fira-mono" fira-mono]))))
+            attrs)]
+   [elems (quad-elems q)]
+   [size (delay
+           (define fontsize (string->number (hash-ref (quad-attrs q) 'fontsize)))
+           (font-size doc fontsize)
+           (font doc (path->string (hash-ref (quad-attrs q) 'font)))
+           (define str (car (quad-elems q)))
+           (pt (string-width doc str) (current-line-height doc)))]))
+
+(define (draw-debug q doc)
+  (save doc)
+  (line-width doc 0.5)
+  (apply rect doc (append (quad-origin q) (size q)))
+  (stroke doc "#fcc")
+  (apply rect doc (append (quad-origin q) (size q)))
+  (clip doc)
+  (circle doc (pt-x (in-point q)) (pt-y (in-point q)) 3)
+  (circle doc (pt-x (out-point q)) (pt-y (out-point q)) 3)
+  (fill doc "#f99")  
+  (restore doc))
 
 (define line-height 20)
-(define q:line (q #:size (pt +inf.0 line-height)
+(define q:line (q #:size (pt 380 line-height)
+                  #:in 'nw
+                  #:inner 'sw ; puts baseline at bottom of line box
                   #:out 'sw
-                  #:printable #true))
+                  #:printable #true
+                  #:draw (λ (q doc)
+                           #;(draw-debug q doc)
+                           (default-draw q doc))))
 (struct line-spacer quad () #:transparent)
 (define q:line-spacer (q #:type line-spacer
-                         #:size (pt +inf.0 (* line-height 0.7))
+                         #:size (pt 380 (* line-height 0.7))
                          #:out 'sw
                          #:printable (λ (q sig)
                                        (not (memq sig '(start end))))))
@@ -101,6 +130,14 @@
                          (append
                           (if (= idx 1) (list q:line-spacer) null)
                           (list (struct-copy quad q:line
+                                             [size (let ()
+                                                     (define line-heights
+                                                       (filter-map
+                                                        (λ (q) (string->number (hash-ref (quad-attrs q) 'line-height "NaN")))
+                                                        pcs))
+                                                     (match-define (list w h) (quad-size q:line))
+                                                     ;; when `line-heights` is empty, this is just h
+                                                     (pt w (apply max (cons h line-heights))))]
                                              [elems (consolidate-runs pcs)]))))))
 
 (define q:page (q #:offset '(36 36)
