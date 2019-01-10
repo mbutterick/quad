@@ -1,5 +1,5 @@
 #lang debug racket/base
-(require (for-syntax racket/base) racket/runtime-path racket/promise racket/match racket/list
+(require (for-syntax racket/base) racket/runtime-path racket/string racket/promise racket/match racket/list
          pitfall  quad sugar/debug markdown pollen/tag (prefix-in pt: pollen/top))
 (provide (except-out (all-from-out racket/base) #%module-begin #%top)
          (rename-out [mb #%module-begin][pt:#%top #%top])
@@ -7,6 +7,9 @@
 
 (define-syntax-rule (p attrs . exprs)
   (list 'q 'attrs . exprs))
+
+(define-syntax-rule (code attrs . exprs)
+  (list 'q (list* '(font "fira-mono") '(bg "gray") 'attrs)  . exprs))
 
 (define-syntax-rule (strong attrs . exprs)
   (list 'q (cons '(font "charter-bold") 'attrs)  . exprs))
@@ -23,13 +26,15 @@
                     ;; draw with pdf text routine
                     #:draw (λ (q doc)
                              (font doc (path->string (hash-ref (quad-attrs q) 'font)))
-                             (define str (car (quad-elems q)))
-                             (apply text doc str (quad-origin q)))))
+                             (match-define (list str) (quad-elems q))
+                             (match-define (list x y) (quad-origin q))
+                             (text doc str x y))))
 
 (define-runtime-path charter "fonts/charter.ttf")
 (define-runtime-path charter-bold "fonts/charter-bold.ttf")
 (define-runtime-path charter-italic "fonts/charter-italic.ttf")
 (define-runtime-path fira "fonts/fira.ttf")
+(define-runtime-path fira-mono "fonts/fira-mono.ttf")
 
 (define (->string-quad doc q)
   (struct-copy quad q:string
@@ -40,11 +45,12 @@
                         ;; but this op should ideally happen earlier
                         (hash-update! attrs 'font (λ (val) (if (path? val)
                                                                val
-                                                               (match (string-downcase val)
+                                                               (match (string-downcase (string-replace val " " "-"))
                                                                  ["charter" charter]
                                                                  ["charter-bold" charter-bold]
                                                                  ["charter-italic" charter-italic]
-                                                                 ["fira" fira]))))
+                                                                 ["fira" fira]
+                                                                 ["fira-mono" fira-mono]))))
                         attrs)]
                [elems (quad-elems q)]
                [size (delay
