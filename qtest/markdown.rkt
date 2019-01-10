@@ -2,23 +2,27 @@
 (require (for-syntax racket/base) txexpr racket/runtime-path racket/string racket/promise racket/match racket/list
          pitfall quad sugar/debug pollen/tag)
 (provide (except-out (all-from-out racket/base) #%module-begin)
-         (rename-out [mb #%module-begin])
-         (all-defined-out) q-tag)
+         (rename-out [mb #%module-begin] [q-tag q])
+         p id strong em attr-list h1 h2 code pre a)
 
 (define-tag-function (p attrs exprs)
   (txexpr 'q attrs exprs))
 
 (define id (default-tag-function 'id))
+(define class (default-tag-function 'class))
 
 (define q-tag (default-tag-function 'q))
 
 (define-tag-function (strong attrs exprs)
   (txexpr 'q (cons '(font "charter-bold") attrs) exprs))
 
+(define-tag-function (a attrs exprs)
+  (txexpr 'q `((link ,(cadr (assoc 'href attrs)))(color "MediumVioletRed")) exprs))
+
 (define-tag-function (em attrs exprs)
   (txexpr 'q (cons '(font "charter-italic") attrs) exprs))
 
-(define (attr-list . attrs) attrs)
+(define-syntax-rule (attr-list . attrs) 'attrs)
 
 (define-tag-function (h1 attrs exprs)
   (txexpr 'q (append  '((font "fira")(fontsize "36")(line-height "48")) attrs) exprs))
@@ -32,7 +36,8 @@
 (define-tag-function (pre attrs exprs)
   (txexpr 'q attrs exprs))
 
-(define q:string (q #:in 'bi #:out 'bo ;; align to baseline
+(define q:string (q #:in 'bi
+                    #:out 'bo ;; align to baseline
                     ;; printable unless single space, which is not printable at start or end
                     #:printable (λ (q [sig #f])
                                   (case (car (quad-elems q))
@@ -42,9 +47,11 @@
                     #:draw (λ (q doc)
                              (font doc (path->string (hash-ref (quad-attrs q) 'font)))
                              (font-size doc (string->number (hash-ref (quad-attrs q) 'fontsize "12")))
+                             (fill-color doc (hash-ref (quad-attrs q) 'color "black"))
                              (match-define (list str) (quad-elems q))
                              (match-define (list x y) (quad-origin q))
-                             (text doc str x y #:bg (hash-ref (quad-attrs q) 'bg #f)))))
+                             (text doc str x y #:bg (hash-ref (quad-attrs q) 'bg #f)
+                                   #:link (hash-ref (quad-attrs q) 'link #f)))))
 
 (define-runtime-path charter "fonts/charter.ttf")
 (define-runtime-path charter-bold "fonts/charter-bold.ttf")
@@ -101,7 +108,7 @@
                            (default-draw q doc))))
 (struct line-spacer quad () #:transparent)
 (define q:line-spacer (q #:type line-spacer
-                         #:size (pt 380 (* line-height 0.7))
+                         #:size (pt 380 (* line-height 0.6))
                          #:out 'sw
                          #:printable (λ (q sig)
                                        (not (memq sig '(start end))))))
@@ -210,5 +217,5 @@
                             #:inside? #t
                             #:command-char #\◊))
     (define stx (quad-at-reader path-string p))
-    (define parsed-stx (datum->syntax stx (xexpr->parse-tree (add-between (parse-markdown (apply string-append (syntax->datum stx))) '(q-tag "¶")))))
+    (define parsed-stx (datum->syntax stx (xexpr->parse-tree (add-between (parse-markdown (apply string-append (syntax->datum stx))) '(q "¶")))))
     (syntax-property parsed-stx 'ps (path-replace-extension path-string #".pdf"))))
