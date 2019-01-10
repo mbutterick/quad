@@ -152,11 +152,16 @@
                                                      (pt w (apply max (cons h line-heights))))]
                                              [elems (consolidate-runs pcs)]))))))
 
-(define vert-margin 48)
+(define top-margin 60)
+(define bottom-margin 120)
 (define side-margin 120)
-(define page-offset (pt side-margin vert-margin))
+(define page-offset (pt side-margin top-margin))
 (define q:page (q #:offset page-offset
-                  #:pre-draw (λ (q doc) (add-page doc))))
+                  #:pre-draw (λ (q doc) (add-page doc))
+                  #:post-draw (λ (q doc)
+                                (text doc (format "— ~a —" (hash-ref (quad-attrs q) 'page-number))
+                                      200
+                                      (- (pdf-height doc) bottom-margin)))))
 
 (define q:doc (q #:pre-draw (λ (q doc) (start-doc doc))
                  #:post-draw (λ (q doc) (end-doc doc))))
@@ -165,7 +170,12 @@
 (define (page-wrap xs vertical-height)
   (break xs vertical-height
          #:soft-break line-spacer?
-         #:finish-wrap (λ (pcs q idx) (list (struct-copy quad q:page [elems pcs])))))
+         #:finish-wrap (λ (pcs q idx) (list (struct-copy quad q:page
+                                                         [attrs (let ([page-number idx]
+                                                                      [h (hash-copy (quad-attrs q:page))])
+                                                                  (hash-set! h 'page-number page-number)
+                                                                  h)]
+                                                         [elems pcs])))))
 
 (define (run xs path)
   (define pdf (time-name make-pdf (make-pdf #:compress #t
@@ -173,7 +183,7 @@
                                             #:output-path path
                                             #:size "legal")))
   (define line-width (- (pdf-width pdf) (* 2 side-margin)))
-  (define vertical-height (- (pdf-height pdf) (* 2 vert-margin)))
+  (define vertical-height (- (pdf-height pdf) top-margin bottom-margin))
   (let* ([x (time-name runify (runify (qexpr->quad xs)))]
          [x (time-name ->string-quad (map (λ (x) (->string-quad pdf x)) x))]
          [x (time-name line-wrap (line-wrap x line-width))]
