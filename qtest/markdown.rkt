@@ -48,14 +48,14 @@
                                     [else #true]))
                     ;; draw with pdf text routine
                     #:draw (λ (q doc)
-                             (draw-debug q doc)
                              (font doc (path->string (hash-ref (quad-attrs q) 'font)))
                              (font-size doc (string->number (hash-ref (quad-attrs q) 'fontsize "12")))
                              (fill-color doc (hash-ref (quad-attrs q) 'color "black"))
                              (match-define (list str) (quad-elems q))
                              (match-define (list x y) (quad-origin q))
                              (text doc str x y #:bg (hash-ref (quad-attrs q) 'bg #f)
-                                   #:link (hash-ref (quad-attrs q) 'link #f)))))
+                                   #:link (hash-ref (quad-attrs q) 'link #f))
+                             (draw-debug q doc "#99f" "#ccf"))))
 
 (define-runtime-path charter "fonts/charter.ttf")
 (define-runtime-path charter-bold "fonts/charter-bold.ttf")
@@ -89,23 +89,26 @@
            (define str (car (quad-elems q)))
            (pt (string-width doc str) (current-line-height doc)))]))
 
-(define (draw-debug q doc)
-  (save doc)
-  (line-width doc 0.5)
-  (apply rect doc (append (quad-origin q) (size q)))
-  (stroke doc "#fcc")
-  (apply rect doc (append (quad-origin q) (size q)))
-  (clip doc)
-  (circle doc (pt-x (in-point q)) (pt-y (in-point q)) 3)
-  (circle doc (pt-x (out-point q)) (pt-y (out-point q)) 3)
-  (fill doc "#f99")  
-  (restore doc))
+(define draw? #f)
+(define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"])
+  (when draw?
+    (save doc)
+    (line-width doc 0.5)
+    (apply rect doc (append (quad-origin q) (size q)))
+    (stroke doc stroke-color)
+    (apply rect doc (append (quad-origin q) (size q)))
+    (clip doc)
+    (circle doc (pt-x (in-point q)) (pt-y (in-point q)) 3)
+    (circle doc (pt-x (out-point q)) (pt-y (out-point q)) 3)
+    (fill doc fill-color)  
+    (restore doc)))
 
 (define line-height 20)
 (define q:line (q #:size (pt 380 line-height)
                   #:in 'nw
-                  #:inner 'sw ; puts baseline at bottom of line box
+                  #:inner 'sw ; puts baseline at lower right corner of line box
                   #:out 'sw
+                  #:offset (pt 4 -6)
                   #:printable #true
                   #:draw (λ (q doc)
                            (draw-debug q doc)
@@ -197,7 +200,8 @@
      #:pre-draw (λ (q doc)
                   (save doc)
                   (apply rect doc (append (quad-origin q) (size q)))
-                  (fill doc "#eee")
+                  (line-width doc 1)
+                  (fill-and-stroke doc "#eee" "#999")
                   (restore doc))))
 
 (define (contiguous-group-by pred xs)
@@ -219,13 +223,7 @@
 
 (define (page-wrap xs vertical-height path)
   (break xs vertical-height
-         #:soft-break line-spacer?
          #:finish-wrap (λ (lns q idx)
-                         (define groups (contiguous-group-by (λ (x) (hash-ref (quad-attrs x) 'container #f)) lns))
-                         (define lns-and-containers (append* (for/list ([grp (in-list groups)])
-                                                                          (match (hash-ref (quad-attrs (car grp)) 'container #f)
-                                                                            ["bq" (list (make-blockquote grp))]
-                                                                            [_ grp])))) 
                          (list (struct-copy quad q:page
                                             [attrs (let ([page-number idx]
                                                          [h (hash-copy (quad-attrs q:page))])
@@ -234,7 +232,20 @@
                                                        (split-path (path-replace-extension path #"")))
                                                      (hash-set! h 'doc-title (string-titlecase (path->string name)))
                                                      h)]
-                                            [elems lns-and-containers])))))
+                                            [elems lns])))))
+
+(define (insert-containers pages)
+  ;; container recomposition happens after page composition because page breaks can happen between lines.
+  ;; iow, the lines within a container may be split over multiple pages, each of which should be drawn
+  ;; as a separate container
+  (for/list ([page (in-list pages)])
+            (define lns (quad-elems page))             
+            (define groups (contiguous-group-by (λ (x) (hash-ref (quad-attrs x) 'container #f)) lns))
+            (define lns-and-containers (append* (for/list ([grp (in-list groups)])
+                                                          (match (hash-ref (quad-attrs (car grp)) 'container #f)
+                                                            ["bq" (list (make-blockquote grp))]
+                                                            [_ grp]))))
+            (struct-copy quad page [elems lns-and-containers])))
 
 (define (run xs path)
   (define pdf (time-name make-pdf (make-pdf #:compress #t
@@ -247,6 +258,7 @@
          [x (time-name ->string-quad (map (λ (x) (->string-quad pdf x)) x))]
          [x (time-name line-wrap (line-wrap x line-width))]
          [x (time-name page-wrap (page-wrap x vertical-height path))]
+         [x (time-name insert-containers (insert-containers x))]
          [x (time-name position (position (struct-copy quad q:doc [elems x])))])
     (time-name draw (draw x pdf))))
 

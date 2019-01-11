@@ -2,7 +2,7 @@
 
 # Hyphenate
 
-A simple _hyphenation engine_ that uses the Knuth–Liang hyphenation algorithm originally developed for TeX.
+A **simple** _hyphenation engine_ that uses the Knuth–Liang hyphenation algorithm originally developed for TeX.
 
 I **have added little** to their work. Accordingly, I take no credit, except a spoonful of *snako-bits.*
 
@@ -16,7 +16,7 @@ We said `raco pkg install hyphenate` dude
 
 What?!
 
-Hyphenate `xexpr` by calculating hyphenation points and inserting
+> Hyphenate `xexpr` by calculating hyphenation points and inserting
 `joiner` at those points. By default, `joiner` is the soft hyphen
 \(Unicode 00AD = decimal 173\). Words shorter than
 `#:min-length` `length` will not be hyphenated. To hyphenate words of
