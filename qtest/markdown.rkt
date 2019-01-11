@@ -3,10 +3,13 @@
          pitfall quad sugar/debug pollen/tag)
 (provide (except-out (all-from-out racket/base) #%module-begin)
          (rename-out [mb #%module-begin] [q-tag q])
-         p id strong em attr-list h1 h2 code pre a)
+         p id strong em attr-list h1 h2 code pre a blockquote)
 
 (define-tag-function (p attrs exprs)
   (txexpr 'q attrs exprs))
+
+(define-tag-function (blockquote attrs exprs)
+  (txexpr 'q (cons '(container "bq") attrs) exprs))
 
 (define id (default-tag-function 'id))
 (define class (default-tag-function 'class))
@@ -45,6 +48,7 @@
                                     [else #true]))
                     ;; draw with pdf text routine
                     #:draw (λ (q doc)
+                             (draw-debug q doc)
                              (font doc (path->string (hash-ref (quad-attrs q) 'font)))
                              (font-size doc (string->number (hash-ref (quad-attrs q) 'fontsize "12")))
                              (fill-color doc (hash-ref (quad-attrs q) 'color "black"))
@@ -104,14 +108,17 @@
                   #:out 'sw
                   #:printable #true
                   #:draw (λ (q doc)
-                           #;(draw-debug q doc)
+                           (draw-debug q doc)
                            (default-draw q doc))))
 (struct line-spacer quad () #:transparent)
 (define q:line-spacer (q #:type line-spacer
                          #:size (pt 380 (* line-height 0.6))
                          #:out 'sw
                          #:printable (λ (q sig)
-                                       (not (memq sig '(start end))))))
+                                       (not (memq sig '(start end))))
+                         #:draw (λ (q doc)
+                                  (draw-debug q doc)
+                                  (default-draw q doc))))
 
 (define softies (map string '(#\space #\- #\u00AD)))
 (define (soft-break-for-line? q)
@@ -139,9 +146,18 @@
          #:hard-break (λ (q) (equal? "¶" (car (quad-elems q))))
          #:soft-break soft-break-for-line?
          #:finish-wrap (λ (pcs q idx)
+                         (define new-elems (consolidate-runs pcs))
                          (append
                           (if (= idx 1) (list q:line-spacer) null)
                           (list (struct-copy quad q:line
+                                             [attrs (let ([attrs (hash-copy (quad-attrs q:line))])
+                                                      (define container-val (hash-ref (quad-attrs (car new-elems)) 'container #f))
+                                                      (when (and container-val
+                                                                 (for/and ([elem (in-list (cdr new-elems))])
+                                                                          (equal? (hash-ref (quad-attrs elem) 'container #f)
+                                                                                  container-val)))
+                                                        (hash-set! attrs 'container container-val))
+                                                      attrs)]
                                              [size (let ()
                                                      (define line-heights
                                                        (filter-map
@@ -150,7 +166,7 @@
                                                      (match-define (list w h) (quad-size q:line))
                                                      ;; when `line-heights` is empty, this is just h
                                                      (pt w (apply max (cons h line-heights))))]
-                                             [elems (consolidate-runs pcs)]))))))
+                                             [elems new-elems]))))))
 
 (define top-margin 60)
 (define bottom-margin 120)
@@ -170,24 +186,61 @@
 (define q:doc (q #:pre-draw (λ (q doc) (start-doc doc))
                  #:post-draw (λ (q doc) (end-doc doc))))
 
+(define (make-blockquote pcs)
+  (q #:attrs (hasheq 'type "bq")
+     #:in 'nw
+     #:out 'sw
+     #:elems pcs
+     #:size (delay (pt (pt-x (size (car pcs)))
+                       (for/sum ([pc (in-list pcs)])
+                                (pt-y (size pc)))))
+     #:pre-draw (λ (q doc)
+                  (save doc)
+                  (apply rect doc (append (quad-origin q) (size q)))
+                  (fill doc "#eee")
+                  (restore doc))))
+
+(define (contiguous-group-by pred xs)
+  ;; like `group-by`, but only groups together contiguous xs with the same pred value.
+  (let loop ([xs xs][groups null])
+    (match xs
+      [(== empty) (reverse groups)]
+      [(cons first-x other-xs)
+       (define equivalence-val (pred first-x))
+       (define-values (group-members rest) (splitf-at other-xs (λ (x) (equal? (pred x) equivalence-val))))
+       (define new-group (cons first-x group-members)) ; group-members might be empty
+       (loop rest (cons new-group groups))])))
+
+(module+ test
+  (require rackunit)
+  (check-equal?
+   (contiguous-group-by values '(1 1 2 2 2 3 4 5 5 6 6 7 8 9))
+   '((1 1) (2 2 2) (3) (4) (5 5) (6 6) (7) (8) (9))))
+
 (define (page-wrap xs vertical-height path)
   (break xs vertical-height
          #:soft-break line-spacer?
-         #:finish-wrap (λ (pcs q idx) (list (struct-copy quad q:page
-                                                         [attrs (let ([page-number idx]
-                                                                      [h (hash-copy (quad-attrs q:page))])
-                                                                  (hash-set! h 'page-number page-number)
-                                                                  (define-values (dir name _)
-                                                                    (split-path (path-replace-extension path #"")))
-                                                                  (hash-set! h 'doc-title (string-titlecase (path->string name)))
-                                                                  h)]
-                                                         [elems pcs])))))
+         #:finish-wrap (λ (lns q idx)
+                         (define groups (contiguous-group-by (λ (x) (hash-ref (quad-attrs x) 'container #f)) lns))
+                         (define lns-and-containers (append* (for/list ([grp (in-list groups)])
+                                                                          (match (hash-ref (quad-attrs (car grp)) 'container #f)
+                                                                            ["bq" (list (make-blockquote grp))]
+                                                                            [_ grp])))) 
+                         (list (struct-copy quad q:page
+                                            [attrs (let ([page-number idx]
+                                                         [h (hash-copy (quad-attrs q:page))])
+                                                     (hash-set! h 'page-number page-number)
+                                                     (define-values (dir name _)
+                                                       (split-path (path-replace-extension path #"")))
+                                                     (hash-set! h 'doc-title (string-titlecase (path->string name)))
+                                                     h)]
+                                            [elems lns-and-containers])))))
 
 (define (run xs path)
   (define pdf (time-name make-pdf (make-pdf #:compress #t
                                             #:auto-first-page #f
                                             #:output-path path
-                                            #:size "legal")))
+                                            #:size "letter")))
   (define line-width (- (pdf-width pdf) (* 2 side-margin)))
   (define vertical-height (- (pdf-height pdf) top-margin bottom-margin))
   (let* ([x (time-name runify (runify (qexpr->quad xs)))]
