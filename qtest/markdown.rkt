@@ -108,7 +108,6 @@
                   #:in 'nw
                   #:inner 'sw ; puts baseline at lower right corner of line box
                   #:out 'sw
-                  #:offset (pt 4 -6)
                   #:printable #true
                   #:draw (λ (q doc)
                            (draw-debug q doc)
@@ -199,7 +198,9 @@
                                 (pt-y (size pc)))))
      #:pre-draw (λ (q doc)
                   (save doc)
-                  (apply rect doc (append (quad-origin q) (size q)))
+                  (match-define (list left top) (quad-origin q))
+                  (match-define (list right bottom) (size q))
+                  (rect doc (- left 4) (+ top 6) right (+ bottom 2))
                   (line-width doc 1)
                   (fill-and-stroke doc "#eee" "#999")
                   (restore doc))))
