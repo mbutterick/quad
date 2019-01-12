@@ -140,31 +140,31 @@
 
 
 (define (line-wrap xs size)
-  (break xs size
-         #:hard-break (λ (q) (equal? "¶" (car (quad-elems q))))
-         #:soft-break soft-break-for-line?
-         #:finish-wrap (λ (pcs q idx)
-                         (define new-elems (consolidate-runs pcs))
-                         (append
-                          (if (= idx 1) (list q:line-spacer) null)
-                          (list (struct-copy quad q:line
-                                             [attrs (let ([attrs (hash-copy (quad-attrs q:line))])
-                                                      (define container-val (hash-ref (quad-attrs (car new-elems)) 'container #f))
-                                                      (when (and container-val
-                                                                 (for/and ([elem (in-list (cdr new-elems))])
-                                                                          (equal? (hash-ref (quad-attrs elem) 'container #f)
-                                                                                  container-val)))
-                                                        (hash-set! attrs 'container container-val))
-                                                      attrs)]
-                                             [size (let ()
-                                                     (define line-heights
-                                                       (filter-map
-                                                        (λ (q) (string->number (hash-ref (quad-attrs q) 'line-height "NaN")))
-                                                        pcs))
-                                                     (match-define (list w h) (quad-size q:line))
-                                                     ;; when `line-heights` is empty, this is just h
-                                                     (pt w (apply max (cons h line-heights))))]
-                                             [elems new-elems]))))))
+  (wrap xs size
+        #:hard-break (λ (q) (equal? "¶" (car (quad-elems q))))
+        #:soft-break soft-break-for-line?
+        #:finish-wrap (λ (pcs q idx)
+                        (define new-elems (consolidate-runs pcs))
+                        (append
+                         (if (= idx 1) (list q:line-spacer) null)
+                         (list (struct-copy quad q:line
+                                            [attrs (let ([attrs (hash-copy (quad-attrs q:line))])
+                                                     (define container-val (hash-ref (quad-attrs (car new-elems)) 'container #f))
+                                                     (when (and container-val
+                                                                (for/and ([elem (in-list (cdr new-elems))])
+                                                                         (equal? (hash-ref (quad-attrs elem) 'container #f)
+                                                                                 container-val)))
+                                                       (hash-set! attrs 'container container-val))
+                                                     attrs)]
+                                            [size (let ()
+                                                    (define line-heights
+                                                      (filter-map
+                                                       (λ (q) (string->number (hash-ref (quad-attrs q) 'line-height "NaN")))
+                                                       pcs))
+                                                    (match-define (list w h) (quad-size q:line))
+                                                    ;; when `line-heights` is empty, this is just h
+                                                    (pt w (apply max (cons h line-heights))))]
+                                            [elems new-elems]))))))
 
 (define top-margin 60)
 (define bottom-margin 120)
@@ -174,12 +174,12 @@
 (define q:page (q #:offset page-offset
                   #:draw-start (λ (q doc) (add-page doc))
                   #:draw-end (λ (q doc)
-                                (font-size doc 10)
-                                (text doc (format "~a · ~a at ~a" (hash-ref (quad-attrs q) 'page-number)
-                                                  (hash-ref (quad-attrs q) 'doc-title)
-                                                  (date->string (current-date) #t))
-                                      side-margin
-                                      (- (pdf-height doc) bottom-margin)))))
+                               (font-size doc 10)
+                               (text doc (format "~a · ~a at ~a" (hash-ref (quad-attrs q) 'page-number)
+                                                 (hash-ref (quad-attrs q) 'doc-title)
+                                                 (date->string (current-date) #t))
+                                     side-margin
+                                     (+ (- (pdf-height doc) bottom-margin) 20)))))
 
 (define q:doc (q #:draw-start (λ (q doc) (start-doc doc))
                  #:draw-end (λ (q doc) (end-doc doc))))
@@ -193,13 +193,13 @@
                        (for/sum ([pc (in-list pcs)])
                                 (pt-y (size pc)))))
      #:draw-start (λ (q doc)
-                  (save doc)
-                  (match-define (list left top) (quad-origin q))
-                  (match-define (list right bottom) (size q))
-                  (rect doc (- left 4) (+ top 6) right (+ bottom 2))
-                  (line-width doc 1)
-                  (fill-and-stroke doc "#eee" "#999")
-                  (restore doc))))
+                    (save doc)
+                    (match-define (list left top) (quad-origin q))
+                    (match-define (list right bottom) (size q))
+                    (rect doc (- left 4) (+ top 6) right (+ bottom 2))
+                    (line-width doc 1)
+                    (fill-and-stroke doc "#eee" "#999")
+                    (restore doc))))
 
 (define (contiguous-group-by pred xs)
   ;; like `group-by`, but only groups together contiguous xs with the same pred value.
@@ -219,17 +219,19 @@
    '((1 1) (2 2 2) (3) (4) (5 5) (6 6) (7) (8) (9))))
 
 (define (page-wrap xs vertical-height path)
-  (break xs vertical-height
-         #:finish-wrap (λ (lns q idx)
-                         (list (struct-copy quad q:page
-                                            [attrs (let ([page-number idx]
-                                                         [h (hash-copy (quad-attrs q:page))])
-                                                     (hash-set! h 'page-number page-number)
-                                                     (define-values (dir name _)
-                                                       (split-path (path-replace-extension path #"")))
-                                                     (hash-set! h 'doc-title (string-titlecase (path->string name)))
-                                                     h)]
-                                            [elems lns])))))
+  (wrap xs vertical-height
+        #:soft-break line-spacer?
+        #:wrap-anywhere? #t
+        #:finish-wrap (λ (lns q idx)
+                        (list (struct-copy quad q:page
+                                           [attrs (let ([page-number idx]
+                                                        [h (hash-copy (quad-attrs q:page))])
+                                                    (hash-set! h 'page-number page-number)
+                                                    (define-values (dir name _)
+                                                      (split-path (path-replace-extension path #"")))
+                                                    (hash-set! h 'doc-title (string-titlecase (path->string name)))
+                                                    h)]
+                                           [elems lns])))))
 
 (define (insert-containers pages)
   ;; container recomposition happens after page composition because page breaks can happen between lines.

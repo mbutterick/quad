@@ -38,7 +38,8 @@
                                  [(hash-has-key? (quad-attrs q) 'link)
                                   (save doc)
                                   (fill-color doc "blue")
-                                  (text doc str (first  (quad-origin q)) (second (quad-origin q)) (hasheq 'link (hash-ref (quad-attrs q) 'link)))
+                                  (text doc str (first  (quad-origin q)) (second (quad-origin q))
+                                        #:link (hash-ref (quad-attrs q) 'link))
                                   (restore doc)]
                                  [else
                                   #;(println str)
@@ -66,15 +67,15 @@
 (define $page (q #:attrs (hasheq 'type "page")
                  #:offset '(36 36)
                  #:draw-start (λ (q doc)
-                              (add-page doc)
-                              (font-size doc 10)
-                              (define str (string-append "page " (number->string page-count)))
-                              ;; page number
-                              (save doc)
-                              (fill-color doc "blue")
-                              (text doc str 10 10 (hasheq 'link "https://practicaltypography.com"))
-                              (restore doc)
-                              (set! page-count (add1 page-count)))))
+                                (add-page doc)
+                                (font-size doc 10)
+                                (define str (string-append "page " (number->string page-count)))
+                                ;; page number
+                                (save doc)
+                                (fill-color doc "blue")
+                                (text doc str 10 10 #:link "https://practicaltypography.com")
+                                (restore doc)
+                                (set! page-count (add1 page-count)))))
 (define $doc (q #:draw-start (λ (q doc) (start-doc doc))
                 #:draw-end (λ (q doc) (end-doc doc))))
 (struct $break quad ())
@@ -96,29 +97,29 @@
                                  [elems (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
                                                                                         (quad-elems pc))))]
                                  [size (delay (pt (for/sum ([pc (in-list run-pcs)])
-                                                             (pt-x (size pc)))
-                                                    (pt-y (size (car pcs)))))]))
+                                                           (pt-x (size pc)))
+                                                  (pt-y (size (car pcs)))))]))
     (values (cons new-run runs) rest)))
 
 
 (define consolidate-into-runs? #t)
 (define (line-wrap xs size [debug #f])
-  (break xs size debug
-         #:soft-break soft-break?
-         #:finish-wrap (λ (pcs q idx) (list (struct-copy quad $line
-                                                  [elems
-                                                   ;; consolidate chars into a single run (naively)
-                                                   ;; by taking attributes from first (including origin)
-                                                   ;; this only works because there's only one run per line
-                                                   ;; that is, it suffices to position the first letter
-                                                   (if consolidate-into-runs?
-                                                       (consolidate-runs pcs)
-                                                       pcs)])))))
+  (wrap xs size debug
+        #:soft-break soft-break?
+        #:finish-wrap (λ (pcs q idx) (list (struct-copy quad $line
+                                                        [elems
+                                                         ;; consolidate chars into a single run (naively)
+                                                         ;; by taking attributes from first (including origin)
+                                                         ;; this only works because there's only one run per line
+                                                         ;; that is, it suffices to position the first letter
+                                                         (if consolidate-into-runs?
+                                                             (consolidate-runs pcs)
+                                                             pcs)])))))
 
 (define (page-wrap xs size [debug #f])
-  (break xs size debug
-         #:finish-wrap (λ (pcs q idx) (list (struct-copy quad $page
-                                                  [elems pcs])))))
+  (wrap xs size debug
+        #:finish-wrap (λ (pcs q idx) (list (struct-copy quad $page
+                                                        [elems pcs])))))
 
 (define (typeset pdf qarg)
   (define chars 65)

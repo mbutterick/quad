@@ -1,31 +1,30 @@
 #lang debug racket
 (require racket/list racket/match sugar/debug 
          "param.rkt" "quad.rkt" "atomize.rkt" "position.rkt")
-(provide break)
+(provide wrap)
 
 (define-syntax (debug-report stx)
   (syntax-case stx ()
     [(_ EXPR ...) (with-syntax ([debug (datum->syntax stx 'debug)])
                     #'(when debug (report EXPR ...)))]))
 
-(define (break xs
-               [target-size (current-wrap-distance)]
-               [debug #f]
-               #:hard-break [hard-break? (λ (x) #f)]
-               #:soft-break [soft-break? (λ (x) #f)]
-               #:finish-wrap [finish-wrap-proc (λ (xs q idx) (list xs))])
+(define (wrap xs
+              [target-size (current-wrap-distance)]
+              [debug #f]
+              #:hard-break [hard-break? (λ (x) #f)]
+              #:soft-break [soft-break? (λ (x) #f)]
+              #:wrap-anywhere? [wrap-anywhere? #f]
+              #:finish-wrap [finish-wrap-proc (λ (xs q idx) (list xs))])
   #;((listof quad?)
      (real?
       any/c
       #:hard-break (quad? . -> . any/c)
       #:soft-break (quad? . -> . any/c)
       #:finish-wrap ((listof any/c) quad? natural? . -> . (listof any/c))) . ->* . (listof any/c))
-  (break-hards xs target-size debug hard-break? soft-break? finish-wrap-proc))
 
-;; the hard breaks are used to divide the wrap territory into smaller chunks
-;; that can be cached, parallelized, etc.
-(define (break-hards qs target-size debug hard-break? soft-break? finish-wrap-proc)
-  (let loop ([wraps null][qs qs])
+  ;; the hard breaks are used to divide the wrap territory into smaller chunks
+  ;; that can be cached, parallelized, etc.
+  (let loop ([wraps null][qs xs])
     (match qs
       ;; ignore a trailing hard break
       [(or (? null?) (list (? hard-break?))) (append* (reverse wraps))]
@@ -33,7 +32,7 @@
        (define-values (head tail) (splitf-at rest (λ (x) (not (hard-break? x)))))
        ;; head will be empty (intentionally) if qs starts with two hard breaks
        ;; because there should be a blank wrap in between
-       (define next-wrap (break-softs head target-size debug soft-break? finish-wrap-proc))
+       (define next-wrap (wrap-soft-breaks head target-size debug soft-break? wrap-anywhere? finish-wrap-proc))
        (debug-report next-wrap)
        (loop (cons next-wrap wraps) tail)])))
 
@@ -46,11 +45,12 @@
   ;; thus beginning of list represents the end of the wrap
   (append partial (dropf wrap nonprinting-soft-break-in-middle?)))
 
-(define (break-softs qs
-                     target-size
-                     debug
-                     soft-break?
-                     finish-wrap-proc) ; takes quads in wrap, triggering quad, and wrap idx; returns list containing wrap (and maybe other things)
+(define (wrap-soft-breaks qs
+                          target-size
+                          debug
+                          soft-break?
+                          wrap-anywhere?
+                          finish-wrap-proc) ; takes quads in wrap, triggering quad, and wrap idx; returns list containing wrap (and maybe other things)
   (define (finish-wrap qs wrap-idx [wrap-triggering-q (car qs)])
     ;; reverse because quads accumulated in reverse
     ;; wrap-triggering-q is ordinarily the last accumulated q
@@ -95,8 +95,16 @@
           (define would-overflow? (and current-dist (> (+ dist current-dist) target-size)))
           (cond
             [would-overflow?
-             (match q
-               [(and (? soft-break?) (? nonprinting-at-end?))
+             (cond
+               [wrap-anywhere?
+                (debug-report 'we-can-wrap-anywhere-so-why-not-here)
+                (loop (cons (finish-wrap (wrap-append next-wrap-tail next-wrap-head) wrap-idx) wraps)
+                      (add1 wrap-idx)
+                      null
+                      null
+                      #false
+                      qs)]
+               [(and (soft-break? q) (nonprinting-at-end? q))
                 (debug-report 'would-overflow-soft-nonprinting)
                 ;; a break is inevitable but we want to wait to finish the wrap until we see a hard quad
                 ;; but we can move the current-partial into the current-wrap
@@ -106,22 +114,22 @@
                       null
                       (+ dist current-dist)
                       other-qs)]
-               [_ #:when (empty? next-wrap-head)
-                  (debug-report 'would-overflow-hard-without-captured-break)
-                  (loop (cons (finish-wrap next-wrap-tail wrap-idx) wraps)
-                        (add1 wrap-idx)
-                        null
-                        null
-                        #false
-                        qs)]
-               [_ ; finish the wrap & reset the line without consuming a quad
+               [(empty? next-wrap-head)
+                (debug-report 'would-overflow-hard-without-captured-break)
+                (loop (cons (finish-wrap next-wrap-tail wrap-idx) wraps)
+                      (add1 wrap-idx)
+                      null
+                      null
+                      #false
+                      qs)]
+               [else ; finish the wrap & reset the line without consuming a quad
                 (loop (cons (finish-wrap next-wrap-head wrap-idx) wraps)
                       (add1 wrap-idx)
                       null
                       next-wrap-tail
                       (apply + (map distance next-wrap-tail))
                       qs)])]         
-            [(soft-break? q) ; printing soft break, like a hyphen
+            [(soft-break? q)
              (debug-report 'would-not-overflow-soft)
              ;; a soft break that fits, so move it on top of the next-wrap-head with the next-wrap-tail
              (loop wraps
@@ -178,10 +186,10 @@
 (define soft-break? (λ (q)  (memv (car (quad-elems q)) '(#\space #\-))))
 
 (define (linewrap xs size [debug #f])
-  (add-between (break xs size debug
-                      #:finish-wrap (λ (xs . _) (list xs))
-                      #:hard-break (λ (q) (char=? (car (quad-elems q)) #\newline))
-                      #:soft-break soft-break?) lbr))
+  (add-between (wrap xs size debug
+                     #:finish-wrap (λ (xs . _) (list xs))
+                     #:hard-break (λ (q) (char=? (car (quad-elems q)) #\newline))
+                     #:soft-break soft-break?) lbr))
 
 (module+ test
   (require rackunit))
@@ -284,13 +292,13 @@
 (define (visual-wrap str int [debug #f])
   (string-join
    (for/list ([x (in-list (linewrap (for/list ([atom (atomize str)])
-                                      (if (equal? (quad-elems atom) '(#\space))
-                                          (struct-copy quad sp)
-                                          (struct-copy quad q-one
-                                                       [attrs (quad-attrs atom)]
-                                                       [elems (quad-elems atom)]))) int debug))]
+                                              (if (equal? (quad-elems atom) '(#\space))
+                                                  (struct-copy quad sp)
+                                                  (struct-copy quad q-one
+                                                               [attrs (quad-attrs atom)]
+                                                               [elems (quad-elems atom)]))) int debug))]
               #:when (and (list? x) (andmap quad? x)))
-     (list->string (map car (map quad-elems x))))
+             (list->string (map car (map quad-elems x))))
    "|"))
 
 (module+ test
@@ -315,9 +323,9 @@
 
 (define (pagewrap xs size [debug #f])
   (add-between
-   (break (flatten xs) size debug
-          #:hard-break (λ (x) (and (quad? x) (memv (car (quad-elems x)) '(#\page))))
-          #:soft-break (λ (x) (and (quad? x) (eq? x lbr)))) pbr))
+   (wrap (flatten xs) size debug
+         #:hard-break (λ (x) (and (quad? x) (memv (car (quad-elems x)) '(#\page))))
+         #:soft-break (λ (x) (and (quad? x) (eq? x lbr)))) pbr))
 (define pbr (q #:size #false #:elems '(#\page)))
 
 (module+ test
@@ -353,10 +361,10 @@
 
 (define (linewrap2 xs size [debug #f])
   (add-between
-   (break xs size debug
-          #:hard-break (λ (q) (memv (car (quad-elems q)) '(#\newline)))
-          #:soft-break soft-break?
-          #:finish-wrap (λ (pcs . _) (list (apply q pcs))))
+   (wrap xs size debug
+         #:hard-break (λ (q) (memv (car (quad-elems q)) '(#\newline)))
+         #:soft-break soft-break?
+         #:finish-wrap (λ (pcs . _) (list (apply q pcs))))
    lbr))
 
 (module+ test
@@ -369,3 +377,18 @@
    (check-equal? (linewrap2 (list x x x x) 3) (list (q x x x) lbr (q x)))
    (check-equal? (linewrap2 (list x x x sp x x) 2) (list (q x x) lbr (q x) lbr (q x x)))
    (check-equal? (linewrap2 (list x x x sp x x) 3) (list (q x x x) lbr (q x x)))))
+
+(module+ test
+  (test-case
+   "wrap anywhere behavior"
+   (struct sp quad ())
+   (define (qsoft)
+     (q #:type sp
+        #:printable (λ (q sig) (not (memq sig '(start end))))
+        #:size (pt 1 1)))
+   (define (qhard) (q #:attrs (hasheq 'q 1) #:size (pt 1 1)))
+   (define qs (list (qhard) (qsoft) (qhard) (qhard)))
+   ;; only wraps on soft break, so two qhards go in second wrap
+   (check-equal? (wrap qs 3 #:soft-break sp?) (list (list (qhard)) (list (qhard) (qhard))))
+   ;; wraps anywhere, so two qhards fit onto first wrap with space
+   (check-equal? (wrap qs 3 #:soft-break sp? #:wrap-anywhere? #t) (list (list (qhard) (qsoft) (qhard)) (list (qhard))))))

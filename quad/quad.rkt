@@ -57,7 +57,7 @@
    (define (hash-proc h recur) (equal-hash-code h))
    (define (hash2-proc h recur) (equal-secondary-hash-code h))])
 
-(define (default-printable q [sig #f]) #f)
+(define (default-printable q [sig #f]) #t)
 
 (define (default-draw q surface)
   (for-each (λ (qi) (draw qi surface)) (quad-elems q)))
