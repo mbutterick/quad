@@ -14,21 +14,23 @@
     [(? procedure? proc) (proc q signal)]
     [val val]))
 
-(define (draw q [surface #f])
-  ((quad-draw q) q surface))
+(define (draw q [surface (current-output-port)])
+  ((quad-draw-start q) q surface)
+  ((quad-draw q) q surface)
+  ((quad-draw-end q) q surface))
 
 (define (hashes-equal? h1 h2)
   (and (= (length (hash-keys h1)) (length (hash-keys h2)))
        (for/and ([(k v) (in-hash h1)])
-         (and (hash-has-key? h2 k) (equal? (hash-ref h2 k) v)))))
+                (and (hash-has-key? h2 k) (equal? (hash-ref h2 k) v)))))
 
 (define (quad=? q1 q2 recur?)
   (and
    ;; exclude attrs from initial comparison
    (for/and ([getter (in-list (list quad-elems quad-size quad-in quad-out quad-inner
                                     quad-offset quad-origin quad-printable
-                                    quad-pre-draw quad-post-draw quad-draw))])
-     (equal? (getter q1) (getter q2)))
+                                    quad-draw-start quad-draw-end quad-draw))])
+            (equal? (getter q1) (getter q2)))
    ;; and compare them key-by-key
    (hashes-equal? (quad-attrs q1) (quad-attrs q2))))
 
@@ -41,9 +43,9 @@
               offset
               origin
               printable
-              pre-draw
-              post-draw
-              draw)
+              draw-start
+              draw
+              draw-end)
   #:property prop:custom-write
   (λ (v p w?) (display
                (format "<quad ~a~a>"
@@ -58,9 +60,7 @@
 (define (default-printable q [sig #f]) #f)
 
 (define (default-draw q surface)
-  ((quad-pre-draw q) q surface)
-  (for-each (λ (qi) ((quad-draw qi) qi surface)) (quad-elems q))
-  ((quad-post-draw q) q surface))
+  (for-each (λ (qi) (draw qi surface)) (quad-elems q)))
 
 ;; why 'nw and 'ne as defaults for in and out points:
 ;; if size is '(0 0), 'nw and 'ne are the same point,
@@ -80,9 +80,9 @@
          #:offset [offset '(0 0)]
          #:origin [origin '(0 0)]
          #:printable [printable default-printable]
-         #:pre-draw [pre-draw void]
-         #:post-draw [post-draw void]
+         #:draw-start [draw-start void]
          #:draw [draw default-draw]
+         #:draw-end [draw-end void]
          . args)
   (match args
     [(list (== #false) elems ...) (make-quad #:elems elems)]
@@ -98,13 +98,14 @@
                 offset
                 origin
                 printable
-                pre-draw
-                post-draw
-                draw)]))
+                draw-start
+                draw
+                draw-end)]))
   
 (define q make-quad)
 
 (module+ test
+  (require racket/port)
   (define q1 (q #f #\H #\e #\l #\o))
   (define q2 (q #f #\H #\e #\l #\o))
   (define q3 (q #f #\H #\e #\l))
@@ -112,5 +113,5 @@
   (check-true (equal? q1 q2))
   (check-false (equal? q1 q3))
   (define q4 (struct-copy quad q1
-                          [draw (λ (q surface) "foo")]))
-  (check-equal? (draw q4) "foo"))
+                          [draw (λ (q surface) (display "foo" surface))]))
+  (check-equal? (with-output-to-string (λ () (draw q4))) "foo"))

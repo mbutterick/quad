@@ -54,8 +54,8 @@
                              (match-define (list str) (quad-elems q))
                              (match-define (list x y) (quad-origin q))
                              (text doc str x y #:bg (hash-ref (quad-attrs q) 'bg #f)
-                                   #:link (hash-ref (quad-attrs q) 'link #f))
-                             (draw-debug q doc "#99f" "#ccf"))))
+                                   #:link (hash-ref (quad-attrs q) 'link #f)))
+                    #:draw-end (λ (q doc)  (draw-debug q doc "#99f" "#ccf"))))
 
 (define-runtime-path charter "fonts/charter.ttf")
 (define-runtime-path charter-bold "fonts/charter-bold.ttf")
@@ -109,18 +109,14 @@
                   #:inner 'sw ; puts baseline at lower right corner of line box
                   #:out 'sw
                   #:printable #true
-                  #:draw (λ (q doc)
-                           (draw-debug q doc)
-                           (default-draw q doc))))
+                  #:draw-start draw-debug))
 (struct line-spacer quad () #:transparent)
 (define q:line-spacer (q #:type line-spacer
                          #:size (pt 380 (* line-height 0.6))
                          #:out 'sw
                          #:printable (λ (q sig)
                                        (not (memq sig '(start end))))
-                         #:draw (λ (q doc)
-                                  (draw-debug q doc)
-                                  (default-draw q doc))))
+                         #:draw-start draw-debug))
 
 (define softies (map string '(#\space #\- #\u00AD)))
 (define (soft-break-for-line? q)
@@ -176,8 +172,8 @@
 (define page-offset (pt side-margin top-margin))
 (require racket/date)
 (define q:page (q #:offset page-offset
-                  #:pre-draw (λ (q doc) (add-page doc))
-                  #:post-draw (λ (q doc)
+                  #:draw-start (λ (q doc) (add-page doc))
+                  #:draw-end (λ (q doc)
                                 (font-size doc 10)
                                 (text doc (format "~a · ~a at ~a" (hash-ref (quad-attrs q) 'page-number)
                                                   (hash-ref (quad-attrs q) 'doc-title)
@@ -185,8 +181,8 @@
                                       side-margin
                                       (- (pdf-height doc) bottom-margin)))))
 
-(define q:doc (q #:pre-draw (λ (q doc) (start-doc doc))
-                 #:post-draw (λ (q doc) (end-doc doc))))
+(define q:doc (q #:draw-start (λ (q doc) (start-doc doc))
+                 #:draw-end (λ (q doc) (end-doc doc))))
 
 (define (make-blockquote pcs)
   (q #:attrs (hasheq 'type "bq")
@@ -196,7 +192,7 @@
      #:size (delay (pt (pt-x (size (car pcs)))
                        (for/sum ([pc (in-list pcs)])
                                 (pt-y (size pc)))))
-     #:pre-draw (λ (q doc)
+     #:draw-start (λ (q doc)
                   (save doc)
                   (match-define (list left top) (quad-origin q))
                   (match-define (list right bottom) (size q))
