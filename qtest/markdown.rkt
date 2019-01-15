@@ -37,7 +37,13 @@
   (txexpr 'q (append '((font "fira-mono")(fontsize "11")(bg "aliceblue")) attrs)  exprs))
 
 (define-tag-function (pre attrs exprs)
-  (txexpr 'q attrs exprs))
+  ;; pre needs to convert white space to equivalent layout elements
+  (define new-exprs (add-between
+                     (for*/list ([expr (in-list exprs)]
+                                 [str (in-list (string-split (car (get-elements expr)) "\n"))])
+                                `(,(get-tag expr) ,(get-attrs expr) ,str))
+                     '(q "¶")))
+  (txexpr 'q attrs new-exprs))
 
 (define q:string (q #:in 'bi
                     #:out 'bo ;; align to baseline
@@ -139,14 +145,24 @@
     (values (cons new-run runs) rest)))
 
 
+(struct line-break quad ())
+(define lbr (q #:type line-break))
+
 (define (line-wrap xs size)
   (wrap xs size
-        #:hard-break (λ (q) (equal? "¶" (car (quad-elems q))))
+        #:hard-break (λ (q) (match (quad-elems q)
+                              [(list (or "¶¶" "¶")) #t]
+                              [_ #f]))
         #:soft-break soft-break-for-line?
         #:finish-wrap (λ (pcs q idx)
+                        #R pcs
+                        #R q
+                        #R (= idx 1)
                         (define new-elems (consolidate-runs pcs))
                         (append
-                         (if (= idx 1) (list q:line-spacer) null)
+                         (if (and (= idx 1) #R (equal? (quad-elems q) '("¶¶")))
+                             (list q:line-spacer)
+                             null)
                          (list (struct-copy quad q:line
                                             [attrs (let ([attrs (hash-copy (quad-attrs q:line))])
                                                      (define container-val (hash-ref (quad-attrs (car new-elems)) 'container #f))
@@ -263,24 +279,17 @@
 
 (define-syntax (mb stx)
   (syntax-case stx ()
-    [(_ . STRS)
-     (with-syntax ([PS (syntax-property #'STRS 'ps)])
-       #'(#%module-begin
-          (define qx `(q ((font "Charter") (fontsize "12")) ,@(list . STRS)))
-          (run qx PS)))]))
+    [(_ PDF-PATH . STRS)
+     #'(#%module-begin
+        (define qx `(q ((font "Charter") (fontsize "12")) ,@(list . STRS)))
+        (run qx PDF-PATH))]))
 
+(module+ reader
+  (require scribble/reader syntax/strip-context (only-in markdown parse-markdown)
+           racket/match txexpr)
+  (provide (rename-out [quad-read-syntax read-syntax]))
 
-
-(module reader syntax/module-reader
-  qtest/markdown
-  #:read quad-read
-  #:read-syntax quad-read-syntax
-  #:whole-body-readers? #t ;; need this to make at-reader work
-  (require scribble/reader  (only-in markdown parse-markdown) racket/list quad)
-  
-  (define (quad-read p) (syntax->datum (quad-read-syntax (object-name p) p)))
-
-  (require racket/match txexpr)
+ 
   (define (xexpr->parse-tree x)
     ;; an ordinary txexpr can't serve as a parse tree because of the attrs list fails when passed to #%app.
     ;; so stick an `attr-list` identifier on it which can hook into the expander.
@@ -297,5 +306,10 @@
                             #:inside? #t
                             #:command-char #\◊))
     (define stx (quad-at-reader path-string p))
-    (define parsed-stx (datum->syntax stx (xexpr->parse-tree (add-between (parse-markdown (apply string-append (syntax->datum stx))) '(q "¶")))))
-    (syntax-property parsed-stx 'ps (path-replace-extension path-string #".pdf"))))
+    (define parsed-stx (datum->syntax stx (xexpr->parse-tree (add-between (parse-markdown (apply string-append (syntax->datum stx))) '(q "¶¶")))))
+    (strip-context
+     (with-syntax ([PT parsed-stx]
+                   [PDF-PATH (path-replace-extension path-string #".pdf")])
+       #'(module _ qtest/markdown
+           PDF-PATH
+           . PT)))))
