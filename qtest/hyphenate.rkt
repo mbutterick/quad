@@ -16,6 +16,11 @@ We said `raco pkg install hyphenate` dude
 
 What?!
 
+```
+Code block
+Goes here
+```
+
 > Hyphenate `xexpr` by calculating hyphenation points and inserting
 `joiner` at those points. By default, `joiner` is the soft hyphen
 \(Unicode 00AD = decimal 173\). Words shorter than

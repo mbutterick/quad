@@ -30,37 +30,39 @@
     ;; wrap-triggering-q is ordinarily the last accumulated q
     ;; unless it's the last wrap, in which case it's #f
     ;; but we capture it separately because it's likely to get trimmed away by `nonprinting-at-end?`
+    ;; note: we don't trim `soft-break?` or `hard-break?` because that's an orthogonal consideration
+    ;; for instance, a hyphen is `soft-break?` but shouldn't be trimmed.
     (finish-wrap-proc (reverse (dropf qs nonprinting-at-end?)) wrap-triggering-q wrap-idx))
   (let loop ([wraps null] ; list of (list of quads)
              [wrap-idx 1] ; wrap count (could be (length wraps) but we'd rather avoid `length`)
-             [next-wrap-head null] ; list of quads ending in previous `soft-break?`
+             [next-wrap-head null] ; list of quads ending in previous `soft-break?` or `hard-break?`
              [next-wrap-tail null] ; list of unbreakable quads
              [current-dist #false] ; #false (to indicate start) or integer
              [qs qs]) ; list of quads
     (match qs
-      [(or (list (? hard-break?)) (== empty))
+      [(or (== empty) (list (? hard-break?))) ; ignore single trailing hard break
        (define last-wrap (finish-wrap (wrap-append next-wrap-tail next-wrap-head) wrap-idx #f))
        ; append* because `finish-wrap-proc` returns a spliceable list
        ; reverse because wraps accumulated in reverse
+       ; as a special case, '(()) is returned as just '()
        (match (append* (reverse (cons last-wrap wraps)))
          [(list (list)) (list)]
-         [val val])]
-      [(cons (? hard-break? hard-break-q) other-qs)
-       (debug-report 'hard-break)
-       ;; a break is inevitable but we want to wait to finish the wrap until we see a hard quad
-       ;; but we can move the current-partial into the current-wrap
-       (loop wraps
-             wrap-idx
-             (wrap-append (cons hard-break-q next-wrap-tail) next-wrap-head)
-             null
-             current-dist
-             other-qs)]
+         [wraps wraps])]
       [(cons q other-qs)
        (debug-report q 'next-q)
        (debug-report (quad-elems q) 'next-q-elems)
-       (define at-start? (not current-dist))
        (cond
-         [at-start?
+         [(hard-break? q)
+          (debug-report 'found-hard-break)
+          ;; put hard break onto next-wrap-tail, and finish the wrap
+          (define wrap-qs (wrap-append (cons q next-wrap-tail) next-wrap-head))
+          (loop (cons (finish-wrap wrap-qs wrap-idx) wraps)
+                (add1 wrap-idx)
+                null
+                null
+                #false
+                other-qs)]
+         [(let ([at-start? (not current-dist)]) at-start?)
           (match q
             [(and (? soft-break?) (? nonprinting-at-start?))
              (debug-report q 'skipping-soft-break-at-beginning)
@@ -269,7 +271,7 @@
   (test-case
    "hard breaks and spurious spaces"
    (check-equal? (linewrap (list a sp sp sp lbr b) 2) (list (list a) lbr (list b)))
-   (check-equal? (linewrap (list x sp lbr sp sp x x sp) 3) (list (list x) lbr (list x x)))
+   (check-equal? (linewrap (list a sp lbr sp sp b c sp) 3) (list (list a) lbr (list b c)))
    (check-equal? (linewrap (list sp sp x x sp sp lbr sp sp sp x) 3) (list (list x x) lbr (list x)))
    (check-equal? (linewrap (list a sp b sp sp lbr sp c) 3) (list (list a sp b) lbr (list c)))
    (check-equal? (linewrap (list x x x x) 3) (list (list x x x) lbr (list x)))
@@ -313,7 +315,9 @@
    (wrap (flatten xs) size debug
          #:hard-break (λ (x) (and (quad? x) (memv (car (quad-elems x)) '(#\page))))
          #:soft-break (λ (x) (and (quad? x) (eq? x lbr)))) pbr))
-(define pbr (q #:size #false #:elems '(#\page)))
+(define pbr (q #:size #false
+               #:printable #false
+               #:elems '(#\page)))
 
 (module+ test
   (require rackunit)
@@ -331,20 +335,20 @@
 (module+ test
   (test-case
    "hard page breaks"
-   (check-equal? (pagewrap (list x pbr x x) 2) (list (list x) pbr (list x x)))
+   (check-equal? (pagewrap (list a pbr b c) 2) (list (list a) pbr (list b c)))
    (check-equal? (pagewrap (list x pbr x x) 1) (list (list x) pbr (list x) pbr (list x)))
    (check-equal? (pagewrap (list x pbr pbr x x) 1) (list (list x) pbr (list) pbr (list x) pbr (list x)))
    (check-equal? (pagewrap (list x pbr pbr x x) 2) (list (list x) pbr (list) pbr (list x x)))
    (check-equal? (pagewrap (list lbr x lbr lbr pbr lbr x x lbr) 2) (list (list x) pbr (list x x)))))
 
-#;(module+ test
-    (test-case
-     "composed line breaks and page breaks"
-     (check-equal? (pagewrap (linewrap null 1) 2) (list))
-     (check-equal? (pagewrap (linewrap (list x) 1) 2) (list (list x)))
-     (check-equal? (pagewrap (linewrap (list x x x) 1) 2) (list (list x lbr x) pbr (list x)))
-     (check-equal? (pagewrap (linewrap (list x x x) 2) 2) (list (list x x) pbr (list x)))
-     (check-equal? (pagewrap (linewrap (list x x x) 2) 1) (list (list x) pbr (list x) pbr (list x)))))
+(module+ test
+  (test-case
+   "composed line breaks and page breaks"
+   (check-equal? (pagewrap (linewrap null 1) 2) (list))
+   (check-equal? (pagewrap (linewrap (list x) 1) 2) (list (list x)))
+   (check-equal? (pagewrap (linewrap (list x x x) 1) 2) (list (list x lbr x) pbr (list x)))
+   (check-equal? (pagewrap (linewrap (list x x x) 2) 2) (list (list x x) pbr (list x)))
+   (check-equal? (pagewrap (linewrap (list x x x) 2) 1) (list (list x) pbr (list x) pbr (list x)))))
 
 (define (linewrap2 xs size [debug #f])
   (add-between
@@ -379,3 +383,4 @@
    (check-equal? (wrap qs 3 #:soft-break sp?) (list (list (qhard)) (list (qhard) (qhard))))
    ;; wraps anywhere, so two qhards fit onto first wrap with space
    (check-equal? (wrap qs 3 #:soft-break sp? #:wrap-anywhere? #t) (list (list (qhard) (qsoft) (qhard)) (list (qhard))))))
+

@@ -146,7 +146,6 @@
 
 
 (struct line-break quad ())
-(define lbr (q #:type line-break))
 
 (define (line-wrap xs size)
   (wrap xs size
@@ -155,14 +154,8 @@
                               [_ #f]))
         #:soft-break soft-break-for-line?
         #:finish-wrap (λ (pcs q idx)
-                        #R pcs
-                        #R q
-                        #R (= idx 1)
                         (define new-elems (consolidate-runs pcs))
                         (append
-                         (if (and (= idx 1) #R (equal? (quad-elems q) '("¶¶")))
-                             (list q:line-spacer)
-                             null)
                          (list (struct-copy quad q:line
                                             [attrs (let ([attrs (hash-copy (quad-attrs q:line))])
                                                      (define container-val (hash-ref (quad-attrs (car new-elems)) 'container #f))
@@ -180,7 +173,10 @@
                                                     (match-define (list w h) (quad-size q:line))
                                                     ;; when `line-heights` is empty, this is just h
                                                     (pt w (apply max (cons h line-heights))))]
-                                            [elems new-elems]))))))
+                                            [elems new-elems]))
+                         (if (and q (equal? (quad-elems q) '("¶¶")))
+                             (list q:line-spacer)
+                             null)))))
 
 (define top-margin 60)
 (define bottom-margin 120)
