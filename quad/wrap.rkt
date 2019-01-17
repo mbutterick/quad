@@ -280,7 +280,8 @@
 
 (define (visual-wrap str int [debug #f])
   (string-join
-   (for/list ([x (in-list (linewrap (for/list ([atom (atomize str)])
+   (for/list ([x (in-list (linewrap (for/list ([c (in-string str)])
+                                              (define atom (q c))
                                               (if (equal? (quad-elems atom) '(#\space))
                                                   (struct-copy quad sp)
                                                   (struct-copy quad q-one

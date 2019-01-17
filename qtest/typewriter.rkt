@@ -128,7 +128,7 @@
   (time-name config-pdf
              (font pdf (path->string charter))
              (font-size pdf 12))
-  (let* ([x (time-name runify (runify qarg))]
+  (let* ([x (time-name atomize (atomize qarg))]
          [x (time-name quadify (map (λ (x) (quadify pdf x)) x))]
          [x (time-name line-wrap (line-wrap x line-width))]
          [x (time-name page-wrap (page-wrap x lines-per-page))]

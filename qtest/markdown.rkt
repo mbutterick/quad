@@ -2,39 +2,37 @@
 (require (for-syntax racket/base) txexpr racket/runtime-path racket/string racket/promise racket/match racket/list
          pitfall quad sugar/debug pollen/tag)
 (provide (except-out (all-from-out racket/base) #%module-begin)
-         (rename-out [mb #%module-begin] [q-tag q])
+         (rename-out [mb #%module-begin])
          p id strong em attr-list h1 h2 code pre a blockquote)
 
 (define-tag-function (p attrs exprs)
-  (txexpr 'q attrs exprs))
+  (qexpr attrs exprs))
 
 (define-tag-function (blockquote attrs exprs)
-  (txexpr 'q (cons '(container "bq") attrs) exprs))
+  (qexpr (cons '(container "bq") attrs) exprs))
 
 (define id (default-tag-function 'id))
 (define class (default-tag-function 'class))
 
-(define q-tag (default-tag-function 'q))
-
 (define-tag-function (strong attrs exprs)
-  (txexpr 'q (cons '(font "charter-bold") attrs) exprs))
+  (qexpr (cons '(font "charter-bold") attrs) exprs))
 
 (define-tag-function (a attrs exprs)
-  (txexpr 'q `((link ,(cadr (assoc 'href attrs)))(color "MediumVioletRed")) exprs))
+  (qexpr `((link ,(cadr (assoc 'href attrs)))(color "MediumVioletRed")) exprs))
 
 (define-tag-function (em attrs exprs)
-  (txexpr 'q (cons '(font "charter-italic") attrs) exprs))
+  (qexpr (cons '(font "charter-italic") attrs) exprs))
 
 (define-syntax-rule (attr-list . attrs) 'attrs)
 
 (define-tag-function (h1 attrs exprs)
-  (txexpr 'q (append  '((font "fira")(fontsize "36")(line-height "48")) attrs) exprs))
+  (qexpr (append  '((font "fira")(fontsize "36")(line-height "48")) attrs) exprs))
 
 (define-tag-function (h2 attrs exprs)
-  (txexpr 'q (append '((font "fira")(fontsize "24")(line-height "36")) attrs)  exprs))
+  (qexpr (append '((font "fira")(fontsize "24")(line-height "36")) attrs)  exprs))
 
 (define-tag-function (code attrs exprs)
-  (txexpr 'q (append '((font "fira-mono")(fontsize "11")(bg "aliceblue")) attrs)  exprs))
+  (qexpr (append '((font "fira-mono")(fontsize "11")(bg "aliceblue")) attrs)  exprs))
 
 (define-tag-function (pre attrs exprs)
   ;; pre needs to convert white space to equivalent layout elements
@@ -42,8 +40,8 @@
                      (for*/list ([expr (in-list exprs)]
                                  [str (in-list (string-split (car (get-elements expr)) "\n"))])
                                 `(,(get-tag expr) ,(get-attrs expr) ,str))
-                     '(q "¶")))
-  (txexpr 'q attrs new-exprs))
+                     lbr))
+  (qexpr attrs new-exprs))
 
 (define q:string (q #:in 'bi
                     #:out 'bo ;; align to baseline
@@ -70,30 +68,33 @@
 (define-runtime-path fira-mono "fonts/fira-mono.ttf")
 
 (define (->string-quad doc q)
-  (struct-copy
-   quad q:string
-   [attrs (let ([attrs (quad-attrs q)])
-            ;; attrs hashes are shared between many quads.
-            ;; so the first update will change every reference to the shared hash
-            ;; hence why we ignore if val is already a path
-            ;; but this op should ideally happen earlier
-            (hash-update! attrs 'font
-                          (λ (val) (if (path? val)
-                                       val
-                                       (match (string-downcase (string-replace val " " "-"))
-                                         ["charter" charter]
-                                         ["charter-bold" charter-bold]
-                                         ["charter-italic" charter-italic]
-                                         ["fira" fira]
-                                         ["fira-mono" fira-mono]))))
-            attrs)]
-   [elems (quad-elems q)]
-   [size (delay
-           (define fontsize (string->number (hash-ref (quad-attrs q) 'fontsize)))
-           (font-size doc fontsize)
-           (font doc (path->string (hash-ref (quad-attrs q) 'font)))
-           (define str (car (quad-elems q)))
-           (pt (string-width doc str) (current-line-height doc)))]))
+  (cond
+    [(line-break? q) q]
+    [else
+     (struct-copy
+      quad q:string
+      [attrs (let ([attrs (quad-attrs q)])
+               ;; attrs hashes are shared between many quads.
+               ;; so the first update will change every reference to the shared hash
+               ;; hence why we ignore if val is already a path
+               ;; but this op should ideally happen earlier
+               (hash-update! attrs 'font
+                             (λ (val) (if (path? val)
+                                          val
+                                          (match (string-downcase (string-replace val " " "-"))
+                                            ["charter" charter]
+                                            ["charter-bold" charter-bold]
+                                            ["charter-italic" charter-italic]
+                                            ["fira" fira]
+                                            ["fira-mono" fira-mono]))))
+               attrs)]
+      [elems (quad-elems q)]
+      [size (delay
+              (define fontsize (string->number (hash-ref (quad-attrs q) 'fontsize)))
+              (font-size doc fontsize)
+              (font doc (path->string (hash-ref (quad-attrs q) 'font)))
+              (define str (car (quad-elems q)))
+              (pt (string-width doc str) (current-line-height doc)))])]))
 
 (define draw? #f)
 (define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"])
@@ -145,15 +146,29 @@
     (values (cons new-run runs) rest)))
 
 
-(struct line-break quad ())
+(struct line-break quad () #:transparent)
+(define lbr (q #:type line-break
+               #:elems '("¶")
+               #:printable #f))
+(struct para-break line-break () #:transparent)
+(define pbr (q #:type para-break
+               #:elems '("¶¶")
+               #:printable #f))
+
+(module+ test
+  (check-true (line-break? (second (quad-elems (q "foo" pbr "bar")))))
+  (check-true (line-break? (second (atomize (q "foo" pbr "bar"))))))
 
 (define (line-wrap xs size)
-  (wrap xs size
-        #:hard-break (λ (q) (match (quad-elems q)
-                              [(list (or "¶¶" "¶")) #t]
-                              [_ #f]))
+  #R xs
+  #R (line-break? (second xs))
+  (wrap xs size 'debug
+        #:hard-break line-break?
         #:soft-break soft-break-for-line?
         #:finish-wrap (λ (pcs q idx)
+                        #R pcs
+                        #R q
+                        #R idx
                         (define new-elems (consolidate-runs pcs))
                         (append
                          (list (struct-copy quad q:line
@@ -187,6 +202,8 @@
                   #:draw-start (λ (q doc) (add-page doc))
                   #:draw-end (λ (q doc)
                                (font-size doc 10)
+                               (font doc charter)
+                               (fill-color doc "black")
                                (text doc (format "~a · ~a at ~a" (hash-ref (quad-attrs q) 'page-number)
                                                  (hash-ref (quad-attrs q) 'doc-title)
                                                  (date->string (current-date) #t))
@@ -265,8 +282,10 @@
                                             #:size "letter")))
   (define line-width (- (pdf-width pdf) (* 2 side-margin)))
   (define vertical-height (- (pdf-height pdf) top-margin bottom-margin))
-  (let* ([x (time-name runify (runify (qexpr->quad xs)))]
+  (let* ([x (time-name atomize #R (atomize #R (qexpr->quad xs)))]
+         [x (begin #R (line-break? (second x)) x)]
          [x (time-name ->string-quad (map (λ (x) (->string-quad pdf x)) x))]
+         [x (begin #R (line-break? (second x)) x)]
          [x (time-name line-wrap (line-wrap x line-width))]
          [x (time-name page-wrap (page-wrap x vertical-height path))]
          [x (time-name insert-containers (insert-containers x))]
@@ -277,7 +296,7 @@
   (syntax-case stx ()
     [(_ PDF-PATH . STRS)
      #'(#%module-begin
-        (define qx `(q ((font "Charter") (fontsize "12")) ,@(list . STRS)))
+        (define qx (list* 'q '((font "Charter") (fontsize "12")) (add-between (list . STRS) pbr)))
         (run qx PDF-PATH))]))
 
 (module+ reader
@@ -302,7 +321,7 @@
                             #:inside? #t
                             #:command-char #\◊))
     (define stx (quad-at-reader path-string p))
-    (define parsed-stx (datum->syntax stx (xexpr->parse-tree (add-between (parse-markdown (apply string-append (syntax->datum stx))) '(q "¶¶")))))
+    (define parsed-stx (datum->syntax stx (xexpr->parse-tree (parse-markdown (apply string-append (syntax->datum stx))))))
     (strip-context
      (with-syntax ([PT parsed-stx]
                    [PDF-PATH (path-replace-extension path-string #".pdf")])

@@ -1,49 +1,59 @@
 #lang debug racket/base
 (require xml
-         racket/contract
-         racket/class
          racket/dict
          racket/string
          racket/match
          racket/list
          txexpr 
-         "quad.rkt" sugar/debug)
+         "quad.rkt")
 (provide (all-defined-out))
 
 (module+ test (require rackunit))
 
-(define/contract (qexpr? x)
-  ;; a qexpr is like an xexpr, but more lenient in some ways (allows single char as body element)
-  ;; and less in others (only allows 'q or 'quad as tag names)
-  (any/c . -> . boolean?)
-  (define (valid-tag? tag) (and (memq tag '(q quad)) #t))
+;; should we allow quads within a qexpr? I say yes
+(define permissive-qexprs (make-parameter #t))
+
+(define (valid-tag? tag) (and (memq tag '(q quad)) #t))
+
+(define (qexpr? x)
+  ;; a qexpr is like an xexpr, but more lenient in some ways (possibly allows quads)
+  ;; and less in others (only allows 'q or 'quad as tag names, only allows strings or qexprs as elements)
+  ;; attrs are open-ended
   (match x
-    [(? txexpr?) #t]
-    [(list (? symbol? tag) (? char? c)) #t]
+    [(cons (? valid-tag?) rest)
+     (match rest
+       [(list (? txexpr-attrs?) (? qexpr?) ...) #t]
+       [(list (? qexpr?) ...) #t]
+       [_ #f])]
     [(? string?) #t]
-    [else #f]))
+    [(? quad?) (permissive-qexprs)]
+    [_ #f]))
 
 
 (module+ test
   (check-true (qexpr? "Hello world"))
   (check-true (qexpr? '(q "Hello world")))
   (check-true (qexpr? '(quad "Hello world")))
-  #;(check-false (qexpr? '(div "Hello world")))
-  (check-true (qexpr? '(q #\H)))
-  (check-true (qexpr? '(quad #\H)))
-  #;(check-false (qexpr? '(span #\H)))
+  (check-false (qexpr? '(div "Hello world")))
+  (check-false (qexpr? '(q #\H)))
+  (check-false (qexpr? '(quad #\H)))
+  (check-false (qexpr? '(span #\H)))
   (check-true (qexpr? '(quad "Hello world")))
-  (check-false (qexpr? 'q)))
+  (check-true (qexpr? `(quad "Hello " ,(q "world")))))
 
 (define (quad-name q) (string->symbol (string-trim (symbol->string (object-name q)) "$")))
 
-(define/contract (qexpr #:clean-attrs? [clean-attrs? #f]
-                        #:name [name 'q]
-                        attrs . elems)
-  ((txexpr-attrs?) (#:clean-attrs? any/c #:name txexpr-tag?) #:rest (or/c txexpr-elements? (list/c char?)) . ->* . qexpr?)
-  (txexpr name (if clean-attrs? (remove-duplicates attrs #:key car) attrs) (match elems
-                                                                             [(list (? char? c)) (list (string c))]
-                                                                             [else elems])))
+(define (qexpr #:clean-attrs? [clean-attrs? #f]
+               #:name [name 'q]
+               attrs . elems)
+  (define new-attrs (if clean-attrs? (remove-duplicates attrs #:key car) attrs))
+  (define new-elems (match elems
+                      [(list (? char? c)) (list (string c))]
+                      [(list (? list? xs)) xs]
+                      [else elems]))
+  (cond
+    [(empty? new-attrs) (list* name new-elems)]
+    [else (list* name new-attrs new-elems)]))
 
 (module+ test
   (check-equal? (qexpr null "foo") '(q "foo"))
@@ -53,30 +63,38 @@
 
 (define (hash->qattrs attr-hash)
   (for/list ([(k v) (in-dict (hash->list attr-hash))])
-    (list k (format "~a" v))))
+            (list k (format "~a" v))))
 
-(define/contract (quad->qexpr q)
-  (quad? . -> . qexpr?)
+(define (quad->qexpr q)
   (let loop ([x q])
     (cond
       [(quad? x) (apply qexpr #:name (quad-name x) #:clean-attrs? #t (hash->qattrs (quad-attrs x)) (map loop (quad-elems x)))]
       [else x])))
 
-(define/contract (qexpr->quad x)
-  (qexpr? . -> . quad?)
-  (if (txexpr? x)
-      (q #:attrs (attrs->hash (get-attrs x))
-         #:elems (map qexpr->quad (get-elements x)))
-      x))
+(define (qexpr->quad x)
+  (unless (qexpr? x)
+    (raise-argument-error 'qexpr->quad "qexpr" x))
+  (let loop ([x x])
+    (match x
+      [(cons (? valid-tag?) rest)
+       (match rest
+         [(list (? txexpr-attrs? attrs) (? qexpr? elems) ...)
+          (q #:attrs (attrs->hash attrs) #:elems (map loop elems))]
+         [(list (? qexpr? elems) ...)
+          (q #:elems (map loop elems))])]
+      [_ x])))
 
-(define/contract (qml->qexpr x)
-  (string? . -> . qexpr?)
+(module+ test
+  (check-equal?
+   (qexpr->quad  `(q ((font "Charter") (fontsize "12")) (q "Foo bar") ,(make-quad "zzz") (q "Zim Zam")))
+   (q (hasheq 'font "Charter" 'fontsize "12") (q "Foo bar") (q "zzz") (q "Zim Zam"))))
+
+(define (qml->qexpr x)
   (parameterize ([permissive-xexprs #t]
                  [xexpr-drop-empty-attributes #t])
     (string->xexpr x)))
 
-(define/contract (qexpr->qml x)
-  (qexpr? . -> . string?)
+(define (qexpr->qml x)
   (xexpr->string x))
 
 (module+ test

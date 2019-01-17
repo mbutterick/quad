@@ -34,7 +34,8 @@
    ;; and compare them key-by-key
    (hashes-equal? (quad-attrs q1) (quad-attrs q2))))
 
-(struct quad (attrs
+(struct quad (type
+              attrs
               elems
               size
               in
@@ -84,12 +85,16 @@
          #:draw [draw default-draw]
          #:draw-end [draw-end void]
          . args)
+  (unless (andmap (λ (x) (not (pair? x))) elems)
+    (raise-argument-error 'make-quad "elements that are not lists" elems))
   (match args
     [(list (== #false) elems ...) (make-quad #:elems elems)]
     [(list (? hash? attrs) elems ...) (make-quad #:attrs attrs #:elems elems)]
     [(list (? dict? assocs) elems ...) assocs (make-quad #:attrs (make-hasheq assocs) #:elems elems)]
     [(list elems ..1) (make-quad #:elems elems)]
-    [null (type attrs
+    ;; all cases end up below
+    [null (type type
+                attrs
                 elems
                 size
                 in
