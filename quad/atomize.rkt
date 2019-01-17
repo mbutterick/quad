@@ -65,18 +65,16 @@
         (for/list ([elem (in-list (merge-adjacent-strings elems 'isolate-white))])
                   (match elem
                     [(? string?)
-                     #|
-190116
-The conundrum: how to atomize quads that have subtypes and possibly other fields.
-We need to make new quads derived from the original.
-But we don't have access to the subtype here.
-Making the quad mutable doesn't solve the problem: we can change the first one, but we still need copies.
-`struct-copy` doesn't work, because it can't see the subtype.
-`struct-list` doesn't work, because it can't rely on structs being transparent.
-|#
-                     (list (make-quad #:type (quad-type x)
-                                      #:attrs next-attrs
-                                      #:elems (list elem)))]
+                     ;; 190116 caveat: all quads with strings as elements will be atomized.
+                     ;; however, if the starting quad has a struct subtype of quad,
+                     ;; this subtype will be lost.
+                     ;; IOW, all atomized quads are of the base `quad` type.
+                     ;; this is because we can't get access to any subtype constructors here.
+                     ;; corollary: quads that need to keep their types should not have any strings as elements.
+                     ;; also, they will not have any run keys embedded
+                     ;; (but they shouldn't need it because they're not part of text runs)
+                     ;; overall I am persuaded that `atomize` is very texty and needs a name befitting that role.
+                     (list (make-quad #:attrs next-attrs #:elems (list elem)))]
                     [_ (loop elem next-attrs next-key)])))]
       [_ (list x)])))
 

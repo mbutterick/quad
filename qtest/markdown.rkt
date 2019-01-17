@@ -148,11 +148,9 @@
 
 (struct line-break quad () #:transparent)
 (define lbr (q #:type line-break
-               #:elems '("¶")
                #:printable #f))
 (struct para-break line-break () #:transparent)
 (define pbr (q #:type para-break
-               #:elems '("¶¶")
                #:printable #f))
 
 (module+ test
@@ -160,15 +158,10 @@
   (check-true (line-break? (second (atomize (q "foo" pbr "bar"))))))
 
 (define (line-wrap xs size)
-  #R xs
-  #R (line-break? (second xs))
-  (wrap xs size 'debug
+  (wrap xs size
         #:hard-break line-break?
         #:soft-break soft-break-for-line?
         #:finish-wrap (λ (pcs q idx)
-                        #R pcs
-                        #R q
-                        #R idx
                         (define new-elems (consolidate-runs pcs))
                         (append
                          (list (struct-copy quad q:line
@@ -189,7 +182,7 @@
                                                     ;; when `line-heights` is empty, this is just h
                                                     (pt w (apply max (cons h line-heights))))]
                                             [elems new-elems]))
-                         (if (and q (equal? (quad-elems q) '("¶¶")))
+                         (if (and q (para-break? q))
                              (list q:line-spacer)
                              null)))))
 
@@ -282,10 +275,8 @@
                                             #:size "letter")))
   (define line-width (- (pdf-width pdf) (* 2 side-margin)))
   (define vertical-height (- (pdf-height pdf) top-margin bottom-margin))
-  (let* ([x (time-name atomize #R (atomize #R (qexpr->quad xs)))]
-         [x (begin #R (line-break? (second x)) x)]
+  (let* ([x (time-name atomize (atomize (qexpr->quad xs)))]
          [x (time-name ->string-quad (map (λ (x) (->string-quad pdf x)) x))]
-         [x (begin #R (line-break? (second x)) x)]
          [x (time-name line-wrap (line-wrap x line-width))]
          [x (time-name page-wrap (page-wrap x vertical-height path))]
          [x (time-name insert-containers (insert-containers x))]
