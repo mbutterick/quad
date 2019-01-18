@@ -35,6 +35,7 @@
    (hashes-equal? (quad-attrs q1) (quad-attrs q2))))
 
 (struct quad (type
+              copier
               attrs
               elems
               size
@@ -72,6 +73,9 @@
 ;; todo: convert immutable hashes to mutable on input?
 (define (make-quad
          #:type [type quad]
+         #:copier [copier (λ (x as es) (struct-copy quad x
+                                                    [attrs as]
+                                                    [elems es]))]
          #:attrs [attrs (make-hasheq)]
          #:elems [elems null]
          #:size [size '(0 0)]
@@ -94,6 +98,7 @@
     [(list elems ..1) (make-quad #:elems elems)]
     ;; all cases end up below
     [null (type type
+                copier
                 attrs
                 elems
                 size

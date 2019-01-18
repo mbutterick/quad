@@ -74,7 +74,7 @@
                      ;; also, they will not have any run keys embedded
                      ;; (but they shouldn't need it because they're not part of text runs)
                      ;; overall I am persuaded that `atomize` is very texty and needs a name befitting that role.
-                     (list (make-quad #:attrs next-attrs #:elems (list elem)))]
+                     (list ((quad-copier x) x next-attrs (list elem)))]
                     [_ (loop elem next-attrs next-key)])))]
       [_ (list x)])))
 
