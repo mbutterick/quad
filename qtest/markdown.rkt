@@ -153,8 +153,7 @@
                [elems #:parent quad es]))
 (define lbr (q #:type line-break
                #:copier line-break-copy
-               #:printable #f
-               #:elems '("foo bar")))
+               #:printable #f))
 (struct para-break line-break () #:transparent)
 (define (para-break-copy x as es)
   (struct-copy para-break x
@@ -162,8 +161,7 @@
                [elems #:parent quad es]))
 (define pbr (q #:type para-break
                #:copier para-break-copy
-               #:printable #f
-               #:elems '("¶¶")))
+               #:printable #f))
 
 (module+ test
   (check-true (line-break? (second (quad-elems (q "foo" pbr "bar")))))
