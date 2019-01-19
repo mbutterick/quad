@@ -145,19 +145,11 @@
                                                   (pt-y (size (car pcs)))))]))
     (values (cons new-run runs) rest)))
 
-
-(struct line-break quad () #:transparent)
-(define (line-break-copy x as es)
-  (struct-copy line-break x
-               [attrs #:parent quad as]
-               [elems #:parent quad es]))
-(define lbr (q #:type line-break
-               #:copier line-break-copy
-               #:printable #f))
-(define pbr (q #:type line-break
-               #:copier line-break-copy
-               #:printable #f
-               #:elems '("¶¶")))
+(struct line-break quad ())
+(define lbr (q #:type line-break #:printable #f))
+;; treat paragraph break as special kind of line break
+(struct para-break line-break ())
+(define pbr (q #:type para-break #:printable #f))
 
 (module+ test
   (check-true (line-break? (second (quad-elems (q "foo" pbr "bar")))))
@@ -188,7 +180,7 @@
                                                     ;; when `line-heights` is empty, this is just h
                                                     (pt w (apply max (cons h line-heights))))]
                                             [elems new-elems]))
-                         (if (and q (line-break? q) (equal? (quad-elems q) '("¶¶")))
+                         (if (para-break? q)
                              (list q:line-spacer)
                              null)))))
 

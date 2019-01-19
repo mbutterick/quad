@@ -62,14 +62,19 @@
                     (values next-key next-attrs)]))
     (match (quad-elems x)
       [(? pair? elems)
+       ;; we don't use `struct-copy` here because it needs to have the structure id at compile time.
+       ;; whereas with this technique, we can extract a constructor for any structure type.
+       ;; notice that the technique depends on
+       ;; 1) we only need to update attrs and elems
+       ;; 2) we make them the first two fields, so we know to drop the first two fields of x-tail
+       (define x-maker (let-values ([(x-structure-type _) (struct-info x)])
+                         (struct-type-make-constructor x-structure-type)))
+       (define x-tail (drop (struct->list x) 2))
        (append* 
         (for/list ([elem (in-list (merge-adjacent-strings elems 'isolate-white))])
-                  (match elem
-                    [(? string?)
-                     (define-values (xtype _) (struct-info x))
-                     (define x-constructor (struct-type-make-constructor xtype))
-                     (list (apply x-constructor (list* next-attrs (list elem) (cddr (struct->list x)))))]
-                    [_ (loop elem next-attrs next-key)])))]
+                  (if (string? elem)
+                      (list (apply x-maker next-attrs (list elem) x-tail))
+                      (loop elem next-attrs next-key))))]
       [_ (list x)])))
 
 (module+ test

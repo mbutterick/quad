@@ -72,9 +72,6 @@
 ;; todo: convert immutable hashes to mutable on input?
 (define (make-quad
          #:type [type quad]
-         #:copier [copier (λ (x as es) (struct-copy quad x
-                                                    [attrs as]
-                                                    [elems es]))]
          #:attrs [attrs (make-hasheq)]
          #:elems [elems null]
          #:size [size '(0 0)]
