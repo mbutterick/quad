@@ -39,7 +39,7 @@
   (define new-exprs (add-between
                      (for*/list ([expr (in-list exprs)]
                                  [str (in-list (string-split (car (get-elements expr)) "\n"))])
-                       `(,(get-tag expr) ,(get-attrs expr) ,str))
+                                `(,(get-tag expr) ,(get-attrs expr) ,str))
                      lbr))
   (qexpr attrs new-exprs))
 
@@ -139,17 +139,17 @@
     (define new-run (struct-copy quad q:string
                                  [attrs (quad-attrs (car pcs))]
                                  [elems (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
-                                                                                (quad-elems pc))))]
+                                                                                        (quad-elems pc))))]
                                  [size (delay (pt (for/sum ([pc (in-list run-pcs)])
-                                                    (pt-x (size pc)))
+                                                           (pt-x (size pc)))
                                                   (pt-y (size (car pcs)))))]))
     (values (cons new-run runs) rest)))
 
-(struct line-break quad ())
-(define lbr (q #:type line-break #:printable #f))
+(define-quad line-break quad ())
+(define lbr (make-line-break #:printable #f))
 ;; treat paragraph break as special kind of line break
-(struct para-break line-break ())
-(define pbr (q #:type para-break #:printable #f))
+(define-quad para-break line-break ())
+(define pbr (make-para-break #:printable #f))
 
 (module+ test
   (check-true (line-break? (second (quad-elems (q "foo" pbr "bar")))))
@@ -167,8 +167,8 @@
                                                      (define container-val (hash-ref (quad-attrs (car new-elems)) 'container #f))
                                                      (when (and container-val
                                                                 (for/and ([elem (in-list (cdr new-elems))])
-                                                                  (equal? (hash-ref (quad-attrs elem) 'container #f)
-                                                                          container-val)))
+                                                                         (equal? (hash-ref (quad-attrs elem) 'container #f)
+                                                                                 container-val)))
                                                        (hash-set! attrs 'container container-val))
                                                      attrs)]
                                             [size (let ()
@@ -211,7 +211,7 @@
      #:elems pcs
      #:size (delay (pt (pt-x (size (car pcs)))
                        (for/sum ([pc (in-list pcs)])
-                         (pt-y (size pc)))))
+                                (pt-y (size pc)))))
      #:draw-start (λ (q doc)
                     (save doc)
                     (match-define (list left top) (quad-origin q))
@@ -258,13 +258,13 @@
   ;; iow, the lines within a container may be split over multiple pages, each of which should be drawn
   ;; as a separate container
   (for/list ([page (in-list pages)])
-    (define lns (quad-elems page))             
-    (define groups (contiguous-group-by (λ (x) (hash-ref (quad-attrs x) 'container #f)) lns))
-    (define lns-and-containers (append* (for/list ([grp (in-list groups)])
-                                          (match (hash-ref (quad-attrs (car grp)) 'container #f)
-                                            ["bq" (list (make-blockquote grp))]
-                                            [_ grp]))))
-    (struct-copy quad page [elems lns-and-containers])))
+            (define lns (quad-elems page))             
+            (define groups (contiguous-group-by (λ (x) (hash-ref (quad-attrs x) 'container #f)) lns))
+            (define lns-and-containers (append* (for/list ([grp (in-list groups)])
+                                                          (match (hash-ref (quad-attrs (car grp)) 'container #f)
+                                                            ["bq" (list (make-blockquote grp))]
+                                                            [_ grp]))))
+            (struct-copy quad page [elems lns-and-containers])))
 
 (define (run xs path)
   (define pdf (time-name make-pdf (make-pdf #:compress #t

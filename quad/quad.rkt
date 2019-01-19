@@ -1,5 +1,6 @@
 #lang debug racket/base
-(require racket/struct racket/format racket/list racket/string racket/promise racket/dict racket/match)
+(require (for-syntax racket/base racket/syntax)
+         racket/struct racket/format racket/list racket/string racket/promise racket/dict racket/match)
 (provide (all-defined-out))
 (module+ test (require rackunit))
 
@@ -105,6 +106,15 @@
                 draw-start
                 draw
                 draw-end)]))
+
+(define-syntax (define-quad stx)
+  (syntax-case stx ()
+    [(_ ID SUPER ARGS . REST)
+     (with-syntax ([MAKE-ID (format-id #'ID "make-~a" (syntax-e #'ID))])
+       #'(begin
+           (struct ID SUPER ARGS . REST)
+           (define MAKE-ID (make-keyword-procedure (λ (kws kw-args . rest)
+                                                     (keyword-apply make-quad #:type ID kws kw-args rest))))))]))
   
 (define q make-quad)
 
