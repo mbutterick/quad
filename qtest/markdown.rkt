@@ -154,14 +154,10 @@
 (define lbr (q #:type line-break
                #:copier line-break-copy
                #:printable #f))
-(struct para-break line-break () #:transparent)
-(define (para-break-copy x as es)
-  (struct-copy para-break x
-               [attrs #:parent quad as]
-               [elems #:parent quad es]))
-(define pbr (q #:type para-break
-               #:copier para-break-copy
-               #:printable #f))
+(define pbr (q #:type line-break
+               #:copier line-break-copy
+               #:printable #f
+               #:elems '("¶¶")))
 
 (module+ test
   (check-true (line-break? (second (quad-elems (q "foo" pbr "bar")))))
@@ -192,7 +188,7 @@
                                                     ;; when `line-heights` is empty, this is just h
                                                     (pt w (apply max (cons h line-heights))))]
                                             [elems new-elems]))
-                         (if (and q (para-break? q))
+                         (if (and q (line-break? q) (equal? (quad-elems q) '("¶¶")))
                              (list q:line-spacer)
                              null)))))
 
