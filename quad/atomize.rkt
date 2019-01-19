@@ -3,6 +3,7 @@
          racket/hash
          racket/match
          racket/list
+         racket/struct
          txexpr
          racket/function
          "quad.rkt"
@@ -65,16 +66,9 @@
         (for/list ([elem (in-list (merge-adjacent-strings elems 'isolate-white))])
                   (match elem
                     [(? string?)
-                     ;; 190116 caveat: all quads with strings as elements will be atomized.
-                     ;; however, if the starting quad has a struct subtype of quad,
-                     ;; this subtype will be lost.
-                     ;; IOW, all atomized quads are of the base `quad` type.
-                     ;; this is because we can't get access to any subtype constructors here.
-                     ;; corollary: quads that need to keep their types should not have any strings as elements.
-                     ;; also, they will not have any run keys embedded
-                     ;; (but they shouldn't need it because they're not part of text runs)
-                     ;; overall I am persuaded that `atomize` is very texty and needs a name befitting that role.
-                     (list ((quad-copier x) x next-attrs (list elem)))]
+                     (define-values (xtype _) (struct-info x))
+                     (define x-constructor (struct-type-make-constructor xtype))
+                     (list (apply x-constructor (list* next-attrs (list elem) (cddr (struct->list x)))))]
                     [_ (loop elem next-attrs next-key)])))]
       [_ (list x)])))
 

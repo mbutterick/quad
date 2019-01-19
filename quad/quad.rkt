@@ -34,9 +34,7 @@
    ;; and compare them key-by-key
    (hashes-equal? (quad-attrs q1) (quad-attrs q2))))
 
-(struct quad (type
-              copier
-              attrs
+(struct quad (attrs
               elems
               size
               in
@@ -48,6 +46,7 @@
               draw-start
               draw
               draw-end)
+  #:transparent
   #:property prop:custom-write
   (λ (v p w?) (display
                (format "<quad ~a~a>"
@@ -97,9 +96,7 @@
     [(list (? dict? assocs) elems ...) assocs (make-quad #:attrs (make-hasheq assocs) #:elems elems)]
     [(list elems ..1) (make-quad #:elems elems)]
     ;; all cases end up below
-    [null (type type
-                copier
-                attrs
+    [null (type attrs
                 elems
                 size
                 in
