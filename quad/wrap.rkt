@@ -18,12 +18,16 @@
   (append partial (dropf wrap nonprinting-soft-break-in-middle?)))
 
 (define (wrap qs
-              [target-size (current-wrap-distance)]
+              [target-size-proc-arg (current-wrap-distance)]
               [debug #f]
               #:hard-break [hard-break? (λ (x) #f)]
               #:soft-break [soft-break? (λ (x) #f)]
               #:wrap-anywhere? [wrap-anywhere? #f]
               #:finish-wrap [finish-wrap-proc (λ (xs q idx) (list xs))])
+  (define target-size-proc
+    (match target-size-proc-arg
+      [(? procedure? proc) proc]
+      [val (λ (q idx) val)]))
   ; takes quads in wrap, triggering quad, and wrap idx; returns list containing wrap (and maybe other things)
   (define (finish-wrap qs wrap-idx [wrap-triggering-q (car qs)])
     ;; reverse because quads accumulated in reverse
@@ -81,7 +85,7 @@
                      other-qs)])]
          [else ; cases that require computing distance
           (define dist (if (printable? q) (distance q) 0))
-          (define would-overflow? (and current-dist (> (+ dist current-dist) target-size)))
+          (define would-overflow? (and current-dist (> (+ dist current-dist) (target-size-proc q wrap-idx))))
           (cond
             [would-overflow?
              (cond

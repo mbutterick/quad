@@ -79,7 +79,10 @@
       [(cons (? valid-tag?) rest)
        (match rest
          [(list (? txexpr-attrs? attrs) (? qexpr? elems) ...)
-          (q #:attrs (attrs->hash attrs) #:elems (map loop elems))]
+          (define mheq (make-hash))
+          (for ([attr-pair (in-list attrs)])
+               (apply hash-set! mheq attr-pair))
+          (q #:attrs mheq #:elems (map loop elems))]
          [(list (? qexpr? elems) ...)
           (q #:elems (map loop elems))])]
       [_ x])))

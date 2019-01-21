@@ -3,13 +3,25 @@
          pitfall quad sugar/debug pollen/tag)
 (provide (except-out (all-from-out racket/base) #%module-begin)
          (rename-out [mb #%module-begin])
-         p id strong em attr-list h1 h2 code pre a blockquote)
+         p id strong em attr-list h1 h2 h3 h4 h5 h6 
+         ol li ul rsquo lsquo rquo lquo hellip
+         hr
+         code pre a blockquote)
+
+(define rsquo "’")
+(define rquo "”")
+(define lsquo "‘")
+(define lquo "“")
+(define hellip "…")
 
 (define-tag-function (p attrs exprs)
   (qexpr attrs exprs))
 
+(define-tag-function (hr attrs exprs)
+  (qexpr (cons '(hrule "yes") attrs) '(" ")))
+
 (define-tag-function (blockquote attrs exprs)
-  (qexpr (cons '(container "bq") attrs) exprs))
+  (qexpr (list* '(container "bq") '(left-inset "5") attrs) exprs))
 
 (define id (default-tag-function 'id))
 (define class (default-tag-function 'class))
@@ -25,11 +37,16 @@
 
 (define-syntax-rule (attr-list . attrs) 'attrs)
 
-(define-tag-function (h1 attrs exprs)
-  (qexpr (append  '((font "fira")(fontsize "36")(line-height "48")) attrs) exprs))
+(define (heading-base font-size attrs exprs)
+  (qexpr (append '((font "fira")(fontsize (number->string font-size))(line-height (number->string (+ 12 font-size)))) attrs) exprs))
 
-(define-tag-function (h2 attrs exprs)
-  (qexpr (append '((font "fira")(fontsize "24")(line-height "36")) attrs)  exprs))
+(define-tag-function (h1 attrs exprs) (heading-base 30 attrs exprs))
+(define-tag-function (h2 attrs exprs) (heading-base 24 attrs exprs))
+(define-tag-function (h3 attrs exprs) (heading-base 18 attrs exprs))
+
+(define h4 h3)
+(define h5 h3)
+(define h6 h3)
 
 (define-tag-function (code attrs exprs)
   (qexpr (append '((font "fira-mono")(fontsize "11")(bg "aliceblue")) attrs)  exprs))
@@ -41,7 +58,18 @@
                                  [str (in-list (string-split (car (get-elements expr)) "\n"))])
                                 `(,(get-tag expr) ,(get-attrs expr) ,str))
                      lbr))
-  (qexpr attrs new-exprs))
+  (qexpr (list* '(container "codeblock") '(left-inset "12") '(right-inset "12") attrs) new-exprs))
+
+(define (list-base attrs exprs [bullet-val #f])
+  (qexpr (list* '(left-inset "20") attrs)
+         (add-between
+          (for/list ([(expr idx) (in-indexed exprs)])
+                    (list* (get-tag expr) (cons (list 'list-index (or bullet-val (format "~a." (add1 idx)))) (get-attrs expr)) (get-elements expr)))
+          pbr)))
+
+(define-tag-function (ol attrs exprs) (list-base attrs exprs))
+(define-tag-function (ul attrs exprs) (list-base attrs exprs "•"))
+(define-tag-function (li attrs exprs) (qexpr attrs exprs))  
 
 (define q:string (q #:in 'bi
                     #:out 'bo ;; align to baseline
@@ -59,7 +87,7 @@
                              (match-define (list x y) (quad-origin q))
                              (text doc str x y #:bg (hash-ref (quad-attrs q) 'bg #f)
                                    #:link (hash-ref (quad-attrs q) 'link #f)))
-                    #:draw-end (λ (q doc)  (draw-debug q doc "#99f" "#ccf"))))
+                    #:draw-end (λ (q doc) (draw-debug q doc "#99f" "#ccf"))))
 
 (define-runtime-path charter "fonts/charter.ttf")
 (define-runtime-path charter-bold "fonts/charter-bold.ttf")
@@ -96,9 +124,9 @@
               (define str (car (quad-elems q)))
               (pt (string-width doc str) (current-line-height doc)))])]))
 
-(define draw? #f)
+(define draw-debug? #t)
 (define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"])
-  (when draw?
+  (when draw-debug?
     (save doc)
     (line-width doc 0.5)
     (apply rect doc (append (quad-origin q) (size q)))
@@ -121,8 +149,7 @@
 (define q:line-spacer (q #:type line-spacer
                          #:size (pt 380 (* line-height 0.6))
                          #:out 'sw
-                         #:printable (λ (q sig)
-                                       (not (memq sig '(start end))))
+                         #:printable (λ (q sig) (not (memq sig '(start end))))
                          #:draw-start draw-debug))
 
 (define softies (map string '(#\space #\- #\u00AD)))
@@ -150,39 +177,66 @@
 ;; treat paragraph break as special kind of line break
 (define-quad para-break line-break ())
 (define pbr (make-para-break #:printable #f))
+(define-quad hr-break para-break ())
+(define hrbr (make-hr-break #:printable #t))
 
 (module+ test
   (check-true (line-break? (second (quad-elems (q "foo" pbr "bar")))))
   (check-true (line-break? (second (atomize (q "foo" pbr "bar"))))))
 
-(define (line-wrap xs size)
-  (wrap xs size
+(define (line-wrap xs wrap-size)
+  (wrap xs (λ (q idx) (- wrap-size (string->number (quad-ref q 'left-inset "0"))
+                         (string->number (quad-ref q 'right-inset "0"))))                        
         #:hard-break line-break?
         #:soft-break soft-break-for-line?
-        #:finish-wrap (λ (pcs q idx)
-                        (define new-elems (consolidate-runs pcs))
-                        (append
-                         (list (struct-copy quad q:line
-                                            [attrs (let ([attrs (hash-copy (quad-attrs q:line))])
-                                                     (define container-val (hash-ref (quad-attrs (car new-elems)) 'container #f))
-                                                     (when (and container-val
-                                                                (for/and ([elem (in-list (cdr new-elems))])
-                                                                         (equal? (hash-ref (quad-attrs elem) 'container #f)
-                                                                                 container-val)))
-                                                       (hash-set! attrs 'container container-val))
-                                                     attrs)]
-                                            [size (let ()
-                                                    (define line-heights
-                                                      (filter-map
-                                                       (λ (q) (string->number (hash-ref (quad-attrs q) 'line-height "NaN")))
-                                                       pcs))
-                                                    (match-define (list w h) (quad-size q:line))
-                                                    ;; when `line-heights` is empty, this is just h
-                                                    (pt w (apply max (cons h line-heights))))]
-                                            [elems new-elems]))
-                         (if (para-break? q)
-                             (list q:line-spacer)
-                             null)))))
+        #:finish-wrap
+        (λ (pcs q idx)
+          (define new-elems (consolidate-runs pcs))
+          (append
+           (list (struct-copy quad q:line
+                              [attrs (let ([attrs (hash-copy (quad-attrs q:line))])
+                                       (define container-val (quad-ref (car new-elems) 'container))
+                                       (when (and container-val
+                                                  (for/and ([elem (in-list (cdr new-elems))])
+                                                           (equal? (quad-ref elem 'container)
+                                                                   container-val)))
+                                         (hash-set! attrs 'container container-val))
+                                       attrs)]
+                              [size (let ()
+                                      (define line-heights
+                                        (filter-map
+                                         (λ (q) (string->number (quad-ref q 'line-height "NaN")))
+                                         pcs))
+                                      (match-define (list w h) (quad-size q:line))
+                                      ;; when `line-heights` is empty, this is just h
+                                      (pt w (apply max (cons h line-heights))))]
+                              [elems new-elems]
+                              [offset (pt
+                                       (string->number (quad-ref (car new-elems) 'left-inset "0"))
+                                       (second (quad-offset q:line)))]
+                              [draw-start (if (quad-ref (car new-elems) 'hrule)
+                                                (λ (dq doc)
+                                                  (save doc)
+                                                  (match-define (list left top) (quad-origin dq))
+                                                  (match-define (list right bottom) (size dq))
+                                                  (translate doc left (+ top (/ bottom 2)))
+                                                  (move-to doc 0 0)
+                                                  (line-to doc wrap-size 0)
+                                                  (line-width doc 3)
+                                                  (stroke doc "#999")
+                                                  (restore doc))
+                                                void)]
+[draw-end (match (and (or (para-break? q) (not q))
+                      (quad-ref (car new-elems) 'list-index))
+            [#false void]
+            [val (λ (q doc)
+                   (save doc)
+                   (translate doc (- (string->number (quad-ref (car new-elems) 'left-inset "0"))) 0)
+                   (text doc val)
+                   (restore doc))])]))
+(if (para-break? q)
+    (list q:line-spacer)
+    null)))))
 
 (define top-margin 60)
 (define bottom-margin 120)
@@ -219,6 +273,35 @@
                     (rect doc (- left 4) (+ top 6) right (+ bottom 2))
                     (line-width doc 1)
                     (fill-and-stroke doc "#eee" "#999")
+                    (restore doc))))
+
+(define (make-codeblock pcs)
+  (q #:attrs (hasheq 'type "codeblock")
+     #:in 'nw
+     #:out 'sw
+     #:elems pcs
+     #:size (delay (pt (pt-x (size (car pcs)))
+                       (for/sum ([pc (in-list pcs)])
+                                (pt-y (size pc)))))
+     #:draw-start (λ (q doc)
+                    (save doc)
+                    (match-define (list left top) (quad-origin q))
+                    (match-define (list right bottom) (size q))
+                    (translate doc (- left 4) (+ top 6)) ; reset origin to top left of quad
+                    (rect doc 0 0 right (+ bottom 2))
+                    (fill doc "aliceblue")
+                    (define vert-line-width 6)
+                    (move-to doc (/ vert-line-width 2) 0) ; affirmatively move cursor
+                    (line-to doc (/ vert-line-width 2) bottom) ; strictly vert line
+                    (line-width doc vert-line-width)
+                    (stroke doc "#669")
+                    #;(move-to doc 0 0) ; affirmatively move cursor
+                    #;(line-to doc 0 bottom) ; strictly horiz line
+                    #;(stroke doc "gray")
+                    #;(translate doc 0 (+ bottom 2)) ; reset origin
+                    #;(move-to doc 0 0) ; move again
+                    #;(line-to doc right 0) ; same line, translated
+                    (stroke doc "gray")
                     (restore doc))))
 
 (define (contiguous-group-by pred xs)
@@ -263,6 +346,7 @@
             (define lns-and-containers (append* (for/list ([grp (in-list groups)])
                                                           (match (hash-ref (quad-attrs (car grp)) 'container #f)
                                                             ["bq" (list (make-blockquote grp))]
+                                                            ["codeblock" (list (make-codeblock grp))]
                                                             [_ grp]))))
             (struct-copy quad page [elems lns-and-containers])))
 
@@ -275,7 +359,7 @@
   (define vertical-height (- (pdf-height pdf) top-margin bottom-margin))
   (let* ([x (time-name atomize (atomize (qexpr->quad xs)))]
          [x (time-name ->string-quad (map (λ (x) (->string-quad pdf x)) x))]
-         [x (time-name line-wrap (line-wrap x line-width))]
+         [x (time-name line-wrap #R (line-wrap x line-width))]
          [x (time-name page-wrap (page-wrap x vertical-height path))]
          [x (time-name insert-containers (insert-containers x))]
          [x (time-name position (position (struct-copy quad q:doc [elems x])))])
@@ -285,7 +369,8 @@
   (syntax-case stx ()
     [(_ PDF-PATH . STRS)
      #'(#%module-begin
-        (define qx (list* 'q '((font "Charter") (fontsize "12")) (add-between (list . STRS) pbr)))
+        ;; stick an nbsp in the strings so we have one printing char
+        (define qx (list* 'q '((font "Charter") (fontsize "12")) (add-between (cons " " (list . STRS)) pbr)))
         (run qx PDF-PATH))]))
 
 (module+ reader
@@ -310,7 +395,7 @@
                             #:inside? #t
                             #:command-char #\◊))
     (define stx (quad-at-reader path-string p))
-    (define parsed-stx (datum->syntax stx (xexpr->parse-tree (parse-markdown (apply string-append (syntax->datum stx))))))
+    (define parsed-stx (datum->syntax stx #R (xexpr->parse-tree (parse-markdown (apply string-append (syntax->datum stx))))))
     (strip-context
      (with-syntax ([PT parsed-stx]
                    [PDF-PATH (path-replace-extension path-string #".pdf")])

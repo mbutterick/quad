@@ -6,7 +6,7 @@
 
 (define (size q)
   (match (quad-size q)
-    [(? procedure? proc) (proc q)]
+    [(? procedure? proc) #R proc (proc q)]
     [(? promise? prom) (force prom)]
     [val val]))
 
@@ -58,6 +58,9 @@
   [(define equal-proc quad=?)
    (define (hash-proc h recur) (equal-hash-code h))
    (define (hash2-proc h recur) (equal-secondary-hash-code h))])
+
+(define (quad-ref q key [default-val #f])
+  (hash-ref (quad-attrs q) key default-val))
 
 (define (default-printable q [sig #f]) #t)
 

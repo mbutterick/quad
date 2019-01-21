@@ -14,12 +14,14 @@ At the command line:
 
 We said `raco pkg install hyphenate` dude
 
-What?!
 
 ```
 Code block
 Goes here
 ```
+
+
+What?!
 
 > Hyphenate `xexpr` by calculating hyphenation points and inserting
 `joiner` at those points. By default, `joiner` is the soft hyphen
