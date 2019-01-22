@@ -20,8 +20,17 @@ Code block
 Goes here
 ```
 
-
 What?!
+
+1. Yes
+
+2. Indeed
+
+And furthermore:
+
+* So it would seem.
+
+* Today.
 
 > Hyphenate `xexpr` by calculating hyphenation points and inserting
 `joiner` at those points. By default, `joiner` is the soft hyphen
@@ -30,33 +39,6 @@ What?!
 any length, use `#:min-length` `#f`.
 
 A [list of web colors](https://en.wikipedia.org/wiki/Web_colors).
-Certain word processors allow users to [insert soft
-hyphens](http://practicaltypography.com/optional-hyphens.html) in their
-text. A [list of web colors](https://en.wikipedia.org/wiki/Web_colors).
-Certain word processors allow users to [insert soft
-hyphens](http://practicaltypography.com/optional-hyphens.html) in their
-text. A [list of web colors](https://en.wikipedia.org/wiki/Web_colors).
-Certain word processors allow users to [insert soft
-hyphens](http://practicaltypography.com/optional-hyphens.html) in their
-text. A [list of web colors](https://en.wikipedia.org/wiki/Web_colors).
-Certain word processors allow users to [insert soft
-hyphens](http://practicaltypography.com/optional-hyphens.html) in their
-text. A [list of web colors](https://en.wikipedia.org/wiki/Web_colors).
-Certain word processors allow users to [insert soft
-hyphens](http://practicaltypography.com/optional-hyphens.html) in their
-text.A [list of web colors](https://en.wikipedia.org/wiki/Web_colors).
-Certain word processors allow users to [insert soft
-hyphens](http://practicaltypography.com/optional-hyphens.html) in their
-text.A [list of web colors](https://en.wikipedia.org/wiki/Web_colors).
-Certain word processors allow users to [insert soft
-hyphens](http://practicaltypography.com/optional-hyphens.html) in their
-text.A [list of web colors](https://en.wikipedia.org/wiki/Web_colors).
-Certain word processors allow users to [insert soft
-hyphens](http://practicaltypography.com/optional-hyphens.html) in their
-text.A [list of web colors](https://en.wikipedia.org/wiki/Web_colors).
-Certain word processors allow users to [insert soft
-hyphens](http://practicaltypography.com/optional-hyphens.html) in their
-text.A [list of web colors](https://en.wikipedia.org/wiki/Web_colors).
 Certain word processors allow users to [insert soft
 hyphens](http://practicaltypography.com/optional-hyphens.html) in their
 text.
