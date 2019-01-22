@@ -23,7 +23,7 @@
   hrbr)
 
 (define-tag-function (blockquote attrs exprs)
-  (qexpr (list* '(container "bq") '(font "fira") '(fontsize "10") '(left-inset "5") attrs) exprs))
+  (qexpr (list* '(container "bq") '(font "fira") '(fontsize "10") '(line-height "11") '(left-inset "5") attrs) exprs))
 
 (define id (default-tag-function 'id))
 (define class (default-tag-function 'class))
@@ -60,7 +60,7 @@
                                  [str (in-list (string-split (string-join (get-elements expr) "") "\n"))])
                        `(,(get-tag expr) ,(get-attrs expr) ,str))
                      lbr))
-  (qexpr (list* '(container "codeblock") '(line-height "11") '(left-inset "12") '(right-inset "12") attrs) new-exprs))
+  (qexpr (list* '(container "codeblock") '(line-height "13") '(left-inset "12") '(right-inset "12") attrs) new-exprs))
 
 (define (list-base attrs exprs [bullet-val #f])
   (qexpr (list* '(left-inset "20") attrs)
@@ -137,7 +137,11 @@
               (font-size doc fontsize)
               (font doc (path->string (hash-ref (quad-attrs q) 'font)))
               (define str (if (pair? (quad-elems q)) (unsafe-car (quad-elems q)) ""))
-              (pt (string-width doc str) (current-line-height doc)))])]))
+              (define line-height (cond
+                                    [(and (pair? (quad-elems q))
+                                          (string->number (quad-ref q 'line-height "NaN")))]
+                                    [else (current-line-height doc)]))
+              (pt (string-width doc str) line-height))])]))
 
 (define draw-debug? #t)
 (define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"])
@@ -146,11 +150,11 @@
     (line-width doc 0.5)
     (apply rect doc (append (quad-origin q) (size q)))
     (stroke doc stroke-color)
-    (apply rect doc (append (quad-origin q) (size q)))
-    (clip doc)
-    (circle doc (pt-x (in-point q)) (pt-y (in-point q)) 3)
-    (circle doc (pt-x (out-point q)) (pt-y (out-point q)) 3)
+    (circle doc (pt-x (in-point q)) (pt-y (in-point q)) 2)
+    (circle doc (pt-x (out-point q)) (pt-y (out-point q)) 2)
     (fill doc fill-color)  
+    (rect-centered doc (pt-x (inner-point q)) (pt-y (inner-point q)) 2)
+    (fill doc stroke-color)  
     (restore doc)))
 
 (define line-height 20)
@@ -244,8 +248,7 @@
                                                (λ (q) (string->number (quad-ref q 'line-height "NaN")))
                                                pcs))
                                             (match-define (list w h) (quad-size q:line))
-                                            ;; when `line-heights` is empty, this is just h
-                                            (pt w (apply max (cons h line-heights))))]
+                                            (pt w (if (empty? line-heights) h (apply max line-heights))))]
                                     [elems new-elems]
                                     [offset (pt
                                              (string->number (quad-ref (car new-elems) 'left-inset "0"))
@@ -267,10 +270,11 @@
 (define top-margin 60)
 (define bottom-margin 120)
 (define side-margin 120)
-(define page-offset (pt side-margin top-margin))
+(define page-offset (pt (/ side-margin 3) (/ top-margin 3)))
 (require racket/date)
 (define q:page (q #:offset page-offset
-                  #:draw-start (λ (q doc) (add-page doc))
+                  #:draw-start (λ (q doc) (add-page doc)
+                                 (scale doc 2 2))
                   #:draw-end (λ (q doc)
                                (font-size doc 10)
                                (font doc charter)
@@ -296,7 +300,8 @@
                     (save doc)
                     (match-define (list left top) (quad-origin q))
                     (match-define (list right bottom) (size q))
-                    (rect doc (- left 4) (+ top 6) right (+ bottom 2))
+                    #;(rect doc (- left 4) (+ top 6) right (+ bottom 2))
+                    (rect doc left top right (+ bottom 4))
                     (line-width doc 1)
                     (fill-and-stroke doc "#eee" "#999")
                     (restore doc))))
@@ -380,7 +385,8 @@
   (define pdf (time-name make-pdf (make-pdf #:compress #t
                                             #:auto-first-page #f
                                             #:output-path path
-                                            #:size "letter")))
+                                            #:width 350
+                                            #:height 400)))
   (define line-width (- (pdf-width pdf) (* 2 side-margin)))
   (define vertical-height (- (pdf-height pdf) top-margin bottom-margin))
   (let* ([x (time-name atomize (atomize (qexpr->quad xs)))]
