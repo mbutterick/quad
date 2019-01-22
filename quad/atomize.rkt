@@ -44,7 +44,7 @@
 (define run-key 'run)
 
 (define (same-run? qa qb)
-  (eq? (hash-ref (quad-attrs qa) run-key) (hash-ref (quad-attrs qb) run-key)))
+  (eq? (quad-ref qa run-key) (quad-ref qb run-key)))
 
 (define (atomize qx)
   ;; atomize a quad by reducing it to the smallest indivisible formatting units.
@@ -73,7 +73,9 @@
        (append* 
         (for/list ([elem (in-list (merge-adjacent-strings elems 'isolate-white))])
                   (if (string? elem)
-                      (list (apply x-maker next-attrs (list elem) x-tail))
+                      (if (zero? (string-length elem))
+                          null
+                          (list (apply x-maker next-attrs (list elem) x-tail)))
                       (loop elem next-attrs next-key))))]
       [_ (list x)])))
 
