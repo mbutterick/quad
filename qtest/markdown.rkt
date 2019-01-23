@@ -73,7 +73,7 @@
                 '(border-inset-top "10")
                 '(border-width-left "2") '(border-color-left "#669") '(border-inset-left "0")
                 '(border-inset-right "10") '(border-inset-bottom "-4")
-                 '(inset-left "12") '(inset-right "12")  '(inset-top "12") '(inset-bottom "6")
+                 '(inset-left "12") '(inset-right "12")  '(inset-top "12") '(inset-bottom "24")
                 attrs) new-exprs))
 
 (define (list-base attrs exprs [bullet-val #f])
@@ -156,7 +156,7 @@
                                     [else (current-line-height doc)]))
               (pt (string-width doc str) line-height))])]))
 
-(define draw-debug? #f)
+(define draw-debug? #t)
 (define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"])
   (when draw-debug?
     (save doc)
@@ -313,11 +313,14 @@
      #:out 'sw
      #:offset (pt 0 (+ (quad-ref first-line 'inset-top 0)))
      #:elems lines
-     #:size (delay (pt (pt-x (size first-line)) ; 
+     ;; this sizing approach doesn't work.
+     ;; can't add inset-top and inset-bottom here because page composition has already happened.
+     ;; therefore, resizing the block quads now will throw off the calculated page breaks.
+     #:size (pt (pt-x (size first-line)) ; 
                        (+ (for/sum ([line (in-list lines)])
                             (pt-y (size line)))
                           (quad-ref first-line 'inset-top 0)
-                          (quad-ref first-line 'inset-bottom 0))))
+                          (quad-ref first-line 'inset-bottom 0)))
      #:draw-start (λ (q doc)
                     ;; adjust drawing coordinates for border inset
                     (match-define (list bil bit bir bib)
