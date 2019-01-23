@@ -63,7 +63,7 @@
 
 (define (hash->qattrs attr-hash)
   (for/list ([(k v) (in-dict (hash->list attr-hash))])
-            (list k (format "~a" v))))
+    (list k (format "~a" v))))
 
 (define (quad->qexpr q)
   (let loop ([x q])
@@ -79,9 +79,11 @@
       [(cons (? valid-tag?) rest)
        (match rest
          [(list (? txexpr-attrs? attrs) (? qexpr? elems) ...)
-          (define mheq (make-hash))
-          (for ([attr-pair (in-list attrs)])
-               (apply hash-set! mheq attr-pair))
+          (define mheq (make-hash)) ; want mutable hash
+          (for ([kv (in-list attrs)])
+            (match-define (list k v) kv)
+            ;; coerce number strings to actual numbers
+            (hash-set! mheq k (or (string->number v) v)))
           (q #:attrs mheq #:elems (map loop elems))]
          [(list (? qexpr? elems) ...)
           (q #:elems (map loop elems))])]
@@ -90,7 +92,7 @@
 (module+ test
   (check-equal?
    (qexpr->quad  `(q ((font "Charter") (fontsize "12")) (q "Foo bar") ,(make-quad "zzz") (q "Zim Zam")))
-   (q (hasheq 'font "Charter" 'fontsize "12") (q "Foo bar") (q "zzz") (q "Zim Zam"))))
+   (q (hasheq 'font "Charter" 'fontsize 12) (q "Foo bar") (q "zzz") (q "Zim Zam"))))
 
 (define (qml->qexpr x)
   (parameterize ([permissive-xexprs #t]

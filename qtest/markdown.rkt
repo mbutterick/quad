@@ -23,7 +23,10 @@
   hrbr)
 
 (define-tag-function (blockquote attrs exprs)
-  (qexpr (list* '(container "bq") '(font "fira") '(fontsize "10") '(line-height "11") '(left-inset "5") attrs) exprs))
+  (qexpr (list* '(container "bq")
+                '(font "fira") '(fontsize "10") '(line-height "13.5") 
+                '(inset-top "1") '(inset-bottom "7") '(inset-left "8")
+                 attrs) exprs))
 
 (define id (default-tag-function 'id))
 (define class (default-tag-function 'class))
@@ -60,10 +63,10 @@
                                  [str (in-list (string-split (string-join (get-elements expr) "") "\n"))])
                        `(,(get-tag expr) ,(get-attrs expr) ,str))
                      lbr))
-  (qexpr (list* '(container "codeblock") '(line-height "13") '(left-inset "12") '(right-inset "12") attrs) new-exprs))
+  (qexpr (list* '(container "codeblock") '(line-height "13") '(inset-left "12") '(inset-right "12") attrs) new-exprs))
 
 (define (list-base attrs exprs [bullet-val #f])
-  (qexpr (list* '(left-inset "20") attrs)
+  (qexpr (list* '(inset-left "20") attrs)
          (add-between
           (for/list ([(expr idx) (in-indexed exprs)])
             (list* (get-tag expr) (cons (list 'list-index (or bullet-val (format "~a." (add1 idx)))) (get-attrs expr)) (get-elements expr)))
@@ -87,7 +90,7 @@
                     #:draw (λ (q doc)
                              (when (pair? (quad-elems q))
                                (font doc (path->string (hash-ref (quad-attrs q) 'font)))
-                               (font-size doc (string->number (hash-ref (quad-attrs q) 'fontsize "12")))
+                               (font-size doc (hash-ref (quad-attrs q) 'fontsize 12))
                                (fill-color doc (hash-ref (quad-attrs q) 'color "black"))
                                (define str (unsafe-car (quad-elems q)))
                                (match-define (list x y) (quad-origin q))
@@ -105,7 +108,7 @@
 (define-runtime-path fira-mono "fonts/fira-mono.ttf")
 
 (define default-font-face charter)
-(define default-font-size "12")
+(define default-font-size 12)
 
 (define (->string-quad doc q)
   (cond
@@ -133,13 +136,12 @@
                attrs)]
       [elems (quad-elems q)]
       [size (delay
-              (define fontsize (string->number (hash-ref (quad-attrs q) 'fontsize)))
+              (define fontsize (hash-ref (quad-attrs q) 'fontsize))
               (font-size doc fontsize)
               (font doc (path->string (hash-ref (quad-attrs q) 'font)))
               (define str (if (pair? (quad-elems q)) (unsafe-car (quad-elems q)) ""))
               (define line-height (cond
-                                    [(and (pair? (quad-elems q))
-                                          (string->number (quad-ref q 'line-height "NaN")))]
+                                    [(and (pair? (quad-elems q)) (quad-ref q 'line-height))]
                                     [else (current-line-height doc)]))
               (pt (string-width doc str) line-height))])]))
 
@@ -161,7 +163,7 @@
 (define dumb-hardcoded-value 380.1234)
 (define q:line (q #:size (pt dumb-hardcoded-value line-height)
                   #:in 'nw
-                  #:inner 'sw ; puts baseline at lower right corner of line box
+                  #:inner 'sw
                   #:out 'sw
                   #:printable #true
                   #:draw-start draw-debug))
@@ -206,9 +208,17 @@
   (check-true (line-break? (second (quad-elems (q "foo" pbr "bar")))))
   (check-true (line-break? (second (atomize (q "foo" pbr "bar"))))))
 
+(define (copy-block-attrs source-hash dest-hash)
+  (define block-attrs '(container inset-top inset-bottom))
+  (for ([k (in-list block-attrs)])
+    (cond
+      [(hash-ref source-hash k #f) => (λ (val) (hash-set! dest-hash k val))]))
+  dest-hash)
+
 (define (line-wrap xs wrap-size)
-  (wrap xs (λ (q idx) (- wrap-size (string->number (quad-ref q 'left-inset "0"))
-                         (string->number (quad-ref q 'right-inset "0"))))                        
+  (wrap xs (λ (q idx) (- wrap-size
+                         (quad-ref q 'inset-left 0)
+                         (quad-ref q 'inset-right 0)))                        
         #:hard-break line-break?
         #:soft-break soft-break-for-line?
         #:finish-wrap
@@ -219,42 +229,33 @@
              [(hr-break? q)
               (list (struct-copy quad q:line
                                  [draw-start (λ (dq doc)
-                                               (save doc)
                                                (match-define (list left top) (quad-origin dq))
                                                (match-define (list right bottom)(size dq))
                                                (translate doc left (+ top (/ bottom 2)))
                                                (move-to doc 0 0)
                                                (line-to doc right 0)
                                                (line-width doc 3)
-                                               (stroke doc "#999")
-                                               (restore doc))]))]
+                                               (stroke doc "#999"))]))]
              [else
-              
-              (define new-elems (consolidate-runs pcs))
-              (cond
-                [(pair? new-elems)
+              (match (consolidate-runs pcs)
+                [(? pair? elems)
+                 (define elem (unsafe-car elems))
                  (list (struct-copy quad q:line
-                                    [attrs (let ([attrs (hash-copy (quad-attrs q:line))])
-                                             (define container-val (quad-ref (unsafe-car new-elems) 'container))
-                                             (when (and container-val
-                                                        (for/and ([elem (in-list (unsafe-cdr new-elems))])
-                                                          (equal? (quad-ref elem 'container)
-                                                                  container-val)))
-                                               (hash-set! attrs 'container container-val))
-                                             attrs)]
+                                    [attrs (copy-block-attrs (quad-attrs elem)
+                                                             (hash-copy (quad-attrs q:line)))]
                                     [size (let ()
                                             (define line-heights
                                               (filter-map
-                                               (λ (q) (string->number (quad-ref q 'line-height "NaN")))
+                                               (λ (q) (quad-ref q 'line-height))
                                                pcs))
                                             (match-define (list w h) (quad-size q:line))
                                             (pt w (if (empty? line-heights) h (apply max line-heights))))]
-                                    [elems new-elems]
+                                    [elems elems]
                                     [offset (pt
-                                             (string->number (quad-ref (car new-elems) 'left-inset "0"))
+                                             (quad-ref elem 'inset-left 0)
                                              (second (quad-offset q:line)))]
                                     [draw-end (match (and (or (para-break? q) (not q))
-                                                          (quad-ref (car new-elems) 'list-index))
+                                                          (quad-ref elem 'list-index))
                                                 [#false void]
                                                 [val (λ (q doc)
                                                        (save doc)
@@ -262,7 +263,7 @@
                                                          (quad-origin (car (quad-elems q))))
                                                        (text doc val x y)
                                                        (restore doc))])]))]
-                [else null])])
+                [_ null])])
            (if (and (para-break? q) (not (hr-break? q)))
                (list q:line-spacer)
                null)))))
@@ -270,11 +271,11 @@
 (define top-margin 60)
 (define bottom-margin 120)
 (define side-margin 120)
-(define page-offset (pt (/ side-margin 3) (/ top-margin 3)))
+(define page-offset (pt (/ side-margin 4) (/ top-margin 3)))
 (require racket/date)
 (define q:page (q #:offset page-offset
                   #:draw-start (λ (q doc) (add-page doc)
-                                 (scale doc 2 2))
+                                 (scale doc 3 3))
                   #:draw-end (λ (q doc)
                                (font-size doc 10)
                                (font doc charter)
@@ -288,23 +289,25 @@
 (define q:doc (q #:draw-start (λ (q doc) (start-doc doc))
                  #:draw-end (λ (q doc) (end-doc doc))))
 
-(define (make-blockquote pcs)
+(define (make-blockquote lines)
+  (define first-line (car lines)) 
   (q #:attrs (hasheq 'type "bq")
      #:in 'nw
      #:out 'sw
-     #:elems pcs
-     #:size (delay (pt (pt-x (size (car pcs)))
-                       (for/sum ([pc (in-list pcs)])
-                         (pt-y (size pc)))))
+     #:offset (pt 0 (quad-ref first-line 'inset-top 0))
+     #:elems lines
+     #:size (delay (pt (pt-x (size first-line)) ; 
+                       (+ (for/sum ([line (in-list lines)])
+                            (pt-y (size line)))
+                          (quad-ref first-line 'inset-top 0)
+                          (quad-ref first-line 'inset-bottom 0))))
      #:draw-start (λ (q doc)
-                    (save doc)
                     (match-define (list left top) (quad-origin q))
                     (match-define (list right bottom) (size q))
                     #;(rect doc (- left 4) (+ top 6) right (+ bottom 2))
-                    (rect doc left top right (+ bottom 4))
+                    (rect doc left top right bottom)
                     (line-width doc 1)
-                    (fill-and-stroke doc "#eee" "#999")
-                    (restore doc))))
+                    (fill-and-stroke doc "#eee" "#999"))))
 
 (define (make-codeblock pcs)
   (q #:attrs (hasheq 'type "codeblock")
