@@ -23,10 +23,15 @@
   hrbr)
 
 (define-tag-function (blockquote attrs exprs)
-  (qexpr (list* '(container "bq")
-                '(font "fira") '(fontsize "10") '(line-height "13.5") 
-                '(inset-top "1") '(inset-bottom "7") '(inset-left "8")
-                 attrs) exprs))
+  (qexpr (list* '(display "block")
+                 '(background-color "#eee")
+                '(font "fira") '(fontsize "10") '(line-height "15")
+                '(border-width-top "0.5") '(border-color-top "gray") '(border-inset-top "8")
+                '(border-width-left "3") '(border-color-left "gray") '(border-inset-left "20")
+                '(border-width-bottom "0.5") '(border-color-bottom "gray") '(border-inset-bottom "-2")
+                '(border-width-right "0.5") '(border-color-right "gray") '(border-inset-right "20")
+                '(inset-top "10") '(inset-bottom "8") '(inset-left "30") '(inset-right "30")
+                attrs) exprs))
 
 (define id (default-tag-function 'id))
 (define class (default-tag-function 'class))
@@ -63,7 +68,13 @@
                                  [str (in-list (string-split (string-join (get-elements expr) "") "\n"))])
                        `(,(get-tag expr) ,(get-attrs expr) ,str))
                      lbr))
-  (qexpr (list* '(container "codeblock") '(line-height "13") '(inset-left "12") '(inset-right "12") attrs) new-exprs))
+  (qexpr (list* '(display "block") '(background-color "aliceblue")
+                '(font "fira-mono") '(fontsize "11") '(line-height "14")
+                '(border-inset-top "10")
+                '(border-width-left "2") '(border-color-left "#669") '(border-inset-left "0")
+                '(border-inset-right "10") '(border-inset-bottom "-4")
+                 '(inset-left "12") '(inset-right "12")  '(inset-top "12") '(inset-bottom "6")
+                attrs) new-exprs))
 
 (define (list-base attrs exprs [bullet-val #f])
   (qexpr (list* '(inset-left "20") attrs)
@@ -145,7 +156,7 @@
                                     [else (current-line-height doc)]))
               (pt (string-width doc str) line-height))])]))
 
-(define draw-debug? #t)
+(define draw-debug? #f)
 (define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"])
   (when draw-debug?
     (save doc)
@@ -209,7 +220,12 @@
   (check-true (line-break? (second (atomize (q "foo" pbr "bar"))))))
 
 (define (copy-block-attrs source-hash dest-hash)
-  (define block-attrs '(container inset-top inset-bottom))
+  (define block-attrs '(display
+                        inset-top inset-bottom inset-left inset-right
+                        border-inset-top  border-inset-bottom border-inset-left border-inset-right
+                        border-width-left border-width-right border-width-top border-width-bottom
+                        border-color-left border-color-right border-color-top border-color-bottom
+                        background-color))
   (for ([k (in-list block-attrs)])
     (cond
       [(hash-ref source-hash k #f) => (λ (val) (hash-set! dest-hash k val))]))
@@ -268,14 +284,16 @@
                (list q:line-spacer)
                null)))))
 
+(define zoom-mode? #f)
 (define top-margin 60)
 (define bottom-margin 120)
 (define side-margin 120)
-(define page-offset (pt (/ side-margin 4) (/ top-margin 3)))
+(define page-offset (pt (/ side-margin (if zoom-mode? 3 1))
+                        (/ top-margin (if zoom-mode? 3 1))))
 (require racket/date)
 (define q:page (q #:offset page-offset
                   #:draw-start (λ (q doc) (add-page doc)
-                                 (scale doc 3 3))
+                                 (scale doc (if zoom-mode? 3 1) (if zoom-mode? 3 1)))
                   #:draw-end (λ (q doc)
                                (font-size doc 10)
                                (font doc charter)
@@ -289,12 +307,11 @@
 (define q:doc (q #:draw-start (λ (q doc) (start-doc doc))
                  #:draw-end (λ (q doc) (end-doc doc))))
 
-(define (make-blockquote lines)
+(define (block-wrap lines)
   (define first-line (car lines)) 
-  (q #:attrs (hasheq 'type "bq")
-     #:in 'nw
+  (q #:in 'nw
      #:out 'sw
-     #:offset (pt 0 (quad-ref first-line 'inset-top 0))
+     #:offset (pt 0 (+ (quad-ref first-line 'inset-top 0)))
      #:elems lines
      #:size (delay (pt (pt-x (size first-line)) ; 
                        (+ (for/sum ([line (in-list lines)])
@@ -302,41 +319,43 @@
                           (quad-ref first-line 'inset-top 0)
                           (quad-ref first-line 'inset-bottom 0))))
      #:draw-start (λ (q doc)
-                    (match-define (list left top) (quad-origin q))
-                    (match-define (list right bottom) (size q))
-                    #;(rect doc (- left 4) (+ top 6) right (+ bottom 2))
-                    (rect doc left top right bottom)
-                    (line-width doc 1)
-                    (fill-and-stroke doc "#eee" "#999"))))
+                    ;; adjust drawing coordinates for border inset
+                    (match-define (list bil bit bir bib)
+                      (map (λ (k) (quad-ref first-line k 0))
+                           '(border-inset-left border-inset-top border-inset-right border-inset-bottom)))
+                    (match-define (list left top) (map + (quad-origin q) (list bil bit)))
+                    (match-define (list width height) (map - (size q) (list (+ bil bir) (+ bit bib))))
+                    ;; fill rect
+                    (cond 
+                      [(quad-ref first-line 'background-color)
+                       => (λ (bgcolor)
+                            (rect doc left top width height)
+                            (fill doc bgcolor))])
+                    ;; draw border
+                    (match-define (list bw-left bw-top bw-right bw-bottom)
+                      (map (λ (k) (max 0 (quad-ref first-line k 0))) '(border-width-left
+                                                                       border-width-top
+                                                                       border-width-right
+                                                                       border-width-bottom)))
+                    ;; adjust start and end points based on adjacent border width
+                    ;; so all borders overlap rectangularly
+                    (define (half x) (/ x 2.0))
+                    (define right (+ left width))
+                    (define bottom (+ top height))
+                    (define (box-side x1 y1 x2 y2 color stroke-width)
+                      (when (positive? stroke-width)
+                        (move-to doc x1 y1)
+                        (line-to doc x2 y2)
+                        (stroke doc (or color "black") stroke-width)))
+                    (box-side (- left (half bw-left)) top (+ right (half bw-right)) top
+                              (quad-ref first-line 'border-color-top) bw-top)
+                    (box-side right (- top (half bw-top)) right (+ bottom (half bw-bottom))
+                              (quad-ref first-line 'border-color-right) bw-right)
+                    (box-side (+ right (half bw-right)) bottom (- left (half bw-left)) bottom
+                              (quad-ref first-line 'border-color-bottom) bw-bottom)
+                    (box-side left (+ bottom (half bw-bottom)) left (- top (half bw-top))
+                              (quad-ref first-line 'border-color-left) bw-left)))) 
 
-(define (make-codeblock pcs)
-  (q #:attrs (hasheq 'type "codeblock")
-     #:in 'nw
-     #:out 'sw
-     #:elems pcs
-     #:size (delay (pt (pt-x (size (car pcs)))
-                       (for/sum ([pc (in-list pcs)])
-                         (pt-y (size pc)))))
-     #:draw-start (λ (q doc)
-                    (save doc)
-                    (match-define (list left top) (quad-origin q))
-                    (match-define (list right bottom) (size q))
-                    (translate doc (- left 4) (+ top 6)) ; reset origin to top left of quad
-                    (rect doc 0 0 right (+ bottom 2))
-                    (fill doc "aliceblue")
-                    (define vert-line-width 6)
-                    (move-to doc (/ vert-line-width 2) 0) ; affirmatively move cursor
-                    (line-to doc (/ vert-line-width 2) bottom) ; strictly vert line
-                    (line-width doc vert-line-width)
-                    (stroke doc "#669")
-                    #;(move-to doc 0 0) ; affirmatively move cursor
-                    #;(line-to doc 0 bottom) ; strictly horiz line
-                    #;(stroke doc "gray")
-                    #;(translate doc 0 (+ bottom 2)) ; reset origin
-                    #;(move-to doc 0 0) ; move again
-                    #;(line-to doc right 0) ; same line, translated
-                    (stroke doc "gray")
-                    (restore doc))))
 
 (define (contiguous-group-by pred xs)
   ;; like `group-by`, but only groups together contiguous xs with the same pred value.
@@ -370,33 +389,33 @@
                                                     h)]
                                            [elems lns])))))
 
-(define (insert-containers pages)
-  ;; container recomposition happens after page composition because page breaks can happen between lines.
-  ;; iow, the lines within a container may be split over multiple pages, each of which should be drawn
-  ;; as a separate container
+(define (insert-blocks pages)
+  ;; block recomposition happens after page composition because page breaks can happen between lines.
+  ;; iow, the lines within a block may be split over multiple pages, each of which should be drawn
+  ;; as a separate block
   (for/list ([page (in-list pages)])
-    (define lns (quad-elems page))             
-    (define groups (contiguous-group-by (λ (x) (hash-ref (quad-attrs x) 'container #f)) lns))
-    (define lns-and-containers (append* (for/list ([grp (in-list groups)])
-                                          (match (hash-ref (quad-attrs (car grp)) 'container #f)
-                                            ["bq" (list (make-blockquote grp))]
-                                            ["codeblock" (list (make-codeblock grp))]
-                                            [_ grp]))))
-    (struct-copy quad page [elems lns-and-containers])))
+    (define lines (quad-elems page))
+    (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x 'display)) lines))
+    (define lines-and-blocks
+      (append* (for/list ([lines (in-list groups-of-lines)])
+                 (match (quad-ref (car lines) 'display)
+                   ["block" (list (block-wrap lines))]
+                   [_ lines]))))
+    (struct-copy quad page [elems lines-and-blocks])))
 
 (define (run xs path)
   (define pdf (time-name make-pdf (make-pdf #:compress #t
                                             #:auto-first-page #f
                                             #:output-path path
-                                            #:width 350
-                                            #:height 400)))
+                                            #:width (if zoom-mode? 350 612)
+                                            #:height (if zoom-mode? 400 792))))
   (define line-width (- (pdf-width pdf) (* 2 side-margin)))
   (define vertical-height (- (pdf-height pdf) top-margin bottom-margin))
   (let* ([x (time-name atomize (atomize (qexpr->quad xs)))]
          [x (time-name ->string-quad (map (λ (x) (->string-quad pdf x)) x))]
          [x (time-name line-wrap (line-wrap x line-width))]
          [x (time-name page-wrap (page-wrap x vertical-height path))]
-         [x (time-name insert-containers (insert-containers x))]
+         [x (time-name insert-containers (insert-blocks x))]
          [x (time-name position (position (struct-copy quad q:doc [elems x])))])
     (time-name draw (draw x pdf))))
 
