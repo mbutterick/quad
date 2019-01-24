@@ -14,10 +14,13 @@
 (module+ test
   (require rackunit))
 
+(define (update-with! h . update-hashes)
+  (apply hash-union! #:combine (λ (v1 v2) v2) h update-hashes))
+
 (define (update-with base-hash . update-hashes)
   ;; starting with base-hash, add or update keys found in update-hashes
   (define h (make-hasheq))
-  (apply hash-union! #:combine (λ (v1 v2) v2) h base-hash update-hashes)
+  (apply update-with! h base-hash update-hashes)
   h)
 
 (module+ test
@@ -79,7 +82,7 @@
                           null
                           (list (apply x-maker next-attrs (list elem) x-tail)))
                       (loop elem next-attrs next-key))))]
-      [_ (list x)])))
+      [_ ((quad-attrs x) . update-with! . next-attrs) (list x)])))
   #;(trimf atomized-qs (λ (q) (equal? (quad-elems q) '(" "))))
   atomized-qs)
 
@@ -89,7 +92,7 @@
                        (hash-remove! (quad-attrs q) 'run))) qs)
     qs)
   (struct $br quad ())
-  (define br (q #:type $br (hasheq 'br "time")))
+  (define br (q #:type $br (make-hasheq '((br . "time")))))
   (check-equal? (filter-private-keys (atomize (q (q "a b") br (q "x y"))))
                 (list (q "a") (q " ") (q "b") br (q "x") (q " ") (q "y")))  
   (check-equal?

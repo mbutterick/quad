@@ -1,7 +1,6 @@
 #lang qtest/markdown
 
-Why don't we
+Tenzing
+We
 
-1. list the ways
-
-2. we can
+* whoudl.

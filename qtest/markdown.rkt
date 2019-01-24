@@ -235,9 +235,10 @@
                         border-width-left border-width-right border-width-top border-width-bottom
                         border-color-left border-color-right border-color-top border-color-bottom
                         background-color))
-  (for ([k (in-list block-attrs)])
-    (cond
-      [(hash-ref source-hash k #f) => (λ (val) (hash-set! dest-hash k val))]))
+  (for* ([k (in-list block-attrs)]
+         [v (in-value (hash-ref source-hash k #f))]
+         #:when v)
+    (hash-set! dest-hash k v))
   dest-hash)
 
 (define (line-wrap xs wrap-size)
@@ -246,8 +247,11 @@
                          (quad-ref q 'inset-right 0)))                        
         #:hard-break line-break?
         #:soft-break soft-break-for-line?
+        #:wrap-count (λ (idx q) (if (para-break? q)
+                                    1
+                                    (add1 idx)))
         #:finish-wrap
-        (λ (pcs ending-q idx)
+        (λ (pcs opening-q ending-q idx)
           (append
            (cond
              [(empty? pcs) null]
@@ -266,47 +270,36 @@
                 [(? pair? elems)
                  (define elem (unsafe-car elems))
                  (list (struct-copy quad q:line
+                                    ;; move block attrs up, so they are visible in page wrap
                                     [attrs (copy-block-attrs (quad-attrs elem)
                                                              (hash-copy (quad-attrs q:line)))]
+                                    ;; line width is static
+                                    ;; line height is the max 'line-height value or the natural height of q:line
                                     [size (let ()
                                             (define line-heights
-                                              (filter-map
-                                               (λ (q) (quad-ref q 'line-height))
-                                               pcs))
+                                              (filter-map (λ (q) (quad-ref q 'line-height)) pcs))
                                             (match-define (list w h) (quad-size q:line))
                                             (pt w (if (empty? line-heights) h (apply max line-heights))))]
-                                    [elems (let ()
-                                             ;; problem here is that ending-q tells us the quad that ends the wrap
-                                             ;; but not the quad that started the wrap
-                                             ;; which is what we need to detect whether we are
-                                             ;; in the first line of a list item.
-                                             #R (car elems)
-                                             (append
-                                            (match (and #R ending-q (or #R (para-break? ending-q) #R (not ending-q))
-                                                        (quad-ref elem 'list-index))
+                                    ;; handle list indexes. drop new quad into line to hold list index
+                                    [elems (append
+                                            (match (and (= idx 1) (quad-ref elem 'list-index))
                                               [#false null]
                                               [bullet (list (make-quad
-                                                             #:in 'sw
-                                                             #:out 'sw
-                                                             #:size (pt 10 10)
-                                                             #:draw-end (λ (q doc) (draw-debug q doc "red" "red"))
+                                                             ;; wart: iffy to rely on `(car elems)` here
+                                                             ;; what if first elem is not a string quad?
                                                              #:elems (list (struct-copy quad (car elems)
                                                                                         [elems (list (if (number? bullet)
                                                                                                          (format "~a." bullet)
                                                                                                          bullet))]))))])
                                             (list (make-quad
-                                                   #:in 'nw
-                                                   #:out 'nw
-                                                   #:size (pt 15 15)
-                                                   #:draw-end (λ (q doc) (draw-debug q doc "blue" "blue"))
                                                    #:offset (pt (quad-ref elem 'inset-left 0) 0)
-                                                   #:elems elems))))]))]
+                                                   #:elems elems)))]))]
                 [_ null])])
            (if (and (para-break? ending-q) (not (hr-break? ending-q)))
                (list q:line-spacer)
                null)))))
 
-(define zoom-mode? #t)
+(define zoom-mode? #f)
 (define top-margin 60)
 (define bottom-margin 120)
 (define side-margin 120)
@@ -407,7 +400,7 @@
                      ;; do trial block insertions
                      (for/sum ([x (in-list (insert-blocks wrap-qs))])
                        (pt-y (size x))))                     
-        #:finish-wrap (λ (lns q idx)
+        #:finish-wrap (λ (lns q0 q idx)
                         (list (struct-copy quad q:page
                                            [attrs (let ([page-number idx]
                                                         [h (hash-copy (quad-attrs q:page))])

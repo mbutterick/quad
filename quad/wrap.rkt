@@ -25,29 +25,31 @@
               #:wrap-anywhere? [wrap-anywhere? #f]
               #:distance [distance-func (λ (q last-dist wrap-qs)
                                           (+ last-dist (if (printable? q) (distance q) 0)))]
-              #:finish-wrap [finish-wrap-func (λ (xs q idx) (list xs))])
+              #:wrap-count [wrap-count (λ (idx q) (add1 idx))]
+              #:finish-wrap [finish-wrap-func (λ (xs q0 q idx) (list xs))])
   (define target-size-proc
     (match target-size-proc-arg
       [(? procedure? proc) proc]
       [val (λ (q idx) val)]))
   ; takes quads in wrap, triggering quad, and wrap idx; returns list containing wrap (and maybe other things)
-  (define (finish-wrap qs wrap-idx [wrap-triggering-q (car qs)])
+  (define (finish-wrap qs previous-wrap-ender wrap-idx [wrap-triggering-q (car qs)])
     ;; reverse because quads accumulated in reverse
     ;; wrap-triggering-q is ordinarily the last accumulated q
     ;; unless it's the last wrap, in which case it's #f
     ;; but we capture it separately because it's likely to get trimmed away by `nonprinting-at-end?`
     ;; note: we don't trim `soft-break?` or `hard-break?` because that's an orthogonal consideration
     ;; for instance, a hyphen is `soft-break?` but shouldn't be trimmed.
-    (finish-wrap-func (reverse (dropf qs nonprinting-at-end?)) wrap-triggering-q wrap-idx))
+    (finish-wrap-func (reverse (dropf qs nonprinting-at-end?)) previous-wrap-ender wrap-triggering-q wrap-idx))
   (let loop ([wraps null] ; list of (list of quads)
              [wrap-idx 1] ; wrap count (could be (length wraps) but we'd rather avoid `length`)
              [next-wrap-head null] ; list of quads ending in previous `soft-break?` or `hard-break?`
              [next-wrap-tail null] ; list of unbreakable quads
              [current-dist #false] ; #false (to indicate start) or integer
+             [previous-wrap-ender #f]
              [qs qs]) ; list of quads
     (match qs
       [(or (== empty) (list (? hard-break?))) ; ignore single trailing hard break
-       (define last-wrap (finish-wrap (wrap-append next-wrap-tail next-wrap-head) wrap-idx #f))
+       (define last-wrap (finish-wrap (wrap-append next-wrap-tail next-wrap-head) previous-wrap-ender wrap-idx #f))
        ; append* because `finish-wrap-proc` returns a spliceable list
        ; reverse because wraps accumulated in reverse
        ; as a special case, '(()) is returned as just '()
@@ -62,11 +64,12 @@
          [(hard-break? q)
           (debug-report 'found-hard-break)
           ;; put hard break onto next-wrap-tail, and finish the wrap
-          (loop (cons (finish-wrap would-be-wrap-qs wrap-idx) wraps)
-                (add1 wrap-idx)
+          (loop (cons (finish-wrap would-be-wrap-qs previous-wrap-ender wrap-idx) wraps)
+                (wrap-count wrap-idx q)
                 null
                 null
                 #false
+                q
                 other-qs)]
          [(let ([at-start? (not current-dist)]) at-start?)
           (match q
@@ -77,13 +80,15 @@
                    next-wrap-head
                    next-wrap-tail
                    current-dist
+                   previous-wrap-ender
                    other-qs)]
             [_ (debug-report 'hard-quad-at-start)
                (loop wraps
                      wrap-idx
                      next-wrap-head
                      (list q)
-                     (distance q)
+                     (distance-func q 0 would-be-wrap-qs)
+                     previous-wrap-ender
                      other-qs)])]
          [else ; cases that require computing distance
           (define cumulative-dist (distance-func q current-dist would-be-wrap-qs))
@@ -93,11 +98,12 @@
              (cond
                [wrap-anywhere?
                 (debug-report 'we-can-wrap-anywhere-so-why-not-here)
-                (loop (cons (finish-wrap (wrap-append next-wrap-tail next-wrap-head) wrap-idx) wraps)
-                      (add1 wrap-idx)
+                (loop (cons (finish-wrap (wrap-append next-wrap-tail next-wrap-head) previous-wrap-ender wrap-idx) wraps)
+                      (wrap-count wrap-idx q)
                       null
                       null
                       #false
+                      q
                       qs)]
                [(and (soft-break? q) (nonprinting-at-end? q))
                 (debug-report 'would-overflow-soft-nonprinting)
@@ -108,21 +114,24 @@
                       (wrap-append (cons q next-wrap-tail) next-wrap-head)
                       null
                       cumulative-dist
+                      previous-wrap-ender
                       other-qs)]
                [(empty? next-wrap-head)
                 (debug-report 'would-overflow-hard-without-captured-break)
-                (loop (cons (finish-wrap next-wrap-tail wrap-idx) wraps)
-                      (add1 wrap-idx)
+                (loop (cons (finish-wrap next-wrap-tail previous-wrap-ender wrap-idx) wraps)
+                      (wrap-count wrap-idx q)
                       null
                       null
                       #false
+                      (car next-wrap-tail)
                       qs)]
                [else ; finish the wrap & reset the line without consuming a quad
-                (loop (cons (finish-wrap next-wrap-head wrap-idx) wraps)
-                      (add1 wrap-idx)
+                (loop (cons (finish-wrap next-wrap-head previous-wrap-ender wrap-idx) wraps)
+                      (wrap-count wrap-idx q)
                       null
                       next-wrap-tail
                       (apply + (map distance next-wrap-tail))
+                      (car next-wrap-head)
                       qs)])]         
             [(soft-break? q)
              (debug-report 'would-not-overflow-soft)
@@ -132,6 +141,7 @@
                    (wrap-append (cons q next-wrap-tail) next-wrap-head)
                    null
                    cumulative-dist
+                   previous-wrap-ender
                    other-qs)]
             [else
              (debug-report 'would-not-overflow)
@@ -141,6 +151,7 @@
                    next-wrap-head
                    (cons q next-wrap-tail)
                    cumulative-dist
+                   previous-wrap-ender
                    other-qs)])])])))
 
 (define q-zero (q #:size (pt 0 0)))
