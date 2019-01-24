@@ -76,11 +76,18 @@
                 '(inset-left "12") '(inset-right "12")  '(inset-top "12") '(inset-bottom "12")
                 attrs) new-exprs))
 
+
+(define draw-debug? #t)
+(define draw-debug-line? #t)
+(define draw-debug-block? #f)
+(define draw-debug-string? #f)
+
+
 (define (list-base attrs exprs [bullet-val #f])
   (qexpr (list* '(inset-left "20") attrs)
          (add-between
           (for/list ([(expr idx) (in-indexed exprs)])
-            (list* (get-tag expr) (cons (list 'list-index (or bullet-val (format "~a." (add1 idx)))) (get-attrs expr)) (get-elements expr)))
+            (list* (get-tag expr) (cons (list 'list-index (or bullet-val (format "~a" (add1 idx)))) (get-attrs expr)) (get-elements expr)))
           pbr)))
 
 (define-tag-function (ol attrs exprs) (list-base attrs exprs))
@@ -109,7 +116,9 @@
                                      #:bg (hash-ref (quad-attrs q) 'bg #f)
                                      #:features (list (cons #"tnum" 1))
                                      #:link (hash-ref (quad-attrs q) 'link #f))))
-                    #:draw-end (λ (q doc) (draw-debug q doc "#99f" "#ccf"))))
+                    #:draw-end (if draw-debug-string?
+                                   (λ (q doc) (draw-debug q doc "#99f" "#ccf"))
+                                   void)))
 
 (define-runtime-path charter "fonts/charter.ttf")
 (define-runtime-path charter-bold "fonts/charter-bold.ttf")
@@ -156,7 +165,7 @@
                                     [else (current-line-height doc)]))
               (pt (string-width doc str) line-height))])]))
 
-(define draw-debug? #t)
+
 (define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"])
   (when draw-debug?
     (save doc)
@@ -177,13 +186,13 @@
                   #:inner 'sw
                   #:out 'sw
                   #:printable #true
-                  #:draw-start draw-debug))
+                  #:draw-start (if draw-debug-line? draw-debug void)))
 (struct line-spacer quad () #:transparent)
 (define q:line-spacer (q #:type line-spacer
                          #:size (pt dumb-hardcoded-value (* line-height 0.6))
                          #:out 'sw
                          #:printable (λ (q sig) (not (memq sig '(start end))))
-                         #:draw-start draw-debug))
+                         #:draw-start (if draw-debug-line? draw-debug void)))
 
 (define softies (map string '(#\space #\- #\u00AD)))
 
@@ -232,7 +241,7 @@
   dest-hash)
 
 (define (line-wrap xs wrap-size)
-  (wrap xs (λ (q idx) (- wrap-size
+  (wrap #R xs (λ (q idx) (- wrap-size
                          (quad-ref q 'inset-left 0)
                          (quad-ref q 'inset-right 0)))                        
         #:hard-break line-break?
@@ -266,25 +275,32 @@
                                                pcs))
                                             (match-define (list w h) (quad-size q:line))
                                             (pt w (if (empty? line-heights) h (apply max line-heights))))]
-                                    [elems elems]
-                                    [offset (pt
-                                             (quad-ref elem 'inset-left 0)
-                                             (second (quad-offset q:line)))]
-                                    [draw-end (match (and (or (para-break? q) (not q))
-                                                          (quad-ref elem 'list-index))
-                                                [#false void]
-                                                [val (λ (q doc)
-                                                       (save doc)
-                                                       (match-define (list x y)
-                                                         (quad-origin (car (quad-elems q))))
-                                                       (text doc val x y)
-                                                       (restore doc))])]))]
+                                    [elems (append
+                                            (match (and (or (para-break? q) (not q))
+                                                        (quad-ref elem 'list-index))
+                                              [#false null]
+                                              [bullet (list (make-quad
+                                                          #:in 'sw
+                                                          #:out 'sw
+                                                          #:size (pt 10 10)
+                                                          #:draw-end (λ (q doc) (draw-debug q doc "red" "red"))
+                                                          #:elems (list (struct-copy quad (car elems)
+                                                                                     [elems (list (if (number? bullet)
+                                                                       (format "~a." bullet)
+                                                                       bullet))]))))])
+                                            (list (make-quad
+                                                   #:in 'nw
+                                                   #:out 'nw
+                                                   #:size (pt 15 15)
+                                                   #:draw-end (λ (q doc) (draw-debug q doc "blue" "blue"))
+                                                   #:offset (pt (quad-ref elem 'inset-left 0) 0)
+                                                   #:elems elems)))]))]
                 [_ null])])
            (if (and (para-break? q) (not (hr-break? q)))
                (list q:line-spacer)
                null)))))
 
-(define zoom-mode? #f)
+(define zoom-mode? #t)
 (define top-margin 60)
 (define bottom-margin 120)
 (define side-margin 120)
@@ -314,10 +330,10 @@
      #:offset (pt 0 (+ (quad-ref first-line 'inset-top 0)))
      #:elems lines
      #:size (delay (pt (pt-x (size first-line)) ; 
-                (+ (for/sum ([line (in-list lines)])
-                     (pt-y (size line)))
-                   (quad-ref first-line 'inset-top 0)
-                   (quad-ref first-line 'inset-bottom 0))))
+                       (+ (for/sum ([line (in-list lines)])
+                            (pt-y (size line)))
+                          (quad-ref first-line 'inset-top 0)
+                          (quad-ref first-line 'inset-bottom 0))))
      #:draw-start (λ (q doc)
                     ;; adjust drawing coordinates for border inset
                     (match-define (list bil bit bir bib)
@@ -355,7 +371,9 @@
                               (quad-ref first-line 'border-color-bottom) bw-bottom)
                     (box-side left (+ bottom (half bw-bottom)) left (- top (half bw-top))
                               (quad-ref first-line 'border-color-left) bw-left))
-     #:draw-end (λ (q doc) (draw-debug q doc "#6c6" "#9c9")))) 
+     #:draw-end (if draw-debug-block?
+                    (λ (q doc) (draw-debug q doc "#6c6" "#9c9"))
+                    void))) 
 
 
 (define (contiguous-group-by pred xs)

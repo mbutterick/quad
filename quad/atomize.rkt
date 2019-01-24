@@ -5,6 +5,7 @@
          racket/list
          racket/struct
          txexpr
+         sugar/list
          racket/function
          "quad.rkt"
          "param.rkt")
@@ -49,7 +50,8 @@
 (define (atomize qx)
   ;; atomize a quad by reducing it to the smallest indivisible formatting units.
   ;; which are multi-character quads with the same formatting.
-  (let loop ([x (make-quad qx)]
+  (define atomized-qs
+    (let loop ([x (make-quad qx)]
              [attrs (hash-copy (current-default-attrs))]
              [key (eq-hash-code (current-default-attrs))])
     (match-define-values (next-key next-attrs)
@@ -78,6 +80,8 @@
                           (list (apply x-maker next-attrs (list elem) x-tail)))
                       (loop elem next-attrs next-key))))]
       [_ (list x)])))
+  #;(trimf atomized-qs (λ (q) (equal? (quad-elems q) '(" "))))
+  atomized-qs)
 
 (module+ test
   (define (filter-private-keys qs)
