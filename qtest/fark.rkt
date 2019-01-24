@@ -20,23 +20,21 @@ it's a
 codeblock!
 ```
 
-```
-it's a
-codeblock!
-```
+> A simple _hyphenation engine_ that uses the Knuth–Liang hyphenation algorithm originally developed for TeX. A simple _hyphenation engine_ that uses the Knuth–Liang hyphenation algorithm originally developed for TeX.
+
 
 ```
 it's a
 codeblock!
 ```
 
-enated. To hyphenate words of
-any length, use `#:min-length` `#f`.
 
-A [list of web colors](https://en.wikipedia.org/wiki/Web_colors).
+> A [list of web colors](https://en.wikipedia.org/wiki/Web_colors).
 Certain word processors allow users to [insert soft
 hyphens](http://practicaltypography.com/optional-hyphens.html) in their
-text. A [list of web colors](https://en.wikipedia.org/wiki/Web_colors).
+text.
+
+A [list of web colors](https://en.wikipedia.org/wiki/Web_colors).
 Certain word processors allow users to [insert soft
 hyphens](http://practicaltypography.com/optional-hyphens.html) in their
 text. A [list of web colors](https://en.wikipedia.org/wiki/Web_colors).

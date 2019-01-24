@@ -23,7 +23,9 @@
               #:hard-break [hard-break? (λ (x) #f)]
               #:soft-break [soft-break? (λ (x) #f)]
               #:wrap-anywhere? [wrap-anywhere? #f]
-              #:finish-wrap [finish-wrap-proc (λ (xs q idx) (list xs))])
+              #:distance [distance-func (λ (q last-dist wrap-qs)
+                                          (+ last-dist (if (printable? q) (distance q) 0)))]
+              #:finish-wrap [finish-wrap-func (λ (xs q idx) (list xs))])
   (define target-size-proc
     (match target-size-proc-arg
       [(? procedure? proc) proc]
@@ -36,7 +38,7 @@
     ;; but we capture it separately because it's likely to get trimmed away by `nonprinting-at-end?`
     ;; note: we don't trim `soft-break?` or `hard-break?` because that's an orthogonal consideration
     ;; for instance, a hyphen is `soft-break?` but shouldn't be trimmed.
-    (finish-wrap-proc (reverse (dropf qs nonprinting-at-end?)) wrap-triggering-q wrap-idx))
+    (finish-wrap-func (reverse (dropf qs nonprinting-at-end?)) wrap-triggering-q wrap-idx))
   (let loop ([wraps null] ; list of (list of quads)
              [wrap-idx 1] ; wrap count (could be (length wraps) but we'd rather avoid `length`)
              [next-wrap-head null] ; list of quads ending in previous `soft-break?` or `hard-break?`
@@ -55,12 +57,12 @@
       [(cons q other-qs)
        (debug-report q 'next-q)
        (debug-report (quad-elems q) 'next-q-elems)
+       (define would-be-wrap-qs (wrap-append (cons q next-wrap-tail) next-wrap-head))
        (cond
          [(hard-break? q)
           (debug-report 'found-hard-break)
           ;; put hard break onto next-wrap-tail, and finish the wrap
-          (define wrap-qs (wrap-append (cons q next-wrap-tail) next-wrap-head))
-          (loop (cons (finish-wrap wrap-qs wrap-idx) wraps)
+          (loop (cons (finish-wrap would-be-wrap-qs wrap-idx) wraps)
                 (add1 wrap-idx)
                 null
                 null
@@ -84,8 +86,8 @@
                      (distance q)
                      other-qs)])]
          [else ; cases that require computing distance
-          (define dist (if (printable? q) (distance q) 0))
-          (define would-overflow? (and current-dist (> (+ dist current-dist) (target-size-proc q wrap-idx))))
+          (define cumulative-dist (distance-func q current-dist would-be-wrap-qs))
+          (define would-overflow? (> cumulative-dist (target-size-proc q wrap-idx)))
           (cond
             [would-overflow?
              (cond
@@ -105,7 +107,7 @@
                       wrap-idx
                       (wrap-append (cons q next-wrap-tail) next-wrap-head)
                       null
-                      (+ dist current-dist)
+                      cumulative-dist
                       other-qs)]
                [(empty? next-wrap-head)
                 (debug-report 'would-overflow-hard-without-captured-break)
@@ -129,7 +131,7 @@
                    wrap-idx
                    (wrap-append (cons q next-wrap-tail) next-wrap-head)
                    null
-                   (+ dist current-dist)
+                   cumulative-dist
                    other-qs)]
             [else
              (debug-report 'would-not-overflow)
@@ -138,7 +140,7 @@
                    wrap-idx
                    next-wrap-head
                    (cons q next-wrap-tail)
-                   (+ dist current-dist)
+                   cumulative-dist
                    other-qs)])])])))
 
 (define q-zero (q #:size (pt 0 0)))
@@ -285,14 +287,14 @@
 (define (visual-wrap str int [debug #f])
   (string-join
    (for/list ([x (in-list (linewrap (for/list ([c (in-string str)])
-                                              (define atom (q c))
-                                              (if (equal? (quad-elems atom) '(#\space))
-                                                  (struct-copy quad sp)
-                                                  (struct-copy quad q-one
-                                                               [attrs (quad-attrs atom)]
-                                                               [elems (quad-elems atom)]))) int debug))]
+                                      (define atom (q c))
+                                      (if (equal? (quad-elems atom) '(#\space))
+                                          (struct-copy quad sp)
+                                          (struct-copy quad q-one
+                                                       [attrs (quad-attrs atom)]
+                                                       [elems (quad-elems atom)]))) int debug))]
               #:when (and (list? x) (andmap quad? x)))
-             (list->string (map car (map quad-elems x))))
+     (list->string (map car (map quad-elems x))))
    "|"))
 
 (module+ test

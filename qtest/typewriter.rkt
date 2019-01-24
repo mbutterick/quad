@@ -32,7 +32,7 @@
                                     [else #true]))
                     #:draw (λ (q doc)
                              (set! draw-counter (add1 draw-counter ))
-                             (font-size doc (string->number (hash-ref (quad-attrs q) 'fontsize "12")))
+                             (font-size doc (hash-ref (quad-attrs q) 'fontsize 12))
                              (let ([str (car (quad-elems q))])
                                (cond
                                  [(hash-has-key? (quad-attrs q) 'link)
@@ -51,7 +51,7 @@
                [attrs (let ([h (quad-attrs q)]) (hash-set! h 'font charter) h)]
                [elems (quad-elems q)]
                [size (delay
-                       (define fontsize (string->number (hash-ref (quad-attrs q) 'fontsize "12")))
+                       (define fontsize (hash-ref (quad-attrs q) 'fontsize 12))
                        (define str (car (quad-elems q)))
                        (font-size doc fontsize)
                        (font doc (path->string charter))
