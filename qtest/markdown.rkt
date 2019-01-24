@@ -48,9 +48,11 @@
 (define-syntax-rule (attr-list . attrs) 'attrs)
 
 (define (heading-base font-size attrs exprs)
-  (qexpr (append `((font "fira-light")(fontsize ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size)))) attrs) exprs))
+  (qexpr (append `((font "fira-light") (display "block") (fontsize ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9")(border-inset-right "12") (inset-bottom "-3") (inset-top "6")) attrs) exprs))
 
-(define-tag-function (h1 attrs exprs) (heading-base 20 attrs exprs))
+(define-tag-function (h1 attrs exprs)
+  (heading-base 20 (append '() attrs) exprs))
+
 (define-tag-function (h2 attrs exprs) (heading-base 16 attrs exprs))
 (define-tag-function (h3 attrs exprs) (heading-base 14 attrs exprs))
 
@@ -247,9 +249,9 @@
                          (quad-ref q 'inset-right 0)))                        
         #:hard-break line-break?
         #:soft-break soft-break-for-line?
-        #:wrap-count (λ (idx q) (if (para-break? q)
-                                    1
-                                    (add1 idx)))
+        ;; restart wrap count after each paragraph break
+        ;; so idx=1 means first line in any paragraph
+        #:wrap-count (λ (idx q) (if (para-break? q) 1 (add1 idx)))
         #:finish-wrap
         (λ (pcs opening-q ending-q idx)
           (append
@@ -281,12 +283,11 @@
                                             (match-define (list w h) (quad-size q:line))
                                             (pt w (if (empty? line-heights) h (apply max line-heights))))]
                                     ;; handle list indexes. drop new quad into line to hold list index
+                                    ;; could also use this for line numbers
                                     [elems (append
                                             (match (and (= idx 1) (quad-ref elem 'list-index))
                                               [#false null]
                                               [bullet (list (make-quad
-                                                             ;; wart: iffy to rely on `(car elems)` here
-                                                             ;; what if first elem is not a string quad?
                                                              #:elems (list (struct-copy quad (car elems)
                                                                                         [elems (list (if (number? bullet)
                                                                                                          (format "~a." bullet)
