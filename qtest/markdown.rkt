@@ -78,7 +78,7 @@
 
 
 (define draw-debug? #t)
-(define draw-debug-line? #t)
+(define draw-debug-line? #f)
 (define draw-debug-block? #f)
 (define draw-debug-string? #f)
 
@@ -241,17 +241,17 @@
   dest-hash)
 
 (define (line-wrap xs wrap-size)
-  (wrap #R xs (λ (q idx) (- wrap-size
+  (wrap xs (λ (q idx) (- wrap-size
                          (quad-ref q 'inset-left 0)
                          (quad-ref q 'inset-right 0)))                        
         #:hard-break line-break?
         #:soft-break soft-break-for-line?
         #:finish-wrap
-        (λ (pcs q idx)
+        (λ (pcs ending-q idx)
           (append
            (cond
              [(empty? pcs) null]
-             [(hr-break? q)
+             [(hr-break? ending-q)
               (list (struct-copy quad q:line
                                  [draw-start (λ (dq doc)
                                                (match-define (list left top) (quad-origin dq))
@@ -275,28 +275,34 @@
                                                pcs))
                                             (match-define (list w h) (quad-size q:line))
                                             (pt w (if (empty? line-heights) h (apply max line-heights))))]
-                                    [elems (append
-                                            (match (and (or (para-break? q) (not q))
+                                    [elems (let ()
+                                             ;; problem here is that ending-q tells us the quad that ends the wrap
+                                             ;; but not the quad that started the wrap
+                                             ;; which is what we need to detect whether we are
+                                             ;; in the first line of a list item.
+                                             #R (car elems)
+                                             (append
+                                            (match (and #R ending-q (or #R (para-break? ending-q) #R (not ending-q))
                                                         (quad-ref elem 'list-index))
                                               [#false null]
                                               [bullet (list (make-quad
-                                                          #:in 'sw
-                                                          #:out 'sw
-                                                          #:size (pt 10 10)
-                                                          #:draw-end (λ (q doc) (draw-debug q doc "red" "red"))
-                                                          #:elems (list (struct-copy quad (car elems)
-                                                                                     [elems (list (if (number? bullet)
-                                                                       (format "~a." bullet)
-                                                                       bullet))]))))])
+                                                             #:in 'sw
+                                                             #:out 'sw
+                                                             #:size (pt 10 10)
+                                                             #:draw-end (λ (q doc) (draw-debug q doc "red" "red"))
+                                                             #:elems (list (struct-copy quad (car elems)
+                                                                                        [elems (list (if (number? bullet)
+                                                                                                         (format "~a." bullet)
+                                                                                                         bullet))]))))])
                                             (list (make-quad
                                                    #:in 'nw
                                                    #:out 'nw
                                                    #:size (pt 15 15)
                                                    #:draw-end (λ (q doc) (draw-debug q doc "blue" "blue"))
                                                    #:offset (pt (quad-ref elem 'inset-left 0) 0)
-                                                   #:elems elems)))]))]
+                                                   #:elems elems))))]))]
                 [_ null])])
-           (if (and (para-break? q) (not (hr-break? q)))
+           (if (and (para-break? ending-q) (not (hr-break? ending-q)))
                (list q:line-spacer)
                null)))))
 
