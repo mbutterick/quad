@@ -21,13 +21,30 @@
 (define (wrap qs
               [target-size-proc-arg (current-wrap-distance)]
               [debug #f]
+              ;; hard break: must wrap
               #:hard-break [hard-break-func (λ (x) #f)]
+              ;; soft break: can wrap
               #:soft-break [soft-break-func (λ (x) #f)]
+              ;; no break: must not wrap (exception to hard / soft predicates)
               #:no-break [no-break-func #f]
+              ;; size of potential wrap.
+              ;; simple: measure q and add it to last-dist
+              ;; sophisticated: process all wrap-qs and measure resulting 
               #:distance [distance-func (λ (q last-dist wrap-qs)
                                           (+ last-dist (if (printable? q) (distance q) 0)))]
+              ;; called when wrap counter increments.
+              ;; perhaps should reset after paragraph breaks, etc.
               #:wrap-count [wrap-count (λ (idx q) (add1 idx))]
-              #:finish-wrap [finish-wrap-func (λ (xs q0 q idx) (list xs))])
+              ;; starting value when wrap counter resets.
+              ;; could use an arbitrary data structure (then incremented with `wrap-count`
+              #:initial-wrap-count [initial-wrap-idx 1]
+              ;; called when wrap is done.
+              ;; takes as input list of qs in wrap,
+              ;; q0 that caused the previous wrap, or #f at beginning.
+              ;; q that caused this one, or #f at end.
+              ;; (q0 is not part of this wrap, but q is)
+              ;; idx is current wrap-count value.
+              #:finish-wrap [finish-wrap-func (λ (wrap-qs q0 q idx) (list wrap-qs))])
   (define (hard-break? x) (and (hard-break-func x) (or (not no-break-func) (not (no-break-func x)))))
   (define (soft-break? x) (and (soft-break-func x) (or (not no-break-func) (not (no-break-func x)))))
   (define target-size-proc
@@ -44,7 +61,7 @@
     ;; for instance, a hyphen is `soft-break?` but shouldn't be trimmed.
     (finish-wrap-func (reverse (dropf qs nonprinting-at-end?)) previous-wrap-ender wrap-triggering-q wrap-idx))
   (let loop ([wraps null] ; list of (list of quads)
-             [wrap-idx 1] ; wrap count (could be (length wraps) but we'd rather avoid `length`)
+             [wrap-idx initial-wrap-idx] ; wrap count (could be (length wraps) but we'd rather avoid `length`)
              [next-wrap-head null] ; list of quads ending in previous `soft-break?` or `hard-break?`
              [next-wrap-tail null] ; list of unbreakable quads
              [current-dist #false] ; #false (to indicate start) or integer
