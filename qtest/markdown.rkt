@@ -23,15 +23,16 @@
   hrbr)
 
 (define-tag-function (blockquote attrs exprs)
-  (qexpr (list* '(display "block")
-                '(background-color "#eee")
-                '(font "fira") '(fontsize "10") '(line-height "15")
-                '(border-width-top "0.5") '(border-color-top "gray") '(border-inset-top "8")
-                '(border-width-left "3") '(border-color-left "gray") '(border-inset-left "20")
-                '(border-width-bottom "0.5") '(border-color-bottom "gray") '(border-inset-bottom "-2")
-                '(border-width-right "0.5") '(border-color-right "gray") '(border-inset-right "20")
-                '(inset-top "10") '(inset-bottom "8") '(inset-left "30") '(inset-right "30")
-                attrs) exprs))
+  (qexpr (append '((display "block")
+                   (background-color "#eee")
+                   (font "fira") (fontsize "10") (line-height "15")
+                   (border-width-top "0.5") (border-color-top "gray") (border-inset-top "8")
+                   (border-width-left "3") (border-color-left "gray") (border-inset-left "20")
+                   (border-width-bottom "0.5") (border-color-bottom "gray") (border-inset-bottom "-2")
+                   (border-width-right "0.5") (border-color-right "gray") (border-inset-right "20")
+                   (inset-top "10") (inset-bottom "8") (inset-left "30") (inset-right "30")
+                   (keep-lines-together "yes"))
+                 attrs) exprs))
 
 (define id (default-tag-function 'id))
 (define class (default-tag-function 'class))
@@ -68,14 +69,14 @@
   (define new-exprs (add-between
                      (for*/list ([expr (in-list exprs)]
                                  [str (in-list (string-split (string-join (get-elements expr) "") "\n"))])
-                       `(,(get-tag expr) ,(get-attrs expr) ,str))
+                       `(,(get-tag expr) ,(get-attrs expr) ,(string-replace str " " " ")))
                      lbr))
   (qexpr (list* '(display "block") '(background-color "aliceblue")
                 '(font "fira-mono") '(fontsize "11") '(line-height "14")
                 '(border-inset-top "10")
                 '(border-width-left "2") '(border-color-left "#669") '(border-inset-left "0")
                 '(border-inset-right "10") '(border-inset-bottom "-4")
-                '(inset-left "12") '(inset-right "12")  '(inset-top "12") '(inset-bottom "12")
+                '(inset-left "12") '(inset-right "12")  '(inset-top "12") '(inset-bottom "8")
                 attrs) new-exprs))
 
 
@@ -236,7 +237,8 @@
                         border-inset-top  border-inset-bottom border-inset-left border-inset-right
                         border-width-left border-width-right border-width-top border-width-bottom
                         border-color-left border-color-right border-color-top border-color-bottom
-                        background-color))
+                        background-color
+                        keep-lines-together))
   (for* ([k (in-list block-attrs)]
          [v (in-value (hash-ref source-hash k #f))]
          #:when v)
@@ -395,8 +397,8 @@
 
 (define (page-wrap xs vertical-height path)
   (wrap xs vertical-height
-        #:soft-break line-spacer?
-        #:wrap-anywhere? #t
+        #:soft-break (λ (q) #t)
+        #:no-break (λ (q) (quad-ref q 'keep-lines-together))
         #:distance (λ (q dist-so-far wrap-qs)
                      ;; do trial block insertions
                      (for/sum ([x (in-list (insert-blocks wrap-qs))])

@@ -15,18 +15,21 @@
 (define (wrap-append partial wrap)
   ;; pieces will have been accumulated in reverse order
   ;; thus beginning of list represents the end of the wrap
+  ;; drop any soft breaks that wouldn't print (e.g., unused soft hyphens)
   (append partial (dropf wrap nonprinting-soft-break-in-middle?)))
 
 (define (wrap qs
               [target-size-proc-arg (current-wrap-distance)]
               [debug #f]
-              #:hard-break [hard-break? (λ (x) #f)]
-              #:soft-break [soft-break? (λ (x) #f)]
-              #:wrap-anywhere? [wrap-anywhere? #f]
+              #:hard-break [hard-break-func (λ (x) #f)]
+              #:soft-break [soft-break-func (λ (x) #f)]
+              #:no-break [no-break-func #f]
               #:distance [distance-func (λ (q last-dist wrap-qs)
                                           (+ last-dist (if (printable? q) (distance q) 0)))]
               #:wrap-count [wrap-count (λ (idx q) (add1 idx))]
               #:finish-wrap [finish-wrap-func (λ (xs q0 q idx) (list xs))])
+  (define (hard-break? x) (and (hard-break-func x) (or (not no-break-func) (not (no-break-func x)))))
+  (define (soft-break? x) (and (soft-break-func x) (or (not no-break-func) (not (no-break-func x)))))
   (define target-size-proc
     (match target-size-proc-arg
       [(? procedure? proc) proc]
@@ -96,15 +99,6 @@
           (cond
             [would-overflow?
              (cond
-               [wrap-anywhere?
-                (debug-report 'we-can-wrap-anywhere-so-why-not-here)
-                (loop (cons (finish-wrap (wrap-append next-wrap-tail next-wrap-head) previous-wrap-ender wrap-idx) wraps)
-                      (wrap-count wrap-idx q)
-                      null
-                      null
-                      #false
-                      q
-                      qs)]
                [(and (soft-break? q) (nonprinting-at-end? q))
                 (debug-report 'would-overflow-soft-nonprinting)
                 ;; a break is inevitable but we want to wait to finish the wrap until we see a hard quad
@@ -386,19 +380,4 @@
    (check-equal? (linewrap2 (list x x x x) 3) (list (q x x x) lbr (q x)))
    (check-equal? (linewrap2 (list x x x sp x x) 2) (list (q x x) lbr (q x) lbr (q x x)))
    (check-equal? (linewrap2 (list x x x sp x x) 3) (list (q x x x) lbr (q x x)))))
-
-(module+ test
-  (test-case
-   "wrap anywhere behavior"
-   (struct sp quad ())
-   (define (qsoft)
-     (q #:type sp
-        #:printable (λ (q sig) (not (memq sig '(start end))))
-        #:size (pt 1 1)))
-   (define (qhard) (q #:attrs (hasheq 'q 1) #:size (pt 1 1)))
-   (define qs (list (qhard) (qsoft) (qhard) (qhard)))
-   ;; only wraps on soft break, so two qhards go in second wrap
-   (check-equal? (wrap qs 3 #:soft-break sp?) (list (list (qhard)) (list (qhard) (qhard))))
-   ;; wraps anywhere, so two qhards fit onto first wrap with space
-   (check-equal? (wrap qs 3 #:soft-break sp? #:wrap-anywhere? #t) (list (list (qhard) (qsoft) (qhard)) (list (qhard))))))
 
