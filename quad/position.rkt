@@ -156,7 +156,7 @@
    (check-equal? (inner-point (position (q #:size size #:inner 'sw #:offset off) orig)) (pt+ '(0 10) off))
    (check-equal? (inner-point (position (q #:size size #:inner 'w #:offset off) orig)) (pt+ '(0 5) off))))
 
-(module+ test
+#;(module+ test
   (require racket/runtime-path fontland/font)
   (define-runtime-path fira "fira.ttf")
 
