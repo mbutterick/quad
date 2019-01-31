@@ -17,7 +17,7 @@
 (define mdash "—")
 
 (define-tag-function (p attrs exprs)
-  (qexpr attrs exprs))
+  (qexpr (append `((display ,(symbol->string (gensym)))) attrs) exprs))
 
 (define-tag-function (hr attrs exprs)
   hrbr)
@@ -31,7 +31,7 @@
                    (border-width-bottom "0.5") (border-color-bottom "gray") (border-inset-bottom "-2")
                    (border-width-right "0.5") (border-color-right "gray") (border-inset-right "20")
                    (inset-top "10") (inset-bottom "8") (inset-left "30") (inset-right "30")
-                   (keep-lines-together "yes"))
+                   (keep-lines "yes"))
                  attrs) exprs))
 
 (define id (default-tag-function 'id))
@@ -49,7 +49,7 @@
 (define-syntax-rule (attr-list . attrs) 'attrs)
 
 (define (heading-base font-size attrs exprs)
-  (qexpr (append `((font "fira-light") (display "block") (fontsize ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9")(border-inset-right "12") (inset-bottom "-3") (inset-top "6") (keep-lines-together "yes") (keep-with-next "yes")) attrs) exprs))
+  (qexpr (append `((font "fira-light") (display "block") (fontsize ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9")(border-inset-right "12") (inset-bottom "-3") (inset-top "6") (keep-lines "next")) attrs) exprs))
 
 (define-tag-function (h1 attrs exprs)
   (heading-base 20 (append '() attrs) exprs))
@@ -82,7 +82,7 @@
 
 (define draw-debug? #t)
 (define draw-debug-line? #f)
-(define draw-debug-block? #f)
+(define draw-debug-block? #t)
 (define draw-debug-string? #f)
 
 
@@ -198,7 +198,7 @@
 (define q:line-spacer-unbreakable
   (struct-copy line-spacer q:line-spacer
                [attrs #:parent quad
-                      (make-hasheq '((keep-with-next . #true)))]))
+                      (make-hasheq '((keep-lines . #true)))]))
 
 (define softies (map string '(#\space #\- #\u00AD)))
 
@@ -241,8 +241,7 @@
                         border-width-left border-width-right border-width-top border-width-bottom
                         border-color-left border-color-right border-color-top border-color-bottom
                         background-color
-                        keep-lines-together
-                        keep-with-next))
+                        keep-lines))
   (for* ([k (in-list block-attrs)]
          [v (in-value (hash-ref source-hash k #f))]
          #:when v)
@@ -303,7 +302,9 @@
                                                    #:elems elems)))]))]
                 [_ null])])
            (if (and (para-break? ending-q) (not (hr-break? ending-q)))
-               (list (if (quad-ref (car pcs) 'keep-with-next) q:line-spacer-unbreakable q:line-spacer))
+               (list (if (equal? (quad-ref (car pcs) 'keep-lines) "next")
+                         q:line-spacer-unbreakable
+                         q:line-spacer))
                null)))))
 
 (define zoom-mode? #f)
@@ -401,9 +402,8 @@
 
 (define (page-wrap xs vertical-height path)
   (wrap xs vertical-height
-        #:soft-break (λ (q) #t)
-        #:no-break (λ (q) (or (quad-ref q 'keep-lines-together)
-                              (quad-ref q 'keep-with-next)))
+        #:soft-break (λ (q) #true)
+        #:no-break (λ (q) (quad-ref q 'keep-lines))
         #:distance (λ (q dist-so-far wrap-qs)
                      ;; do trial block insertions
                      (for/sum ([x (in-list (insert-blocks wrap-qs))])
@@ -417,15 +417,14 @@
                                                       (split-path (path-replace-extension path #"")))
                                                     (hash-set! h 'doc-title (string-titlecase (path->string name)))
                                                     h)]
-                                           [elems (insert-blocks lns)])))))
+                                           [elems (insert-blocks lns #t)])))))
 
-(define (insert-blocks lines)
+(define (insert-blocks lines [debug #f])
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x 'display)) lines))
   (append* (for/list ([line-group (in-list groups-of-lines)])
              (match (quad-ref (car line-group) 'display)
-               ["block" (list (block-wrap line-group))]
-               [_ line-group]))))
-
+               [#false line-group]
+               [_ (list (block-wrap line-group))]))))
 
 (define (run xs path)
   (define pdf (time-name make-pdf (make-pdf #:compress #t
