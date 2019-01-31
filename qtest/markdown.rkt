@@ -49,7 +49,7 @@
 (define-syntax-rule (attr-list . attrs) 'attrs)
 
 (define (heading-base font-size attrs exprs)
-  (qexpr (append `((font "fira-light") (display "block") (fontsize ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9")(border-inset-right "12") (inset-bottom "-3") (inset-top "6")) attrs) exprs))
+  (qexpr (append `((font "fira-light") (display "block") (fontsize ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9")(border-inset-right "12") (inset-bottom "-3") (inset-top "6") (keep-lines-together "yes") (keep-with-next "yes")) attrs) exprs))
 
 (define-tag-function (h1 attrs exprs)
   (heading-base 20 (append '() attrs) exprs))
@@ -185,7 +185,6 @@
 (define line-height 20)
 (define dumb-hardcoded-value 380.1234)
 (define q:line (q #:size (pt dumb-hardcoded-value line-height)
-                  #:in 'nw
                   #:inner 'sw
                   #:out 'sw
                   #:printable #true
@@ -196,6 +195,10 @@
                          #:out 'sw
                          #:printable (λ (q sig) (not (memq sig '(start end))))
                          #:draw-start (if draw-debug-line? draw-debug void)))
+(define q:line-spacer-unbreakable
+  (struct-copy line-spacer q:line-spacer
+               [attrs #:parent quad
+                      (make-hasheq '((keep-with-next . #true)))]))
 
 (define softies (map string '(#\space #\- #\u00AD)))
 
@@ -238,7 +241,8 @@
                         border-width-left border-width-right border-width-top border-width-bottom
                         border-color-left border-color-right border-color-top border-color-bottom
                         background-color
-                        keep-lines-together))
+                        keep-lines-together
+                        keep-with-next))
   (for* ([k (in-list block-attrs)]
          [v (in-value (hash-ref source-hash k #f))]
          #:when v)
@@ -299,7 +303,7 @@
                                                    #:elems elems)))]))]
                 [_ null])])
            (if (and (para-break? ending-q) (not (hr-break? ending-q)))
-               (list q:line-spacer)
+               (list (if (quad-ref (car pcs) 'keep-with-next) q:line-spacer-unbreakable q:line-spacer))
                null)))))
 
 (define zoom-mode? #f)
@@ -398,7 +402,8 @@
 (define (page-wrap xs vertical-height path)
   (wrap xs vertical-height
         #:soft-break (λ (q) #t)
-        #:no-break (λ (q) (quad-ref q 'keep-lines-together))
+        #:no-break (λ (q) (or (quad-ref q 'keep-lines-together)
+                              (quad-ref q 'keep-with-next)))
         #:distance (λ (q dist-so-far wrap-qs)
                      ;; do trial block insertions
                      (for/sum ([x (in-list (insert-blocks wrap-qs))])
