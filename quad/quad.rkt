@@ -62,6 +62,10 @@
 (define (quad-ref q key [default-val #f])
   (hash-ref (quad-attrs q) key default-val))
 
+(define (quad-set! q key val)
+  (hash-set! (quad-attrs q) key val)
+  q)
+
 (define (default-printable q [sig #f]) #t)
 
 (define (default-draw q surface)
