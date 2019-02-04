@@ -16,16 +16,18 @@
 (define (get-font font-name)
   (hash-ref! font-cache font-name (λ () (open-font font-name))))
 
+(define font-path-key 'font-path)
+
 (define ascender-cache (make-hash))
 (define (ascender q)
-  (define font-key-val (hash-ref (quad-attrs q) 'font "Courier"))
+  (define font-key-val (hash-ref (quad-attrs q) font-path-key "Courier"))
   (unless font-key-val
     (error 'ascender-no-font-key))
   (hash-ref! ascender-cache font-key-val (λ () (font-ascent (get-font font-key-val)))))
 
 (define units-cache (make-hash))
 (define (units-per-em q)
-  (define font-key-val (hash-ref (quad-attrs q) 'font "Courier"))
+  (define font-key-val (hash-ref (quad-attrs q) font-path-key "Courier"))
   (unless font-key-val
     (error 'units-per-em-no-font-key))
   (hash-ref! units-cache font-key-val (λ () (font-units-per-em (get-font font-key-val)))))
@@ -160,15 +162,15 @@
   (require racket/runtime-path fontland/font)
   (define-runtime-path fira "fira.ttf")
 
-  (define q1 (q (list 'in 'bi 'out 'bo 'size '(10 10) 'font fira 'fontsize 12)))
-  (define q2 (q (list 'in 'bi 'out 'bo 'size '(10 10) 'font fira 'fontsize 24)))
-  (define q3 (q (list 'in 'bi 'out 'bo 'size '(10 10) 'font fira 'fontsize 6)))
+  (define q1 (q (list 'in 'bi 'out 'bo 'size '(10 10) font-path-key fira 'fontsize 12)))
+  (define q2 (q (list 'in 'bi 'out 'bo 'size '(10 10) font-path-key fira 'fontsize 24)))
+  (define q3 (q (list 'in 'bi 'out 'bo 'size '(10 10) font-path-key fira 'fontsize 6)))
   #;(position (q #f q1 q2 q3)))
 
 
 #;(module+ test
     (require rackunit)
-    (define q (q (list 'in 'bi 'out 'bo 'size '(10 10) 'font fira 'fontsize 12)))
+    (define q (q (list 'in 'bi 'out 'bo 'size '(10 10) font-path-key fira 'fontsize 12)))
     (check-equal? (ascender q) 935)
     (check-equal? (units-per-em q) 1000)
     (define ascender-scaled (* (/ (ascender q) (units-per-em q)) (hash-ref (quad-attrs q) 'fontsize) 1.0))

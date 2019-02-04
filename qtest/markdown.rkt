@@ -17,7 +17,7 @@
 (define mdash "—")
 
 (define-tag-function (p attrs exprs)
-  (qexpr (append `((keep-first "2")(keep-last "3")(display ,(symbol->string (gensym)))) attrs) exprs))
+  (qexpr (append `((keep-first "2")(keep-last "3")(font-family "charter") (display ,(symbol->string (gensym)))) attrs) exprs))
 
 (define-tag-function (hr attrs exprs)
   hrbr)
@@ -25,7 +25,7 @@
 (define-tag-function (blockquote attrs exprs)
   (qexpr (append '((display "block")
                    (background-color "#eee")
-                   (font "fira") (fontsize "10") (line-height "15")
+                   (font-family "fira") (fontsize "10") (line-height "15")
                    (border-width-top "0.5") (border-color-top "gray") (border-inset-top "8")
                    (border-width-left "3") (border-color-left "gray") (border-inset-left "20")
                    (border-width-bottom "0.5") (border-color-bottom "gray") (border-inset-bottom "-2")
@@ -38,18 +38,18 @@
 (define class (default-tag-function 'class))
 
 (define-tag-function (strong attrs exprs)
-  (qexpr (cons '(font "charter-bold") attrs) exprs))
+  (qexpr (list* '(font-bold "true") attrs) exprs))
 
 (define-tag-function (a attrs exprs)
   (qexpr `((link ,(cadr (assoc 'href attrs)))(color "MediumVioletRed")) exprs))
 
 (define-tag-function (em attrs exprs)
-  (qexpr (cons '(font "charter-italic") attrs) exprs))
+  (qexpr (list* '(font-italic "true") attrs) exprs))
 
 (define-syntax-rule (attr-list . attrs) 'attrs)
 
 (define (heading-base font-size attrs exprs)
-  (qexpr (append `((font "fira-light") (display "block") (fontsize ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9")(border-inset-right "12") (inset-bottom "-3") (inset-top "6") (keep-with-next "true")) attrs) exprs))
+  (qexpr (append `((font-family "fira-light") (display "block") (fontsize ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9")(border-inset-right "12") (inset-bottom "-3") (inset-top "6") (keep-with-next "true")) attrs) exprs))
 
 (define-tag-function (h1 attrs exprs)
   (heading-base 20 (append '() attrs) exprs))
@@ -62,7 +62,7 @@
 (define h6 h3)
 
 (define-tag-function (code attrs exprs)
-  (qexpr (append '((font "fira-mono")(fontsize "10")(bg "aliceblue")) attrs)  exprs))
+  (qexpr (append '((font-family "fira-mono")(fontsize "10")(bg "aliceblue")) attrs)  exprs))
 
 (define-tag-function (pre attrs exprs)
   ;; pre needs to convert white space to equivalent layout elements
@@ -72,7 +72,7 @@
                        `(,(get-tag expr) ,(get-attrs expr) ,(string-replace str " " " ")))
                      lbr))
   (qexpr (list* '(display "block") '(background-color "aliceblue")
-                '(font "fira-mono") '(fontsize "11") '(line-height "14")
+                '(font-family "fira-mono") '(fontsize "11") '(line-height "14")
                 '(border-inset-top "10")
                 '(border-width-left "2") '(border-color-left "#669") '(border-inset-left "0")
                 '(border-inset-right "10") '(border-inset-bottom "-4")
@@ -110,7 +110,7 @@
                     ;; draw with pdf text routine
                     #:draw (λ (q doc)
                              (when (pair? (quad-elems q))
-                               (font doc (path->string (hash-ref (quad-attrs q) 'font)))
+                               (font doc (path->string (hash-ref (quad-attrs q) font-path-key)))
                                (font-size doc (hash-ref (quad-attrs q) 'fontsize 12))
                                (fill-color doc (hash-ref (quad-attrs q) 'color "black"))
                                (define str (unsafe-car (quad-elems q)))
@@ -127,10 +127,15 @@
 (define-runtime-path charter-bold "fonts/charter-bold.ttf")
 (define-runtime-path charter-italic "fonts/charter-italic.ttf")
 (define-runtime-path fira "fonts/fira.ttf")
+(define-runtime-path fira-bold "fonts/fira-bold.ttf")
+(define-runtime-path fira-italic "fonts/fira.ttf")
 (define-runtime-path fira-light "fonts/fira-light.ttf")
+(define-runtime-path fira-light-bold "fonts/fira-light-bold.ttf")
+(define-runtime-path fira-light-italic "fonts/fira-light-italic.ttf")
 (define-runtime-path fira-mono "fonts/fira-mono.ttf")
 
 (define default-font-face charter)
+(define default-font-family "charter")
 (define default-font-size 12)
 
 (define (->string-quad doc q)
@@ -144,24 +149,40 @@
                ;; so the first update will change every reference to the shared hash
                ;; hence why we ignore if val is already a path
                ;; but this op should ideally happen earlier
-               (hash-update! attrs 'font
-                             (λ (val) (if (path? val)
-                                          val
-                                          (match (string-downcase (string-replace val " " "-"))
-                                            ["charter" charter]
-                                            ["charter-bold" charter-bold]
-                                            ["charter-italic" charter-italic]
-                                            ["fira" fira]
-                                            ["fira-light" fira-light]
-                                            ["fira-mono" fira-mono])))
-                             default-font-face)
+               (unless (quad-ref q font-path-key)
+                 (hash-set! attrs font-path-key
+                            (match (string-downcase
+                                    (string-replace (or (quad-ref q 'font-family) default-font-family) " " "-"))
+                              ["charter" (if (quad-ref q 'font-bold)
+                                                (if (quad-ref q 'font-italic)
+                                                    (error 'no-charter-bold-italic)
+                                                    charter-bold)
+                                                (if (quad-ref q 'font-italic)
+                                                    charter-italic
+                                                    charter))]
+                              ["fira" (if (quad-ref q 'font-bold)
+                                          (if (quad-ref q 'font-italic)
+                                              (error 'no-fira-bold-italic)
+                                              fira-bold)
+                                          (if (quad-ref q 'font-italic)
+                                              fira-italic
+                                              fira))]
+                              ["fira-light" (if (quad-ref q 'font-bold)
+                                                (if (quad-ref q 'font-italic)
+                                                    (error 'no-fira-light-italic)
+                                                    fira-light-bold)
+                                                (if (quad-ref q 'font-italic)
+                                                    fira-light-italic
+                                                    fira-light))]
+                              ["fira-mono" fira-mono]
+                              [_ default-font-face])))
                (hash-ref! attrs 'fontsize default-font-size)
                attrs)]
       [elems (quad-elems q)]
       [size (delay
               (define fontsize (hash-ref (quad-attrs q) 'fontsize))
               (font-size doc fontsize)
-              (font doc (path->string (hash-ref (quad-attrs q) 'font)))
+              (font doc (path->string (hash-ref (quad-attrs q) font-path-key)))
               (define str (if (pair? (quad-elems q)) (unsafe-car (quad-elems q)) ""))
               (define line-height (cond
                                     [(and (pair? (quad-elems q)) (quad-ref q 'line-height))]
