@@ -17,7 +17,7 @@
 (define mdash "—")
 
 (define-tag-function (p attrs exprs)
-  (qexpr (append `((keep-first "2")(keep-last "2")(display ,(symbol->string (gensym)))) attrs) exprs))
+  (qexpr (append `((keep-first "2")(keep-last "3")(display ,(symbol->string (gensym)))) attrs) exprs))
 
 (define-tag-function (hr attrs exprs)
   hrbr)
@@ -307,41 +307,40 @@
 
 (define (make-nobreak! q) (quad-set! q 'no-pbr "true"))
 
-(define (finish-keep-with-next! reversed-lines)
+(define (do-keep-with-next! reversed-lines)
   ;; paints nobreak onto spacers that follow keep-with-next lines
   ;; (we are iterating backward, so the geometrically previous ln follows the spacer)
   (for ([this-ln (in-list reversed-lines)]
         [prev-ln (in-list (cdr reversed-lines))]
         #:when (and (line-spacer? this-ln)
                     (quad-ref prev-ln 'keep-with-next)))
+    (make-nobreak! prev-ln)
     (make-nobreak! this-ln)))
 
 (define (apply-keeps lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x 'display)) lines))
   (for*/fold ([reversed-lines null]
               #:result (begin
-                         (finish-keep-with-next! reversed-lines)
+                         (do-keep-with-next! reversed-lines)
                          (reverse reversed-lines)))
              ([group (in-list groups-of-lines)]
               [group-len (in-value (length group))]
               [(ln idx0) (in-indexed group)])
     (define idx (add1 idx0))
-    (cond
-      ;; always catch last line of block in this case
-      ;; so later cases are guaranteed to have earlier lines.
-      [(= idx group-len) 
-       (when (quad-ref ln 'keep-with-next)
-         (make-nobreak! ln))]
-      ;; if we have 'keep-all we can skip 'keep-first and 'keep-last cases
-      [(quad-ref ln 'keep-all) (make-nobreak! ln)]
-      ;; to keep n lines, we only paint the first n - 1
-      ;; (because each nobr line sticks to the next)
-      [(let ([keep-first (quad-ref ln 'keep-first)])
-         (and (number? keep-first) (< idx keep-first)))
-       (make-nobreak! ln)]
-      [(let ([keep-last (quad-ref ln 'keep-last)])
-         (and (number? keep-last) (< (- group-len keep-last) idx)))
-       (make-nobreak! ln)])
+    ;; always catch last line of block in this case
+    ;; so later cases are guaranteed to have earlier lines.
+    (unless (= idx group-len)
+      (cond
+        ;; if we have 'keep-all we can skip 'keep-first and 'keep-last cases
+        [(quad-ref ln 'keep-all) (make-nobreak! ln)]
+        ;; to keep n lines, we only paint the first n - 1
+        ;; (because each nobr line sticks to the next)
+        [(let ([keep-first (quad-ref ln 'keep-first)])
+           (and (number? keep-first) (< idx keep-first)))
+         (make-nobreak! ln)]
+        [(let ([keep-last (quad-ref ln 'keep-last)])
+           (and (number? keep-last) (< (- group-len keep-last) idx)))
+         (make-nobreak! ln)]))
     (cons ln reversed-lines)))
 
 (define zoom-mode? #f)
