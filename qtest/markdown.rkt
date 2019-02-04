@@ -17,7 +17,7 @@
 (define mdash "—")
 
 (define-tag-function (p attrs exprs)
-  (qexpr (append `((display ,(symbol->string (gensym)))) attrs) exprs))
+  (qexpr (append `((keep-first "2")(keep-last "2")(display ,(symbol->string (gensym)))) attrs) exprs))
 
 (define-tag-function (hr attrs exprs)
   hrbr)
@@ -49,7 +49,7 @@
 (define-syntax-rule (attr-list . attrs) 'attrs)
 
 (define (heading-base font-size attrs exprs)
-  (qexpr (append `((font "fira-light") (display "block") (fontsize ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9")(border-inset-right "12") (inset-bottom "-3") (inset-top "6") (keep-lines "next")) attrs) exprs))
+  (qexpr (append `((font "fira-light") (display "block") (fontsize ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9")(border-inset-right "12") (inset-bottom "-3") (inset-top "6") (keep-with-next "true")) attrs) exprs))
 
 (define-tag-function (h1 attrs exprs)
   (heading-base 20 (append '() attrs) exprs))
@@ -241,7 +241,7 @@
                         border-width-left border-width-right border-width-top border-width-bottom
                         border-color-left border-color-right border-color-top border-color-bottom
                         background-color
-                        keep-lines))
+                        keep-lines keep-first keep-last keep-all keep-with-next))
   (for* ([k (in-list block-attrs)]
          [v (in-value (hash-ref source-hash k #f))]
          #:when v)
@@ -302,10 +302,47 @@
                                                    #:elems elems)))]))]
                 [_ null])])
            (if (and (para-break? ending-q) (not (hr-break? ending-q)))
-               (list (if (equal? (quad-ref (car pcs) 'keep-lines) "next")
-                         q:line-spacer-unbreakable
-                         q:line-spacer))
+               (list q:line-spacer)
                null)))))
+
+(define (make-nobreak! q) (quad-set! q 'no-pbr "true"))
+
+(define (finish-keep-with-next! reversed-lines)
+  ;; paints nobreak onto spacers that follow keep-with-next lines
+  ;; (we are iterating backward, so the geometrically previous ln follows the spacer)
+  (for ([this-ln (in-list reversed-lines)]
+        [prev-ln (in-list (cdr reversed-lines))]
+        #:when (and (line-spacer? this-ln)
+                    (quad-ref prev-ln 'keep-with-next)))
+    (make-nobreak! this-ln)))
+
+(define (apply-keeps lines)
+  (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x 'display)) lines))
+  (for*/fold ([reversed-lines null]
+              #:result (begin
+                         (finish-keep-with-next! reversed-lines)
+                         (reverse reversed-lines)))
+             ([group (in-list groups-of-lines)]
+              [group-len (in-value (length group))]
+              [(ln idx0) (in-indexed group)])
+    (define idx (add1 idx0))
+    (cond
+      ;; always catch last line of block in this case
+      ;; so later cases are guaranteed to have earlier lines.
+      [(= idx group-len) 
+       (when (quad-ref ln 'keep-with-next)
+         (make-nobreak! ln))]
+      ;; if we have 'keep-all we can skip 'keep-first and 'keep-last cases
+      [(quad-ref ln 'keep-all) (make-nobreak! ln)]
+      ;; to keep n lines, we only paint the first n - 1
+      ;; (because each nobr line sticks to the next)
+      [(let ([keep-first (quad-ref ln 'keep-first)])
+         (and (number? keep-first) (< idx keep-first)))
+       (make-nobreak! ln)]
+      [(let ([keep-last (quad-ref ln 'keep-last)])
+         (and (number? keep-last) (< (- group-len keep-last) idx)))
+       (make-nobreak! ln)])
+    (cons ln reversed-lines)))
 
 (define zoom-mode? #f)
 (define top-margin 60)
@@ -403,7 +440,7 @@
 (define (page-wrap xs vertical-height path)
   (wrap xs vertical-height
         #:soft-break (λ (q) #true)
-        #:no-break (λ (q) (quad-ref q 'keep-lines))
+        #:no-break (λ (q) (quad-ref q 'no-pbr))
         #:distance (λ (q dist-so-far wrap-qs)
                      ;; do trial block insertions
                      (for/sum ([x (in-list (insert-blocks wrap-qs))])
@@ -417,9 +454,9 @@
                                                       (split-path (path-replace-extension path #"")))
                                                     (hash-set! h 'doc-title (string-titlecase (path->string name)))
                                                     h)]
-                                           [elems (insert-blocks lns #t)])))))
+                                           [elems (insert-blocks lns)])))))
 
-(define (insert-blocks lines [debug #f])
+(define (insert-blocks lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x 'display)) lines))
   (append* (for/list ([line-group (in-list groups-of-lines)])
              (match (quad-ref (car line-group) 'display)
@@ -437,6 +474,7 @@
   (let* ([x (time-name atomize (atomize (qexpr->quad xs)))]
          [x (time-name ->string-quad (map (λ (x) (->string-quad pdf x)) x))]
          [x (time-name line-wrap (line-wrap x line-width))]
+         [x (time-name apply-keeps (apply-keeps x))]
          [x (time-name page-wrap (page-wrap x vertical-height path))]
          [x (time-name position (position (struct-copy quad q:doc [elems x])))])
     (time-name draw (draw x pdf))))
