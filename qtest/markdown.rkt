@@ -1,5 +1,5 @@
 #lang debug racket/base
-(require (for-syntax racket/base) txexpr racket/runtime-path racket/string racket/promise racket/match racket/list
+(require (for-syntax racket/base) txexpr racket/runtime-path racket/path racket/string racket/promise racket/match racket/list
          pitfall quad sugar/debug pollen/tag racket/unsafe/ops)
 (provide (except-out (all-from-out racket/base) #%module-begin)
          (rename-out [mb #%module-begin])
@@ -17,7 +17,8 @@
 (define mdash "—")
 
 (define-tag-function (p attrs exprs)
-  (qexpr (append `((keep-first "2")(keep-last "3")(font-family "charter") (display ,(symbol->string (gensym)))) attrs) exprs))
+  ;; no font-family so that it adopts whatever the surrounding family is
+  (qexpr (append `((keep-first "2")(keep-last "3") (display ,(symbol->string (gensym)))) attrs) exprs))
 
 (define-tag-function (hr attrs exprs)
   hrbr)
@@ -69,7 +70,7 @@
   (define new-exprs (add-between
                      (for*/list ([expr (in-list exprs)]
                                  [str (in-list (string-split (string-join (get-elements expr) "") "\n"))])
-                       `(,(get-tag expr) ,(get-attrs expr) ,(string-replace str " " " ")))
+                                `(,(get-tag expr) ,(get-attrs expr) ,(string-replace str " " " ")))
                      lbr))
   (qexpr (list* '(display "block") '(background-color "aliceblue")
                 '(font-family "fira-mono") '(fontsize "11") '(line-height "14")
@@ -90,7 +91,7 @@
   (qexpr (list* '(inset-left "20") attrs)
          (add-between
           (for/list ([(expr idx) (in-indexed exprs)])
-            (list* (get-tag expr) (cons (list 'list-index (or bullet-val (format "~a" (add1 idx)))) (get-attrs expr)) (get-elements expr)))
+                    (list* (get-tag expr) (cons (list 'list-index (or bullet-val (format "~a" (add1 idx)))) (get-attrs expr)) (get-elements expr)))
           pbr)))
 
 (define-tag-function (ol attrs exprs) (list-base attrs exprs))
@@ -123,18 +124,7 @@
                                    (λ (q doc) (draw-debug q doc "#99f" "#ccf"))
                                    void)))
 
-(define-runtime-path charter "fonts/charter.ttf")
-(define-runtime-path charter-bold "fonts/charter-bold.ttf")
-(define-runtime-path charter-italic "fonts/charter-italic.ttf")
-(define-runtime-path fira "fonts/fira.ttf")
-(define-runtime-path fira-bold "fonts/fira-bold.ttf")
-(define-runtime-path fira-italic "fonts/fira.ttf")
-(define-runtime-path fira-light "fonts/fira-light.ttf")
-(define-runtime-path fira-light-bold "fonts/fira-light-bold.ttf")
-(define-runtime-path fira-light-italic "fonts/fira-light-italic.ttf")
-(define-runtime-path fira-mono "fonts/fira-mono.ttf")
-
-(define default-font-face charter)
+(define default-font-face "fonts/default.ttf")
 (define default-font-family "charter")
 (define default-font-size 12)
 
@@ -145,37 +135,6 @@
      (struct-copy
       quad q:string
       [attrs (let ([attrs (quad-attrs q)])
-               ;; attrs hashes are shared between many quads.
-               ;; so the first update will change every reference to the shared hash
-               ;; hence why we ignore if val is already a path
-               ;; but this op should ideally happen earlier
-               (unless (quad-ref q font-path-key)
-                 (hash-set! attrs font-path-key
-                            (match (string-downcase
-                                    (string-replace (or (quad-ref q 'font-family) default-font-family) " " "-"))
-                              ["charter" (if (quad-ref q 'font-bold)
-                                                (if (quad-ref q 'font-italic)
-                                                    (error 'no-charter-bold-italic)
-                                                    charter-bold)
-                                                (if (quad-ref q 'font-italic)
-                                                    charter-italic
-                                                    charter))]
-                              ["fira" (if (quad-ref q 'font-bold)
-                                          (if (quad-ref q 'font-italic)
-                                              (error 'no-fira-bold-italic)
-                                              fira-bold)
-                                          (if (quad-ref q 'font-italic)
-                                              fira-italic
-                                              fira))]
-                              ["fira-light" (if (quad-ref q 'font-bold)
-                                                (if (quad-ref q 'font-italic)
-                                                    (error 'no-fira-light-italic)
-                                                    fira-light-bold)
-                                                (if (quad-ref q 'font-italic)
-                                                    fira-light-italic
-                                                    fira-light))]
-                              ["fira-mono" fira-mono]
-                              [_ default-font-face])))
                (hash-ref! attrs 'fontsize default-font-size)
                attrs)]
       [elems (quad-elems q)]
@@ -237,9 +196,9 @@
     (define new-run (struct-copy quad q:string
                                  [attrs (quad-attrs (car pcs))]
                                  [elems (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
-                                                                                (quad-elems pc))))]
+                                                                                        (quad-elems pc))))]
                                  [size (delay (pt (for/sum ([pc (in-list run-pcs)])
-                                                    (pt-x (size pc)))
+                                                           (pt-x (size pc)))
                                                   (pt-y (size (car pcs)))))]))
     (values (cons new-run runs) rest)))
 
@@ -266,7 +225,7 @@
   (for* ([k (in-list block-attrs)]
          [v (in-value (hash-ref source-hash k #f))]
          #:when v)
-    (hash-set! dest-hash k v))
+        (hash-set! dest-hash k v))
   dest-hash)
 
 (define (line-wrap xs wrap-size)
@@ -335,8 +294,8 @@
         [prev-ln (in-list (cdr reversed-lines))]
         #:when (and (line-spacer? this-ln)
                     (quad-ref prev-ln 'keep-with-next)))
-    (make-nobreak! prev-ln)
-    (make-nobreak! this-ln)))
+       (make-nobreak! prev-ln)
+       (make-nobreak! this-ln)))
 
 (define (apply-keeps lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x 'display)) lines))
@@ -376,7 +335,7 @@
                                  (scale doc (if zoom-mode? 3 1) (if zoom-mode? 3 1)))
                   #:draw-end (λ (q doc)
                                (font-size doc 10)
-                               (font doc charter)
+                               (font doc default-font-face)
                                (fill-color doc "black")
                                (text doc (format "~a · ~a at ~a" (hash-ref (quad-attrs q) 'page-number)
                                                  (hash-ref (quad-attrs q) 'doc-title)
@@ -395,7 +354,7 @@
      #:elems lines
      #:size (delay (pt (pt-x (size first-line)) ; 
                        (+ (for/sum ([line (in-list lines)])
-                            (pt-y (size line)))
+                                   (pt-y (size line)))
                           (quad-ref first-line 'inset-top 0)
                           (quad-ref first-line 'inset-bottom 0))))
      #:draw-start (λ (q doc)
@@ -458,13 +417,18 @@
    '((1 1) (2 2 2) (3) (4) (5 5) (6 6) (7) (8) (9))))
 
 (define (page-wrap xs vertical-height path)
+  ;; on timing of `insert-blocks`:
+  ;; can't do it before because it depends on where pages are broken.
+  ;; could do it after, but it would require going back inside each page quad
+  ;; which seems overly interdependent, because `insert-blocks` is used to determine break locations.
+  ;; `page-wrap` should emit quads that are complete.
   (wrap xs vertical-height
         #:soft-break (λ (q) #true)
         #:no-break (λ (q) (quad-ref q 'no-pbr))
         #:distance (λ (q dist-so-far wrap-qs)
                      ;; do trial block insertions
                      (for/sum ([x (in-list (insert-blocks wrap-qs))])
-                       (pt-y (size x))))                     
+                              (pt-y (size x))))                     
         #:finish-wrap (λ (lns q0 q idx)
                         (list (struct-copy quad q:page
                                            [attrs (let ([page-number idx]
@@ -479,23 +443,81 @@
 (define (insert-blocks lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x 'display)) lines))
   (append* (for/list ([line-group (in-list groups-of-lines)])
-             (match (quad-ref (car line-group) 'display)
-               [#false line-group]
-               [_ (list (block-wrap line-group))]))))
+                     (match (quad-ref (car line-group) 'display)
+                       [#false line-group]
+                       [_ (list (block-wrap line-group))]))))
 
-(define (run xs path)
+(define font-paths (make-hash))
+
+(define (setup-font-path-table! base-path)
+  ;; populate `font-paths` table with font paths
+  ;; search "fonts" subdirectory in project for other subdirectories
+  ;; which are presumed to contain fonts.
+  ;; and link them to their family names & styles.
+  ;; this allows a flexible mapping from internal to external names, like @font-face
+  ;; note that all the semantics are derived from the file system
+  ;; not any metadata fields within the font.
+  ;; this is faster and easier, because you can just muck with the directory and filenames
+  ;; to change the font mapping.
+  ;; though it also creates the potential for mischief,
+  ;; if a font is named something that doesn't reflect its visual reality.
+  ;; but we are not the font police.
+  (define-values (dir path _) (split-path base-path))
+  (define fonts-dir (build-path dir "fonts"))
+  (for* ([font-family-subdir (in-directory fonts-dir)]
+         #:when (directory-exists? font-family-subdir)
+         [font-path (in-directory font-family-subdir)]
+         #:when (path-has-extension? font-path #"ttf"))
+        (match-define (list font-path-string family-name)
+          (map (λ (x) (path->string (find-relative-path fonts-dir x))) (list font-path font-family-subdir)))
+        (define key
+          (cons family-name
+                (match (string-downcase font-path-string)
+                  [(and (regexp "bold") (regexp "italic")) 'bi]
+                  [(regexp "bold") 'b]
+                  [(regexp "italic") 'i]
+                  [_ 'r])))
+        ;; only set value if there's not one there already.
+        ;; this means that we only use the first eligible font we find.
+        (hash-ref! font-paths key font-path)))
+
+(define (font-attrs->path font-family bold italic)
+  ;; find the font-path corresponding to a certain family name and style.
+  (define key (cons font-family
+                    (cond
+                      [(and bold italic) 'bi]
+                      [bold 'b]
+                      [italic 'i]
+                      [else 'r])))
+  (define regular-key (cons font-family 'r))
+  (cond
+    [(hash-ref font-paths key #false)]
+    ;; if there isn't one, try the regular style.
+    [(hash-ref font-paths regular-key #false)]
+    ;; If there isn't one, use the default.
+    [else default-font-face]))
+
+(define (resolve-font-path attrs)
+  (define this-font-family (hash-ref! attrs 'font-family default-font-family))
+  (define this-bold (hash-ref! attrs 'font-bold #false))
+  (define this-italic (hash-ref! attrs 'font-italic #false))
+  (hash-set! attrs 'font-path (font-attrs->path this-font-family this-bold this-italic)))
+                 
+(define (run xs pdf-path)
   (define pdf (time-name make-pdf (make-pdf #:compress #t
                                             #:auto-first-page #f
-                                            #:output-path path
+                                            #:output-path pdf-path
                                             #:width (if zoom-mode? 350 612)
                                             #:height (if zoom-mode? 400 792))))
   (define line-width (- (pdf-width pdf) (* 2 side-margin)))
   (define vertical-height (- (pdf-height pdf) top-margin bottom-margin))
-  (let* ([x (time-name atomize (atomize (qexpr->quad xs)))]
+  (setup-font-path-table! pdf-path)
+  (let* ([x (time-name parse-qexpr (qexpr->quad xs))]
+         [x (time-name atomize (atomize x #:attrs-proc resolve-font-path))]
          [x (time-name ->string-quad (map (λ (x) (->string-quad pdf x)) x))]
          [x (time-name line-wrap (line-wrap x line-width))]
          [x (time-name apply-keeps (apply-keeps x))]
-         [x (time-name page-wrap (page-wrap x vertical-height path))]
+         [x (time-name page-wrap (page-wrap x vertical-height pdf-path))]
          [x (time-name position (position (struct-copy quad q:doc [elems x])))])
     (time-name draw (draw x pdf))))
 

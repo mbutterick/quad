@@ -50,7 +50,7 @@
 (define (same-run? qa qb)
   (eq? (quad-ref qa run-key) (quad-ref qb run-key)))
 
-(define (atomize qx)
+(define (atomize qx #:attrs-proc [attrs-proc values])
   ;; atomize a quad by reducing it to the smallest indivisible formatting units.
   ;; which are multi-character quads with the same formatting.
   (define atomized-qs
@@ -64,6 +64,7 @@
         [this-attrs (define next-key (eq-hash-code this-attrs))
                     (define next-attrs (attrs . update-with . this-attrs))
                     (hash-set! next-attrs run-key next-key)
+                    (attrs-proc next-attrs)
                     (values next-key next-attrs)]))
     (match (quad-elems x)
       [(? pair? elems)
