@@ -26,7 +26,7 @@
 (define-tag-function (blockquote attrs exprs)
   (qexpr (append '((display "block")
                    (background-color "#eee")
-                   (font-family "fira") (fontsize "10") (line-height "15")
+                   (font-family "fira") (font-size "10") (line-height "15")
                    (border-width-top "0.5") (border-color-top "gray") (border-inset-top "8")
                    (border-width-left "3") (border-color-left "gray") (border-inset-left "20")
                    (border-width-bottom "0.5") (border-color-bottom "gray") (border-inset-bottom "-2")
@@ -39,18 +39,18 @@
 (define class (default-tag-function 'class))
 
 (define-tag-function (strong attrs exprs)
-  (qexpr (list* '(font-bold "true") attrs) exprs))
+  (qexpr (list* '(font-bold "true") '(font-size-adjust "120%") attrs) exprs))
 
 (define-tag-function (a attrs exprs)
   (qexpr `((link ,(cadr (assoc 'href attrs)))(color "MediumVioletRed")) exprs))
 
 (define-tag-function (em attrs exprs)
-  (qexpr (list* '(font-italic "true") attrs) exprs))
+  (qexpr (list* '(font-italic "true") '(font-size-adjust "90%") attrs) exprs))
 
 (define-syntax-rule (attr-list . attrs) 'attrs)
 
 (define (heading-base font-size attrs exprs)
-  (qexpr (append `((font-family "fira-light") (display "block") (fontsize ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9")(border-inset-right "12") (inset-bottom "-3") (inset-top "6") (keep-with-next "true")) attrs) exprs))
+  (qexpr (append `((font-family "fira-light") (display "block") (font-size ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9")(border-inset-right "12") (inset-bottom "-3") (inset-top "6") (keep-with-next "true")) attrs) exprs))
 
 (define-tag-function (h1 attrs exprs)
   (heading-base 20 (append '() attrs) exprs))
@@ -63,7 +63,7 @@
 (define h6 h3)
 
 (define-tag-function (code attrs exprs)
-  (qexpr (append '((font-family "fira-mono")(fontsize "10")(bg "aliceblue")) attrs)  exprs))
+  (qexpr (append '((font-family "fira-mono")(font-size "10")(bg "aliceblue")) attrs)  exprs))
 
 (define-tag-function (pre attrs exprs)
   ;; pre needs to convert white space to equivalent layout elements
@@ -73,7 +73,7 @@
                                 `(,(get-tag expr) ,(get-attrs expr) ,(string-replace str " " " ")))
                      lbr))
   (qexpr (list* '(display "block") '(background-color "aliceblue")
-                '(font-family "fira-mono") '(fontsize "11") '(line-height "14")
+                '(font-family "fira-mono") '(font-size "11") '(line-height "14")
                 '(border-inset-top "10")
                 '(border-width-left "2") '(border-color-left "#669") '(border-inset-left "0")
                 '(border-inset-right "10") '(border-inset-bottom "-4")
@@ -112,7 +112,7 @@
                     #:draw (λ (q doc)
                              (when (pair? (quad-elems q))
                                (font doc (path->string (hash-ref (quad-attrs q) font-path-key)))
-                               (font-size doc (hash-ref (quad-attrs q) 'fontsize 12))
+                               (font-size doc (hash-ref (quad-attrs q) 'font-size 12))
                                (fill-color doc (hash-ref (quad-attrs q) 'color "black"))
                                (define str (unsafe-car (quad-elems q)))
                                (match-define (list x y) (quad-origin q))
@@ -135,13 +135,12 @@
      (struct-copy
       quad q:string
       [attrs (let ([attrs (quad-attrs q)])
-               (hash-ref! attrs 'fontsize default-font-size)
+               (hash-ref! attrs 'font-size default-font-size)
                attrs)]
       [elems (quad-elems q)]
       [size (delay
-              (define fontsize (hash-ref (quad-attrs q) 'fontsize))
-              (font-size doc fontsize)
-              (font doc (path->string (hash-ref (quad-attrs q) font-path-key)))
+              (font-size doc (quad-ref q 'font-size))
+              (font doc (path->string (quad-ref q font-path-key)))
               (define str (if (pair? (quad-elems q)) (unsafe-car (quad-elems q)) ""))
               (define line-height (cond
                                     [(and (pair? (quad-elems q)) (quad-ref q 'line-height))]
@@ -323,7 +322,7 @@
          (make-nobreak! ln)]))
     (cons ln reversed-lines)))
 
-(define zoom-mode? #f)
+(define zoom-mode? #t)
 (define top-margin 60)
 (define bottom-margin 120)
 (define side-margin 120)
@@ -502,6 +501,21 @@
   (define this-bold (hash-ref! attrs 'font-bold #false))
   (define this-italic (hash-ref! attrs 'font-italic #false))
   (hash-set! attrs 'font-path (font-attrs->path this-font-family this-bold this-italic)))
+
+(define (parse-percentage pstr)
+  (/ (string->number (string-trim pstr "%")) 100.0))
+
+(define (resolve-font-size attrs)
+  (define this-font-size (hash-ref! attrs 'font-size default-font-size))
+  (define this-font-size-adjust (parse-percentage (hash-ref! attrs 'font-size-adjust "100%")))
+  ;; we bake the adjustment into the font size...
+  (hash-set! attrs 'font-size (* this-font-size this-font-size-adjust))
+  ;; and then set the adjustment back to 100% (since it's now accounted for)
+  (hash-set! attrs 'font-size-adjust "100%"))
+
+(define (handle-cascading-attrs attrs)
+  (resolve-font-path attrs)
+  (resolve-font-size attrs))
                  
 (define (run xs pdf-path)
   (define pdf (time-name make-pdf (make-pdf #:compress #t
@@ -513,7 +527,7 @@
   (define vertical-height (- (pdf-height pdf) top-margin bottom-margin))
   (setup-font-path-table! pdf-path)
   (let* ([x (time-name parse-qexpr (qexpr->quad xs))]
-         [x (time-name atomize (atomize x #:attrs-proc resolve-font-path))]
+         [x (time-name atomize (atomize x #:attrs-proc handle-cascading-attrs))]
          [x (time-name ->string-quad (map (λ (x) (->string-quad pdf x)) x))]
          [x (time-name line-wrap (line-wrap x line-width))]
          [x (time-name apply-keeps (apply-keeps x))]

@@ -1,5 +1,7 @@
 #lang qtest/markdown
 
+> A simple _hyphenation engine_ that **uses** the _**Knuth–Liang**_ hyphenation algorithm originally developed for TeX. A simple _hyphenation engine_ that uses the Knuth–Liang hyphenation algorithm originally developed for TeX.
+
 # Hyphenate
 
 A simple _hyphenation engine_ that uses the _**Knuth–Liang**_ hyphenation algorithm originally developed for TeX.
