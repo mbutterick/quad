@@ -323,6 +323,7 @@
     (cons ln reversed-lines)))
 
 (define zoom-mode? #t)
+(define zoom-scale 2)
 (define top-margin 60)
 (define bottom-margin 120)
 (define side-margin 120)
@@ -331,7 +332,7 @@
 (require racket/date)
 (define q:page (q #:offset page-offset
                   #:draw-start (λ (q doc) (add-page doc)
-                                 (scale doc (if zoom-mode? 3 1) (if zoom-mode? 3 1)))
+                                 (scale doc (if zoom-mode? zoom-scale 1) (if zoom-mode? zoom-scale 1)))
                   #:draw-end (λ (q doc)
                                (font-size doc 10)
                                (font doc default-font-face)
