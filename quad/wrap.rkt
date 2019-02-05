@@ -128,14 +128,29 @@
                       previous-wrap-ender
                       other-qs)]
                [(empty? next-wrap-head)
-                (debug-report 'would-overflow-hard-without-captured-break)
-                (loop (cons (finish-wrap next-wrap-tail previous-wrap-ender wrap-idx) wraps)
-                      (wrap-count wrap-idx q)
-                      null
-                      null
-                      #false
-                      (car next-wrap-tail)
-                      qs)]
+                (cond
+                  [(empty? next-wrap-tail)
+                   ;; degenerate case where we have something big enough to trigger a wrap on its own,
+                   ;; and nothing left in next-wrap-head or next-wrap-tail.
+                   ;; so we put it in a wrap on its own, because otherwise we can't proceed
+                   ;; though it will look screwy
+                   (debug-report 'making-the-best-of-a-bad-situation)
+                   (loop (cons (finish-wrap (list q) previous-wrap-ender wrap-idx) wraps)
+                         (wrap-count wrap-idx q)
+                         null
+                         null
+                         #false
+                         q
+                         (cdr qs))]
+                  [else
+                   (debug-report 'would-overflow-hard-without-captured-break)
+                   (loop (cons (finish-wrap next-wrap-tail previous-wrap-ender wrap-idx) wraps)
+                         (wrap-count wrap-idx q)
+                         null
+                         null
+                         #false
+                         (car next-wrap-tail)
+                         qs)])]
                [else ; finish the wrap & reset the line without consuming a quad
                 (loop (cons (finish-wrap next-wrap-head previous-wrap-ender wrap-idx) wraps)
                       (wrap-count wrap-idx q)
