@@ -6,7 +6,7 @@
 
 (define (size q)
   (match (quad-size q)
-    [(? procedure? proc) #R proc (proc q)]
+    [(? procedure? proc) proc (proc q)]
     [(? promise? prom) (force prom)]
     [val val]))
 
