@@ -20,20 +20,20 @@
 
 (define ascender-cache (make-hash))
 (define (ascender q)
-  (define font-key-val (hash-ref (quad-attrs q) font-path-key "Courier"))
+  (define font-key-val (quad-ref q font-path-key "Courier"))
   (unless font-key-val
     (error 'ascender-no-font-key))
   (hash-ref! ascender-cache font-key-val (λ () (font-ascent (get-font font-key-val)))))
 
 (define units-cache (make-hash))
 (define (units-per-em q)
-  (define font-key-val (hash-ref (quad-attrs q) font-path-key "Courier"))
+  (define font-key-val (quad-ref q font-path-key "Courier"))
   (unless font-key-val
     (error 'units-per-em-no-font-key))
   (hash-ref! units-cache font-key-val (λ () (font-units-per-em (get-font font-key-val)))))
 
 (define (fontsize q)
-  (define val (hash-ref (quad-attrs q) 'fontsize current-default-font-size))
+  (define val (quad-ref q 'font-size current-default-font-size))
   ((if (number? val) values string->number) val))
 
 (define (vertical-baseline-offset q)
@@ -173,6 +173,6 @@
     (define q (q (list 'in 'bi 'out 'bo 'size '(10 10) font-path-key fira 'fontsize 12)))
     (check-equal? (ascender q) 935)
     (check-equal? (units-per-em q) 1000)
-    (define ascender-scaled (* (/ (ascender q) (units-per-em q)) (hash-ref (quad-attrs q) 'fontsize) 1.0))
+    (define ascender-scaled (* (/ (ascender q) (units-per-em q)) (quad-ref q 'fontsize) 1.0))
     (check-equal? (in-point q) (list 0 ascender-scaled))
     (check-equal? (out-point q) (list 10 ascender-scaled)))
