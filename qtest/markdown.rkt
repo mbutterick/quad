@@ -25,6 +25,7 @@
 
 (define-tag-function (blockquote attrs exprs)
   (qexpr (append '((display "block")
+                   (line-align "center")
                    (background-color "#eee")
                    (font-family "fira") (font-size "10") (line-height "15")
                    (border-width-top "0.5") (border-color-top "gray") (border-inset-top "8")
@@ -63,7 +64,7 @@
 (define h6 h3)
 
 (define-tag-function (code attrs exprs)
-  (qexpr (append '((font-family "fira-mono")(font-size "10")(bg "aliceblue")) attrs)  exprs))
+  (qexpr (append '((font-family "fira-mono")(line-align "right")(font-size "10")(bg "aliceblue")) attrs)  exprs))
 
 (define-tag-function (pre attrs exprs)
   ;; pre needs to convert white space to equivalent layout elements
@@ -82,7 +83,7 @@
 
 
 (define draw-debug? #t)
-(define draw-debug-line? #f)
+(define draw-debug-line? #t)
 (define draw-debug-block? #t)
 (define draw-debug-string? #f)
 
@@ -220,7 +221,8 @@
                         border-width-left border-width-right border-width-top border-width-bottom
                         border-color-left border-color-right border-color-top border-color-bottom
                         background-color
-                        keep-lines keep-first keep-last keep-all keep-with-next))
+                        keep-lines keep-first keep-last keep-all keep-with-next
+                        line-align line-align-first line-align-last))
   (for* ([k (in-list block-attrs)]
          [v (in-value (hash-ref source-hash k #f))]
          #:when v)
@@ -255,17 +257,34 @@
               (match (consolidate-runs pcs)
                 [(? pair? elems)
                  (define elem (unsafe-car elems))
+                 (match-define (list line-width line-height) (quad-size q:line))
+                 (define new-size (let ()
+                                    (define line-heights
+                                      (filter-map (λ (q) (quad-ref q 'line-height)) pcs))
+                                    (pt line-width (if (empty? line-heights) line-height (apply max line-heights)))))
                  (list (struct-copy quad q:line
                                     ;; move block attrs up, so they are visible in page wrap
                                     [attrs (copy-block-attrs (quad-attrs elem)
                                                              (hash-copy (quad-attrs q:line)))]
                                     ;; line width is static
                                     ;; line height is the max 'line-height value or the natural height of q:line
-                                    [size (let ()
-                                            (define line-heights
-                                              (filter-map (λ (q) (quad-ref q 'line-height)) pcs))
-                                            (match-define (list w h) (quad-size q:line))
-                                            (pt w (if (empty? line-heights) h (apply max line-heights))))]
+                                    [size new-size]
+                                    #|
+line alignment
+naive approach works but:
++ `line-width` is not the right reference value for calculating offset adjust
++ alignment width reference needs to take account of inset due to border
+
+|#
+                                    [offset (match (quad-ref elem 'line-align "left")
+                                              ["left" (pt 0 0)]
+                                              [val (define elems-width (pt-x (apply pt+ (map size elems))))
+                                                   (define h-divisor (match val
+                                                                       ["right" 1]
+                                                                       ["center" 2]))
+                                                   (define offset-adjust
+                                                     (pt (/ (- line-width elems-width) h-divisor) 0))
+                                                   (pt+ offset-adjust (quad-offset q:line))])]
                                     ;; handle list indexes. drop new quad into line to hold list index
                                     ;; could also use this for line numbers
                                     [elems (append
@@ -362,8 +381,8 @@
                     (match-define (list bil bit bir bib)
                       (map (λ (k) (quad-ref first-line k 0))
                            '(border-inset-left border-inset-top border-inset-right border-inset-bottom)))
-                    (match-define (list left top) (map + (quad-origin q) (list bil bit)))
-                    (match-define (list width height) (map - (size q) (list (+ bil bir) (+ bit bib))))
+                    (match-define (list left top) (pt+ (quad-origin q) (list bil bit)))
+                    (match-define (list width height) (pt- (size q) (list (+ bil bir) (+ bit bib))))
                     ;; fill rect
                     (cond 
                       [(quad-ref first-line 'background-color)

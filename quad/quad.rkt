@@ -35,18 +35,22 @@
    ;; and compare them key-by-key
    (hashes-equal? (quad-attrs q1) (quad-attrs q2))))
 
-(struct quad (attrs
-              elems
-              size
-              in
-              out
-              inner
-              offset
-              origin
-              printable
-              draw-start
-              draw
-              draw-end)
+(struct quad (attrs ; key-value pairs, arbitrary
+              elems ; subquads or text
+              ;; size is a two-dim pt
+              size ; outer size of quad for layout (though not necessarily the bounding box for drawing)
+              ;; in, out, inner are phrased in terms of cardinal position
+              in ; alignment point matched to previous quad
+              out ; alignment point matched to next quad
+              inner ; alignment point for elems (might be different from in/out)
+              ;; offset, origin are two-dim pts
+              offset ; relocation of pen before quad is drawn
+              origin ; reference point for all subsequent drawing ops in the quad. Calculated, not set directly
+              printable ; whether the quad will print
+              draw-start ; func called at the beginning of every draw event (for setup ops)
+              draw ; func called in the middle of every daw event
+              draw-end ; func called at the end of every draw event (for teardown ops)
+              )
   #:transparent
   #:property prop:custom-write
   (λ (v p w?) (display
