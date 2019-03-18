@@ -125,7 +125,7 @@
                                    (λ (q doc) (draw-debug q doc "#99f" "#ccf"))
                                    void)))
 
-(define default-font-face "fonts/default.ttf")
+(define-runtime-path default-font-face "fonts/charter/charter.otf")
 (define default-font-family "charter")
 (define default-font-size 12)
 
