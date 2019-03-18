@@ -47,10 +47,9 @@
               #:finish-wrap [finish-wrap-func (λ (wrap-qs q0 q idx) (list wrap-qs))])
   (define (hard-break? x) (and (hard-break-func x) (or (not no-break-func) (not (no-break-func x)))))
   (define (soft-break? x) (and (soft-break-func x) (or (not no-break-func) (not (no-break-func x)))))
-  (define target-size-proc
-    (match target-size-proc-arg
-      [(? procedure? proc) proc]
-      [val (λ (q idx) val)]))
+  (define target-size-proc (match target-size-proc-arg
+                             [(? procedure? proc) proc]
+                             [val (λ (q idx) val)]))
   ; takes quads in wrap, triggering quad, and wrap idx; returns list containing wrap (and maybe other things)
   (define (finish-wrap qs previous-wrap-ender wrap-idx [wrap-triggering-q (car qs)])
     ;; reverse because quads accumulated in reverse
@@ -152,7 +151,7 @@
                       (wrap-count wrap-idx q)
                       null
                       next-wrap-tail
-                      (apply + (map distance next-wrap-tail))
+                      (for/sum ([item (in-list next-wrap-tail)]) (distance item))
                       (car next-wrap-head)
                       qs)])]         
             [(soft-break? q)
@@ -177,41 +176,33 @@
                    other-qs)])])])))
 
 (define q-zero (q #:size (pt 0 0)))
-
 (define q-one (q #:size (pt 1 1) #:printable #t))
-
 (define x (struct-copy quad q-one [elems '(#\x)]))
-
 (define zwx (struct-copy quad q-zero
                          [printable (λ _ #t)]
                          [elems '(#\z)]))
-
 (define hyph (struct-copy quad q-one [elems '(#\-)]))
-
 (define shy (struct-copy quad q-one
                          [printable (λ (q [sig #f])
                                       (case sig
                                         [(end) #t]
                                         [else #f]))]
                          [elems '(#\-)]))
-
 (define a (struct-copy quad q-one [elems '(#\a)]))
 (define b (struct-copy quad q-one [elems '(#\b)]))
 (define c (struct-copy quad q-one [elems '(#\c)]))
 (define d (struct-copy quad q-one [elems '(#\d)]))
-
 (define sp (struct-copy quad q-one
                         [printable (λ (q [sig #f])
                                      (case sig
                                        [(start end) #f]
                                        [else #t]))]
                         [elems '(#\space)]))
-
 (define lbr (struct-copy quad q-one
                          [printable (λ _ #f)]
                          [elems '(#\newline)]))
 
-(define soft-break? (λ (q)  (memv (car (quad-elems q)) '(#\space #\-))))
+(define (soft-break? q) (memv (car (quad-elems q)) '(#\space #\-)))
 
 (define (linewrap xs size [debug #f])
   (add-between (wrap xs size debug
@@ -320,14 +311,14 @@
 (define (visual-wrap str int [debug #f])
   (string-join
    (for/list ([x (in-list (linewrap (for/list ([c (in-string str)])
-                                      (define atom (q c))
-                                      (if (equal? (quad-elems atom) '(#\space))
-                                          (struct-copy quad sp)
-                                          (struct-copy quad q-one
-                                                       [attrs (quad-attrs atom)]
-                                                       [elems (quad-elems atom)]))) int debug))]
+                                              (define atom (q c))
+                                              (if (equal? (quad-elems atom) '(#\space))
+                                                  (struct-copy quad sp)
+                                                  (struct-copy quad q-one
+                                                               [attrs (quad-attrs atom)]
+                                                               [elems (quad-elems atom)]))) int debug))]
               #:when (and (list? x) (andmap quad? x)))
-     (list->string (map car (map quad-elems x))))
+             (list->string (map car (map quad-elems x))))
    "|"))
 
 (module+ test
