@@ -28,13 +28,24 @@
   ;; for instance, a hyphen is `soft-break?` but shouldn't be trimmed.
   (finish-wrap-func (reverse (dropf qs nonprinting-at-end?)) previous-wrap-ender wrap-triggering-q wrap-idx))
 
+(define (make-max-distance-proc max-distance-proc-arg)
+  (match max-distance-proc-arg
+    [(? procedure? proc) proc]
+    [val (λ (q idx) val)]))
+
 (define (finalize-reversed-wraps wraps)
   (match (append* (reverse wraps))
     [(list (list)) (list)]
     [wraps wraps]))
 
+(define ((make-hard-break-pred hard-break-func no-break-func) x)
+  (and (hard-break-func x) (or (not no-break-func) (not (no-break-func x)))))
+
+(define ((make-soft-break-pred soft-break-func no-break-func) x)
+  (and (soft-break-func x) (or (not no-break-func) (not (no-break-func x)))))
+
 (define (wrap qs
-              [target-size-proc-arg (current-wrap-distance)]
+              [max-distance-proc-arg (current-wrap-distance)]
               [debug #f]
               ;; hard break: must wrap
               #:hard-break [hard-break-func (λ (x) #f)]
@@ -60,11 +71,9 @@
               ;; (q0 is not part of this wrap, but q is)
               ;; idx is current wrap-count value.
               #:finish-wrap [finish-wrap-func default-finish-wrap-func])
-  (define (hard-break? x) (and (hard-break-func x) (or (not no-break-func) (not (no-break-func x)))))
-  (define (soft-break? x) (and (soft-break-func x) (or (not no-break-func) (not (no-break-func x)))))
-  (define target-size-proc (match target-size-proc-arg
-                             [(? procedure? proc) proc]
-                             [val (λ (q idx) val)]))
+  (define hard-break? (make-hard-break-pred hard-break-func no-break-func))
+  (define soft-break? (make-soft-break-pred soft-break-func no-break-func))
+  (define max-distance-proc (make-max-distance-proc max-distance-proc-arg))
   ; takes quads in wrap, triggering quad, and wrap idx; returns list containing wrap (and maybe other things)
   (define finish-wrap (make-finish-wrap finish-wrap-func))
   (let loop ([wraps null] ; list of (list of quads)
@@ -116,8 +125,9 @@
                      previous-wrap-ender
                      other-qs)])]
          [else ; cases that require computing distance
-          (define cumulative-dist (distance-func q current-dist would-be-wrap-qs))
-          (define would-overflow? (> cumulative-dist (target-size-proc q wrap-idx)))
+          (define wrap-distance (distance-func q current-dist would-be-wrap-qs))
+          (define max-distance (max-distance-proc q wrap-idx))
+          (define would-overflow? (> wrap-distance max-distance))
           (cond
             [would-overflow?
              (cond
@@ -129,7 +139,7 @@
                       wrap-idx
                       (wrap-append (cons q next-wrap-tail) next-wrap-head)
                       null
-                      cumulative-dist
+                      wrap-distance
                       previous-wrap-ender
                       other-qs)]
                [(empty? next-wrap-head)
@@ -167,7 +177,7 @@
                    wrap-idx
                    (wrap-append (cons q next-wrap-tail) next-wrap-head)
                    null
-                   cumulative-dist
+                   wrap-distance
                    previous-wrap-ender
                    other-qs)]
             [else
@@ -177,12 +187,12 @@
                    wrap-idx
                    next-wrap-head
                    (cons q next-wrap-tail)
-                   cumulative-dist
+                   wrap-distance
                    previous-wrap-ender
                    other-qs)])])])))
 
 (define (wrap-best qs
-                   [target-size-proc-arg (current-wrap-distance)]
+                   [max-distance-proc-arg (current-wrap-distance)]
                    [debug #f]
                    ;; hard break: must wrap
                    #:hard-break [hard-break-func (λ (x) #f)]
@@ -208,37 +218,49 @@
                    ;; (q0 is not part of this wrap, but q is)
                    ;; idx is current wrap-count value.
                    #:finish-wrap [finish-wrap-func default-finish-wrap-func])
-  (define (hard-break? x) (and (hard-break-func x) (or (not no-break-func) (not (no-break-func x)))))
-  (define (soft-break? x) (and (soft-break-func x) (or (not no-break-func) (not (no-break-func x)))))
+  (define hard-break? (make-hard-break-pred hard-break-func no-break-func))
+  (define soft-break? (make-soft-break-pred soft-break-func no-break-func))
+  (define max-distance-proc (make-max-distance-proc max-distance-proc-arg))
   (define finish-wrap (make-finish-wrap finish-wrap-func))
   
-  (define measure target-size-proc-arg)
   (struct $penalty (val idx) #:transparent)
   (define (penalty i j)
     (match-define ($penalty last-val last-idx) (ocm-min-value ocm i))
     (cond
-      [(> j (vector-length pieces)) ($penalty (- i) last-idx)]
+      [(> j (vector-length pieces))
+       (define out-of-bounds-signal (- i))
+       ($penalty out-of-bounds-signal last-idx)]
       [else
+       (define would-be-wrap-qs (pieces-sublist i j))
        (define last-q (vector-ref pieces (sub1 j)))
-       (define wrap-qs (pieces-sublist i j))
-       (define this-idx (wrap-count last-idx last-q))
-       (define line-width (length wrap-qs))
-       (define underflow (- measure line-width))
+       (define wrap-idx (wrap-count last-idx last-q))
+       (define wrap-distance (for/fold ([last-dist 0])
+                                       ([q (in-list would-be-wrap-qs)])
+                               (distance-func q last-dist would-be-wrap-qs)))
+       (define measure (max-distance-proc (car would-be-wrap-qs) wrap-idx))
+       (define underflow (- measure wrap-distance))
        ($penalty
-        (+  last-val ; include penalty so far
-            (if (negative? underflow)
-                ;; overfull line: huge penalty prevents break; multiplier is essential for monotonicity.
-                (* 1e8 (- underflow))
-                ;; standard penalty
-                (expt underflow 2)))
-        this-idx)]))
+        (+ last-val ; include penalty so far
+           (if (negative? underflow)
+               ;; overfull line: huge penalty prevents break; multiplier is essential for monotonicity.
+               (* 1e8 (- underflow))
+               ;; standard penalty
+               (expt underflow 2)))
+        wrap-idx)]))
 
   (define ocm (make-ocm penalty ($penalty 0 (sub1 initial-wrap-idx)) $penalty-val))
   ;; starting from last position, ask ocm for position of row minimum (= new-pos)
   ;; collect this value, and use it as the input next time
   ;; until you reach first position.
   (define pieces (list->vector (slicef-after qs (λ (q) (or (hard-break? q) (soft-break? q)) ))))
-  (define (pieces-sublist i j) (apply append (vector->list (vector-copy pieces i j))))
+  (define (pieces-sublist i j)
+    ;; nonprinting-soft-break-in-middle? is soft hyphen.
+    ;; if a soft hyphen is in the middle of a pieces-sublist, it's superfluous.
+    ;; the ones that will end up in the middle are the ones at the end of every piece except the last.
+    ;; and the last can drop the nonprinting-at-end?
+    (apply append (for*/list ([n (in-range i j)]
+                              [pcs (in-value (vector-ref pieces n))])
+                    (dropf-right pcs (if (= n j) nonprinting-at-end? nonprinting-soft-break-in-middle?)))))
   (define last-j (vector-length pieces))
   (define bps
     (let loop ([j last-j][bps (list last-j)]) ; start from end
@@ -252,7 +274,7 @@
             ([i (in-list bps)]
              [j (in-list (cdr bps))])
     (define wrap-qs (reverse (pieces-sublist i j))) ; first-fit gets wrap-qs in reverse, so be consistent
-    (define previous-wrap-ender (and (positive? i) (vector-ref pieces (sub1 i))))
+    (define previous-wrap-ender (and (not (zero? i)) (vector-ref pieces (sub1 i))))
     (define wrap-triggering-q (and (not (= j (vector-length pieces))) (car wrap-qs)))
     (values (cons (finish-wrap wrap-qs previous-wrap-ender wrap-idx wrap-triggering-q) wraps)
             (wrap-count wrap-idx (car wrap-qs)))))
