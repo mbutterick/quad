@@ -1,7 +1,7 @@
 #lang debug racket
 (require racket/list racket/match sugar/debug sugar/list
          "param.rkt" "quad.rkt" "atomize.rkt" "position.rkt" "ocm.rkt")
-(provide wrap)
+(provide wrap wrap-best)
 
 (define-syntax (debug-report stx)
   (syntax-case stx ()
@@ -227,12 +227,12 @@
   (define (penalty i j)
     (match-define ($penalty last-val last-idx) (ocm-min-value ocm i))
     (cond
-      [(> j (vector-length pieces))
+      [(or (= i j) (> j (vector-length pieces)))
        (define out-of-bounds-signal (- i))
        ($penalty out-of-bounds-signal last-idx)]
       [else
        (define would-be-wrap-qs (pieces-sublist i j))
-       (define last-q (vector-ref pieces (sub1 j)))
+       (define last-q (last (vector-ref pieces (sub1 j))))
        (define wrap-idx (wrap-count last-idx last-q))
        (define wrap-distance (for/fold ([last-dist 0])
                                        ([q (in-list would-be-wrap-qs)])
@@ -264,17 +264,17 @@
   (define last-j (vector-length pieces))
   (define bps
     (let loop ([j last-j][bps (list last-j)]) ; start from end
-      (define i (ocm-min-index ocm j)) ; look to the previous line
-      (if (zero? i) ; zero means we're at first position, and therefore done
-          (cons i bps)
-          (loop i (cons i bps)))))
+      (define min-i (ocm-min-index ocm j)) ; look to the previous line
+      (if (zero? min-i) ; zero means we're at first position, and therefore done
+          (cons min-i bps)
+          (loop min-i (cons min-i bps)))))
   (for/fold ([wraps null]
              [wrap-idx initial-wrap-idx]
              #:result (finalize-reversed-wraps wraps))
             ([i (in-list bps)]
              [j (in-list (cdr bps))])
     (define wrap-qs (reverse (pieces-sublist i j))) ; first-fit gets wrap-qs in reverse, so be consistent
-    (define previous-wrap-ender (and (not (zero? i)) (vector-ref pieces (sub1 i))))
+    (define previous-wrap-ender (and (not (zero? i)) (last (vector-ref pieces (sub1 i)))))
     (define wrap-triggering-q (and (not (= j (vector-length pieces))) (car wrap-qs)))
     (values (cons (finish-wrap wrap-qs previous-wrap-ender wrap-idx wrap-triggering-q) wraps)
             (wrap-count wrap-idx (car wrap-qs)))))

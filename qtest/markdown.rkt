@@ -230,7 +230,7 @@
   dest-hash)
 
 (define (line-wrap xs wrap-size)
-  (wrap xs (λ (q idx) (- wrap-size
+  (wrap-best xs (λ (q idx) (- wrap-size
                          (quad-ref q 'inset-left 0)
                          (quad-ref q 'inset-right 0)))                        
         #:hard-break line-break?
