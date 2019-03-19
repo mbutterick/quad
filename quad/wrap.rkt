@@ -1,6 +1,6 @@
 #lang debug racket
 (require racket/list racket/match sugar/debug 
-         "param.rkt" "quad.rkt" "atomize.rkt" "position.rkt")
+         "param.rkt" "quad.rkt" "atomize.rkt" "position.rkt" "ocm.rkt")
 (provide wrap)
 
 (define-syntax (debug-report stx)
@@ -175,6 +175,61 @@
                    previous-wrap-ender
                    other-qs)])])])))
 
+(define (wrap-best qs
+                   [target-size-proc-arg (current-wrap-distance)]
+                   [debug #f]
+                   ;; hard break: must wrap
+                   #:hard-break [hard-break-func (λ (x) #f)]
+                   ;; soft break: can wrap
+                   #:soft-break [soft-break-func (λ (x) #f)]
+                   ;; no break: must not wrap (exception to hard / soft predicates)
+                   #:no-break [no-break-func #f]
+                   ;; size of potential wrap.
+                   ;; simple: measure q and add it to last-dist
+                   ;; sophisticated: process all wrap-qs and measure resulting 
+                   #:distance [distance-func (λ (q last-dist wrap-qs)
+                                               (+ last-dist (if (printable? q) (distance q) 0)))]
+                   ;; called when wrap counter increments.
+                   ;; perhaps should reset after paragraph breaks, etc.
+                   #:wrap-count [wrap-count (λ (idx q) (add1 idx))]
+                   ;; starting value when wrap counter resets.
+                   ;; could use an arbitrary data structure (then incremented with `wrap-count`
+                   #:initial-wrap-count [initial-wrap-idx 1]
+                   ;; called when wrap is done.
+                   ;; takes as input list of qs in wrap,
+                   ;; q0 that caused the previous wrap, or #f at beginning.
+                   ;; q that caused this one, or #f at end.
+                   ;; (q0 is not part of this wrap, but q is)
+                   ;; idx is current wrap-count value.
+                   #:finish-wrap [finish-wrap-func (λ (wrap-qs q0 q idx) (list wrap-qs))])
+
+  (define measure target-size-proc-arg)
+  (define (penalty i j)
+    (define line-width (- j i))
+    (define underflow (- measure line-width))
+    (+ (ocm-min-value ocm i) ; include penalty so far
+       (if (negative? underflow)
+           ;; overfull line: huge penalty prevents break; multiplier is essential for monotonicity.
+           (* underflow -1e8)
+           ;; standard penalty, optionally also applied to last line (by changing operator)
+           (expt underflow 2))))
+
+  (define ocm (make-ocm penalty))
+  ;; starting from last position, ask ocm for position of row minimum (= new-pos)
+  ;; collect this value, and use it as the input next time
+  ;; until you reach first position.
+  (define pieces (list->vector qs))
+  (define last-j (vector-length pieces))
+  (define bps
+    (let loop ([j last-j][bps (list last-j)]) ; start from end
+      (define i (ocm-min-index ocm j)) ; look to the previous line
+      (if (zero? i) ; zero means we're at first position, and therefore done
+          (cons i bps)
+          (loop i (cons i bps)))))
+  (for/list ([i (in-list bps)]
+             [j (in-list (cdr bps))])
+    (vector->list (vector-copy pieces i j))))
+
 (define q-zero (q #:size (pt 0 0)))
 (define q-one (q #:size (pt 1 1) #:printable #t))
 (define x (struct-copy quad q-one [elems '(#\x)]))
@@ -204,11 +259,19 @@
 
 (define (soft-break? q) (memv (car (quad-elems q)) '(#\space #\-)))
 
-(define (linewrap xs size [debug #f])
-  (add-between (wrap xs size debug
-                     #:finish-wrap (λ (xs . _) (list xs))
-                     #:hard-break (λ (q) (char=? (car (quad-elems q)) #\newline))
-                     #:soft-break soft-break?) lbr))
+(define (linewrap xs size [debug #f] #:wrapper [wrap-proc wrap])
+  (add-between (wrap-proc xs size debug
+                          #:finish-wrap (λ (xs . _) (list xs))
+                          #:hard-break (λ (q) (char=? (car (quad-elems q)) #\newline))
+                          #:soft-break soft-break?) lbr))
+
+;; "Meg is an ally."
+(require rackunit)
+(check-equal? (linewrap (list a b c sp a b sp c d sp a b c d x) 6)
+              (list (list a b c sp a b) lbr (list c d) lbr (list a b c d x)))
+
+(equal? #R (linewrap (list a b c sp a b sp c d sp a b c d x) 6 #:wrapper wrap-best)
+        (list (list a b c) lbr (list a b sp c d) lbr (list a b c d x)))
 
 (module+ test
   (require rackunit))
@@ -308,18 +371,25 @@
    (check-equal? (linewrap (list x x x sp x x) 2) (list (list x x) lbr (list x) lbr (list x x)))
    (check-equal? (linewrap (list x x x sp x x) 3) (list (list x x x) lbr (list x x)))))
 
-(define (visual-wrap str int [debug #f])
+(define (visual-wrap str int [debug #f] #:wrapper [wrap-proc wrap])
   (string-join
    (for/list ([x (in-list (linewrap (for/list ([c (in-string str)])
-                                              (define atom (q c))
-                                              (if (equal? (quad-elems atom) '(#\space))
-                                                  (struct-copy quad sp)
-                                                  (struct-copy quad q-one
-                                                               [attrs (quad-attrs atom)]
-                                                               [elems (quad-elems atom)]))) int debug))]
+                                      (define atom (q c))
+                                      (if (equal? (quad-elems atom) '(#\space))
+                                          (struct-copy quad sp)
+                                          (struct-copy quad q-one
+                                                       [attrs (quad-attrs atom)]
+                                                       [elems (quad-elems atom)]))) int debug
+                                                                                    #:wrapper wrap-proc))]
               #:when (and (list? x) (andmap quad? x)))
-             (list->string (map car (map quad-elems x))))
+     (list->string (map car (map quad-elems x))))
    "|"))
+
+(module+ test
+  (test-case
+   "kp linebreaking"
+   (check-equal? (visual-wrap "Meg is an ally." 6) "Meg is|an|ally.")
+   (check-equal? (visual-wrap "Meg is an ally." 6 #:wrapper wrap-best) "Meg i|s an |ally.")))
 
 (module+ test
   (test-case
