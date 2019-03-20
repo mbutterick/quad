@@ -183,64 +183,78 @@
 
 (define last-line-can-be-short? #t)
 (define mega-penalty 1e8)
-(define (wrap-best qs max-distance-proc debug hard-break? soft-break? finish-wrap wrap-count distance-func initial-wrap-idx)
-  (struct $penalty (val idx) #:transparent)
-  (define (penalty i j)
-    (match-define ($penalty last-val last-idx) (ocm-min-value ocm i))
-    (cond
-      [(or (= i j) (> j (vector-length pieces)))
-       (define out-of-bounds-signal (- i))
-       ($penalty out-of-bounds-signal last-idx)]
-      [else
-       (define last-q (last (vector-ref pieces (sub1 j))))
-       (define wrap-idx (wrap-count last-idx last-q))
-       (define would-be-wrap-qs (pieces-sublist i j))
-       (define wrap-distance (for/fold ([last-dist 0])
-                                       ([q (in-list would-be-wrap-qs)])
-                               (distance-func q last-dist would-be-wrap-qs)))
-       (define measure (max-distance-proc (car would-be-wrap-qs) wrap-idx))
-       (define underflow (- measure wrap-distance))
-       ($penalty
-        (+ last-val ; include penalty so far
-           (* (sub1 wrap-idx) mega-penalty) ; new line penalty
-           (cond
-             ;; overfull line: huge penalty prevents break; multiplier is essential for monotonicity.
-             [(negative? underflow) (* mega-penalty (- underflow))]
-             ;; standard penalty
-             [((if last-line-can-be-short? < <=) j (vector-length pieces)) (expt underflow 2)]
-             [else 0]))
-        wrap-idx)]))
+(define (pieces-sublist pieces i j)
+  ;; nonprinting-soft-break-in-middle? is soft hyphen.
+  ;; if a soft hyphen is in the middle of a pieces-sublist, it's superfluous.
+  ;; the ones that will end up in the middle are the ones at the end of every piece except the last.
+  ;; and the last can drop the nonprinting-at-end?
+  (apply append (for*/list ([n (in-range i j)]
+                            [pcs (in-value (vector-ref pieces n))])
+                  (if (= n j) (dropf-right pcs nonprinting-at-end?) pcs))))
 
-  (define ocm (make-ocm penalty ($penalty 0 (sub1 initial-wrap-idx)) $penalty-val))
-  ;; starting from last position, ask ocm for position of row minimum (= new-pos)
-  ;; collect this value, and use it as the input next time
-  ;; until you reach first position.
-  (define pieces (list->vector (slicef-after qs (λ (q) (or (hard-break? q) (soft-break? q)) ))))
-  (define (pieces-sublist i j)
-    ;; nonprinting-soft-break-in-middle? is soft hyphen.
-    ;; if a soft hyphen is in the middle of a pieces-sublist, it's superfluous.
-    ;; the ones that will end up in the middle are the ones at the end of every piece except the last.
-    ;; and the last can drop the nonprinting-at-end?
-    (apply append (for*/list ([n (in-range i j)]
-                              [pcs (in-value (vector-ref pieces n))])
-                    (if (= n j) (dropf-right pcs nonprinting-at-end?) pcs))))
-  (define last-j (vector-length pieces))
-  (define bps
-    (let loop ([j last-j][bps (list last-j)]) ; start from end
-      (define min-i (ocm-min-index ocm j)) ; look to the previous line
-      (if (zero? min-i) ; zero means we're at first position, and therefore done
-          (cons min-i bps)
-          (loop min-i (cons min-i bps)))))
-  (for/fold ([wraps null]
-             [wrap-idx initial-wrap-idx]
-             #:result (finalize-reversed-wraps wraps))
-            ([i (in-list bps)]
-             [j (in-list (cdr bps))])
-    (define wrap-qs (reverse (pieces-sublist i j))) ; first-fit gets wrap-qs in reverse, so be consistent
-    (define previous-wrap-ender (and (not (zero? i)) (last (vector-ref pieces (sub1 i)))))
-    (define wrap-triggering-q (and (not (= j (vector-length pieces))) (car wrap-qs)))
-    (values (cons (finish-wrap wrap-qs previous-wrap-ender wrap-idx wrap-triggering-q) wraps)
-            (wrap-count wrap-idx (car wrap-qs)))))
+(define (wrap-best qs max-distance-proc debug hard-break? soft-break? finish-wrap wrap-count distance-func initial-wrap-idx)
+
+  (define (wrap-pieces pieces starting-wrap-idx previous-last-q)
+    (struct $penalty (val idx last) #:transparent)
+    (define (penalty i j)
+      (cond
+        [(or (= i j) (> j (vector-length pieces)))
+         (define out-of-bounds-signal (- i))
+         ($penalty out-of-bounds-signal #f #f)]
+        [else
+         (match-define ($penalty last-val starting-idx last-q) (ocm-min-value ocm i))
+         (define next-idx (wrap-count starting-idx last-q))
+         (define would-be-wrap-qs (reverse (pieces-sublist pieces i j))) ; `reverse` to track ordinary wrap logic
+         (define wrap-distance (for/fold ([last-dist 0])
+                                         ([q (in-list would-be-wrap-qs)])
+                                 (distance-func q last-dist would-be-wrap-qs)))
+         (define underflow (- (max-distance-proc (car would-be-wrap-qs) starting-idx) wrap-distance))
+         ($penalty
+          (+ last-val ; include penalty so far
+             (* (sub1 starting-idx) mega-penalty) ; new line penalty
+             (cond
+               [(negative? underflow)
+                ;; overfull line: huge penalty prevents break; multiplier is essential for monotonicity.
+                (* mega-penalty (- underflow))]
+               [((if last-line-can-be-short? < <=) j (vector-length pieces))
+                ;; standard penalty
+                (expt underflow 2)]
+               [else 0]))
+          next-idx
+          (car would-be-wrap-qs))]))
+
+    (define ocm (make-ocm penalty ($penalty 0 starting-wrap-idx previous-last-q) $penalty-val))
+    ;; starting from last position, ask ocm for position of row minimum (= new-pos)
+    ;; collect this value, and use it as the input next time
+    ;; until you reach first position.
+
+    (define breakpoints
+      (let ([last-j (vector-length pieces)])
+        (let loop ([j last-j][bps (list last-j)]) ; start from end
+          (define min-i (ocm-min-index ocm j)) ; look to the previous line
+          (if (zero? min-i) ; zero means we're at first position, and therefore done
+              (cons min-i bps)
+              (loop min-i (cons min-i bps))))))
+    (for/fold ([wraps null]
+               [wrap-idx starting-wrap-idx]
+               [previous-wrap-ender previous-last-q])
+              ([i (in-list breakpoints)]
+               [j (in-list (cdr breakpoints))])
+      (define wrap-qs (reverse (pieces-sublist pieces i j))) ; first-fit gets wrap-qs in reverse, so be consistent
+      (values (cons (finish-wrap wrap-qs previous-wrap-ender wrap-idx) wraps)
+              (wrap-count wrap-idx (car wrap-qs))
+              (car wrap-qs))))
+  
+  (for*/fold ([wrapss null]
+              [wrap-idx initial-wrap-idx]
+              [previous-wrap-ender #f]
+              #:result (finalize-reversed-wraps (apply append wrapss)))
+             ([pieces-ending-in-hard-break (in-list (slicef-after qs hard-break?))])
+    (define piece-vec (list->vector (slicef-after pieces-ending-in-hard-break soft-break?)))
+    (define-values (wraps idx ender)
+      (wrap-pieces piece-vec wrap-idx previous-wrap-ender))
+    (values (cons wraps wrapss) idx ender)))
+
 
 (module+ test
   (define q-zero (q #:size (pt 0 0)))
@@ -315,19 +329,19 @@
 (module+ test (require rackunit))
 
 (module+ test
-    (test-case
-     "kp linebreaking"
-     (define meg-is-an-ally (list a b c sp a b sp c d sp a b c d x)) ; "Meg is an ally."
-     (check-equal? (linewrap meg-is-an-ally 6)
-                   ;; Meg is
-                   ;; an
-                   ;; ally.
-                   (list (list a b c sp a b) lbr (list c d) lbr (list a b c d x)))
-     (check-equal? (linewrap meg-is-an-ally 6 #:nicely #t)
-                   ;; Meg
-                   ;; is an
-                   ;; ally.
-                   (list (list a b c) lbr (list a b sp c d) lbr (list a b c d x)))))
+  (test-case
+   "kp linebreaking"
+   (define meg-is-an-ally (list a b c sp a b sp c d sp a b c d x)) ; "Meg is an ally."
+   (check-equal? (linewrap meg-is-an-ally 6)
+                 ;; Meg is
+                 ;; an
+                 ;; ally.
+                 (list (list a b c sp a b) lbr (list c d) lbr (list a b c d x)))
+   (check-equal? (linewrap meg-is-an-ally 6 #:nicely #t)
+                 ;; Meg
+                 ;; is an
+                 ;; ally.
+                 (list (list a b c) lbr (list a b sp c d) lbr (list a b c d x)))))
 
 (module+ test
   (test-begin
