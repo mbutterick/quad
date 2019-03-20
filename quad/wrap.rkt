@@ -181,6 +181,8 @@
                    previous-wrap-ender
                    other-qs)])])])))
 
+(define last-line-can-be-short? #t)
+(define mega-penalty 1e8)
 (define (wrap-best qs max-distance-proc debug hard-break? soft-break? finish-wrap wrap-count distance-func initial-wrap-idx)
   (struct $penalty (val idx) #:transparent)
   (define (penalty i j)
@@ -190,9 +192,9 @@
        (define out-of-bounds-signal (- i))
        ($penalty out-of-bounds-signal last-idx)]
       [else
-       (define would-be-wrap-qs (pieces-sublist i j))
        (define last-q (last (vector-ref pieces (sub1 j))))
        (define wrap-idx (wrap-count last-idx last-q))
+       (define would-be-wrap-qs (pieces-sublist i j))
        (define wrap-distance (for/fold ([last-dist 0])
                                        ([q (in-list would-be-wrap-qs)])
                                (distance-func q last-dist would-be-wrap-qs)))
@@ -200,11 +202,13 @@
        (define underflow (- measure wrap-distance))
        ($penalty
         (+ last-val ; include penalty so far
-           (if (negative? underflow)
-               ;; overfull line: huge penalty prevents break; multiplier is essential for monotonicity.
-               (* 1e8 (- underflow))
-               ;; standard penalty
-               (expt underflow 2)))
+           (* wrap-idx mega-penalty) ; new line penalty
+           (cond
+             ;; overfull line: huge penalty prevents break; multiplier is essential for monotonicity.
+             [(negative? underflow) (* mega-penalty (- underflow))]
+             ;; standard penalty
+             [((if last-line-can-be-short? < <=) j (vector-length pieces)) (expt underflow 2)]
+             [else 0]))
         wrap-idx)]))
 
   (define ocm (make-ocm penalty ($penalty 0 (sub1 initial-wrap-idx)) $penalty-val))

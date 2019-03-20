@@ -442,7 +442,7 @@ naive approach works but:
   ;; could do it after, but it would require going back inside each page quad
   ;; which seems overly interdependent, because `insert-blocks` is used to determine break locations.
   ;; `page-wrap` should emit quads that are complete.
-  (wrap #R xs vertical-height
+  (wrap xs vertical-height
         #:soft-break (λ (q) #true)
         #:no-break (λ (q) (quad-ref q 'no-pbr))
         #:distance (λ (q dist-so-far wrap-qs)
