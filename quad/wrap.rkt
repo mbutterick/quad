@@ -12,15 +12,6 @@
 (define (nonprinting-at-end? x) (not (printable? x 'end)))
 
 (define (default-finish-wrap-func wrap-qs q0 q idx) (list wrap-qs))
-(define ((make-finish-wrap finish-wrap-func) qs previous-wrap-ender wrap-idx [wrap-triggering-q (car qs)])
-  ;; reverse because quads accumulated in reverse
-  ;; wrap-triggering-q is ordinarily the last accumulated q
-  ;; unless it's the last wrap, in which case it's #f
-  ;; but we capture it separately because it's likely to get trimmed away by `nonprinting-at-end?`
-  ;; note: we don't trim `soft-break?` or `hard-break?` because that's an orthogonal consideration
-  ;; for instance, a hyphen is `soft-break?` but shouldn't be trimmed.
-  (finish-wrap-func (reverse (dropf qs nonprinting-at-end?)) previous-wrap-ender wrap-triggering-q wrap-idx))
-
 (define (finalize-reversed-wraps wraps)
   (match (append* (reverse wraps))
     [(list (list)) (list)]
@@ -62,7 +53,15 @@
                               [(? procedure? proc) proc]
                               [val (λ (q idx) val)]))
   ; takes quads in wrap, triggering quad, and wrap idx; returns list containing wrap (and maybe other things)
-  (define finish-wrap (make-finish-wrap finish-wrap-func))
+  (define (finish-wrap qs previous-wrap-ender wrap-idx [wrap-triggering-q (car qs)])
+    ;; reverse because quads accumulated in reverse
+    ;; wrap-triggering-q is ordinarily the last accumulated q
+    ;; unless it's the last wrap, in which case it's #f
+    ;; but we capture it separately because it's likely to get trimmed away by `nonprinting-at-end?`
+    ;; note: we don't trim `soft-break?` or `hard-break?` because that's an orthogonal consideration
+    ;; for instance, a hyphen is `soft-break?` but shouldn't be trimmed.
+    (finish-wrap-func (reverse (dropf qs nonprinting-at-end?)) previous-wrap-ender wrap-triggering-q wrap-idx))
+
   (wrap-proc qs max-distance-proc debug hard-break? soft-break? finish-wrap wrap-count distance-func initial-wrap-idx))
 
 (define (wrap-first qs max-distance-proc debug hard-break? soft-break? finish-wrap wrap-count distance-func initial-wrap-idx)

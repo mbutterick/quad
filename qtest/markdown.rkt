@@ -233,7 +233,7 @@
   (wrap xs (λ (q idx) (- wrap-size
                          (quad-ref q 'inset-left 0)
                          (quad-ref q 'inset-right 0)))
-        #:nicely #f
+        #:nicely #t
         #:hard-break line-break?
         #:soft-break soft-break-for-line?
         ;; restart wrap count after each paragraph break
@@ -442,7 +442,7 @@ naive approach works but:
   ;; could do it after, but it would require going back inside each page quad
   ;; which seems overly interdependent, because `insert-blocks` is used to determine break locations.
   ;; `page-wrap` should emit quads that are complete.
-  (wrap xs vertical-height
+  (wrap #R xs vertical-height
         #:soft-break (λ (q) #true)
         #:no-break (λ (q) (quad-ref q 'no-pbr))
         #:distance (λ (q dist-so-far wrap-qs)
