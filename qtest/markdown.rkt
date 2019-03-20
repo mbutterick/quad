@@ -232,7 +232,8 @@
 (define (line-wrap xs wrap-size)
   (wrap xs (λ (q idx) (- wrap-size
                          (quad-ref q 'inset-left 0)
-                         (quad-ref q 'inset-right 0)))                        
+                         (quad-ref q 'inset-right 0)))
+        #:nicely #f
         #:hard-break line-break?
         #:soft-break soft-break-for-line?
         ;; restart wrap count after each paragraph break
