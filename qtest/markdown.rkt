@@ -141,7 +141,7 @@
       [elems (quad-elems q)]
       [size (delay
               (font-size doc (quad-ref q 'font-size))
-              (font doc (path->string (quad-ref q font-path-key)))
+              (font doc (path->string (quad-ref q font-path-key default-font-face)))
               (define str (if (pair? (quad-elems q)) (unsafe-car (quad-elems q)) ""))
               (define line-height (cond
                                     [(and (pair? (quad-elems q)) (quad-ref q 'line-height))]
@@ -230,7 +230,7 @@
   dest-hash)
 
 (define (line-wrap xs wrap-size)
-  (wrap-best xs (λ (q idx) (- wrap-size
+  (wrap xs (λ (q idx) (- wrap-size
                          (quad-ref q 'inset-left 0)
                          (quad-ref q 'inset-right 0)))                        
         #:hard-break line-break?
@@ -486,7 +486,8 @@ naive approach works but:
   (for* ([font-family-subdir (in-directory fonts-dir)]
          #:when (directory-exists? font-family-subdir)
          [font-path (in-directory font-family-subdir)]
-         #:when (path-has-extension? font-path #"ttf"))
+         #:when (or (path-has-extension? font-path #"otf")
+                    (path-has-extension? font-path #"ttf")))
         (match-define (list font-path-string family-name)
           (map (λ (x) (path->string (find-relative-path fonts-dir x))) (list font-path font-family-subdir)))
         (define key
