@@ -13,6 +13,9 @@
 
 (define (default-finish-wrap-func wrap-qs q0 q idx) (list wrap-qs))
 (define (finalize-reversed-wraps wraps)
+  ; append* because `finish-wrap-proc` returns a spliceable list
+  ; reverse because wraps accumulated in reverse
+  ; as a special case, '(()) is returned as just '()
   (match (append* (reverse wraps))
     [(list (list)) (list)]
     [wraps wraps]))
@@ -76,9 +79,6 @@
     (match qs
       [(or (== empty) (list (? hard-break?))) ; ignore single trailing hard break
        (define last-wrap (finish-wrap (append next-wrap-tail next-wrap-head) previous-wrap-ender wrap-idx #f))
-       ; append* because `finish-wrap-proc` returns a spliceable list
-       ; reverse because wraps accumulated in reverse
-       ; as a special case, '(()) is returned as just '()
        (finalize-reversed-wraps (cons last-wrap wraps))]
       [(cons q other-qs)
        (debug-report q 'next-q)
@@ -87,7 +87,7 @@
        (cond
          [(hard-break? q)
           (debug-report 'found-hard-break)
-          ;; put hard break onto next-wrap-tail, and finish the wrap
+          ;; must break. finish the wrap
           (loop (cons (finish-wrap would-be-wrap-qs previous-wrap-ender wrap-idx) wraps)
                 (wrap-count wrap-idx q)
                 null
@@ -202,7 +202,7 @@
        (define underflow (- measure wrap-distance))
        ($penalty
         (+ last-val ; include penalty so far
-           (* wrap-idx mega-penalty) ; new line penalty
+           (* (sub1 wrap-idx) mega-penalty) ; new line penalty
            (cond
              ;; overfull line: huge penalty prevents break; multiplier is essential for monotonicity.
              [(negative? underflow) (* mega-penalty (- underflow))]
@@ -315,19 +315,19 @@
 (module+ test (require rackunit))
 
 (module+ test
-  (test-case
-   "kp linebreaking"
-   (define meg-is-an-ally (list a b c sp a b sp c d sp a b c d x)) ; "Meg is an ally."
-   (check-equal? (linewrap meg-is-an-ally 6)
-                 ;; Meg is
-                 ;; an
-                 ;; ally.
-                 (list (list a b c sp a b) lbr (list c d) lbr (list a b c d x)))
-   (check-equal? (linewrap meg-is-an-ally 6 #:nicely #t)
-                 ;; Meg
-                 ;; is an
-                 ;; ally.
-                 (list (list a b c) lbr (list a b sp c d) lbr (list a b c d x)))))
+    (test-case
+     "kp linebreaking"
+     (define meg-is-an-ally (list a b c sp a b sp c d sp a b c d x)) ; "Meg is an ally."
+     (check-equal? (linewrap meg-is-an-ally 6)
+                   ;; Meg is
+                   ;; an
+                   ;; ally.
+                   (list (list a b c sp a b) lbr (list c d) lbr (list a b c d x)))
+     (check-equal? (linewrap meg-is-an-ally 6 #:nicely #t)
+                   ;; Meg
+                   ;; is an
+                   ;; ally.
+                   (list (list a b c) lbr (list a b sp c d) lbr (list a b c d x)))))
 
 (module+ test
   (test-begin
