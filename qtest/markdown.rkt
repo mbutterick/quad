@@ -25,7 +25,7 @@
 
 (define-tag-function (blockquote attrs exprs)
   (qexpr (append '((display "block")
-                   (line-align "center")
+                   #;(line-align "center")
                    (background-color "#eee")
                    (font-family "fira") (font-size "10") (line-height "15")
                    (border-width-top "0.5") (border-color-top "gray") (border-inset-top "8")
@@ -40,13 +40,13 @@
 (define class (default-tag-function 'class))
 
 (define-tag-function (strong attrs exprs)
-  (qexpr (list* '(font-bold "true") '(font-size-adjust "120%") attrs) exprs))
+  (qexpr (list* '(font-bold "true") '(font-size-adjust "100%") attrs) exprs))
 
 (define-tag-function (a attrs exprs)
   (qexpr `((link ,(cadr (assoc 'href attrs)))(color "MediumVioletRed")) exprs))
 
 (define-tag-function (em attrs exprs)
-  (qexpr (list* '(font-italic "true") '(font-size-adjust "90%") attrs) exprs))
+  (qexpr (list* '(font-italic "true") '(font-size-adjust "100%") attrs) exprs))
 
 (define-syntax-rule (attr-list . attrs) 'attrs)
 
@@ -64,14 +64,14 @@
 (define h6 h3)
 
 (define-tag-function (code attrs exprs)
-  (qexpr (append '((font-family "fira-mono")(line-align "right")(font-size "10")(bg "aliceblue")) attrs)  exprs))
+  (qexpr (append '((font-family "fira-mono")#;(line-align "right")(font-size "10")(bg "aliceblue")) attrs)  exprs))
 
 (define-tag-function (pre attrs exprs)
   ;; pre needs to convert white space to equivalent layout elements
   (define new-exprs (add-between
                      (for*/list ([expr (in-list exprs)]
                                  [str (in-list (string-split (string-join (get-elements expr) "") "\n"))])
-                                `(,(get-tag expr) ,(get-attrs expr) ,(string-replace str " " " ")))
+                       `(,(get-tag expr) ,(get-attrs expr) ,(string-replace str " " " ")))
                      lbr))
   (qexpr (list* '(display "block") '(background-color "aliceblue")
                 '(font-family "fira-mono") '(font-size "11") '(line-height "14")
@@ -92,7 +92,7 @@
   (qexpr (list* '(inset-left "20") attrs)
          (add-between
           (for/list ([(expr idx) (in-indexed exprs)])
-                    (list* (get-tag expr) (cons (list 'list-index (or bullet-val (format "~a" (add1 idx)))) (get-attrs expr)) (get-elements expr)))
+            (list* (get-tag expr) (cons (list 'list-index (or bullet-val (format "~a" (add1 idx)))) (get-attrs expr)) (get-elements expr)))
           pbr)))
 
 (define-tag-function (ol attrs exprs) (list-base attrs exprs))
@@ -163,7 +163,7 @@
     (restore doc)))
 
 (define line-height 20)
-(define dumb-hardcoded-value 380.1234)
+(define dumb-hardcoded-value 372)
 (define q:line (q #:size (pt dumb-hardcoded-value line-height)
                   #:inner 'sw
                   #:out 'sw
@@ -196,9 +196,9 @@
     (define new-run (struct-copy quad q:string
                                  [attrs (quad-attrs (car pcs))]
                                  [elems (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
-                                                                                        (quad-elems pc))))]
+                                                                                (quad-elems pc))))]
                                  [size (delay (pt (for/sum ([pc (in-list run-pcs)])
-                                                           (pt-x (size pc)))
+                                                    (pt-x (size pc)))
                                                   (pt-y (size (car pcs)))))]))
     (values (cons new-run runs) rest)))
 
@@ -226,13 +226,11 @@
   (for* ([k (in-list block-attrs)]
          [v (in-value (hash-ref source-hash k #f))]
          #:when v)
-        (hash-set! dest-hash k v))
+    (hash-set! dest-hash k v))
   dest-hash)
 
 (define (line-wrap xs wrap-size)
-  (wrap xs (λ (q idx) (- wrap-size
-                         (quad-ref q 'inset-left 0)
-                         (quad-ref q 'inset-right 0)))
+  (wrap xs (λ (q idx) (- wrap-size (quad-ref q 'inset-left 0) (quad-ref q 'inset-right 0)))
         #:nicely #t
         #:hard-break line-break?
         #:soft-break soft-break-for-line?
@@ -270,22 +268,17 @@
                                     ;; line width is static
                                     ;; line height is the max 'line-height value or the natural height of q:line
                                     [size new-size]
-                                    #|
-line alignment
-naive approach works but:
-+ `line-width` is not the right reference value for calculating offset adjust
-+ alignment width reference needs to take account of inset due to border
-
-|#
-                                    [offset (match (quad-ref elem 'line-align "left")
-                                              ["left" (pt 0 0)]
-                                              [val (define elems-width (pt-x (apply pt+ (map size elems))))
-                                                   (define h-divisor (match val
-                                                                       ["right" 1]
-                                                                       ["center" 2]))
-                                                   (define offset-adjust
-                                                     (pt (/ (- line-width elems-width) h-divisor) 0))
-                                                   (pt+ offset-adjust (quad-offset q:line))])]
+                                    [offset (let ()
+                                              (define elems-width (pt-x (apply pt+ (map size elems))))
+                                              (define h-factor (match (quad-ref elem 'line-align "left")
+                                                                 ["left" 0]
+                                                                 ["center" 0.5]
+                                                                 ["right" 1]))
+                                              (define empty-hspace (- line-width
+                                                                      (quad-ref elem 'inset-left 0)
+                                                                      elems-width
+                                                                      (quad-ref elem 'inset-right 0)))
+                                              (pt+ (quad-offset q:line) (pt (* empty-hspace h-factor) 0)))]
                                     ;; handle list indexes. drop new quad into line to hold list index
                                     ;; could also use this for line numbers
                                     [elems (append
@@ -313,8 +306,8 @@ naive approach works but:
         [prev-ln (in-list (cdr reversed-lines))]
         #:when (and (line-spacer? this-ln)
                     (quad-ref prev-ln 'keep-with-next)))
-       (make-nobreak! prev-ln)
-       (make-nobreak! this-ln)))
+    (make-nobreak! prev-ln)
+    (make-nobreak! this-ln)))
 
 (define (apply-keeps lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x 'display)) lines))
@@ -374,7 +367,7 @@ naive approach works but:
      #:elems lines
      #:size (delay (pt (pt-x (size first-line)) ; 
                        (+ (for/sum ([line (in-list lines)])
-                                   (pt-y (size line)))
+                            (pt-y (size line)))
                           (quad-ref first-line 'inset-top 0)
                           (quad-ref first-line 'inset-bottom 0))))
      #:draw-start (λ (q doc)
@@ -448,7 +441,7 @@ naive approach works but:
         #:distance (λ (q dist-so-far wrap-qs)
                      ;; do trial block insertions
                      (for/sum ([x (in-list (insert-blocks wrap-qs))])
-                              (pt-y (size x))))                     
+                       (pt-y (size x))))                     
         #:finish-wrap (λ (lns q0 q idx)
                         (list (struct-copy quad q:page
                                            [attrs (let ([page-number idx]
@@ -463,9 +456,9 @@ naive approach works but:
 (define (insert-blocks lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x 'display)) lines))
   (append* (for/list ([line-group (in-list groups-of-lines)])
-                     (match (quad-ref (car line-group) 'display)
-                       [#false line-group]
-                       [_ (list (block-wrap line-group))]))))
+             (match (quad-ref (car line-group) 'display)
+               [#false line-group]
+               [_ (list (block-wrap line-group))]))))
 
 (define font-paths (make-hash))
 
@@ -489,18 +482,18 @@ naive approach works but:
          [font-path (in-directory font-family-subdir)]
          #:when (or (path-has-extension? font-path #"otf")
                     (path-has-extension? font-path #"ttf")))
-        (match-define (list font-path-string family-name)
-          (map (λ (x) (path->string (find-relative-path fonts-dir x))) (list font-path font-family-subdir)))
-        (define key
-          (cons family-name
-                (match (string-downcase font-path-string)
-                  [(and (regexp "bold") (regexp "italic")) 'bi]
-                  [(regexp "bold") 'b]
-                  [(regexp "italic") 'i]
-                  [_ 'r])))
-        ;; only set value if there's not one there already.
-        ;; this means that we only use the first eligible font we find.
-        (hash-ref! font-paths key font-path)))
+    (match-define (list font-path-string family-name)
+      (map (λ (x) (path->string (find-relative-path fonts-dir x))) (list font-path font-family-subdir)))
+    (define key
+      (cons family-name
+            (match (string-downcase font-path-string)
+              [(and (regexp "bold") (regexp "italic")) 'bi]
+              [(regexp "bold") 'b]
+              [(regexp "italic") 'i]
+              [_ 'r])))
+    ;; only set value if there's not one there already.
+    ;; this means that we only use the first eligible font we find.
+    (hash-ref! font-paths key font-path)))
 
 (define (font-attrs->path font-family bold italic)
   ;; find the font-path corresponding to a certain family name and style.
