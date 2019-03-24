@@ -1,6 +1,6 @@
 #lang debug racket/base
 (require (for-syntax racket/base) txexpr racket/runtime-path racket/path racket/string racket/promise racket/match racket/list
-         pitfall quad sugar/debug pollen/tag racket/unsafe/ops)
+         pitfall quad sugar/debug pollen/tag racket/unsafe/ops hyphenate)
 (provide (except-out (all-from-out racket/base) #%module-begin)
          (rename-out [mb #%module-begin])
          p id strong em attr-list h1 h2 h3 h4 h5 h6 
@@ -18,7 +18,7 @@
 
 (define-tag-function (p attrs exprs)
   ;; no font-family so that it adopts whatever the surrounding family is
-  (qexpr (append `((keep-first "2")(keep-last "3") (display ,(symbol->string (gensym)))) attrs) exprs))
+  (qexpr (append `((keep-first "2")(keep-last "3") (hyphenate "true") (display ,(symbol->string (gensym)))) attrs) exprs))
 
 (define-tag-function (hr attrs exprs)
   hrbr)
@@ -229,8 +229,22 @@
     (hash-set! dest-hash k v))
   dest-hash)
 
-(define (line-wrap xs wrap-size)
-  (wrap xs (λ (q idx) (- wrap-size (quad-ref q 'inset-left 0) (quad-ref q 'inset-right 0)))
+(define (handle-hyphenate qs)
+  ;; find quads that want hyphenation and split them into smaller pieces
+  ;; do this before ->string-quad so that it can handle the sizing promises
+  (apply append (for/list ([q (in-list qs)])
+                  (match (quad-ref q 'hyphenate #false)
+                    [(or #false "false") (list q)]
+                    [_ (for*/list ([str (in-list (quad-elems q))]
+                                   [hstr (in-value (hyphenate str
+                                                              #:min-left-length 4
+                                                              #:min-right-length 4
+                                                              #:min-hyphens 1))]
+                                   [substr (in-list (regexp-match* #rx"(-|\u00AD)" hstr #:gap-select? #t))])
+                         (struct-copy quad q [elems (list substr)]))]))))
+
+(define (line-wrap qs wrap-size)
+  (wrap (handle-hyphenate qs) (λ (q idx) (- wrap-size (quad-ref q 'inset-left 0) (quad-ref q 'inset-right 0)))
         #:nicely #t
         #:hard-break line-break?
         #:soft-break soft-break-for-line?
@@ -543,6 +557,7 @@
   (setup-font-path-table! pdf-path)
   (let* ([x (time-name parse-qexpr (qexpr->quad xs))]
          [x (time-name atomize (atomize x #:attrs-proc handle-cascading-attrs))]
+         [x (time-name hyphenate (handle-hyphenate x))]
          [x (time-name ->string-quad (map (λ (x) (->string-quad pdf x)) x))]
          [x (time-name line-wrap (line-wrap x line-width))]
          [x (time-name apply-keeps (apply-keeps x))]

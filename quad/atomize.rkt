@@ -33,7 +33,7 @@
 (define (merge-and-isolate-white str)
   (for/list ([(m idx) (in-indexed (regexp-match* whitespace-pat str #:gap-select? #t))]
              #:when (non-empty-string? m))
-            (if (even? idx) m " ")))
+    (if (even? idx) m " ")))
 
 (define (merge-adjacent-strings xs [isolate-white? #false])
   (let loop ([xs xs][acc null])
@@ -55,35 +55,34 @@
   ;; which are multi-character quads with the same formatting.
   (define atomized-qs
     (let loop ([x (make-quad qx)]
-             [attrs (hash-copy (current-default-attrs))]
-             [key (eq-hash-code (current-default-attrs))])
-    (match-define-values (next-key next-attrs)
-      ;; make a new run when we encounter non-empty attrs
-      (match (quad-attrs x)
-        [(? hash-empty?) (values key attrs)]
-        [this-attrs (define next-key (eq-hash-code this-attrs))
-                    (define next-attrs (attrs . update-with . this-attrs))
-                    (hash-set! next-attrs run-key next-key)
-                    (attrs-proc next-attrs)
-                    (values next-key next-attrs)]))
-    (match (quad-elems x)
-      [(? pair? elems)
-       ;; we don't use `struct-copy` here because it needs to have the structure id at compile time.
-       ;; whereas with this technique, we can extract a constructor for any structure type.
-       ;; notice that the technique depends on
-       ;; 1) we only need to update attrs and elems
-       ;; 2) we make them the first two fields, so we know to drop the first two fields of x-tail
-       (define x-maker (let-values ([(x-structure-type _) (struct-info x)])
-                         (struct-type-make-constructor x-structure-type)))
-       (define x-tail (drop (struct->list x) 2))
-       (append* 
-        (for/list ([elem (in-list (merge-adjacent-strings elems 'isolate-white))])
-                  (if (string? elem)
-                      (if (zero? (string-length elem))
-                          null
-                          (list (apply x-maker next-attrs (list elem) x-tail)))
-                      (loop elem next-attrs next-key))))]
-      [_ ((quad-attrs x) . update-with! . next-attrs) (list x)])))
+               [attrs (hash-copy (current-default-attrs))]
+               [key (eq-hash-code (current-default-attrs))])
+      (match-define-values (next-key next-attrs)
+        ;; make a new run when we encounter non-empty attrs
+        (match (quad-attrs x)
+          [(? hash-empty?) (values key attrs)]
+          [this-attrs (define next-key (eq-hash-code this-attrs))
+                      (define next-attrs (attrs . update-with . this-attrs))
+                      (hash-set! next-attrs run-key next-key)
+                      (attrs-proc next-attrs)
+                      (values next-key next-attrs)]))
+      (match (quad-elems x)
+        [(? pair? elems)
+         ;; we don't use `struct-copy` here because it needs to have the structure id at compile time.
+         ;; whereas with this technique, we can extract a constructor for any structure type.
+         ;; notice that the technique depends on
+         ;; 1) we only need to update attrs and elems
+         ;; 2) we make them the first two fields, so we know to drop the first two fields of x-tail
+         (define x-maker (let-values ([(x-structure-type _) (struct-info x)])
+                           (struct-type-make-constructor x-structure-type)))
+         (define x-tail (drop (struct->list x) 2))
+         (append* 
+          (for/list ([elem (in-list (merge-adjacent-strings elems 'isolate-white))])
+            (match elem
+              ["" null]
+              [(? string? str) (list (apply x-maker next-attrs (list str) x-tail))]
+              [_ (loop elem next-attrs next-key)])))]
+        [_ ((quad-attrs x) . update-with! . next-attrs) (list x)])))
   #;(trimf atomized-qs (λ (q) (equal? (quad-elems q) '(" "))))
   atomized-qs)
 
