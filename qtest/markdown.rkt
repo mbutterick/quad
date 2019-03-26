@@ -131,15 +131,22 @@
 
 (define current-doc (make-parameter #f))
 
-(define (make-size-promise q [str #f])
-  (match (quad-elems q)
-    [(? pair? elems)
-     (delay
-       (define doc (current-doc))
-       (font-size doc (quad-ref q 'font-size))
-       (font doc (path->string (quad-ref q font-path-key default-font-face)))
-       (list (string-width doc (or str (unsafe-car elems))) (quad-ref q 'line-height)))]
-    [_ (delay (list 0 (current-line-height (current-doc))))]))
+(define (make-size-promise q [str-arg #f])
+  (delay
+    (define doc (current-doc))
+    (define str
+      (cond
+        [str-arg]
+        [(pair? (quad-elems q)) (unsafe-car (quad-elems q))]
+        [else #false]))
+    (define string-size
+      (cond
+        [str
+         (font-size doc (quad-ref q 'font-size default-font-size))
+         (font doc (path->string (quad-ref q font-path-key default-font-face)))
+         (string-width doc str)]
+        [else 0]))
+    (list string-size (quad-ref q 'line-height (current-line-height doc)))))
 
 (define (->string-quad q)
   (cond
