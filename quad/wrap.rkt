@@ -180,6 +180,8 @@
 
 (define last-line-can-be-short? #t)
 (define mega-penalty 1e8)
+(define hyphen-penalty +inf.0)
+(define max-consecutive-hyphens 1)
 (define (pieces-sublist pieces i j)
   (reverse (apply append (for/list ([n (in-range i j)])
                            (vector-ref pieces n)))))
@@ -195,37 +197,45 @@
       (wrap-pieces-best pieces-vec wrap-idx previous-wrap-ender wrap-count distance-func max-distance-proc finish-wrap))
     (values (cons wraps wrapss) idx ender)))
 
-(struct penalty-rec (val idx) #:transparent)
+(struct penalty-rec (val idx hyphen-count) #:transparent)
 (define (wrap-pieces-best pieces-vec starting-wrap-idx previous-last-q wrap-count distance-func max-distance-proc finish-wrap)
   (define (penalty i j)
     (cond
       [(or (= i j) (> j (vector-length pieces-vec)))
        (define out-of-bounds-signal (- i))
-       (penalty-rec out-of-bounds-signal #f)]
+       (penalty-rec out-of-bounds-signal #f 0)]
       [else
-       (match-define (penalty-rec last-val starting-idx) (ocm-min-value ocm i))
+       (match-define (penalty-rec last-val starting-idx hyphen-count) (ocm-min-value ocm i)) 
        (define would-be-wrap-qs (pieces-sublist pieces-vec i j)) ; `reverse` to track ordinary wrap logic
        (define wrap-distance (for/fold ([last-dist 0])
                                        ([q (in-list would-be-wrap-qs)])
                                (distance-func q last-dist would-be-wrap-qs)))
        (define underflow (- (max-distance-proc (car would-be-wrap-qs) starting-idx) wrap-distance))
+       (define new-consecutive-hyphen-count
+         (if (equal? (quad-elems (car would-be-wrap-qs)) '("\u00AD")) (add1 hyphen-count) 0))
        (penalty-rec
         (+ last-val ; include penalty so far
            (* starting-idx mega-penalty) ; new line penalty
+           (if (> new-consecutive-hyphen-count max-consecutive-hyphens)
+               (* hyphen-penalty (- new-consecutive-hyphen-count max-consecutive-hyphens))
+               0)
            (cond
              [(negative? underflow)
               ;; overfull line: huge penalty prevents break; multiplier is essential for monotonicity.
               (* mega-penalty (- underflow))]
-             [((if last-line-can-be-short? < <=) j (vector-length pieces-vec))
+             [(let ([on-last-line? (= j (vector-length pieces-vec))])
+                (or (not on-last-line?)
+                  (and on-last-line? (not last-line-can-be-short?))))
               ;; standard penalty
               (expt underflow 2)]
              [else 0]))
-        (wrap-count starting-idx (car would-be-wrap-qs)))]))
+        (wrap-count starting-idx (car would-be-wrap-qs))
+        new-consecutive-hyphen-count)]))
   
   ;; starting from last position, ask ocm for position of row minimum (= new-pos)
   ;; collect this value, and use it as the input next time
   ;; until you reach first position.
-  (define ocm (make-ocm penalty (penalty-rec 0 starting-wrap-idx) penalty-rec-val))
+  (define ocm (make-ocm penalty (penalty-rec 0 starting-wrap-idx 0) penalty-rec-val))
   (define breakpoints
     (let ([last-j (vector-length pieces-vec)])
       (let loop ([bps (list last-j)]) ; start from end

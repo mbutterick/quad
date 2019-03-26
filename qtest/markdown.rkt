@@ -18,23 +18,23 @@
 
 (define-tag-function (p attrs exprs)
   ;; no font-family so that it adopts whatever the surrounding family is
-  (qexpr (append `((keep-first "2")(keep-last "3") (hyphenate "true") (display ,(symbol->string (gensym)))) attrs) exprs))
+  (qexpr (append `((keep-first "2")(keep-last "3")(font-size "12") (hyphenate "true") (display ,(symbol->string (gensym)))) attrs) exprs))
 
 (define-tag-function (hr attrs exprs)
   hrbr)
 
 (define-tag-function (blockquote attrs exprs)
-  (qexpr (append '((display "block")
-                   #;(line-align "center")
-                   (background-color "#eee")
-                   (font-family "fira") (font-size "10") (line-height "15")
-                   (border-width-top "0.5") (border-color-top "gray") (border-inset-top "8")
-                   (border-width-left "3") (border-color-left "gray") (border-inset-left "20")
-                   (border-width-bottom "0.5") (border-color-bottom "gray") (border-inset-bottom "-2")
-                   (border-width-right "0.5") (border-color-right "gray") (border-inset-right "20")
-                   (inset-top "10") (inset-bottom "8") (inset-left "30") (inset-right "30")
-                   (keep-lines "yes"))
-                 attrs) exprs))
+    (qexpr (append '((display "block")
+                     (line-align "right")
+                     (background-color "#eee")
+                     (font-family "fira") (font-size "10") (line-height "15")
+                     (border-width-top "0.5") (border-color-top "gray") (border-inset-top "8")
+                     (border-width-left "3") (border-color-left "gray") (border-inset-left "20")
+                     (border-width-bottom "0.5") (border-color-bottom "gray") (border-inset-bottom "-2")
+                     (border-width-right "0.5") (border-color-right "gray") (border-inset-right "20")
+                     (inset-top "10") (inset-bottom "8") (inset-left "30") (inset-right "30")
+                     (keep-lines "yes"))
+                   attrs) exprs))
 
 (define id (default-tag-function 'id))
 (define class (default-tag-function 'class))
@@ -133,20 +133,25 @@
   (cond
     [(line-break? q) q]
     [else
-     (struct-copy
-      quad q:string
-      [attrs (let ([attrs (quad-attrs q)])
-               (hash-ref! attrs 'font-size default-font-size)
-               attrs)]
-      [elems (quad-elems q)]
-      [size (delay
-              (font-size doc (quad-ref q 'font-size))
-              (font doc (path->string (quad-ref q font-path-key default-font-face)))
-              (define str (if (pair? (quad-elems q)) (unsafe-car (quad-elems q)) ""))
-              (define line-height (cond
-                                    [(and (pair? (quad-elems q)) (quad-ref q 'line-height))]
-                                    [else (current-line-height doc)]))
-              (pt (string-width doc str) line-height))])]))
+     (let* ([q-elems (quad-elems q)]
+            [soft-hyphen? (equal? q-elems '("\u00AD"))])
+       (struct-copy
+        quad q:string
+        [attrs (let ([attrs (quad-attrs q)])
+                 (hash-ref! attrs 'font-size default-font-size)
+                 attrs)]
+        [elems q-elems]
+        [printable (if soft-hyphen?
+                       (λ (q [sig #f]) (eq? sig 'end))
+                       (quad-printable q))]
+        [size (delay
+                (font-size doc (quad-ref q 'font-size))
+                (font doc (path->string (quad-ref q font-path-key default-font-face)))
+                (define str (if (pair? q-elems) (unsafe-car q-elems) ""))
+                (define line-height (cond
+                                      [(and (pair? q-elems) (quad-ref q 'line-height))]
+                                      [else (current-line-height doc)]))
+                (pt (string-width doc str) line-height))]))]))
 
 
 (define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"])
@@ -186,10 +191,10 @@
   (and (pair? (quad-elems q))
        (member (unsafe-car (quad-elems q)) softies)))
 
-(define (consolidate-runs pcs)
+(define (consolidate-runs pcs #:finalize [finalize-proc reverse])
   (for/fold ([runs empty]
              [pcs pcs]
-             #:result (reverse runs))
+             #:result (finalize-proc runs))
             ([i (in-naturals)]
              #:break (empty? pcs))
     (define-values (run-pcs rest) (splitf-at pcs (λ (p) (same-run? (car pcs) p))))
@@ -236,15 +241,16 @@
                   (match (quad-ref q 'hyphenate #false)
                     [(or #false "false") (list q)]
                     [_ (for*/list ([str (in-list (quad-elems q))]
-                                   [hstr (in-value (hyphenate str
+                                   [hyphen-char (in-value #\u00AD)]
+                                   [hstr (in-value (hyphenate str hyphen-char
                                                               #:min-left-length 4
-                                                              #:min-right-length 4
-                                                              #:min-hyphens 1))]
-                                   [substr (in-list (regexp-match* #rx"(-|\u00AD)" hstr #:gap-select? #t))])
+                                                              #:min-right-length 3))]
+                                   [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
                          (struct-copy quad q [elems (list substr)]))]))))
 
 (define (line-wrap qs wrap-size)
-  (wrap (handle-hyphenate qs) (λ (q idx) (- wrap-size (quad-ref q 'inset-left 0) (quad-ref q 'inset-right 0)))
+  (wrap qs
+        (λ (q idx) (- wrap-size (quad-ref q 'inset-left 0) (quad-ref q 'inset-right 0)))
         #:nicely #t
         #:hard-break line-break?
         #:soft-break soft-break-for-line?
@@ -252,7 +258,11 @@
         ;; so idx=1 means first line in any paragraph
         #:wrap-count (λ (idx q) (if (para-break? q) 1 (add1 idx)))
         #:finish-wrap
-        (λ (pcs opening-q ending-q idx)
+        (λ (pcs-in opening-q ending-q idx)
+          ;; remove unused soft hyphens so they don't affect final shaping
+          (define pcs (for/list ([pc (in-list pcs-in)]
+                                 #:unless (equal? (quad-elems pc) '("\u00AD")))
+                        pc))
           (append
            (cond
              [(empty? pcs) null]
@@ -267,7 +277,23 @@
                                                (line-width doc 3)
                                                (stroke doc "#999"))]))]
              [else
-              (match (consolidate-runs pcs)
+              (match (consolidate-runs pcs
+                      #:finalize (λ (reversed-runs)
+                                   (reverse (if (and ending-q (equal? (quad-elems ending-q) '("\u00AD")))
+                                                ;; naive handling of soft hyphen:
+                                                ;; if soft hyphen cause the break, then append a printing hyphen to the end of the run.
+                                                ;; this assumes that there is room for the hyphen on the line
+                                                ;; and does not take into account hyphen-break transformations
+                                                ;; found in other languages.
+                                                ;; However we do want the hyphen joined into the string
+                                                ;; so the final shaping / positioning is correct
+                                                ;; for instance, kerning between last letter and hyphen.
+                                                ;; todo: this finagle doesn't update the `size` correctly
+                                                ;; so center & right alignment look wrong
+                                                (cons (let ([r (car reversed-runs)])
+                                                        (struct-copy quad r
+                                                                     [elems (list (string-append (car (quad-elems r)) "-"))])) (cdr reversed-runs))
+                                                reversed-runs))))
                 [(? pair? elems)
                  (define elem (unsafe-car elems))
                  (match-define (list line-width line-height) (quad-size q:line))
