@@ -201,7 +201,7 @@
 (define (wrap-pieces-best pieces-vec starting-wrap-idx previous-last-q wrap-count distance-func max-distance-proc finish-wrap)
   (define (penalty i j)
     (cond
-      [(or (= i j) (> j (vector-length pieces-vec)))
+      [(or (eq? i j) (> j (vector-length pieces-vec)))
        (define out-of-bounds-signal (- i))
        (penalty-rec out-of-bounds-signal #f 0)]
       [else
@@ -223,7 +223,7 @@
              [(negative? underflow)
               ;; overfull line: huge penalty prevents break; multiplier is essential for monotonicity.
               (* mega-penalty (- underflow))]
-             [(let ([on-last-line? (= j (vector-length pieces-vec))])
+             [(let ([on-last-line? (eq? j (vector-length pieces-vec))])
                 (or (not on-last-line?)
                   (and on-last-line? (not last-line-can-be-short?))))
               ;; standard penalty
