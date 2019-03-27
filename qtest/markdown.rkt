@@ -277,16 +277,16 @@
 
 (require sugar/list)
 (define (fill-wrap qs ending-q)
-  (match-define (list line-width line-height) (quad-size q:line))
-  ;; todo: how to detect last line of paragraph?
-  (match (and ending-q (pair? qs) (quad-ref (car qs) 'line-align #f))
+  (match (and ending-q (not (para-break? ending-q)) (pair? qs) (quad-ref (car qs) 'line-align #f))
     ["justify"
-     ;; words may still be in hyphenated fragments
-     ;; (though soft hyphens would have been removed)
      (define word-sublists (filter-split qs (λ (q) (equal? (car (quad-elems q)) " "))))
      (match (length word-sublists)
        [1 qs] ; can't justify single word
        [word-count
+        (match-define (list line-width line-height) (quad-size q:line))
+        ;; words may still be in hyphenated fragments
+        ;; (though soft hyphens would have been removed)
+        ;; so group them (but no need to consolidate — that happens elsewhere)
         (define words-width (for*/sum ([word-sublist (in-list word-sublists)]
                                        [word (in-list word-sublist)])
                               (pt-x (size word))))
@@ -636,7 +636,7 @@
         (define strs (match (list . STRS)
                        [(? null?) '(" ")]
                        [strs strs]))
-        (define qx (list* 'q null (add-between strs pbr)))
+        (define qx (list* 'q null (append (add-between strs pbr) (list pbr))))
         (run qx PDF-PATH))]))
 
 (module+ reader
