@@ -290,10 +290,13 @@
         (define words-width (for*/sum ([word-sublist (in-list word-sublists)]
                                        [word (in-list word-sublist)])
                               (pt-x (size word))))
-        (define empty-hspace (- line-width words-width))
+        (define empty-hspace (- line-width
+                                (quad-ref (car qs) 'inset-left 0)
+                                words-width
+                                (quad-ref (car qs) 'inset-right 0)))
         (define space-width (/ empty-hspace (sub1 word-count)))
         (apply append (add-between word-sublists (list (make-quad #:size (pt space-width line-height)))))])]
-     [_ qs]))
+    [_ qs]))
 
 (define (line-wrap qs wrap-size)
   (wrap qs
