@@ -18,7 +18,7 @@
 
 (define-tag-function (p attrs exprs)
   ;; no font-family so that it adopts whatever the surrounding family is
-  (qexpr (append `((keep-first "2")(keep-last "3")(font-size "12") (hyphenate "true") (display ,(symbol->string (gensym)))) attrs) exprs))
+  (qexpr (append `((keep-first "2")(keep-last "3")(font-size "12") (character-tracking "0") (hyphenate "true") (display ,(symbol->string (gensym)))) attrs) exprs))
 
 (define-tag-function (hr attrs exprs)
   hrbr)
@@ -112,15 +112,16 @@
                     ;; draw with pdf text routine
                     #:draw (λ (q doc)
                              (when (pair? (quad-elems q))
-                               (font doc (path->string (hash-ref (quad-attrs q) font-path-key)))
-                               (font-size doc (hash-ref (quad-attrs q) 'font-size 12))
-                               (fill-color doc (hash-ref (quad-attrs q) 'color "black"))
+                               (font doc (path->string (quad-ref q font-path-key)))
+                               (font-size doc (quad-ref q 'font-size 12))
+                               (fill-color doc (quad-ref q 'color "black"))
                                (define str (unsafe-car (quad-elems q)))
                                (match-define (list x y) (quad-origin q))
                                (text doc str x y
-                                     #:bg (hash-ref (quad-attrs q) 'bg #f)
+                                     #:tracking (quad-ref q 'character-tracking 0)
+                                     #:bg (quad-ref q 'bg #f)
                                      #:features (list (cons #"tnum" 1))
-                                     #:link (hash-ref (quad-attrs q) 'link #f))))
+                                     #:link (quad-ref q 'link #f))))
                     #:draw-end (if draw-debug-string?
                                    (λ (q doc) (draw-debug q doc "#99f" "#ccf"))
                                    void)))
@@ -144,7 +145,12 @@
         [str
          (font-size doc (quad-ref q 'font-size default-font-size))
          (font doc (path->string (quad-ref q font-path-key default-font-face)))
-         (string-width doc str)]
+         (+ (string-width doc str
+                       #:tracking (quad-ref q 'character-tracking 0))
+            ;; add one more dose because `string-width` only adds it intercharacter,
+            ;; and this quad will be adjacent to another
+            ;; (so we need to account for the "inter-quad" space
+            (quad-ref q 'character-tracking 0))]
         [else 0]))
     (list string-size (quad-ref q 'line-height (current-line-height doc)))))
 
