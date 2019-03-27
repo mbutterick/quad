@@ -18,7 +18,7 @@
 
 (define-tag-function (p attrs exprs)
   ;; no font-family so that it adopts whatever the surrounding family is
-  (qexpr (append `((keep-first "2")(keep-last "3")(font-size "12") (character-tracking "0") (hyphenate "true") (display ,(symbol->string (gensym)))) attrs) exprs))
+  (qexpr (append `((keep-first "2")(keep-last "3")(line-align "justify")(font-size "12") (character-tracking "0") (hyphenate "true") (display ,(symbol->string (gensym)))) attrs) exprs))
 
 (define-tag-function (hr attrs exprs)
   hrbr)
@@ -146,7 +146,7 @@
          (font-size doc (quad-ref q 'font-size default-font-size))
          (font doc (path->string (quad-ref q font-path-key default-font-face)))
          (+ (string-width doc str
-                       #:tracking (quad-ref q 'character-tracking 0))
+                          #:tracking (quad-ref q 'character-tracking 0))
             ;; add one more dose because `string-width` only adds it intercharacter,
             ;; and this quad will be adjacent to another
             ;; (so we need to account for the "inter-quad" space
@@ -204,21 +204,35 @@
   (and (pair? (quad-elems q))
        (member (unsafe-car (quad-elems q)) softies)))
 
-(define (consolidate-runs pcs #:finalize [finalize-proc reverse])
-  (for/fold ([runs empty]
-             [pcs pcs]
-             #:result (finalize-proc runs))
-            ([i (in-naturals)]
-             #:break (empty? pcs))
-    (define-values (run-pcs rest) (splitf-at pcs (λ (p) (same-run? (car pcs) p))))
-    (define new-run (struct-copy quad q:string
-                                 [attrs (quad-attrs (car pcs))]
-                                 [elems (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
-                                                                                (quad-elems pc))))]
-                                 [size (delay (pt (for/sum ([pc (in-list run-pcs)])
-                                                    (pt-x (size pc)))
-                                                  (pt-y (size (car pcs)))))]))
-    (values (cons new-run runs) rest)))
+(define (consolidate-runs pcs ending-q)
+  (define reversed-runs
+    (for/fold ([runs empty]
+               [pcs pcs]
+               #:result runs)
+              ([i (in-naturals)]
+               #:break (empty? pcs))
+      (define-values (run-pcs rest) (splitf-at pcs (λ (p) (same-run? (car pcs) p))))
+      (define new-run (struct-copy quad q:string
+                                   [attrs (quad-attrs (car pcs))]
+                                   [elems (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
+                                                                                  (quad-elems pc))))]
+                                   [size (delay (pt (for/sum ([pc (in-list run-pcs)])
+                                                      (pt-x (size pc)))
+                                                    (pt-y (size (car pcs)))))]))
+      (values (cons new-run runs) rest)))
+  ;; naive handling of soft hyphen:
+  ;; if soft hyphen cause the break, then append a printing hyphen to the end of the run.
+  ;; this assumes that there is room for the hyphen on the line
+  ;; and does not take into account hyphen-break transformations found in other languages.
+  ;; However we do want the hyphen joined into the string so the final shaping / positioning is correct
+  ;; for instance, kerning between last letter and hyphen.
+  (reverse (if (and ending-q (equal? (quad-elems ending-q) '("\u00AD")))
+               (cons (let* ([last-run (car reversed-runs)]
+                            [str+hyphen (string-append (car (quad-elems last-run)) "-")])
+                       (struct-copy quad last-run
+                                    [elems (list str+hyphen)]
+                                    [size (make-size-promise last-run str+hyphen)])) (cdr reversed-runs))
+               reversed-runs)))
 
 (define-quad line-break quad ())
 (define lbr (make-line-break #:printable #f))
@@ -261,6 +275,19 @@
                                    [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
                          (struct-copy quad q [elems (list substr)]))]))))
 
+(define (fill-wrap qs ending-q)
+  (match-define (list line-width line-height) (quad-size q:line))
+  (match (quad-ref (car qs) 'line-align #f)
+    ["justify"
+     (define words (for/list ([q (in-list qs)]
+                              #:unless (equal? (car (quad-elems q)) " "))
+                     q))
+     (define words-width (pt-x (apply pt+ (map size words))))
+     (define empty-hspace (- line-width words-width))
+     (define space-width (/ empty-hspace (sub1 (length words))))
+     (add-between words (make-quad #:size (pt space-width line-height)))]
+    [_ qs]))
+
 (define (line-wrap qs wrap-size)
   (wrap qs
         (λ (q idx) (- wrap-size (quad-ref q 'inset-left 0) (quad-ref q 'inset-right 0)))
@@ -273,9 +300,10 @@
         #:finish-wrap
         (λ (pcs-in opening-q ending-q idx)
           ;; remove unused soft hyphens so they don't affect final shaping
-          (define pcs (for/list ([pc (in-list pcs-in)]
-                                 #:unless (equal? (quad-elems pc) '("\u00AD")))
-                        pc))
+          (define pcs-printing (for/list ([pc (in-list pcs-in)]
+                                          #:unless (equal? (quad-elems pc) '("\u00AD")))
+                                 pc))
+          (define pcs (fill-wrap pcs-printing ending-q))
           (append
            (cond
              [(empty? pcs) null]
@@ -290,23 +318,7 @@
                                                (line-width doc 3)
                                                (stroke doc "#999"))]))]
              [else
-              (match (consolidate-runs pcs
-                                       #:finalize (λ (reversed-runs)
-                                                    (reverse (if (and ending-q (equal? (quad-elems ending-q) '("\u00AD")))
-                                                                 ;; naive handling of soft hyphen:
-                                                                 ;; if soft hyphen cause the break, then append a printing hyphen to the end of the run.
-                                                                 ;; this assumes that there is room for the hyphen on the line
-                                                                 ;; and does not take into account hyphen-break transformations
-                                                                 ;; found in other languages.
-                                                                 ;; However we do want the hyphen joined into the string
-                                                                 ;; so the final shaping / positioning is correct
-                                                                 ;; for instance, kerning between last letter and hyphen.
-                                                                 (cons (let ([r (car reversed-runs)])
-                                                                         (define new-str (string-append (car (quad-elems r)) "-"))
-                                                                         (struct-copy quad r
-                                                                                      [elems (list new-str)]
-                                                                                      [size (make-size-promise r new-str)])) (cdr reversed-runs))
-                                                                 reversed-runs))))
+              (match (consolidate-runs pcs ending-q)
                 [(? pair? elems)
                  (define elem (unsafe-car elems))
                  (match-define (list line-width line-height) (quad-size q:line))
@@ -326,7 +338,8 @@
                                               (define h-factor (match (quad-ref elem 'line-align "left")
                                                                  ["left" 0]
                                                                  ["center" 0.5]
-                                                                 ["right" 1]))
+                                                                 ["right" 1]
+                                                                 [_ 0]))
                                               (define empty-hspace (- line-width
                                                                       (quad-ref elem 'inset-left 0)
                                                                       elems-width

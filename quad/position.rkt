@@ -37,7 +37,10 @@
   ((if (number? val) values string->number) val))
 
 (define (vertical-baseline-offset q)
-  (* (/ (ascender q) (units-per-em q) 1.0) (fontsize q)))
+  (cond
+    [(quad-ref q font-path-key #f)
+     (* (/ (ascender q) (units-per-em q) 1.0) (fontsize q))]
+    [else 0]))
 
 (define (anchor->local-point q anchor)
   ;; calculate the location of the anchor on the bounding box relative to '(0 0) (aka "locally")
@@ -159,13 +162,13 @@
    (check-equal? (inner-point (position (q #:size size #:inner 'w #:offset off) orig)) (pt+ '(0 5) off))))
 
 #;(module+ test
-  (require racket/runtime-path fontland/font)
-  (define-runtime-path fira "fira.ttf")
+    (require racket/runtime-path fontland/font)
+    (define-runtime-path fira "fira.ttf")
 
-  (define q1 (q (list 'in 'bi 'out 'bo 'size '(10 10) font-path-key fira 'fontsize 12)))
-  (define q2 (q (list 'in 'bi 'out 'bo 'size '(10 10) font-path-key fira 'fontsize 24)))
-  (define q3 (q (list 'in 'bi 'out 'bo 'size '(10 10) font-path-key fira 'fontsize 6)))
-  #;(position (q #f q1 q2 q3)))
+    (define q1 (q (list 'in 'bi 'out 'bo 'size '(10 10) font-path-key fira 'fontsize 12)))
+    (define q2 (q (list 'in 'bi 'out 'bo 'size '(10 10) font-path-key fira 'fontsize 24)))
+    (define q3 (q (list 'in 'bi 'out 'bo 'size '(10 10) font-path-key fira 'fontsize 6)))
+    #;(position (q #f q1 q2 q3)))
 
 
 #;(module+ test
