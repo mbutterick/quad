@@ -275,18 +275,25 @@
                                    [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
                          (struct-copy quad q [elems (list substr)]))]))))
 
+(require sugar/list)
 (define (fill-wrap qs ending-q)
   (match-define (list line-width line-height) (quad-size q:line))
-  (match (quad-ref (car qs) 'line-align #f)
+  ;; todo: how to detect last line of paragraph?
+  (match (and ending-q (pair? qs) (quad-ref (car qs) 'line-align #f))
     ["justify"
-     (define words (for/list ([q (in-list qs)]
-                              #:unless (equal? (car (quad-elems q)) " "))
-                     q))
-     (define words-width (pt-x (apply pt+ (map size words))))
-     (define empty-hspace (- line-width words-width))
-     (define space-width (/ empty-hspace (sub1 (length words))))
-     (add-between words (make-quad #:size (pt space-width line-height)))]
-    [_ qs]))
+     ;; words may still be in hyphenated fragments
+     ;; (though soft hyphens would have been removed)
+     (define word-sublists (filter-split qs (λ (q) (equal? (car (quad-elems q)) " "))))
+     (match (length word-sublists)
+       [1 qs] ; can't justify single word
+       [word-count
+        (define words-width (for*/sum ([word-sublist (in-list word-sublists)]
+                                       [word (in-list word-sublist)])
+                              (pt-x (size word))))
+        (define empty-hspace (- line-width words-width))
+        (define space-width (/ empty-hspace (sub1 word-count)))
+        (apply append (add-between word-sublists (list (make-quad #:size (pt space-width line-height)))))])]
+     [_ qs]))
 
 (define (line-wrap qs wrap-size)
   (wrap qs

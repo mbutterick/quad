@@ -20,14 +20,14 @@
 
 (define ascender-cache (make-hash))
 (define (ascender q)
-  (define font-key-val (quad-ref q font-path-key "Courier"))
+  (define font-key-val (quad-ref q font-path-key #false))
   (unless font-key-val
     (error 'ascender-no-font-key))
   (hash-ref! ascender-cache font-key-val (λ () (font-ascent (get-font font-key-val)))))
 
 (define units-cache (make-hash))
 (define (units-per-em q)
-  (define font-key-val (quad-ref q font-path-key "Courier"))
+  (define font-key-val (quad-ref q font-path-key #false))
   (unless font-key-val
     (error 'units-per-em-no-font-key))
   (hash-ref! units-cache font-key-val (λ () (font-units-per-em (get-font font-key-val)))))
@@ -38,7 +38,7 @@
 
 (define (vertical-baseline-offset q)
   (cond
-    [(quad-ref q font-path-key #f)
+    [(quad-ref q font-path-key #false)
      (* (/ (ascender q) (units-per-em q) 1.0) (fontsize q))]
     [else 0]))
 
@@ -53,7 +53,9 @@
       [else (raise-argument-error 'anchor->local-point (format "anchor value in ~v" valid-anchors) anchor)]))
   (match-define (list x y) (size q))
   (pt (coerce-int (* x x-fac))
-      (coerce-int (+ (* y y-fac) (if (memq anchor '(bi bo)) (vertical-baseline-offset q) 0)))))
+      (coerce-int (+ (* y y-fac) (match anchor
+                                   [(or 'bi 'bo) (vertical-baseline-offset q)]
+                                   [_ 0])))))
 
 (define (inner-point q)
   ;; calculate absolute location of inner-point
