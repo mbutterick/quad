@@ -3,7 +3,7 @@
          pitfall quad sugar/debug pollen/tag racket/unsafe/ops hyphenate)
 (provide (except-out (all-from-out racket/base) #%module-begin)
          (rename-out [mb #%module-begin])
-         p id strong em attr-list h1 h2 h3 h4 h5 h6 
+          p id strong em attr-list h1 h2 h3 h4 h5 h6 
          ol li ul rsquo lsquo rdquo ldquo hellip ndash mdash
          hr
          code pre a blockquote)
@@ -16,17 +16,20 @@
 (define ndash "–")
 (define mdash "—")
 
+(define (root attrs exprs)
+  (qexpr (append `((first-line-indent "12") (line-align "justify")) attrs) exprs))
+
 (define-tag-function (p attrs exprs)
   ;; no font-family so that it adopts whatever the surrounding family is
-  (qexpr (append `((keep-first "2")(keep-last "3") 
-                                   (line-align "justify") (font-size-adjust "100%") (character-tracking "0") (hyphenate "true") (display ,(symbol->string (gensym)))) attrs) exprs))
+  (qexpr (append `((keep-first "2")(keep-last "3") (font-size-adjust "100%") (character-tracking "0") (hyphenate "true") (display ,(symbol->string (gensym)))) attrs) exprs))
 
 (define-tag-function (hr attrs exprs)
   hrbr)
 
 (define-tag-function (blockquote attrs exprs)
   (qexpr (append '((display "block")
-                   (background-color "#eee")
+                   (first-line-indent "0") (line-align "left")
+                   (background-color "#eee") 
                    (font-family "fira") (font-size "10") (line-height "15")
                    (border-width-top "0.5") (border-color-top "gray") (border-inset-top "8")
                    (border-width-left "3") (border-color-left "gray") (border-inset-left "20")
@@ -51,7 +54,7 @@
 (define-syntax-rule (attr-list . attrs) 'attrs)
 
 (define (heading-base font-size attrs exprs)
-  (qexpr (append `((font-family "fira-light") (display "block") (font-size ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9")(border-inset-right "12") (inset-bottom "-3") (inset-top "6") (keep-with-next "true")) attrs) exprs))
+  (qexpr (append `((font-family "fira-light") (first-line-indent "0") (display "block") (font-size ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9")(border-inset-right "12") (inset-bottom "-3") (inset-top "6") (keep-with-next "true")) attrs) exprs))
 
 (define-tag-function (h1 attrs exprs)
   (heading-base 20 (append '() attrs) exprs))
@@ -96,9 +99,11 @@
 
 (define-tag-function (ol attrs exprs) (list-base attrs exprs))
 (define-tag-function (ul attrs exprs) (list-base attrs exprs "•"))
-(define-tag-function (li attrs exprs) (qexpr attrs exprs))  
+(define-tag-function (li attrs exprs) (qexpr (cons '(first-line-indent "0") attrs) exprs))  
 
-(define q:string (q #:in 'bi
+(define-quad string-quad quad ())
+(define q:string (q #:type string-quad
+                    #:in 'bi
                     #:out 'bo ;; align to baseline
                     ;; printable unless single space, which is not printable at start or end
                     #:printable (λ (q [sig #f])
@@ -209,15 +214,18 @@
              #:result (reverse runs))
             ([i (in-naturals)]
              #:break (empty? pcs))
-    (define-values (run-pcs rest) (splitf-at pcs (λ (p) (same-run? (car pcs) p))))
-    (define new-run (struct-copy quad q:string
-                                 [attrs (quad-attrs (car pcs))]
-                                 [elems (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
-                                                                                (quad-elems pc))))]
-                                 [size (delay (pt (for/sum ([pc (in-list run-pcs)])
-                                                    (pt-x (size pc)))
-                                                  (pt-y (size (car pcs)))))]))
-    (values (cons new-run runs) rest)))
+    (match pcs
+      [(cons (? string-quad? strq) rest)
+       (define-values (run-pcs rest) (splitf-at pcs (λ (p) (same-run? strq p))))
+       (define new-run (struct-copy quad q:string
+                                    [attrs (quad-attrs strq)]
+                                    [elems (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
+                                                                                   (quad-elems pc))))]
+                                    [size (delay (pt (for/sum ([pc (in-list run-pcs)])
+                                                       (pt-x (size pc)))
+                                                     (pt-y (size strq))))]))
+       (values (cons new-run runs) rest)]
+      [(cons first rest) (values (cons first runs) rest)])))
 
 (define (render-hyphen qs ending-q)
   ;; naive handling of soft hyphen:
@@ -255,7 +263,7 @@
                         border-color-left border-color-right border-color-top border-color-bottom
                         background-color
                         keep-lines keep-first keep-last keep-all keep-with-next
-                        line-align line-align-first line-align-last))
+                        line-align line-align-last first-line-indent))
   (for* ([k (in-list block-attrs)]
          [v (in-value (hash-ref source-hash k #f))]
          #:when v)
@@ -278,11 +286,12 @@
 
 (require sugar/list)
 (define (fill-wrap qs ending-q)
-  (match (and ending-q (pair? qs) (quad-ref (car qs) 'line-align "left"))
+  (match (and ending-q (pair? qs) (quad-ref (car qs) (if (para-break? ending-q)
+                                                         'line-align-last
+                                                         'line-align) "left"))
     [(or #false "left") qs] ; default is left aligned, no filling needed 
-    ["justify" #:when (para-break? ending-q) qs] ; don't justify last line
     [align-value
-     (define word-sublists (filter-split qs (λ (q) (equal? (car (quad-elems q)) " "))))
+     (define word-sublists (filter-split qs (λ (q) (and (pair? (quad-elems q)) (equal? (car (quad-elems q)) " ")))))
      (match (length word-sublists)
        [1 #:when (equal? align-value "justify") qs] ; can't justify single word
        [word-count
@@ -612,6 +621,20 @@
 (define (handle-cascading-attrs attrs)
   (resolve-font-path attrs)
   (resolve-font-size attrs))
+
+(define (insert-first-line-indents qs-in)
+  ;; first line indents are quads inserted at the beginning of a paragraph
+  ;; (that is, just after a paragraph break)
+  ;; they need to be installed before line wrap
+  ;; to be compatible with first-fit and best-fit.
+  (for/fold ([qs-out null]
+             #:result (reverse qs-out))
+            ([q (in-list (cons pbr qs-in))]
+             [next-q (in-list qs-in)])
+    (match (and (para-break? q) (quad-ref next-q 'first-line-indent 0))
+      [(or #false 0) (cons next-q qs-out)]
+      [indent-val (list* next-q (make-quad #:attrs (quad-attrs next-q)
+                                           #:size (pt indent-val 0)) qs-out)])))
                  
 (define (run xs pdf-path)
   (define pdf (time-name make-pdf (make-pdf #:compress #t
@@ -627,6 +650,7 @@
            [x (time-name atomize (atomize x #:attrs-proc handle-cascading-attrs))]
            [x (time-name hyphenate (handle-hyphenate x))]
            [x (time-name ->string-quad (map ->string-quad x))]
+           [x (time-name insert-first-line-indents (insert-first-line-indents x))]  
            [x (time-name line-wrap (line-wrap x line-width))]
            [x (time-name apply-keeps (apply-keeps x))]
            [x (time-name page-wrap (page-wrap x vertical-height pdf-path))]
@@ -641,7 +665,9 @@
         (define strs (match (list . STRS)
                        [(? null?) '(" ")]
                        [strs strs]))
-        (define qx (list* 'q null (append (add-between strs pbr) (list pbr))))
+        (define qx (root null (add-between strs (list pbr)
+                                               #:after-last (list pbr)
+                                               #:splice? #true)))
         (run qx PDF-PATH))]))
 
 (module+ reader
@@ -655,10 +681,10 @@
     ;; so stick an `attr-list` identifier on it which can hook into the expander.
     ;; sort of SXML-ish.
     (let loop ([x x])
-      (match x
-        [(txexpr tag attrs elems) (list* tag (cons 'attr-list attrs) (map loop elems))]
-        [(? list? xs) (map loop xs)]
-        [_ x])))
+                  (match x
+                    [(txexpr tag attrs elems) (list* tag (cons 'attr-list attrs) (map loop elems))]
+                    [(? list? xs) (map loop xs)]
+                    [_ x])))
   
   (define (quad-read-syntax path-string p)
     (define quad-at-reader (make-at-reader
@@ -666,10 +692,10 @@
                             #:inside? #t
                             #:command-char #\◊))
     (define stx (quad-at-reader path-string p))
-    (define parsed-stx (datum->syntax stx (xexpr->parse-tree (parse-markdown (apply string-append (syntax->datum stx))))))
+    (define parsed-stxs (datum->syntax stx (xexpr->parse-tree (parse-markdown (apply string-append (syntax->datum stx))))))
     (strip-context
-     (with-syntax ([PT parsed-stx]
+     (with-syntax ([STXS parsed-stxs]
                    [PDF-PATH (path-replace-extension path-string #".pdf")])
        #'(module _ qtest/markdown
            PDF-PATH
-           . PT)))))
+           . STXS)))))
