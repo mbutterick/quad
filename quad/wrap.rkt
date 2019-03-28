@@ -11,7 +11,7 @@
 (define (nonprinting-at-start? x) (not (printable? x 'start)))
 (define (nonprinting-at-end? x) (not (printable? x 'end)))
 
-(define (default-finish-wrap-func wrap-qs q0 q idx) (list wrap-qs))
+(define (default-finish-wrap-func wrap-qs q0 ending-q idx) (list wrap-qs))
 (define (finalize-reversed-wraps wraps)
   ; append* because `finish-wrap-proc` returns a spliceable list
   ; reverse because wraps accumulated in reverse

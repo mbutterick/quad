@@ -18,14 +18,14 @@
 
 (define-tag-function (p attrs exprs)
   ;; no font-family so that it adopts whatever the surrounding family is
-  (qexpr (append `((keep-first "2")(keep-last "3")(line-align "justify")(font-size "12") (character-tracking "0") (hyphenate "true") (display ,(symbol->string (gensym)))) attrs) exprs))
+  (qexpr (append `((keep-first "2")(keep-last "3") 
+                                   (line-align "justify") (font-size-adjust "100%") (character-tracking "0") (hyphenate "true") (display ,(symbol->string (gensym)))) attrs) exprs))
 
 (define-tag-function (hr attrs exprs)
   hrbr)
 
 (define-tag-function (blockquote attrs exprs)
   (qexpr (append '((display "block")
-                   (line-align "right")
                    (background-color "#eee")
                    (font-family "fira") (font-size "10") (line-height "15")
                    (border-width-top "0.5") (border-color-top "gray") (border-inset-top "8")
@@ -86,7 +86,6 @@
 (define draw-debug-line? #t)
 (define draw-debug-block? #t)
 (define draw-debug-string? #f)
-
 
 (define (list-base attrs exprs [bullet-val #f])
   (qexpr (list* '(inset-left "20") attrs)
@@ -205,34 +204,36 @@
        (member (unsafe-car (quad-elems q)) softies)))
 
 (define (consolidate-runs pcs ending-q)
-  (define reversed-runs
-    (for/fold ([runs empty]
-               [pcs pcs]
-               #:result runs)
-              ([i (in-naturals)]
-               #:break (empty? pcs))
-      (define-values (run-pcs rest) (splitf-at pcs (λ (p) (same-run? (car pcs) p))))
-      (define new-run (struct-copy quad q:string
-                                   [attrs (quad-attrs (car pcs))]
-                                   [elems (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
-                                                                                  (quad-elems pc))))]
-                                   [size (delay (pt (for/sum ([pc (in-list run-pcs)])
-                                                      (pt-x (size pc)))
-                                                    (pt-y (size (car pcs)))))]))
-      (values (cons new-run runs) rest)))
+  (for/fold ([runs empty]
+             [pcs pcs]
+             #:result (reverse runs))
+            ([i (in-naturals)]
+             #:break (empty? pcs))
+    (define-values (run-pcs rest) (splitf-at pcs (λ (p) (same-run? (car pcs) p))))
+    (define new-run (struct-copy quad q:string
+                                 [attrs (quad-attrs (car pcs))]
+                                 [elems (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
+                                                                                (quad-elems pc))))]
+                                 [size (delay (pt (for/sum ([pc (in-list run-pcs)])
+                                                    (pt-x (size pc)))
+                                                  (pt-y (size (car pcs)))))]))
+    (values (cons new-run runs) rest)))
+
+(define (render-hyphen qs ending-q)
   ;; naive handling of soft hyphen:
   ;; if soft hyphen cause the break, then append a printing hyphen to the end of the run.
   ;; this assumes that there is room for the hyphen on the line
   ;; and does not take into account hyphen-break transformations found in other languages.
   ;; However we do want the hyphen joined into the string so the final shaping / positioning is correct
   ;; for instance, kerning between last letter and hyphen.
-  (reverse (if (and ending-q (equal? (quad-elems ending-q) '("\u00AD")))
-               (cons (let* ([last-run (car reversed-runs)]
-                            [str+hyphen (string-append (car (quad-elems last-run)) "-")])
-                       (struct-copy quad last-run
-                                    [elems (list str+hyphen)]
-                                    [size (make-size-promise last-run str+hyphen)])) (cdr reversed-runs))
-               reversed-runs)))
+  (match (and ending-q (equal? (quad-elems ending-q) '("\u00AD")) qs)
+    [(list head ... last-q)
+     (define str+hyphen (string-append (car (quad-elems last-q)) "-"))
+     (append head
+             (list (struct-copy quad last-q
+                                [elems (list str+hyphen)]
+                                [size (make-size-promise last-q str+hyphen)])))]
+    [_ qs]))
 
 (define-quad line-break quad ())
 (define lbr (make-line-break #:printable #f))
@@ -277,26 +278,39 @@
 
 (require sugar/list)
 (define (fill-wrap qs ending-q)
-  (match (and ending-q (not (para-break? ending-q)) (pair? qs) (quad-ref (car qs) 'line-align #f))
-    ["justify"
+  (match (and ending-q (pair? qs) (quad-ref (car qs) 'line-align "left"))
+    [(or #false "left") qs] ; default is left aligned, no filling needed 
+    ["justify" #:when (para-break? ending-q) qs] ; don't justify last line
+    [align-value
      (define word-sublists (filter-split qs (λ (q) (equal? (car (quad-elems q)) " "))))
      (match (length word-sublists)
-       [1 qs] ; can't justify single word
+       [1 #:when (equal? align-value "justify") qs] ; can't justify single word
        [word-count
         (match-define (list line-width line-height) (quad-size q:line))
         ;; words may still be in hyphenated fragments
         ;; (though soft hyphens would have been removed)
         ;; so group them (but no need to consolidate — that happens elsewhere)
-        (define words-width (for*/sum ([word-sublist (in-list word-sublists)]
-                                       [word (in-list word-sublist)])
-                              (pt-x (size word))))
+        (define occupied-width (match align-value
+                                 ;; for justified line, we care about size of words without spaces
+                                 ["justify" (for*/sum ([word-sublist (in-list word-sublists)]
+                                                       [word (in-list word-sublist)])
+                                              (pt-x (size word)))]
+                                 ;; for others, we care about size with spaces
+                                 [_ (for/sum ([q (in-list qs)])
+                                      (pt-x (size q)))]))
         (define empty-hspace (- line-width
                                 (quad-ref (car qs) 'inset-left 0)
-                                words-width
+                                occupied-width
                                 (quad-ref (car qs) 'inset-right 0)))
-        (define space-width (/ empty-hspace (sub1 word-count)))
-        (apply append (add-between word-sublists (list (make-quad #:size (pt space-width line-height)))))])]
-    [_ qs]))
+        (match align-value
+          ["justify" 
+           (define space-width (/ empty-hspace (sub1 word-count)))
+           (apply append (add-between word-sublists (list (make-quad #:size (pt space-width line-height)))))]
+          [_
+           (define space-multiplier (match align-value
+                                      ["center" 0.5]
+                                      ["right" 1]))
+           (cons (make-quad #:size (pt (* empty-hspace space-multiplier) line-height)) qs)])])]))
 
 (define (line-wrap qs wrap-size)
   (wrap qs
@@ -313,10 +327,9 @@
           (define pcs-printing (for/list ([pc (in-list pcs-in)]
                                           #:unless (equal? (quad-elems pc) '("\u00AD")))
                                  pc))
-          (define pcs (fill-wrap pcs-printing ending-q))
           (append
            (cond
-             [(empty? pcs) null]
+             [(empty? pcs-printing) null]
              [(hr-break? ending-q)
               (list (struct-copy quad q:line
                                  [draw-start (λ (dq doc)
@@ -328,6 +341,10 @@
                                                (line-width doc 3)
                                                (stroke doc "#999"))]))]
              [else
+              ;; render hyphen first so that all printable characters are available for size-dependent ops.
+              (define pcs-with-hyphen (render-hyphen pcs-printing ending-q))
+              ;; fill wrap so that consolidate-runs works properly (justified lines won't be totally consolidated)
+              (define pcs (fill-wrap pcs-with-hyphen ending-q))
               (match (consolidate-runs pcs ending-q)
                 [(? pair? elems)
                  (define elem (unsafe-car elems))
@@ -343,18 +360,6 @@
                                     ;; line width is static
                                     ;; line height is the max 'line-height value or the natural height of q:line
                                     [size new-size]
-                                    [offset (let ()
-                                              (define elems-width (pt-x (apply pt+ (map size elems))))
-                                              (define h-factor (match (quad-ref elem 'line-align "left")
-                                                                 ["left" 0]
-                                                                 ["center" 0.5]
-                                                                 ["right" 1]
-                                                                 [_ 0]))
-                                              (define empty-hspace (- line-width
-                                                                      (quad-ref elem 'inset-left 0)
-                                                                      elems-width
-                                                                      (quad-ref elem 'inset-right 0)))
-                                              (pt+ (quad-offset q:line) (pt (* empty-hspace h-factor) 0)))]
                                     ;; handle list indexes. drop new quad into line to hold list index
                                     ;; could also use this for line numbers
                                     [elems (append
