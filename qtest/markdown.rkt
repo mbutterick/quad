@@ -3,7 +3,7 @@
          pitfall quad sugar/debug pollen/tag racket/unsafe/ops hyphenate)
 (provide (except-out (all-from-out racket/base) #%module-begin)
          (rename-out [mb #%module-begin])
-          p id strong em attr-list h1 h2 h3 h4 h5 h6 
+         p id strong em attr-list h1 h2 h3 h4 h5 h6 
          ol li ul rsquo lsquo rdquo ldquo hellip ndash mdash
          hr
          code pre a blockquote)
@@ -17,7 +17,7 @@
 (define mdash "—")
 
 (define (root attrs exprs)
-  (qexpr (append `((first-line-indent "12") (line-align "justify")) attrs) exprs))
+  (qexpr (append `(#;(first-line-indent "12") (line-align "justify") #;(line-align-last "center")) attrs) exprs))
 
 (define-tag-function (p attrs exprs)
   ;; no font-family so that it adopts whatever the surrounding family is
@@ -27,7 +27,7 @@
   hrbr)
 
 (define-tag-function (blockquote attrs exprs)
-  (qexpr (append '((display "block")
+  (qexpr (append '((display "block") (line-wrap "kp")
                    (first-line-indent "0") (line-align "left")
                    (background-color "#eee") 
                    (font-family "fira") (font-size "10") (line-height "15")
@@ -263,7 +263,8 @@
                         border-color-left border-color-right border-color-top border-color-bottom
                         background-color
                         keep-lines keep-first keep-last keep-all keep-with-next
-                        line-align line-align-last first-line-indent))
+                        line-align line-align-last first-line-indent
+                        line-wrap))
   (for* ([k (in-list block-attrs)]
          [v (in-value (hash-ref source-hash k #f))]
          #:when v)
@@ -286,9 +287,9 @@
 
 (require sugar/list)
 (define (fill-wrap qs ending-q)
-  (match (and ending-q (pair? qs) (quad-ref (car qs) (if (para-break? ending-q)
-                                                         'line-align-last
-                                                         'line-align) "left"))
+  (match (and (pair? qs) (quad-ref (car qs) (if ending-q
+                                                'line-align
+                                                'line-align-last) "left"))
     [(or #false "left") qs] ; default is left aligned, no filling needed 
     [align-value
      (define word-sublists (filter-split qs (λ (q) (and (pair? (quad-elems q)) (equal? (car (quad-elems q)) " ")))))
@@ -322,70 +323,73 @@
            (cons (make-quad #:size (pt (* empty-hspace space-multiplier) line-height)) qs)])])]))
 
 (define (line-wrap qs wrap-size)
-  (wrap qs
-        (λ (q idx) (- wrap-size (quad-ref q 'inset-left 0) (quad-ref q 'inset-right 0)))
-        #:nicely #t
-        #:hard-break line-break?
-        #:soft-break soft-break-for-line?
-        ;; restart wrap count after each paragraph break
-        ;; so idx=1 means first line in any paragraph
-        #:wrap-count (λ (idx q) (if (para-break? q) 1 (add1 idx)))
-        #:finish-wrap
-        (λ (pcs-in opening-q ending-q idx)
-          ;; remove unused soft hyphens so they don't affect final shaping
-          (define pcs-printing (for/list ([pc (in-list pcs-in)]
-                                          #:unless (equal? (quad-elems pc) '("\u00AD")))
-                                 pc))
-          (append
-           (cond
-             [(empty? pcs-printing) null]
-             [(hr-break? ending-q)
-              (list (struct-copy quad q:line
-                                 [draw-start (λ (dq doc)
-                                               (match-define (list left top) (quad-origin dq))
-                                               (match-define (list right bottom)(size dq))
-                                               (translate doc left (+ top (/ bottom 2)))
-                                               (move-to doc 0 0)
-                                               (line-to doc right 0)
-                                               (line-width doc 3)
-                                               (stroke doc "#999"))]))]
-             [else
-              ;; render hyphen first so that all printable characters are available for size-dependent ops.
-              (define pcs-with-hyphen (render-hyphen pcs-printing ending-q))
-              ;; fill wrap so that consolidate-runs works properly (justified lines won't be totally consolidated)
-              (define pcs (fill-wrap pcs-with-hyphen ending-q))
-              (match (consolidate-runs pcs ending-q)
-                [(? pair? elems)
-                 (define elem (unsafe-car elems))
-                 (match-define (list line-width line-height) (quad-size q:line))
-                 (define new-size (let ()
-                                    (define line-heights
-                                      (filter-map (λ (q) (quad-ref q 'line-height)) pcs))
-                                    (pt line-width (if (empty? line-heights) line-height (apply max line-heights)))))
-                 (list (struct-copy quad q:line
-                                    ;; move block attrs up, so they are visible in page wrap
-                                    [attrs (copy-block-attrs (quad-attrs elem)
-                                                             (hash-copy (quad-attrs q:line)))]
-                                    ;; line width is static
-                                    ;; line height is the max 'line-height value or the natural height of q:line
-                                    [size new-size]
-                                    ;; handle list indexes. drop new quad into line to hold list index
-                                    ;; could also use this for line numbers
-                                    [elems (append
-                                            (match (and (eq? idx 1) (quad-ref elem 'list-index))
-                                              [#false null]
-                                              [bullet (list (make-quad
-                                                             #:elems (list (struct-copy quad (car elems)
-                                                                                        [elems (list (if (number? bullet)
-                                                                                                         (format "~a." bullet)
-                                                                                                         bullet))]))))])
-                                            (list (make-quad
-                                                   #:offset (pt (quad-ref elem 'inset-left 0) 0)
-                                                   #:elems elems)))]))]
-                [_ null])])
-           (if (and (para-break? ending-q) (not (hr-break? ending-q)))
-               (list q:line-spacer)
-               null)))))
+  (apply append
+         ;; next line removes all para-break? quads as a consequence
+         (for/list ([qs (in-list (filter-split qs para-break?))])
+           (wrap qs
+                 (λ (q idx) (- wrap-size (quad-ref q 'inset-left 0) (quad-ref q 'inset-right 0)))
+                 #:nicely (match (and (pair? qs)
+                                      (string-downcase (quad-ref (car qs) 'line-wrap "false")))
+                            [(or #false "false") #false]
+                            [(or "best" "kp") #true])
+                 #:hard-break line-break?
+                 #:soft-break soft-break-for-line?
+                 #:finish-wrap
+                 (λ (pcs-in opening-q ending-q idx)
+                   ;; remove unused soft hyphens so they don't affect final shaping
+                   (define pcs-printing (for/list ([pc (in-list pcs-in)]
+                                                   #:unless (equal? (quad-elems pc) '("\u00AD")))
+                                          pc))
+                   (append
+                    (cond
+                      [(empty? pcs-printing) null]
+                      [(hr-break? ending-q)
+                       (list (struct-copy quad q:line
+                                          [draw-start (λ (dq doc)
+                                                        (match-define (list left top) (quad-origin dq))
+                                                        (match-define (list right bottom)(size dq))
+                                                        (translate doc left (+ top (/ bottom 2)))
+                                                        (move-to doc 0 0)
+                                                        (line-to doc right 0)
+                                                        (line-width doc 3)
+                                                        (stroke doc "#999"))]))]
+                      [else
+                       ;; render hyphen first so that all printable characters are available for size-dependent ops.
+                       (define pcs-with-hyphen (render-hyphen pcs-printing ending-q))
+                       ;; fill wrap so that consolidate-runs works properly (justified lines won't be totally consolidated)
+                       (define pcs (fill-wrap pcs-with-hyphen ending-q))
+                       (match (consolidate-runs pcs ending-q)
+                         [(? pair? elems)
+                          (define elem (unsafe-car elems))
+                          (match-define (list line-width line-height) (quad-size q:line))
+                          (define new-size (let ()
+                                             (define line-heights
+                                               (filter-map (λ (q) (quad-ref q 'line-height)) pcs))
+                                             (pt line-width (if (empty? line-heights) line-height (apply max line-heights)))))
+                          (list (struct-copy quad q:line
+                                             ;; move block attrs up, so they are visible in page wrap
+                                             [attrs (copy-block-attrs (quad-attrs elem)
+                                                                      (hash-copy (quad-attrs q:line)))]
+                                             ;; line width is static
+                                             ;; line height is the max 'line-height value or the natural height of q:line
+                                             [size new-size]
+                                             ;; handle list indexes. drop new quad into line to hold list index
+                                             ;; could also use this for line numbers
+                                             [elems (append
+                                                     (match (and (eq? idx 1) (quad-ref elem 'list-index))
+                                                       [#false null]
+                                                       [bullet (list (make-quad
+                                                                      #:elems (list (struct-copy quad (car elems)
+                                                                                                 [elems (list (if (number? bullet)
+                                                                                                                  (format "~a." bullet)
+                                                                                                                  bullet))]))))])
+                                                     (list (make-quad
+                                                            #:offset (pt (quad-ref elem 'inset-left 0) 0)
+                                                            #:elems elems)))]))]
+                         [_ null])])
+                    (cond
+                      [ending-q null]
+                      [else (list q:line-spacer)])))))))
 
 (define (make-nobreak! q) (quad-set! q 'no-pbr "true"))
 
@@ -666,8 +670,9 @@
                        [(? null?) '(" ")]
                        [strs strs]))
         (define qx (root null (add-between strs (list pbr)
-                                               #:after-last (list pbr)
-                                               #:splice? #true)))
+                                           #:before-first (list pbr)
+                                           #:after-last (list pbr)
+                                           #:splice? #true)))
         (run qx PDF-PATH))]))
 
 (module+ reader
@@ -681,10 +686,10 @@
     ;; so stick an `attr-list` identifier on it which can hook into the expander.
     ;; sort of SXML-ish.
     (let loop ([x x])
-                  (match x
-                    [(txexpr tag attrs elems) (list* tag (cons 'attr-list attrs) (map loop elems))]
-                    [(? list? xs) (map loop xs)]
-                    [_ x])))
+      (match x
+        [(txexpr tag attrs elems) (list* tag (cons 'attr-list attrs) (map loop elems))]
+        [(? list? xs) (map loop xs)]
+        [_ x])))
   
   (define (quad-read-syntax path-string p)
     (define quad-at-reader (make-at-reader
