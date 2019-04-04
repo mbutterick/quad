@@ -215,7 +215,7 @@
          (if (equal? (quad-elems (car would-be-wrap-qs)) '("\u00AD")) (add1 hyphen-count) 0))
        (penalty-rec
         (+ last-val ; include penalty so far
-           (* starting-idx mega-penalty) ; new line penalty
+           mega-penalty ; new line penalty
            (if (> new-consecutive-hyphen-count max-consecutive-hyphens)
                (* hyphen-penalty (- new-consecutive-hyphen-count max-consecutive-hyphens))
                0)
@@ -236,21 +236,23 @@
   ;; collect this value, and use it as the input next time
   ;; until you reach first position.
   (define ocm (make-ocm penalty (penalty-rec 0 starting-wrap-idx 0) penalty-rec-val))
+  (define last-j (vector-length pieces-vec))
   (define breakpoints
-    (let ([last-j (vector-length pieces-vec)])
-      (let loop ([bps (list last-j)]) ; start from end
+          (let loop ([bps (list last-j)]) ; start from end
         (match (ocm-min-index ocm (car bps)) ; look to the previous line
           [0 (cons 0 bps)]; zero means we're at first position, and therefore done
-          [min-i (loop (cons min-i bps))]))))
+          [min-i (loop (cons min-i bps))])))
   (for/fold ([wraps null]
              [wrap-idx starting-wrap-idx]
              [previous-wrap-ender previous-last-q])
             ([i (in-list breakpoints)]
              [j (in-list (cdr breakpoints))])
     (define wrap-qs (pieces-sublist pieces-vec i j)) ; first-fit gets wrap-qs in reverse, so be consistent
-    (values (cons (finish-wrap wrap-qs previous-wrap-ender wrap-idx) wraps)
+     ;; last wrap-ender must be #false
+    (define this-wrap-ender (if (eq? j last-j) #false (car wrap-qs)))
+    (values (cons (finish-wrap wrap-qs previous-wrap-ender wrap-idx this-wrap-ender) wraps)
             (wrap-count wrap-idx (car wrap-qs))
-            (car wrap-qs))))
+            this-wrap-ender)))
 
 
 (module+ test
