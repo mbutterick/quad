@@ -84,7 +84,7 @@
             (match-define (list k v) kv)
             ;; coerce number strings to actual numbers
             ;; this misbehaves on a list index like "1." which becomes 1.0
-            (hash-set! mheq k (or (string->number v) v)))
+            (hash-set! mheq k (or (string->number v) (string-downcase v))))
           (q #:attrs mheq #:elems (map loop elems))]
          [(list (? qexpr? elems) ...)
           (q #:elems (map loop elems))])]
