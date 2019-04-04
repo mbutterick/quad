@@ -35,6 +35,8 @@
    ;; and compare them key-by-key
    (hashes-equal? (quad-attrs q1) (quad-attrs q2))))
 
+(define verbose-quad-printing? (make-parameter #f))
+
 (struct quad (attrs ; key-value pairs, arbitrary
               elems ; subquads or text
               ;; size is a two-dim pt
@@ -53,11 +55,14 @@
               )
   #:transparent
   #:property prop:custom-write
-  (λ (v p w?) (display
-               (format "<quad ~a~a>"
-                       (string-join (map ~v (flatten (hash->list (quad-attrs v))))
+  (λ (q p w?) (display
+               (format "<~a~a~a>"
+                       (object-name q)
+                       (if (verbose-quad-printing?)
+                           (string-join (map ~v (flatten (hash->list (quad-attrs q))))
                                     " " #:before-first "(" #:after-last ")")
-                       (string-join (map ~v (quad-elems v)) " " #:before-first " ")) p))
+                           "")
+                       (string-join (map ~v (quad-elems q)) " " #:before-first " ")) p))
   #:methods gen:equal+hash
   [(define equal-proc quad=?)
    (define (hash-proc h recur) (equal-hash-code h))
