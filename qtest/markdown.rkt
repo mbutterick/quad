@@ -248,7 +248,7 @@
 ;; treat paragraph break as special kind of line break
 (define-quad para-break line-break ())
 (define pbr (make-para-break #:printable #f))
-(define-quad hr-break para-break ())
+(define-quad hr-break line-break ())
 (define hrbr (make-hr-break #:printable #t))
 
 (module+ test
@@ -626,6 +626,8 @@
   (resolve-font-path attrs)
   (resolve-font-size attrs))
 
+(define-quad first-line-indent quad ())
+
 (define (insert-first-line-indents qs-in)
   ;; first line indents are quads inserted at the beginning of a paragraph
   ;; (that is, just after a paragraph break)
@@ -633,11 +635,12 @@
   ;; to be compatible with first-fit and best-fit.
   (for/fold ([qs-out null]
              #:result (reverse qs-out))
-            ([q (in-list (cons pbr qs-in))]
-             [next-q (in-list qs-in)])
+            ([q (in-list qs-in)]
+             [next-q (in-list (cdr qs-in))])
     (match (and (para-break? q) (quad-ref next-q 'first-line-indent 0))
       [(or #false 0) (cons next-q qs-out)]
-      [indent-val (list* next-q (make-quad #:attrs (quad-attrs next-q)
+      [indent-val (list* next-q (make-quad #:type first-line-indent
+                                           #:attrs (quad-attrs next-q)
                                            #:size (pt indent-val 0)) qs-out)])))
                  
 (define (run xs pdf-path)
