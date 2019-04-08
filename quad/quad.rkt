@@ -62,7 +62,9 @@
                            (string-join (map ~v (flatten (hash->list (quad-attrs q))))
                                     " " #:before-first "(" #:after-last ")")
                            "")
-                       (string-join (map ~v (quad-elems q)) " " #:before-first " ")) p))
+                       (match (quad-elems q)
+                         [(? pair?) (string-join (map ~v (quad-elems q)) " " #:before-first " ")]
+                         [_ ""])) p))
   #:methods gen:equal+hash
   [(define equal-proc quad=?)
    (define (hash-proc h recur) (equal-hash-code h))
