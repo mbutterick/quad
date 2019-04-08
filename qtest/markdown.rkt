@@ -17,7 +17,7 @@
 (define mdash "—")
 
 (define (root attrs exprs)
-  (qexpr (append `(#;(first-line-indent "12")
+  (qexpr (append `((first-line-indent "12")
                    #;(line-align "center")
                    (line-wrap "kp")
                    #;(line-align-last "center")) attrs) exprs))
@@ -93,8 +93,12 @@
 (define draw-debug-block? #t)
 (define draw-debug-string? #f)
 
+(require racket/dict)
 (define (list-base attrs exprs [bullet-val #f])
-  (qexpr (list* '(inset-left "20") attrs)
+  (define bullet-space-factor 2.5)
+  (define em (dict-ref attrs 'font-size default-font-size))
+  (define bullet-indent (* bullet-space-factor em))
+  (qexpr (list* `(inset-left ,(number->string bullet-indent)) attrs)
          (add-between
           (for/list ([(expr idx) (in-indexed exprs)])
             (list* (get-tag expr) (cons (list 'list-index (or bullet-val (format "~a" (add1 idx)))) (get-attrs expr)) (get-elements expr)))
@@ -102,7 +106,7 @@
 
 (define-tag-function (ol attrs exprs) (list-base attrs exprs))
 (define-tag-function (ul attrs exprs) (list-base attrs exprs "•"))
-(define-tag-function (li attrs exprs) (qexpr (cons '(first-line-indent "0") attrs) exprs))  
+(define-tag-function (li attrs exprs) (qexpr attrs exprs))  
 
 (define-quad string-quad quad ())
 (define q:string (q #:type string-quad
@@ -377,22 +381,23 @@
            ;; handle list indexes. drop new quad into line to hold list index
            ;; could also use this for line numbers
            [elems
+                ;; we assume here that a list item has already had extra inset-left
+                ;; with room for a bullet
+                ;; which we just insert at the front.
+                ;; this is safe because line has already been filled.
             (append
+             ;; only put bullet into line if we're at the first line of the list item
              (match (and (eq? idx 1) (quad-ref elem 'list-index))
                [#false null]
                [bullet
-                (define bullet-indent (* 3 (quad-ref elem 'font-size default-font-size)))
-                (list (make-quad
-                       #:elems (list
-                                (struct-copy quad (car elems)
-                                             [elems (list (if (number? bullet)
-                                                              (format "~a." bullet)
-                                                              bullet))]))))
-                (list (struct-copy quad elem
-                             [elems (list (if (number? bullet)
-                                              (format "~a." bullet)
-                                              bullet))]
-                             [size (pt bullet-indent 0)]))])
+                (list (struct-copy
+                       quad q:string ;; copy q:string to get draw routine
+                       ;; borrow attrs from elem
+                       [attrs (quad-attrs elem)]
+                       ;; use bullet as elems
+                       [elems (list (if (number? bullet) (format "~a." bullet) bullet))]
+                       ;; no size because it's inside inset
+                       [size (pt 0 0)]))])
              (list (make-quad
                     #:type offsetter
                     #:offset (pt (quad-ref elem 'inset-left 0) 0)
