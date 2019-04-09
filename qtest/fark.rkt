@@ -1,3 +1,8 @@
 #lang qtest/markdown
 
-* interlinked actualization multitasking percolated intoxication broadcaster chopstick halleluiah constantly gentlemanly miniskirt congealed initiated quadrature ensconced retouched pronounced escarpment tranquilizing administrated unzipping reorganize alchemist compendium streaking dimwitted invitation inefficient awestricken reinforcement scrupling subjectively precipitously knighting darkening steadying outshined interlocking archaeologist
+`(6 5)`
+
+`(65)`
+
+The result of the above expression should be `(6 5)`. The naive
+expansion of this use of `swap`, however, is

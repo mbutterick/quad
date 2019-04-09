@@ -17,14 +17,15 @@
 (define mdash "—")
 
 (define (root attrs exprs)
-  (qexpr (append `((first-line-indent "12")
+  (qexpr (append `(#;(first-line-indent "12")
                    #;(line-align "center")
                    (line-wrap "kp")
+                   (line-height "17")
                    #;(line-align-last "center")) attrs) exprs))
 
 (define-tag-function (p attrs exprs)
   ;; no font-family so that it adopts whatever the surrounding family is
-  (qexpr (append `((keep-first "2")(keep-last "3") (font-size-adjust "100%") (character-tracking "0") (hyphenate "true") (display ,(symbol->string (gensym)))) attrs) exprs))
+  (qexpr (append `((keep-first "2")(keep-last "3") (line-align "justify") (font-size-adjust "100%") (character-tracking "0") (hyphenate "true") (display ,(symbol->string (gensym)))) attrs) exprs))
 
 (define-tag-function (hr attrs exprs)
   hrbr)
@@ -33,7 +34,7 @@
   (qexpr (append '((display "block") 
                    (first-line-indent "0") 
                    (background-color "#eee") 
-                   (font-family "fira") (font-size "10") (line-height "15")
+                   (font-family "fira") (font-size "10") (line-height "14")
                    (border-width-top "0.5") (border-color-top "gray") (border-inset-top "8")
                    (border-width-left "3") (border-color-left "gray") (border-inset-left "20")
                    (border-width-bottom "0.5") (border-color-bottom "gray") (border-inset-bottom "-2")
@@ -57,7 +58,7 @@
 (define-syntax-rule (attr-list . attrs) 'attrs)
 
 (define (heading-base font-size attrs exprs)
-  (qexpr (append `((font-family "fira-light") (first-line-indent "0") (display "block") (font-size ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9")(border-inset-right "12") (inset-bottom "-3") (inset-top "6") (keep-with-next "true")) attrs) exprs))
+  (qexpr (append `((font-family "fira-light") (first-line-indent "0") (display "block") (font-size ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9") (inset-bottom "-3") (inset-top "6") (keep-with-next "true")) attrs) exprs))
 
 (define-tag-function (h1 attrs exprs)
   (heading-base 20 (append '() attrs) exprs))
@@ -70,7 +71,7 @@
 (define h6 h3)
 
 (define-tag-function (code attrs exprs)
-  (qexpr (append '((font-family "fira-mono")#;(line-align "right")(font-size "10")(bg "aliceblue")) attrs)  exprs))
+  (qexpr (append '((font-family "fira-mono")#;(line-align "right")(font-size "10")(bg "aliceblue")) attrs) exprs))
 
 (define-tag-function (pre attrs exprs)
   ;; pre needs to convert white space to equivalent layout elements
@@ -84,12 +85,12 @@
                 '(font-family "fira-mono") '(font-size "11") '(line-height "14")
                 '(border-inset-top "10")
                 '(border-width-left "2") '(border-color-left "#669") '(border-inset-left "0")
-                '(border-inset-right "10") '(border-inset-bottom "-4")
-                '(inset-left "12") '(inset-right "12")  '(inset-top "12") '(inset-bottom "8")
+                '(border-inset-bottom "-4")
+                '(inset-left "12")  '(inset-top "12") '(inset-bottom "8")
                 attrs) new-exprs))
 
 
-(define draw-debug? #t)
+(define draw-debug? #f)
 (define draw-debug-line? #t)
 (define draw-debug-block? #t)
 (define draw-debug-string? #f)
@@ -192,7 +193,7 @@
     (fill doc stroke-color)  
     (restore doc)))
 
-(define line-height 20)
+(define line-height 16)
 (define dumb-hardcoded-value 372)
 (define q:line (q #:size (pt dumb-hardcoded-value line-height)
                   #:inner 'sw
@@ -733,7 +734,7 @@
                             #:inside? #t
                             #:command-char #\◊))
     (define stx (quad-at-reader path-string p))
-    (define parsed-stxs (datum->syntax stx (xexpr->parse-tree #R (parse-markdown (apply string-append (syntax->datum stx))))))
+    (define parsed-stxs (datum->syntax stx (xexpr->parse-tree (parse-markdown (apply string-append (syntax->datum stx))))))
     (strip-context
      (with-syntax ([STXS parsed-stxs]
                    [PDF-PATH (path-replace-extension path-string #".pdf")])
