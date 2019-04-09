@@ -351,11 +351,13 @@
                          [draw-start (λ (dq doc)
                                        (match-define (list left top) (quad-origin dq))
                                        (match-define (list right bottom)(size dq))
+                                       (save doc)
                                        (translate doc left (+ top (/ bottom 2)))
                                        (move-to doc 0 0)
                                        (line-to doc right 0)
-                                       (line-width doc 3)
-                                       (stroke doc "#999"))]))]
+                                       (line-width doc 0.5)
+                                       (stroke doc "black")
+                                       (restore doc))]))]
      [else
       ;; render hyphen first so that all printable characters are available for size-dependent ops.
       (define pcs-with-hyphen (render-hyphen pcs-printing ending-q))
@@ -731,7 +733,7 @@
                             #:inside? #t
                             #:command-char #\◊))
     (define stx (quad-at-reader path-string p))
-    (define parsed-stxs (datum->syntax stx (xexpr->parse-tree (parse-markdown (apply string-append (syntax->datum stx))))))
+    (define parsed-stxs (datum->syntax stx (xexpr->parse-tree #R (parse-markdown (apply string-append (syntax->datum stx))))))
     (strip-context
      (with-syntax ([STXS parsed-stxs]
                    [PDF-PATH (path-replace-extension path-string #".pdf")])
