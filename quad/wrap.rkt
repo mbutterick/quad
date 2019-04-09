@@ -191,14 +191,18 @@
               [wrap-idx initial-wrap-idx]
               [previous-wrap-ender #f]
               #:result (finalize-reversed-wraps (apply append wrapss)))
-             ([pieces-ending-in-hard-break (in-list (slicef-after qs hard-break?))])
-    (define pieces-vec (list->vector (slicef-after pieces-ending-in-hard-break soft-break?)))
+             ([pieces-maybe-ending-in-hard-break (in-list (slicef-after qs hard-break?))])
+    (define-values (pieces last-ender)
+      (match pieces-maybe-ending-in-hard-break
+        [(list pieces ... (? hard-break? hbr)) (values pieces hbr)]
+        [pieces (values pieces #f)]))
+    (define pieces-vec (list->vector (slicef-after pieces soft-break?)))
     (define-values (wraps idx ender)
-      (wrap-pieces-best pieces-vec wrap-idx previous-wrap-ender wrap-count distance-func max-distance-proc finish-wrap))
-    (values (cons wraps wrapss) idx ender)))
+      (wrap-pieces-best pieces-vec wrap-idx previous-wrap-ender last-ender wrap-count distance-func max-distance-proc finish-wrap))
+    (values (cons wraps wrapss) idx last-ender)))
 
 (struct penalty-rec (val idx hyphen-count) #:transparent)
-(define (wrap-pieces-best pieces-vec starting-wrap-idx previous-last-q wrap-count distance-func max-distance-proc finish-wrap)
+(define (wrap-pieces-best pieces-vec starting-wrap-idx previous-last-q last-ender wrap-count distance-func max-distance-proc finish-wrap)
   (define (penalty i j)
     (cond
       [(or (eq? i j) (> j (vector-length pieces-vec)))
@@ -225,7 +229,7 @@
               (* mega-penalty (- underflow))]
              [(let ([on-last-line? (eq? j (vector-length pieces-vec))])
                 (or (not on-last-line?)
-                  (and on-last-line? (not last-line-can-be-short?))))
+                    (and on-last-line? (not last-line-can-be-short?))))
               ;; standard penalty
               (expt underflow 2)]
              [else 0]))
@@ -238,20 +242,22 @@
   (define ocm (make-ocm penalty (penalty-rec 0 starting-wrap-idx 0) penalty-rec-val))
   (define last-j (vector-length pieces-vec))
   (define breakpoints
-          (let loop ([bps (list last-j)]) ; start from end
-        (match (ocm-min-index ocm (car bps)) ; look to the previous line
-          [0 (cons 0 bps)]; zero means we're at first position, and therefore done
-          [min-i (loop (cons min-i bps))])))
+    (if (zero? last-j)
+        (list 0 0)
+        (let loop ([bps (list last-j)]) ; start from end
+          (match (ocm-min-index ocm (car bps)) ; look to the previous line
+            [0 (cons 0 bps)]; zero means we're at first position, and therefore done
+            [min-i (loop (cons min-i bps))]))))
   (for/fold ([wraps null]
              [wrap-idx starting-wrap-idx]
              [previous-wrap-ender previous-last-q])
             ([i (in-list breakpoints)]
              [j (in-list (cdr breakpoints))])
     (define wrap-qs (pieces-sublist pieces-vec i j)) ; first-fit gets wrap-qs in reverse, so be consistent
-     ;; last wrap-ender must be #false
-    (define this-wrap-ender (if (eq? j last-j) #false (car wrap-qs)))
+    ;; last wrap-ender must be #false
+    (define this-wrap-ender (if (eq? j last-j) last-ender (car wrap-qs)))
     (values (cons (finish-wrap wrap-qs previous-wrap-ender wrap-idx this-wrap-ender) wraps)
-            (wrap-count wrap-idx (car wrap-qs))
+            (wrap-count wrap-idx this-wrap-ender)
             this-wrap-ender)))
 
 
