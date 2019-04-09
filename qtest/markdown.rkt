@@ -80,6 +80,7 @@
                        `(,(get-tag expr) ,(get-attrs expr) ,(string-replace str " " " ")))
                      lbr))
   (qexpr (list* '(display "block") '(background-color "aliceblue")
+                '(first-line-indent "0")
                 '(font-family "fira-mono") '(font-size "11") '(line-height "14")
                 '(border-inset-top "10")
                 '(border-width-left "2") '(border-color-left "#669") '(border-inset-left "0")
