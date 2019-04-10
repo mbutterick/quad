@@ -194,15 +194,14 @@
     (restore doc)))
 
 (define line-height 16)
-(define dumb-hardcoded-value 372)
-(define q:line (q #:size (pt dumb-hardcoded-value line-height)
+(define q:line (q #:size (pt 0 line-height)
                   #:inner 'sw
                   #:out 'sw
                   #:printable #true
                   #:draw-start (if draw-debug-line? draw-debug void)))
 (struct line-spacer quad () #:transparent)
 (define q:line-spacer (q #:type line-spacer
-                         #:size (pt dumb-hardcoded-value (* line-height 0.6))
+                         #:size (pt 0 (* line-height 0.6))
                          #:out 'sw
                          #:printable (λ (q sig) (not (memq sig '(start end))))
                          #:draw-start (if draw-debug-line? draw-debug void)))
@@ -284,7 +283,7 @@
   ;; find quads that want hyphenation and split them into smaller pieces
   ;; do this before ->string-quad so that it can handle the sizing promises
   (apply append (for/list ([q (in-list qs)])
-                  (match (quad-ref q 'hyphenate #false)
+                  (match (quad-ref q 'hyphenate)
                     [(or #false "false") (list q)]
                     [_ (for*/list ([str (in-list (quad-elems q))]
                                    [hyphen-char (in-value #\u00AD)]
@@ -296,7 +295,7 @@
 
 (require sugar/list)
 (define-quad filler quad ())
-(define (fill-wrap qs ending-q)
+(define (fill-wrap qs ending-q line-q)
   (match (and (pair? qs) (quad-ref (car qs) (if ending-q
                                                 'line-align
                                                 'line-align-last) "left"))
@@ -308,7 +307,7 @@
      (match (length word-sublists)
        [1 #:when (equal? align-value "justify") qs] ; can't justify single word
        [word-count
-        (match-define (list line-width line-height) (quad-size q:line))
+        (match-define (list line-width line-height) (quad-size line-q))
         ;; words may still be in hyphenated fragments
         ;; (though soft hyphens would have been removed)
         ;; so group them (but no need to consolidate — that happens elsewhere)
@@ -338,7 +337,8 @@
 
 (define-quad offsetter quad ())
 
-(define (finish-line-wrap pcs-in opening-q ending-q idx)
+(define ((finish-line-wrap line-q) pcs-in opening-q ending-q idx)
+  ;; we curry line-q so that the wrap size can be communicated to this operation
   ;; remove unused soft hyphens so they don't affect final shaping
   (define pcs-printing
     (for/list ([pc (in-list pcs-in)]
@@ -348,7 +348,7 @@
    (cond
      [(empty? pcs-printing) null]
      [(hr-break? ending-q)
-      (list (struct-copy quad q:line
+      (list (struct-copy quad line-q
                          [draw-start (λ (dq doc)
                                        (match-define (list left top) (quad-origin dq))
                                        (match-define (list right bottom)(size dq))
@@ -364,31 +364,31 @@
       (define pcs-with-hyphen (render-hyphen pcs-printing ending-q))
       ;; fill wrap so that consolidate-runs works properly
       ;; (justified lines won't be totally consolidated)
-      (define pcs (fill-wrap pcs-with-hyphen ending-q))
+      (define pcs (fill-wrap pcs-with-hyphen ending-q line-q))
       (match (consolidate-runs pcs ending-q)
         [(? pair? elems)
          (define elem (unsafe-car elems))
-         (match-define (list line-width line-height) (quad-size q:line))
+         (match-define (list line-width line-height) (quad-size line-q))
          (define new-size (let ()
                             (define line-heights
                               (filter-map (λ (q) (quad-ref q 'line-height)) pcs))
                             (pt line-width (if (empty? line-heights) line-height (apply max line-heights)))))
          (list
           (struct-copy
-           quad q:line
+           quad line-q
            ;; move block attrs up, so they are visible in page wrap
            [attrs (copy-block-attrs (quad-attrs elem)
-                                    (hash-copy (quad-attrs q:line)))]
+                                    (hash-copy (quad-attrs line-q)))]
            ;; line width is static
            ;; line height is the max 'line-height value or the natural height of q:line
            [size new-size]
            ;; handle list indexes. drop new quad into line to hold list index
            ;; could also use this for line numbers
            [elems
-                ;; we assume here that a list item has already had extra inset-left
-                ;; with room for a bullet
-                ;; which we just insert at the front.
-                ;; this is safe because line has already been filled.
+            ;; we assume here that a list item has already had extra inset-left
+            ;; with room for a bullet
+            ;; which we just insert at the front.
+            ;; this is safe because line has already been filled.
             (append
              ;; only put bullet into line if we're at the first line of the list item
              (match (and (eq? idx 1) (quad-ref elem 'list-index))
@@ -412,17 +412,20 @@
      [else (list q:line-spacer)])))
 
 (define (line-wrap qs wrap-size)
+  (define line-q (struct-copy
+                  quad q:line
+                  [size (pt wrap-size (pt-y (size q:line)))]))
   (apply append
          ;; next line removes all para-break? quads as a consequence
          (for/list ([qs (in-list (filter-split qs para-break?))])
            (wrap qs
                  (λ (q idx) (- wrap-size (quad-ref q 'inset-left 0) (quad-ref q 'inset-right 0)))
-                 #:nicely (match (and (pair? qs) (quad-ref (car qs) 'line-wrap #false))
-                            [(or #false "false") #false]
-                            [(or "best" "kp") #true])
+                 #:nicely (match (and (pair? qs) (quad-ref (car qs) 'line-wrap))
+                            [(or "best" "kp") #true]
+                            [_ #false])
                  #:hard-break line-break?
                  #:soft-break soft-break-for-line?
-                 #:finish-wrap finish-line-wrap))))
+                 #:finish-wrap (finish-line-wrap line-q)))))
 
 (define (make-nobreak! q) (quad-set! q 'no-pbr "true"))
 
