@@ -3,7 +3,7 @@
 (require racket/promise racket/list sugar/debug pitfall/pdf pitfall/vector pitfall/font pitfall/annotation pitfall/color pitfall/text fontland/font racket/runtime-path pollen/tag)
 (provide (rename-out [mb #%module-begin]) (except-out (all-from-out racket) #%module-begin))
 
-(define-runtime-path charter "fonts/charter.ttf")
+(define-runtime-path charter "fonts/charter/charter.otf")
 
 (define (soft-break? q)
   (and (quad? q)

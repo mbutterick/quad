@@ -1,4 +1,4 @@
-#lang qtest/markdown
+#lang quadwriter/markdown
 
 # Hyphenate
 

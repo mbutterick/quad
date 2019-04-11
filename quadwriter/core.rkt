@@ -1,114 +1,25 @@
 #lang debug racket/base
-(require (for-syntax racket/base) txexpr racket/runtime-path racket/path racket/string racket/promise racket/match racket/list
-         pitfall quad sugar/debug pollen/tag racket/unsafe/ops hyphenate)
-(provide (except-out (all-from-out racket/base) #%module-begin)
-         (rename-out [mb #%module-begin])
-         p id strong em attr-list h1 h2 h3 h4 h5 h6 
-         ol li ul rsquo lsquo rdquo ldquo hellip ndash mdash
-         hr
-         code pre a blockquote)
+(require (for-syntax racket/base)
+         racket/runtime-path
+         racket/path
+         racket/string
+         racket/promise
+         racket/match
+         racket/list
+         sugar/list
+         racket/date
+         pitfall
+         quad
+         sugar/debug
+         racket/unsafe/ops
+         hyphenate)
 
-(define rsquo "’")
-(define rdquo "”")
-(define lsquo "‘")
-(define ldquo "“")
-(define hellip "…")
-(define ndash "–")
-(define mdash "—")
-
-(define (root attrs exprs)
-  (qexpr (append `(#;(first-line-indent "12")
-                   #;(line-align "center")
-                   (line-wrap "kp")
-                   (line-height "17")
-                   #;(line-align-last "center")) attrs) exprs))
-
-(define-tag-function (p attrs exprs)
-  ;; no font-family so that it adopts whatever the surrounding family is
-  (qexpr (append `((keep-first "2")(keep-last "3") (line-align "justify") (font-size-adjust "100%") (character-tracking "0") (hyphenate "true") (display ,(symbol->string (gensym)))) attrs) exprs))
-
-(define-tag-function (hr attrs exprs)
-  hrbr)
-
-(define-tag-function (blockquote attrs exprs)
-  (qexpr (append '((display "block") 
-                   (first-line-indent "0") 
-                   (background-color "#eee") 
-                   (font-family "fira") (font-size "10") (line-height "14")
-                   (border-width-top "0.5") (border-color-top "gray") (border-inset-top "8")
-                   (border-width-left "3") (border-color-left "gray") (border-inset-left "20")
-                   (border-width-bottom "0.5") (border-color-bottom "gray") (border-inset-bottom "-2")
-                   (border-width-right "0.5") (border-color-right "gray") (border-inset-right "20")
-                   (inset-top "10") (inset-bottom "8") (inset-left "30") (inset-right "30")
-                   (keep-lines "yes"))
-                 attrs) exprs))
-
-(define id (default-tag-function 'id))
-(define class (default-tag-function 'class))
-
-(define-tag-function (strong attrs exprs)
-  (qexpr (list* '(font-bold "true") '(font-size-adjust "100%") attrs) exprs))
-
-(define-tag-function (a attrs exprs)
-  (qexpr `((link ,(cadr (assoc 'href attrs)))(color "MediumVioletRed")) exprs))
-
-(define-tag-function (em attrs exprs)
-  (qexpr (list* '(font-italic "true") '(font-size-adjust "100%") attrs) exprs))
-
-(define-syntax-rule (attr-list . attrs) 'attrs)
-
-(define (heading-base font-size attrs exprs)
-  (qexpr (append `((font-family "fira-light") (first-line-indent "0") (display "block") (font-size ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9") (inset-bottom "-3") (inset-top "6") (keep-with-next "true")) attrs) exprs))
-
-(define-tag-function (h1 attrs exprs)
-  (heading-base 20 (append '() attrs) exprs))
-
-(define-tag-function (h2 attrs exprs) (heading-base 16 attrs exprs))
-(define-tag-function (h3 attrs exprs) (heading-base 14 attrs exprs))
-
-(define h4 h3)
-(define h5 h3)
-(define h6 h3)
-
-(define-tag-function (code attrs exprs)
-  (qexpr (append '((font-family "fira-mono")#;(line-align "right")(font-size "10")(bg "aliceblue")) attrs) exprs))
-
-(define-tag-function (pre attrs exprs)
-  ;; pre needs to convert white space to equivalent layout elements
-  (define new-exprs (add-between
-                     (for*/list ([expr (in-list exprs)]
-                                 [str (in-list (string-split (string-join (get-elements expr) "") "\n"))])
-                       `(,(get-tag expr) ,(get-attrs expr) ,(string-replace str " " " ")))
-                     lbr))
-  (qexpr (list* '(display "block") '(background-color "aliceblue")
-                '(first-line-indent "0")
-                '(font-family "fira-mono") '(font-size "11") '(line-height "14")
-                '(border-inset-top "10")
-                '(border-width-left "2") '(border-color-left "#669") '(border-inset-left "0")
-                '(border-inset-bottom "-4")
-                '(inset-left "12")  '(inset-top "12") '(inset-bottom "8")
-                attrs) new-exprs))
-
+(provide hrbr lbr pbr run default-font-size default-font-face)
 
 (define draw-debug? #f)
 (define draw-debug-line? #t)
 (define draw-debug-block? #t)
-(define draw-debug-string? #f)
-
-(require racket/dict)
-(define (list-base attrs exprs [bullet-val #f])
-  (define bullet-space-factor 2.5)
-  (define em (dict-ref attrs 'font-size default-font-size))
-  (define bullet-indent (* bullet-space-factor em))
-  (qexpr (list* `(inset-left ,(number->string bullet-indent)) attrs)
-         (add-between
-          (for/list ([(expr idx) (in-indexed exprs)])
-            (list* (get-tag expr) (cons (list 'list-index (or bullet-val (format "~a" (add1 idx)))) (get-attrs expr)) (get-elements expr)))
-          pbr)))
-
-(define-tag-function (ol attrs exprs) (list-base attrs exprs))
-(define-tag-function (ul attrs exprs) (list-base attrs exprs "•"))
-(define-tag-function (li attrs exprs) (qexpr attrs exprs))  
+(define draw-debug-string? #t)
 
 (define-quad string-quad quad ())
 (define q:string (q #:type string-quad
@@ -125,21 +36,21 @@
                     ;; draw with pdf text routine
                     #:draw (λ (q doc)
                              (when (pair? (quad-elems q))
-                               (font doc (path->string (quad-ref q font-path-key)))
+                               (font doc (path->string (quad-ref q font-path-key default-font-face)))
                                (font-size doc (quad-ref q 'font-size 12))
                                (fill-color doc (quad-ref q 'color "black"))
                                (define str (unsafe-car (quad-elems q)))
                                (match-define (list x y) (quad-origin q))
                                (text doc str x y
                                      #:tracking (quad-ref q 'character-tracking 0)
-                                     #:bg (quad-ref q 'bg #f)
+                                     #:bg (quad-ref q 'bg)
                                      #:features (list (cons #"tnum" 1))
-                                     #:link (quad-ref q 'link #f))))
+                                     #:link (quad-ref q 'link))))
                     #:draw-end (if draw-debug-string?
                                    (λ (q doc) (draw-debug q doc "#99f" "#ccf"))
                                    void)))
 
-(define-runtime-path default-font-face "fonts/charter/charter.otf")
+(define-runtime-path default-font-face "fonts/charter.otf")
 (define default-font-family "charter")
 (define default-font-size 12)
 
@@ -293,7 +204,6 @@
                                    [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
                          (struct-copy quad q [elems (list substr)]))]))))
 
-(require sugar/list)
 (define-quad filler quad ())
 (define (fill-wrap qs ending-q line-q)
   (match (and (pair? qs) (quad-ref (car qs) (if ending-q
@@ -472,7 +382,6 @@
 (define side-margin (/ 120 (if zoom-mode? zoom-scale 1)))
 (define page-offset (pt (/ side-margin (if zoom-mode? 3 1))
                         (/ top-margin (if zoom-mode? 3 1))))
-(require racket/date)
 (define q:page (q #:offset page-offset
                   #:draw-start (λ (q doc) (add-page doc)
                                  (scale doc (if zoom-mode? zoom-scale 1) (if zoom-mode? zoom-scale 1)))
@@ -690,7 +599,8 @@
   (setup-font-path-table! pdf-path)
   (parameterize ([current-doc pdf]
                  [verbose-quad-printing? #false])
-    (let* ([x (time-name parse-qexpr (qexpr->quad xs))]
+    (let* ([x (time-name parse-qexpr (qexpr->quad  `(q ((font-family ,default-font-family)
+                                                        (font-size ,(number->string default-font-size))) ,xs)))]
            [x (time-name atomize (atomize x #:attrs-proc handle-cascading-attrs))]
            [x (time-name hyphenate (handle-hyphenate x))]
            [x (time-name ->string-quad (map ->string-quad x))]
@@ -700,47 +610,3 @@
            [x (time-name page-wrap (page-wrap x vertical-height pdf-path))]
            [x (time-name position (position (struct-copy quad q:doc [elems x])))])
       (time-name draw (draw x pdf)))))
-
-(define-syntax (mb stx)
-  (syntax-case stx ()
-    [(_ PDF-PATH . STRS)
-     #'(#%module-begin
-        ;; stick an nbsp in the strings so we have one printing char
-        (define strs (match (list . STRS)
-                       [(? null?) '(" ")]
-                       [strs strs]))
-        (define qx (root null (add-between strs (list pbr)
-                                           #:before-first (list pbr)
-                                           #:after-last (list pbr)
-                                           #:splice? #true)))
-        (run qx PDF-PATH))]))
-
-(module+ reader
-  (require scribble/reader syntax/strip-context (only-in markdown parse-markdown)
-           racket/match txexpr)
-  (provide (rename-out [quad-read-syntax read-syntax]))
-
- 
-  (define (xexpr->parse-tree x)
-    ;; an ordinary txexpr can't serve as a parse tree because of the attrs list fails when passed to #%app.
-    ;; so stick an `attr-list` identifier on it which can hook into the expander.
-    ;; sort of SXML-ish.
-    (let loop ([x x])
-      (match x
-        [(txexpr tag attrs elems) (list* tag (cons 'attr-list attrs) (map loop elems))]
-        [(? list? xs) (map loop xs)]
-        [_ x])))
-  
-  (define (quad-read-syntax path-string p)
-    (define quad-at-reader (make-at-reader
-                            #:syntax? #t 
-                            #:inside? #t
-                            #:command-char #\◊))
-    (define stx (quad-at-reader path-string p))
-    (define parsed-stxs (datum->syntax stx (xexpr->parse-tree (parse-markdown (apply string-append (syntax->datum stx))))))
-    (strip-context
-     (with-syntax ([STXS parsed-stxs]
-                   [PDF-PATH (path-replace-extension path-string #".pdf")])
-       #'(module _ qtest/markdown
-           PDF-PATH
-           . STXS)))))
