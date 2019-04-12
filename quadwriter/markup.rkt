@@ -31,7 +31,7 @@
    (run qx PDF-PATH)))
 
 (module reader racket/base
-  (require syntax/strip-context (only-in markdown parse-markdown) "reader-helper.rkt")
+  (require pollen/decode syntax/strip-context "reader-helper.rkt")
   (provide (rename-out [rs read-syntax]))
  
   (define (rs path-string p)
@@ -39,7 +39,7 @@
     (define parsed-stxs
       (datum->syntax stx
                      (xexpr->parse-tree
-                      (parse-markdown (apply string-append (syntax->datum stx))))))
+                      (decode-paragraphs (syntax->datum stx)))))
     (strip-context
      (with-syntax ([STXS parsed-stxs]
                    [PDF-PATH (path-string->pdf-path path-string)])
