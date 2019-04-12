@@ -6,7 +6,10 @@
 
 (define (path-string->pdf-path path-string)
   (match (format "~a" path-string)
-    ["unsaved-editor" (build-path (find-system-path 'desk-dir) "untitled.pdf")]
+    ;; weird test but sometimes DrRacket calls the unsaved file
+    ;; 'unsaved-editor and sometimes "unsaved editor"
+    [(regexp #rx"unsaved.editor")
+     (build-path (find-system-path 'desk-dir) "untitled.pdf")]
     [_ (path-replace-extension path-string #".pdf")]))
 
 (define quad-at-reader (make-at-reader
