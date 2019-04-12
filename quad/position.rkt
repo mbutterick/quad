@@ -49,12 +49,12 @@
       [(nw) '(0 0  )] [(n) '(0.5 0  )] [(ne) '(1 0  )]
       [( w) '(0 0.5)] [(c) '(0.5 0.5)] [( e) '(1 0.5)]
       [(sw) '(0 1  )] [(s) '(0.5 1  )] [(se) '(1 1  )]
-      [(bi) '(0 0  )]                  [(bo) '(1 0  )]
+      [(baseline-in bi) '(0 0  )]                  [(baseline-out bo) '(1 0  )]
       [else (raise-argument-error 'anchor->local-point (format "anchor value in ~v" valid-anchors) anchor)]))
   (match-define (list x y) (size q))
   (pt (coerce-int (* x x-fac))
       (coerce-int (+ (* y y-fac) (match anchor
-                                   [(or 'bi 'bo) (vertical-baseline-offset q)]
+                                   [(or 'bi 'bo 'baseline-in 'baseline-out) (vertical-baseline-offset q)]
                                    [_ 0])))))
 
 (define (inner-point q)

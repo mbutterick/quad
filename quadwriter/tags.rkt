@@ -5,19 +5,20 @@
          racket/string
          racket/list
          racket/dict
-         txexpr/base)
+         txexpr/base
+         "font.rkt")
 (provide (all-defined-out))
 
 (define (root attrs exprs)
   (qexpr (append `(#;(first-line-indent "12")
                    #;(line-align "center")
-                   (line-wrap "kp")
+                   #;(line-wrap "kp")
                    (line-height "17")
                    #;(line-align-last "center")) attrs) exprs))
 
 (define-tag-function (p attrs exprs)
   ;; no font-family so that it adopts whatever the surrounding family is
-  (qexpr (append `((keep-first "2")(keep-last "3") (line-align "justify") (font-size-adjust "100%") (character-tracking "0") (hyphenate "true") (display ,(symbol->string (gensym)))) attrs) exprs))
+  (qexpr (append `((keep-first "2")(keep-last "3") (line-align "left") (font-size-adjust "100%") (character-tracking "0") (hyphenate "true") (display ,(symbol->string (gensym)))) attrs) exprs))
 
 (define-tag-function (hr attrs exprs)
   hrbr)

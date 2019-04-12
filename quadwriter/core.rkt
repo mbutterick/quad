@@ -10,46 +10,45 @@
          sugar/debug
          racket/unsafe/ops
          hyphenate
+         "attrs.rkt"
          "param.rkt"
          "font.rkt")
-
-(provide hrbr lbr pbr run default-font-size default-font-face)
-
-(define draw-debug? #f)
-(define draw-debug-line? #t)
-(define draw-debug-block? #t)
-(define draw-debug-string? #t)
+(provide hrbr lbr pbr run)
 
 (define-quad string-quad quad ())
+ 
+(define (q:string-draw q doc)
+  ;; draw with pdf text routine  (when (pair? (quad-elems q))
+  (font doc (path->string (quad-ref q font-path-key default-font-face)))
+  (font-size doc (quad-ref q 'font-size 12))
+  (fill-color doc (quad-ref q 'color "black"))
+  (define str (unsafe-car (quad-elems q)))
+  (match-define (list x y) (quad-origin q))
+  (text doc str x y
+        #:tracking (quad-ref q 'character-tracking 0)
+        #:bg (quad-ref q 'bg)
+        #:features (list (cons #"tnum" 1))
+        #:link (quad-ref q 'link)))
+
+(define (q:string-draw-end q doc)
+  (when (draw-debug-string?)
+    (draw-debug q doc "#99f" "#ccf")))
+
+(define (q:string-printable? q [sig #f])
+  ;; printable unless single space, which is not printable at start or end
+  (match (quad-elems q)
+    [(cons elem _)
+     (case elem
+       [(" " #\space) (not (memq sig '(start end)))]
+       [else #true])]
+    [_ #true]))
+
 (define q:string (q #:type string-quad
-                    #:in 'bi
-                    #:out 'bo ;; align to baseline
-                    ;; printable unless single space, which is not printable at start or end
-                    #:printable (λ (q [sig #f])
-                                  (match (quad-elems q)
-                                    [(cons elem _)
-                                     (case elem
-                                       [(" " #\space) (not (memq sig '(start end)))]
-                                       [else #true])]
-                                    [_ #true]))
-                    ;; draw with pdf text routine
-                    #:draw (λ (q doc)
-                             (when (pair? (quad-elems q))
-                               (font doc (path->string (quad-ref q font-path-key default-font-face)))
-                               (font-size doc (quad-ref q 'font-size 12))
-                               (fill-color doc (quad-ref q 'color "black"))
-                               (define str (unsafe-car (quad-elems q)))
-                               (match-define (list x y) (quad-origin q))
-                               (text doc str x y
-                                     #:tracking (quad-ref q 'character-tracking 0)
-                                     #:bg (quad-ref q 'bg)
-                                     #:features (list (cons #"tnum" 1))
-                                     #:link (quad-ref q 'link))))
-                    #:draw-end (if draw-debug-string?
-                                   (λ (q doc) (draw-debug q doc "#99f" "#ccf"))
-                                   void)))
-
-
+                    #:in 'baseline-in
+                    #:out 'baseline-out
+                    #:printable q:string-printable?
+                    #:draw q:string-draw
+                    #:draw-end q:string-draw-end))
 
 (define (make-size-promise q [str-arg #f])
   (delay
@@ -87,7 +86,7 @@
 
 
 (define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"])
-  (when draw-debug?
+  (when (draw-debug?)
     (save doc)
     (line-width doc 0.5)
     (apply rect doc (append (quad-origin q) (size q)))
@@ -99,18 +98,20 @@
     (fill doc stroke-color)  
     (restore doc)))
 
-(define line-height 16)
-(define q:line (q #:size (pt 0 line-height)
+(define dumb-hardcoded-line-height 16)
+(define q:line (q #:size (pt 0 dumb-hardcoded-line-height)
                   #:inner 'sw
                   #:out 'sw
                   #:printable #true
                   #:draw-start (if draw-debug-line? draw-debug void)))
+
 (struct line-spacer quad () #:transparent)
 (define q:line-spacer (q #:type line-spacer
-                         #:size (pt 0 (* line-height 0.6))
+                         #:size (pt 0 (* dumb-hardcoded-line-height 0.6))
                          #:out 'sw
                          #:printable (λ (q sig) (not (memq sig '(start end))))
-                         #:draw-start (if draw-debug-line? draw-debug void)))
+                         #:draw-start (if (draw-debug-line?) draw-debug void)))
+
 (define q:line-spacer-unbreakable
   (struct-copy line-spacer q:line-spacer
                [attrs #:parent quad
@@ -123,12 +124,9 @@
        (member (unsafe-car (quad-elems q)) softies)))
 
 (define (consolidate-runs pcs ending-q)
-  (for/fold ([runs empty]
-             [pcs pcs]
-             #:result (reverse runs))
-            ([i (in-naturals)]
-             #:break (empty? pcs))
+  (let loop ([runs empty][pcs pcs])
     (match pcs
+      [(? empty?) (reverse runs)]
       [(cons (? string-quad? strq) rest)
        (define-values (run-pcs rest) (splitf-at pcs (λ (p) (same-run? strq p))))
        (define new-run (struct-copy quad q:string
@@ -138,8 +136,8 @@
                                     [size (delay (pt (for/sum ([pc (in-list run-pcs)])
                                                        (pt-x (size pc)))
                                                      (pt-y (size strq))))]))
-       (values (cons new-run runs) rest)]
-      [(cons first rest) (values (cons first runs) rest)])))
+       (loop (cons new-run runs) rest)]
+      [(cons first rest) (loop (cons first runs) rest)])))
 
 (define (render-hyphen qs ending-q)
   ;; naive handling of soft hyphen:
@@ -170,15 +168,6 @@
   (check-true (line-break? (second (atomize (q "foo" pbr "bar"))))))
 
 (define (copy-block-attrs source-hash dest-hash)
-  (define block-attrs '(display
-                        inset-top inset-bottom inset-left inset-right
-                        border-inset-top  border-inset-bottom border-inset-left border-inset-right
-                        border-width-left border-width-right border-width-top border-width-bottom
-                        border-color-left border-color-right border-color-top border-color-bottom
-                        background-color
-                        keep-lines keep-first keep-last keep-all keep-with-next
-                        line-align line-align-last first-line-indent
-                        line-wrap))
   (for* ([k (in-list block-attrs)]
          [v (in-value (hash-ref source-hash k #f))]
          #:when v)
@@ -188,16 +177,17 @@
 (define (handle-hyphenate qs)
   ;; find quads that want hyphenation and split them into smaller pieces
   ;; do this before ->string-quad so that it can handle the sizing promises
-  (apply append (for/list ([q (in-list qs)])
-                  (match (quad-ref q 'hyphenate)
-                    [(or #false "false") (list q)]
-                    [_ (for*/list ([str (in-list (quad-elems q))]
-                                   [hyphen-char (in-value #\u00AD)]
-                                   [hstr (in-value (hyphenate str hyphen-char
-                                                              #:min-left-length 4
-                                                              #:min-right-length 3))]
-                                   [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
-                         (struct-copy quad q [elems (list substr)]))]))))
+  (apply append
+         (for/list ([q (in-list qs)])
+           (match (quad-ref q 'hyphenate)
+             [(or #false "false") (list q)]
+             [_ (for*/list ([str (in-list (quad-elems q))]
+                            [hyphen-char (in-value #\u00AD)]
+                            [hstr (in-value (hyphenate str hyphen-char
+                                                       #:min-left-length 4
+                                                       #:min-right-length 3))]
+                            [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
+                  (struct-copy quad q [elems (list substr)]))]))))
 
 (define-quad filler quad ())
 (define (fill-wrap qs ending-q line-q)
@@ -216,14 +206,15 @@
         ;; words may still be in hyphenated fragments
         ;; (though soft hyphens would have been removed)
         ;; so group them (but no need to consolidate — that happens elsewhere)
-        (define occupied-width (match align-value
-                                 ;; for justified line, we care about size of words without spaces
-                                 ["justify" (for*/sum ([word-sublist (in-list word-sublists)]
-                                                       [word (in-list word-sublist)])
-                                              (pt-x (size word)))]
-                                 ;; for others, we care about size with spaces
-                                 [_ (for/sum ([q (in-list qs)])
-                                      (pt-x (size q)))]))
+        (define occupied-width
+          (match align-value
+            ;; for justified line, we care about size of words without spaces
+            ["justify" (for*/sum ([word-sublist (in-list word-sublists)]
+                                  [word (in-list word-sublist)])
+                         (pt-x (size word)))]
+            ;; for others, we care about size with spaces
+            [_ (for/sum ([q (in-list qs)])
+                 (pt-x (size q)))]))
         (define empty-hspace (- line-width
                                 (quad-ref (car qs) 'inset-left 0)
                                 occupied-width
@@ -242,28 +233,30 @@
 
 (define-quad offsetter quad ())
 
+(define (hr-draw dq doc)
+  (match-define (list left top) (quad-origin dq))
+  (match-define (list right bottom)(size dq))
+  (save doc)
+  (translate doc left (+ top (/ bottom 2)))
+  (move-to doc 0 0)
+  (line-to doc right 0)
+  (line-width doc 0.5)
+  (stroke doc "black")
+  (restore doc))
+
+(define (make-hr-quad line-q)
+  (struct-copy quad line-q [draw-start hr-draw]))
+
 (define ((finish-line-wrap line-q) pcs-in opening-q ending-q idx)
   ;; we curry line-q so that the wrap size can be communicated to this operation
   ;; remove unused soft hyphens so they don't affect final shaping
-  (define pcs-printing
-    (for/list ([pc (in-list pcs-in)]
-               #:unless (equal? (quad-elems pc) '("\u00AD")))
-      pc))
+  (define pcs-printing (for/list ([pc (in-list pcs-in)]
+                                  #:unless (equal? (quad-elems pc) '("\u00AD")))
+                         pc))
   (append
    (cond
      [(empty? pcs-printing) null]
-     [(hr-break? ending-q)
-      (list (struct-copy quad line-q
-                         [draw-start (λ (dq doc)
-                                       (match-define (list left top) (quad-origin dq))
-                                       (match-define (list right bottom)(size dq))
-                                       (save doc)
-                                       (translate doc left (+ top (/ bottom 2)))
-                                       (move-to doc 0 0)
-                                       (line-to doc right 0)
-                                       (line-width doc 0.5)
-                                       (stroke doc "black")
-                                       (restore doc))]))]
+     [(hr-break? ending-q) (list (make-hr-quad line-q))]
      [else
       ;; render hyphen first so that all printable characters are available for size-dependent ops.
       (define pcs-with-hyphen (render-hyphen pcs-printing ending-q))
@@ -377,21 +370,65 @@
 (define side-margin (/ 120 (if zoom-mode? zoom-scale 1)))
 (define page-offset (pt (/ side-margin (if zoom-mode? 3 1))
                         (/ top-margin (if zoom-mode? 3 1))))
+
+(define (page-draw-start q doc)
+  (add-page doc)
+  (scale doc (if zoom-mode? zoom-scale 1) (if zoom-mode? zoom-scale 1)))
+
+(define (page-draw-end q doc)
+  (font-size doc 10)
+  (font doc default-font-face)
+  (fill-color doc "black")
+  (text doc (format "~a · ~a at ~a" (hash-ref (quad-attrs q) 'page-number)
+                    (hash-ref (quad-attrs q) 'doc-title)
+                    (date->string (current-date) #t))
+        side-margin
+        (+ (- (pdf-height doc) bottom-margin) 20)))
+
 (define q:page (q #:offset page-offset
-                  #:draw-start (λ (q doc) (add-page doc)
-                                 (scale doc (if zoom-mode? zoom-scale 1) (if zoom-mode? zoom-scale 1)))
-                  #:draw-end (λ (q doc)
-                               (font-size doc 10)
-                               (font doc default-font-face)
-                               (fill-color doc "black")
-                               (text doc (format "~a · ~a at ~a" (hash-ref (quad-attrs q) 'page-number)
-                                                 (hash-ref (quad-attrs q) 'doc-title)
-                                                 (date->string (current-date) #t))
-                                     side-margin
-                                     (+ (- (pdf-height doc) bottom-margin) 20)))))
+                  #:draw-start page-draw-start
+                  #:draw-end page-draw-end))
 
 (define q:doc (q #:draw-start (λ (q doc) (start-doc doc))
                  #:draw-end (λ (q doc) (end-doc doc))))
+
+(define ((block-draw-start first-line) q doc)
+  ;; adjust drawing coordinates for border inset
+  (match-define (list bil bit bir bib)
+    (for/list ([k (in-list '(border-inset-left border-inset-top border-inset-right border-inset-bottom))])
+      (quad-ref first-line k 0)))
+  (match-define (list left top) (pt+ (quad-origin q) (list bil bit)))
+  (match-define (list width height) (pt- (size q) (list (+ bil bir) (+ bit bib))))
+  ;; fill rect
+  (cond 
+    [(quad-ref first-line 'background-color)
+     => (λ (bgcolor)
+          (rect doc left top width height)
+          (fill doc bgcolor))])
+  ;; draw border
+  (match-define (list bw-left bw-top bw-right bw-bottom)
+    (map (λ (k) (max 0 (quad-ref first-line k 0))) '(border-width-left
+                                                     border-width-top
+                                                     border-width-right
+                                                     border-width-bottom)))
+  ;; adjust start and end points based on adjacent border width
+  ;; so all borders overlap rectangularly
+  (define (half x) (/ x 2.0))
+  (define right (+ left width))
+  (define bottom (+ top height))
+  (define (box-side x1 y1 x2 y2 color stroke-width)
+    (when (positive? stroke-width)
+      (move-to doc x1 y1)
+      (line-to doc x2 y2)
+      (stroke doc (or color "black") stroke-width)))
+  (box-side (- left (half bw-left)) top (+ right (half bw-right)) top
+            (quad-ref first-line 'border-color-top) bw-top)
+  (box-side right (- top (half bw-top)) right (+ bottom (half bw-bottom))
+            (quad-ref first-line 'border-color-right) bw-right)
+  (box-side (+ right (half bw-right)) bottom (- left (half bw-left)) bottom
+            (quad-ref first-line 'border-color-bottom) bw-bottom)
+  (box-side left (+ bottom (half bw-bottom)) left (- top (half bw-top))
+            (quad-ref first-line 'border-color-left) bw-left))
 
 (define (block-wrap lines)
   (define first-line (car lines)) 
@@ -404,47 +441,10 @@
                             (pt-y (size line)))
                           (quad-ref first-line 'inset-top 0)
                           (quad-ref first-line 'inset-bottom 0))))
-     #:draw-start (λ (q doc)
-                    ;; adjust drawing coordinates for border inset
-                    (match-define (list bil bit bir bib)
-                      (map (λ (k) (quad-ref first-line k 0))
-                           '(border-inset-left border-inset-top border-inset-right border-inset-bottom)))
-                    (match-define (list left top) (pt+ (quad-origin q) (list bil bit)))
-                    (match-define (list width height) (pt- (size q) (list (+ bil bir) (+ bit bib))))
-                    ;; fill rect
-                    (cond 
-                      [(quad-ref first-line 'background-color)
-                       => (λ (bgcolor)
-                            (rect doc left top width height)
-                            (fill doc bgcolor))])
-                    ;; draw border
-                    (match-define (list bw-left bw-top bw-right bw-bottom)
-                      (map (λ (k) (max 0 (quad-ref first-line k 0))) '(border-width-left
-                                                                       border-width-top
-                                                                       border-width-right
-                                                                       border-width-bottom)))
-                    ;; adjust start and end points based on adjacent border width
-                    ;; so all borders overlap rectangularly
-                    (define (half x) (/ x 2.0))
-                    (define right (+ left width))
-                    (define bottom (+ top height))
-                    (define (box-side x1 y1 x2 y2 color stroke-width)
-                      (when (positive? stroke-width)
-                        (move-to doc x1 y1)
-                        (line-to doc x2 y2)
-                        (stroke doc (or color "black") stroke-width)))
-                    (box-side (- left (half bw-left)) top (+ right (half bw-right)) top
-                              (quad-ref first-line 'border-color-top) bw-top)
-                    (box-side right (- top (half bw-top)) right (+ bottom (half bw-bottom))
-                              (quad-ref first-line 'border-color-right) bw-right)
-                    (box-side (+ right (half bw-right)) bottom (- left (half bw-left)) bottom
-                              (quad-ref first-line 'border-color-bottom) bw-bottom)
-                    (box-side left (+ bottom (half bw-bottom)) left (- top (half bw-top))
-                              (quad-ref first-line 'border-color-left) bw-left))
-     #:draw-end (if draw-debug-block?
+     #:draw-start (block-draw-start first-line)
+     #:draw-end (if (draw-debug-block?)
                     (λ (q doc) (draw-debug q doc "#6c6" "#9c9"))
                     void))) 
-
 
 (define (contiguous-group-by pred xs)
   ;; like `group-by`, but only groups together contiguous xs with the same pred value.
@@ -463,6 +463,17 @@
    (contiguous-group-by values '(1 1 2 2 2 3 4 5 5 6 6 7 8 9))
    '((1 1) (2 2 2) (3) (4) (5 5) (6 6) (7) (8) (9))))
 
+(define ((page-finish-wrap path) lns q0 q idx)
+  (list (struct-copy quad q:page
+                     [attrs (let ([page-number idx]
+                                  [h (hash-copy (quad-attrs q:page))])
+                              (hash-set! h 'page-number page-number)
+                              (define-values (dir name _)
+                                (split-path (path-replace-extension path #"")))
+                              (hash-set! h 'doc-title (string-titlecase (path->string name)))
+                              h)]
+                     [elems (insert-blocks lns)])))
+
 (define (page-wrap xs vertical-height path)
   ;; on timing of `insert-blocks`:
   ;; can't do it before because it depends on where pages are broken.
@@ -476,23 +487,14 @@
                      ;; do trial block insertions
                      (for/sum ([x (in-list (insert-blocks wrap-qs))])
                        (pt-y (size x))))                     
-        #:finish-wrap (λ (lns q0 q idx)
-                        (list (struct-copy quad q:page
-                                           [attrs (let ([page-number idx]
-                                                        [h (hash-copy (quad-attrs q:page))])
-                                                    (hash-set! h 'page-number page-number)
-                                                    (define-values (dir name _)
-                                                      (split-path (path-replace-extension path #"")))
-                                                    (hash-set! h 'doc-title (string-titlecase (path->string name)))
-                                                    h)]
-                                           [elems (insert-blocks lns)])))))
+        #:finish-wrap (page-finish-wrap path)))
 
 (define (insert-blocks lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x 'display)) lines))
   (append* (for/list ([line-group (in-list groups-of-lines)])
-             (match (quad-ref (car line-group) 'display)
-               [#false line-group]
-               [_ (list (block-wrap line-group))]))))
+             (if (quad-ref (car line-group) 'display)
+                 (list (block-wrap line-group))
+                 line-group))))
 
 (define (handle-cascading-attrs attrs)
   (resolve-font-path attrs)
@@ -526,8 +528,9 @@
   (parameterize ([current-doc pdf]
                  [verbose-quad-printing? #false])
     (setup-font-path-table! pdf-path)
-    (let* ([x (time-name parse-qexpr (qexpr->quad  `(q ((font-family ,default-font-family)
-                                                        (font-size ,(number->string default-font-size))) ,xs)))]
+    (let* ([x (time-name parse-qexpr
+                         (qexpr->quad  `(q ((font-family ,default-font-family)
+                                            (font-size ,(number->string default-font-size))) ,xs)))]
            [x (time-name atomize (atomize x #:attrs-proc handle-cascading-attrs))]
            [x (time-name hyphenate (handle-hyphenate x))]
            [x (time-name ->string-quad (map ->string-quad x))]

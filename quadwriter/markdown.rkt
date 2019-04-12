@@ -4,12 +4,12 @@
          racket/match
          quadwriter/core
          "tags.rkt"
+         "font.rkt"
          "reader-helper.rkt")
 (provide (except-out (all-defined-out) mb)
          (rename-out [mb #%module-begin])
-         #%app #%datum #%top-interaction)
-(provide (all-from-out "tags.rkt")
-         rsquo rsquo lsquo ldquo hellip ndash mdash)
+         #%app #%datum #%top-interaction
+         (all-from-out "tags.rkt"))
 
 (define rsquo "’")
 (define rdquo "”")
