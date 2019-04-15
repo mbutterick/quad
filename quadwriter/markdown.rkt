@@ -5,7 +5,8 @@
          quadwriter/core
          "tags.rkt"
          "font.rkt"
-         "reader-helper.rkt")
+         "reader-helper.rkt"
+         "param.rkt")
 (provide (except-out (all-defined-out) mb)
          (rename-out [mb #%module-begin])
          #%app #%datum #%top-interaction
@@ -19,17 +20,22 @@
 (define ndash "–")
 (define mdash "—")
 
-(define-syntax-rule (mb PATH-STRING . STRS)
-  (#%module-begin
-   ;; stick an nbsp in the strings so we have one printing char
-   (define strs (match (list . STRS)
-                  [(? null?) '(" ")]
-                  [strs strs]))
-   (define qx (root null (add-between strs (list pbr)
-                                      #:before-first (list pbr)
-                                      #:after-last (list pbr)
-                                      #:splice? #true)))
-   (run qx (path-string->pdf-path 'PATH-STRING))))
+(define-syntax (mb stx)
+  (syntax-case stx ()
+    [(_ PATH-STRING . STRS)
+     (with-syntax ([DOC (datum->syntax #'PATH-STRING 'doc)])
+       #'(#%module-begin
+          ;; stick an nbsp in the strings so we have one printing char
+          (define strs (match (list . STRS)
+                         [(? null?) '(" ")]
+                         [strs strs]))
+          (define DOC (root null (add-between strs (list pbr)
+                                              #:before-first (list pbr)
+                                              #:after-last (list pbr)
+                                              #:splice? #true)))
+          (provide DOC)
+          (module+ main
+            (render-pdf DOC (path-string->pdf-path 'PATH-STRING)))))]))
 
 (module reader racket/base
   (require syntax/strip-context

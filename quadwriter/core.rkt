@@ -13,7 +13,7 @@
          "attrs.rkt"
          "param.rkt"
          "font.rkt")
-(provide hrbr lbr pbr run)
+(provide hrbr lbr pbr render-pdf)
 
 (define-quad string-quad quad ())
  
@@ -52,7 +52,7 @@
 
 (define (make-size-promise q [str-arg #f])
   (delay
-    (define doc (current-doc))
+    (define pdf (current-pdf))
     (define str
       (cond
         [str-arg]
@@ -61,16 +61,16 @@
     (define string-size
       (cond
         [str
-         (font-size doc (quad-ref q 'font-size default-font-size))
-         (font doc (path->string (quad-ref q font-path-key default-font-face)))
-         (+ (string-width doc str
+         (font-size pdf (quad-ref q 'font-size default-font-size))
+         (font pdf (path->string (quad-ref q font-path-key default-font-face)))
+         (+ (string-width pdf str
                           #:tracking (quad-ref q 'character-tracking 0))
             ;; add one more dose because `string-width` only adds it intercharacter,
             ;; and this quad will be adjacent to another
             ;; (so we need to account for the "inter-quad" space
             (quad-ref q 'character-tracking 0))]
         [else 0]))
-    (list string-size (quad-ref q 'line-height (current-line-height doc)))))
+    (list string-size (quad-ref q 'line-height (current-line-height pdf)))))
 
 (define (->string-quad q)
   (cond
@@ -517,7 +517,7 @@
                                            #:attrs (quad-attrs next-q)
                                            #:size (pt indent-val 0)) qs-out)])))
                  
-(define (run xs pdf-path)
+(define (render-pdf xs pdf-path)
   (define pdf (time-name make-pdf (make-pdf #:compress #t
                                             #:auto-first-page #f
                                             #:output-path pdf-path
@@ -525,7 +525,7 @@
                                             #:height (if zoom-mode? 400 792))))
   (define line-width (- (pdf-width pdf) (* 2 side-margin)))
   (define vertical-height (- (pdf-height pdf) top-margin bottom-margin))
-  (parameterize ([current-doc pdf]
+  (parameterize ([current-pdf pdf]
                  [verbose-quad-printing? #false])
     (setup-font-path-table! pdf-path)
     (let* ([x (time-name parse-qexpr
