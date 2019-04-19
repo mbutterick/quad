@@ -8,8 +8,8 @@
 
 (define-syntax-rule (make-mb DOC-PROC)
   (begin
-    (provide #%module-begin)
-    (define-syntax (#%module-begin stx)
+    (provide (rename-out [mb #%module-begin]))
+    (define-syntax (mb stx)
       (syntax-case stx ()
         [(_ PATH-STRING . EXPRS)
          (with-syntax ([DOC (datum->syntax #'PATH-STRING 'doc)])
