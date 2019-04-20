@@ -1,10 +1,20 @@
 #lang debug racket/base
 (require (for-syntax racket/base)
          racket/match
+         syntax/strip-context
          scribble/reader
          quadwriter/core
          txexpr)
 (provide (all-defined-out))
+
+(define ((make-read-syntax expander-mod pt-proc) path-string p)
+  (strip-context
+   (with-syntax ([PATH-STRING path-string]
+                 [PT (pt-proc path-string p)]
+                 [EXPANDER-MOD expander-mod])
+     #'(module _ EXPANDER-MOD
+         PATH-STRING
+         . PT))))
 
 (define-syntax-rule (make-mb DOC-PROC)
   (begin

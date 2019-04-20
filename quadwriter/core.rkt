@@ -98,8 +98,7 @@
     (fill doc stroke-color)  
     (restore doc)))
 
-(define dumb-hardcoded-line-height 16)
-(define q:line (q #:size (pt 0 dumb-hardcoded-line-height)
+(define q:line (q #:size (pt 0 default-line-height)
                   #:inner 'sw
                   #:out 'sw
                   #:printable #true
@@ -107,7 +106,7 @@
 
 (struct line-spacer quad () #:transparent)
 (define q:line-spacer (q #:type line-spacer
-                         #:size (pt 0 (* dumb-hardcoded-line-height 0.6))
+                         #:size (pt 0 (* default-line-height 0.6))
                          #:out 'sw
                          #:printable (λ (q sig) (not (memq sig '(start end))))
                          #:draw-start (if (draw-debug-line?) draw-debug void)))
@@ -235,7 +234,7 @@
 
 (define (hr-draw dq doc)
   (match-define (list left top) (quad-origin dq))
-  (match-define (list right bottom)(size dq))
+  (match-define (list right bottom) (size dq))
   (save doc)
   (translate doc left (+ top (/ bottom 2)))
   (move-to doc 0 0)

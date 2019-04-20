@@ -9,6 +9,7 @@
 (define-runtime-path default-font-face "fonts/source-serif/SourceSerifPro-Regular.otf")
 (define default-font-family "source-serif")
 (define default-font-size 12)
+(define default-line-height 16)
 
 (define font-paths (make-hash))
 
