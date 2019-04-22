@@ -329,12 +329,15 @@
 (define (do-keep-with-next! reversed-lines)
   ;; paints nobreak onto spacers that follow keep-with-next lines
   ;; (we are iterating backward, so the geometrically previous ln follows the spacer)
-  (for ([this-ln (in-list reversed-lines)]
-        [prev-ln (in-list (cdr reversed-lines))]
-        #:when (and (line-spacer? this-ln)
-                    (quad-ref prev-ln 'keep-with-next)))
-    (make-nobreak! prev-ln)
-    (make-nobreak! this-ln)))
+  (cond
+    [(null? reversed-lines) null]
+    [else
+     (for ([this-ln (in-list reversed-lines)]
+           [prev-ln (in-list (cdr reversed-lines))]
+           #:when (and (line-spacer? this-ln)
+                       (quad-ref prev-ln 'keep-with-next)))
+       (make-nobreak! prev-ln)
+       (make-nobreak! this-ln))]))
 
 (define (apply-keeps lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x 'display)) lines))
@@ -518,17 +521,17 @@
                  
 (define (render-pdf xs pdf-path)
   (define pdf (make-pdf #:compress #t
-                                            #:auto-first-page #f
-                                            #:output-path pdf-path
-                                            #:width (if zoom-mode? 350 612)
-                                            #:height (if zoom-mode? 400 792)))
+                        #:auto-first-page #f
+                        #:output-path pdf-path
+                        #:width (if zoom-mode? 350 612)
+                        #:height (if zoom-mode? 400 792)))
   (define line-width (- (pdf-width pdf) (* 2 side-margin)))
   (define vertical-height (- (pdf-height pdf) top-margin bottom-margin))
   (parameterize ([current-pdf pdf]
                  [verbose-quad-printing? #false])
     (setup-font-path-table! pdf-path)
     (let* ([x (qexpr->quad  `(q ((font-family ,default-font-family)
-                                            (font-size ,(number->string default-font-size))) ,xs))]
+                                 (font-size ,(number->string default-font-size))) ,xs))]
            [x (atomize x #:attrs-proc handle-cascading-attrs)]
            [x (time-name hyphenate (handle-hyphenate x))]
            [x (map ->string-quad x)]
