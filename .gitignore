@@ -19,4 +19,11 @@ Icon
 *log.txt
 *.pdf
 *.cache
-
+quad/scribblings/manual-fonts.css
+quad/scribblings/manual-racket.css
+quad/scribblings/manual-racket.js
+quad/scribblings/manual-style.css
+quad/scribblings/quad.html
+quad/scribblings/racket.css
+quad/scribblings/scribble-common.js
+quad/scribblings/scribble.css
