@@ -1,5 +1,6 @@
 #lang info
-(define collection 'multi)(define deps '("at-exp-lib"
+(define collection 'multi)
+(define deps '("at-exp-lib"
                "base"
                "beautiful-racket-lib"
                "fontland"
@@ -11,3 +12,4 @@
                "txexpr"
                "csp"))
 (define build-deps '("debug"))
+(define update-implies '("xenomorph" "fontland" "pitfall"))

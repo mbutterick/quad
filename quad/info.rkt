@@ -1,3 +1,3 @@
 #lang info
-(define collection "quad")
 (define version "0.0")
+(define scribblings '(("scribblings/quad.scrbl")))
