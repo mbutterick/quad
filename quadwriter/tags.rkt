@@ -27,7 +27,7 @@
   (qexpr (append '((display "block") 
                    (first-line-indent "0") 
                    (background-color "#eee") 
-                   (font-family "fira") (font-size "10") (line-height "14")
+                   (font-family "fira-sans") (font-size "10") (line-height "14")
                    (border-width-top "0.5") (border-color-top "gray") (border-inset-top "8")
                    (border-width-left "3") (border-color-left "gray") (border-inset-left "20")
                    (border-width-bottom "0.5") (border-color-bottom "gray") (border-inset-bottom "-2")
@@ -41,17 +41,19 @@
 
 (define-tag-function (strong attrs exprs)
   (qexpr (list* '(font-bold "true") '(font-size-adjust "100%") attrs) exprs))
+(define b strong)
 
 (define-tag-function (a attrs exprs)
   (qexpr `((link ,(cadr (assoc 'href attrs)))(color "MediumVioletRed")) exprs))
 
 (define-tag-function (em attrs exprs)
   (qexpr (list* '(font-italic "true") '(font-size-adjust "100%") attrs) exprs))
+(define i em)
 
 (define-syntax-rule (attr-list . attrs) 'attrs)
 
 (define (heading-base font-size attrs exprs)
-  (qexpr (append `((font-family "fira-light") (first-line-indent "0") (display "block") (font-size ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9") (inset-bottom "-3") (inset-top "6") (keep-with-next "true")) attrs) exprs))
+  (qexpr (append `((font-family "fira-sans-light") (first-line-indent "0") (display "block") (font-size ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9") (inset-bottom "-3") (inset-top "6") (keep-with-next "true")) attrs) exprs))
 
 (define-tag-function (h1 attrs exprs)
   (heading-base 20 (append '() attrs) exprs))

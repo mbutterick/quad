@@ -517,25 +517,25 @@
                                            #:size (pt indent-val 0)) qs-out)])))
                  
 (define (render-pdf xs pdf-path)
-  (define pdf (time-name make-pdf (make-pdf #:compress #t
+  (define pdf (make-pdf #:compress #t
                                             #:auto-first-page #f
                                             #:output-path pdf-path
                                             #:width (if zoom-mode? 350 612)
-                                            #:height (if zoom-mode? 400 792))))
+                                            #:height (if zoom-mode? 400 792)))
   (define line-width (- (pdf-width pdf) (* 2 side-margin)))
   (define vertical-height (- (pdf-height pdf) top-margin bottom-margin))
   (parameterize ([current-pdf pdf]
                  [verbose-quad-printing? #false])
     (setup-font-path-table! pdf-path)
-    (let* ([x (time-name parse-qexpr
-                         (qexpr->quad  `(q ((font-family ,default-font-family)
-                                            (font-size ,(number->string default-font-size))) ,xs)))]
-           [x (time-name atomize (atomize x #:attrs-proc handle-cascading-attrs))]
+    (let* ([x (qexpr->quad  `(q ((font-family ,default-font-family)
+                                            (font-size ,(number->string default-font-size))) ,xs))]
+           [x (atomize x #:attrs-proc handle-cascading-attrs)]
            [x (time-name hyphenate (handle-hyphenate x))]
-           [x (time-name ->string-quad (map ->string-quad x))]
-           [x (time-name insert-first-line-indents (insert-first-line-indents x))]  
+           [x (map ->string-quad x)]
+           [x (insert-first-line-indents x)]  
            [x (time-name line-wrap (line-wrap x line-width))]
-           [x (time-name apply-keeps (apply-keeps x))]
+           [x (apply-keeps x)]
            [x (time-name page-wrap (page-wrap x vertical-height pdf-path))]
            [x (time-name position (position (struct-copy quad q:doc [elems x])))])
-      (time-name draw (draw x pdf)))))
+      (time-name draw (draw x pdf))
+      (displayln (format "wrote PDF to ~a" pdf-path)))))

@@ -25,7 +25,7 @@
                           #:before-first (list pbr)
                           #:after-last (list pbr)
                           #:splice? #true)))
-(make-mb doc-proc)
+(make-module-begin doc-proc)
 
 (module reader racket/base
   (require racket/port markdown "lang-helper.rkt")

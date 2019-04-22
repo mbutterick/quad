@@ -4,7 +4,7 @@
 
 (define q (default-tag-function 'q))
 (define (doc-proc strs) (apply q strs))
-(make-mb doc-proc)
+(make-module-begin doc-proc)
 
 (module reader racket/base
   (require "lang-helper.rkt")

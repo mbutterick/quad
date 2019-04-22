@@ -16,10 +16,10 @@
          PATH-STRING
          . PT))))
 
-(define-syntax-rule (make-mb DOC-PROC)
+(define-syntax-rule (make-module-begin DOC-PROC)
   (begin
-    (provide (rename-out [mb #%module-begin]))
-    (define-syntax (mb stx)
+    (provide (rename-out [new-module-begin #%module-begin]))
+    (define-syntax (new-module-begin stx)
       (syntax-case stx ()
         [(_ PATH-STRING . EXPRS)
          (with-syntax ([DOC (datum->syntax #'PATH-STRING 'doc)])
