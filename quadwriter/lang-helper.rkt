@@ -1,6 +1,8 @@
 #lang debug racket/base
 (require (for-syntax racket/base)
          racket/match
+         racket/system
+         racket/class
          syntax/strip-context
          scribble/reader
          quadwriter/core
@@ -22,13 +24,17 @@
     (define-syntax (new-module-begin stx)
       (syntax-case stx ()
         [(_ PATH-STRING . EXPRS)
-         (with-syntax ([DOC (datum->syntax #'PATH-STRING 'doc)])
+         (with-syntax ([DOC (datum->syntax #'PATH-STRING 'doc)]
+                       [VIEW-RESULT (datum->syntax #'PATH-STRING 'view-result)])
            #'(#%module-begin
-              ;; stick an nbsp in the strings so we have one printing char
+              (provide DOC VIEW-RESULT)
               (define DOC (DOC-PROC (list . EXPRS)))
-              (provide DOC)
+              (define pdf-path (path-string->pdf-path 'PATH-STRING))
+              (define (VIEW-RESULT)
+                (when (file-exists? pdf-path)
+                  (void (system (format "open ~a" pdf-path)))))
               (module+ main
-                (render-pdf DOC (path-string->pdf-path 'PATH-STRING)))))]))))
+                (render-pdf DOC pdf-path))))]))))
 
 (define (path-string->pdf-path path-string)
   (match (format "~a" path-string)
@@ -52,3 +58,31 @@
       [(txexpr tag attrs elems) (list* tag (cons 'attr-list attrs) (map loop elems))]
       [(? list? xs) (map loop xs)]
       [_ x])))
+
+(define (get-info in mod line col pos)
+  ;; DrRacket caches source file information per session,
+  ;; so we can do the same to avoid multiple searches for the command char.
+  (define command-char-cache (make-hash))
+  (define my-command-char #\◊)
+  (λ (key default)
+    (case key
+      [(color-lexer)
+       (match (dynamic-require 'syntax-color/scribble-lexer 'make-scribble-inside-lexer (λ () #false))
+         [(? procedure? make-lexer) (make-lexer #:command-char my-command-char)]
+         [_ default])]
+      [(drracket:toolbar-buttons)
+       (match (dynamic-require 'pollen/private/drracket-buttons 'make-drracket-buttons (λ () #false))
+         [(? procedure? make-buttons) (make-buttons my-command-char)])]
+      [(drracket:indentation)
+       (λ (text pos)
+         (define line-idx (send text position-line pos))
+         (define line-start-pos (send text line-start-position line-idx))
+         (define line-end-pos (send text line-end-position line-idx))
+         (define first-vis-pos
+           (or
+            (for/first ([pos (in-range line-start-pos line-end-pos)]
+                        #:unless (char-blank? (send text get-character pos)))
+              pos)
+            line-start-pos))
+         (- first-vis-pos line-start-pos))]      
+      [else default])))

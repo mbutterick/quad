@@ -29,6 +29,6 @@
 
 (module reader racket/base
   (require racket/port markdown "lang-helper.rkt")
-  (provide read-syntax)
+  (provide read-syntax get-info)
   (define read-syntax (make-read-syntax 'quadwriter/markdown
                        (λ (path-string p) (xexpr->parse-tree (parse-markdown (port->string p)))))))

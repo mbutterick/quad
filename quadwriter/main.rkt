@@ -8,5 +8,5 @@
 
 (module reader racket/base
   (require "lang-helper.rkt")
-  (provide read-syntax)
+  (provide read-syntax get-info)
   (define read-syntax (make-read-syntax 'quadwriter quad-at-reader)))

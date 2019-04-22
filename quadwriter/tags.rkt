@@ -5,6 +5,7 @@
          racket/string
          racket/list
          racket/dict
+         racket/match
          txexpr/base
          "font.rkt")
 (provide (all-defined-out))
@@ -90,7 +91,8 @@
   (define bullet-indent (* bullet-space-factor em))
   (qexpr (list* `(inset-left ,(number->string bullet-indent)) attrs)
          (add-between
-          (for/list ([(expr idx) (in-indexed exprs)])
+          (for/list ([(expr idx) (in-indexed exprs)]
+                     #:when (txexpr? expr))
             (list* (get-tag expr) (cons (list 'list-index (or bullet-val (format "~a" (add1 idx)))) (get-attrs expr)) (get-elements expr)))
           pbr)))
 
