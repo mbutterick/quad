@@ -12,4 +12,4 @@
                "txexpr"
                "csp"))
 (define build-deps '("debug"))
-(define update-implies '("xenomorph" "fontland" "pitfall"))
+(define update-implies '("fontland" "pitfall"))
