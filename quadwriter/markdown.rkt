@@ -5,7 +5,7 @@
          "tags.rkt"
          "lang-helper.rkt")
 (provide (all-defined-out)
-         #%app #%top #%datum #%top-interaction
+         #%app #%top #%datum #%top-interaction require
          (all-from-out "tags.rkt"))
 
 (define rsquo "’")
@@ -21,9 +21,9 @@
                  [(? null?) '(" ")] ; single nonbreaking space, so something prints
                  [strs strs]))
   ;; markdown parser returns list of paragraphs
-  (root null (add-between strs (list pbr)
-                          #:before-first (list pbr)
-                          #:after-last (list pbr)
+  (root null (add-between strs (list qexpr-para-break)
+                          #:before-first (list qexpr-para-break)
+                          #:after-last (list qexpr-para-break)
                           #:splice? #true)))
 (make-module-begin doc-proc)
 

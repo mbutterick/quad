@@ -1,6 +1,7 @@
 #lang debug racket/base
 (require (for-syntax racket/base)
          racket/match
+         pollen/tag
          racket/system
          racket/class
          syntax/strip-context
@@ -8,6 +9,8 @@
          quadwriter/core
          txexpr)
 (provide (all-defined-out))
+
+(define q (default-tag-function 'q))
 
 (define ((make-read-syntax expander-mod pt-proc) path-string p)
   (strip-context

@@ -4,6 +4,7 @@
          racket/match
          racket/list
          sugar/list
+         txexpr/base
          racket/date
          pitfall
          quad
@@ -13,7 +14,7 @@
          "attrs.rkt"
          "param.rkt"
          "font.rkt")
-(provide hrbr lbr pbr render-pdf)
+(provide qexpr-para-break hrbr lbr pbr render-pdf)
 
 (define-quad string-quad quad ())
  
@@ -509,17 +510,31 @@
   ;; (that is, just after a paragraph break)
   ;; they need to be installed before line wrap
   ;; to be compatible with first-fit and best-fit.
+
+  ;; stick a pbr on the front if there isn't one already
+  ;; because of the "lookahead" style of iteration
+  (define qs (match qs-in
+               [(list (? para-break?) _ ...) qs-in]
+               [_ (cons pbr qs-in)]))
   (for/fold ([qs-out null]
              #:result (reverse qs-out))
-            ([q (in-list qs-in)]
-             [next-q (in-list (cdr qs-in))])
+            ([q (in-list qs)]
+             [next-q (in-list (cdr qs))])
     (match (and (para-break? q) (quad-ref next-q 'first-line-indent 0))
       [(or #false 0) (cons next-q qs-out)]
       [indent-val (list* next-q (make-quad #:type first-line-indent
                                            #:attrs (quad-attrs next-q)
                                            #:size (pt indent-val 0)) qs-out)])))
+
+
+(define qexpr-para-break '(q ((break "paragraph"))))
+(define (replace-para-breaks x)
+  (map-elements (λ (el)
+                  (match el
+                    [(== qexpr-para-break) pbr]
+                    [_ el])) x))
                  
-(define (render-pdf xs pdf-path)
+(define (render-pdf x pdf-path)
   (define pdf (make-pdf #:compress #t
                         #:auto-first-page #f
                         #:output-path pdf-path
@@ -530,8 +545,9 @@
   (parameterize ([current-pdf pdf]
                  [verbose-quad-printing? #false])
     (setup-font-path-table! pdf-path)
-    (let* ([x (qexpr->quad  `(q ((font-family ,default-font-family)
-                                 (font-size ,(number->string default-font-size))) ,xs))]
+    (let* ([x (replace-para-breaks x)]
+           [x (qexpr->quad  `(q ((font-family ,default-font-family)
+                                 (font-size ,(number->string default-font-size))) ,x))]
            [x (atomize x #:attrs-proc handle-cascading-attrs)]
            [x (time-name hyphenate (handle-hyphenate x))]
            [x (map ->string-quad x)]

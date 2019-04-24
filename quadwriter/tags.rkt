@@ -94,7 +94,7 @@
           (for/list ([(expr idx) (in-indexed exprs)]
                      #:when (txexpr? expr))
             (list* (get-tag expr) (cons (list 'list-index (or bullet-val (format "~a" (add1 idx)))) (get-attrs expr)) (get-elements expr)))
-          pbr)))
+          qexpr-para-break)))
 
 (define-tag-function (ol attrs exprs) (list-base attrs exprs))
 (define-tag-function (ul attrs exprs) (list-base attrs exprs "•"))
