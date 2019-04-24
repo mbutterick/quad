@@ -202,7 +202,7 @@ You will see the actual input to Quadwriter, which is called a @deftech{Q-expres
 '(q ((line-height "17")) (q ((break "paragraph"))) "Brennan and Dale like fancy sauce." (q ((break "paragraph"))))
 }
 
-A Q-expression is an @tech{X-expression} with some extra restrictions.
+A Q-expression is an @seclink["X-expressions" #:doc '(lib "pollen/scribblings/pollen.scrbl")]{X-expression} with some extra restrictions.
 
 In the demos that follow, the input language will change slightly. But the PDF will be rendered the same way (by running the source file) and you can always look at @racket[doc].
 
@@ -274,7 +274,7 @@ To see this:
 
 This is part of the @tech{Q-expression} that the source file produces. This Q-expression is passed to Quadwriter for layout and rendering.
 
-If you know about the duality of @tech{X-expressions} and XML, you might wonder if we could create an equivalent text-based markup language for Q-expressions — let's call it QML. Sure, why not:
+If you know about the duality of X-expressions and XML, you might wonder if we could create an equivalent text-based markup language for Q-expressions — let's call it QML. Sure, why not:
 
 @repl-output{
   <q line-height="17"><q break="paragraph"></q><q font-family="fira-sans-light" first-line-indent="0" display="block" font-size="20" line-height="24.0" border-width-top="0.5" border-inset-top="9" inset-bottom="-3" inset-top="6" keep-with-next="true" id="did-you-know">Did you know?</q> ···
