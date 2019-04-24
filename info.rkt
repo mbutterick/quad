@@ -10,6 +10,10 @@
                "rackunit-lib"
                "sugar"
                "txexpr"
+               "markdown"
                "csp"))
-(define build-deps '("debug"))
+(define build-deps '("draw-lib"
+                     "racket-doc"
+                     "scribble-lib"
+                     "debug"))
 (define update-implies '("fontland" "pitfall"))
