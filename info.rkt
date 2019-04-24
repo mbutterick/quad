@@ -17,3 +17,4 @@
                      "scribble-lib"
                      "debug"))
 (define update-implies '("fontland" "pitfall"))
+(define test-omit-paths 'all)
