@@ -18,3 +18,4 @@
                      "debug"))
 (define update-implies '("fontland" "pitfall"))
 (define test-omit-paths 'all)
+(define compile-omit-paths '("qtest"))
