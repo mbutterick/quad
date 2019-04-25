@@ -283,7 +283,7 @@ If you know about the duality of X-expressions and XML, you might wonder if we c
   <q line-height="17"><q break="paragraph"></q><q font-family="fira-sans-light" first-line-indent="0" display="block" font-size="20" line-height="24.0" border-width-top="0.5" border-inset-top="9" inset-bottom="-3" inset-top="6" keep-with-next="true" id="did-you-know">Did you know?</q> ···
 }
 
-There's nothing interesting about QML — it's just a way of cosmetically encoding an S-expression as a string. We could also convert our Q-expression to, say, JSON. Thus, having noted that QML can exist, and @racket[quadwriter] could support this input, let's move on.
+There's nothing interesting about QML — it's just a way of cosmetically encoding a Q-expression as a string. We could also convert our Q-expression to, say, JSON. Thus, having noted that QML can exist, and @racket[quadwriter] could support this input, let's move on.
 
 @subsection{Hard rock: Quadwriter & markup}
 
