@@ -502,7 +502,7 @@ It's a demo! Don't panic! @racket[quadwriter] itself is just meant to show how o
 
 In the sample above, though you see formatting tags like @racket[background-color] and @racket[font-family], those are defined by @racket[quadwriter], not @racket[quad]. So if you don't like them — no problem! You can still drop down one more layer and program your own interface to @racket[quad].
 
-That said, I imagine that most users & developers are looking for PDF generation along the lines of ``don't make me think too hard.'' So I can foresee that @racket[quadwriter] (or a better replacement) will be the preferred interface.
+That said, I imagine that most users & developers are looking for PDF generation along the lines of ``don't make me think too hard.'' So I can foresee that @racket[quadwriter] (or a better version of it) will be the preferred interface.
 
 Why? Decades of experience with HTML and its relations have acclimated us to the model of marking up a text with certain codes that denote layout, and then passing the markup to a program for output. So I think the idea of a Q-expression, and some vocabulary of markup tags will probably end up being the most natural and useful interface.
 
