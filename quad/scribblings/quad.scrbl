@@ -36,7 +36,10 @@ A demo language built on Quad that takes a text-based source file as input, calc
 
 @section{What can I do with this demo?}
 
-You can fiddle with it & then submit issues and feature requests at the @link["http://github.com/mbutterick/quad"]{Quad repo}. After a few dead ends, I think I'm headed in the right direction. But I also want to open it to comments & criticism, because it can bend the thinking in productive ways.
+You can fiddle with it & then submit issues and feature requests at the @link["http://github.com/mbutterick/quad"]{Quad repo}. After a few dead ends, I think I'm headed in the right direction. But I also want to open it to comments & criticism, because that can bend the thinking in productive ways.
+
+Also, I have about a hundred topics to add to the documentation. So I don't mind requests along the lines of ``can you document such-and-such'' — it's probably already on my list and I don't mind moving it to the front in response to human interest. At this point in its development, I find it easier to have a working version of the project and iterate, rather than leave it in some partially busted state for weeks on end.
+
 
 @section{What are your plans for Quad?}
 
