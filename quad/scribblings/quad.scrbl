@@ -447,11 +447,11 @@ Which yields the same PDF result. (If you've spent any time with ’90s HTML mar
 
 @subsection{Q-expression PS}
 
-In @code{#lang quadwriter}, we enter our Q-expression in the usual Racket list notation. What if we wanted to use the text-based notation of @racket[quadwriter/markup]? Sure — we can convert our Q-expression to that notation:
+In @code{#lang quadwriter}, we enter our Q-expression in the usual Racket list notation. What if we wanted to use the text-based notation of @racket[quadwriter/markup]? Sure — we can convert our Q-expression to that notation, and invoke the @racket[quadwriter/markup] dialect:
 
 @fileblock["test.rkt"
 @codeblock|{
-#lang quadwriter
+#lang quadwriter/markup
 ◊q[#:line-height "17"]{◊q[#:break "paragraph"]
 ◊q[#:font-family "fira-sans-light" #:first-line-indent "0" 
 #:display "block" #:font-size "20" #:line-height "24.0" 
