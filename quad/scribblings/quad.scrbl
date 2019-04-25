@@ -1,6 +1,6 @@
 #lang scribble/manual
 
-@(require scribble/eval (for-label (except-in pollen #%module-begin) xml racket/base racket/draw)
+@(require scribble/eval (for-label (except-in pollen txexpr #%module-begin) xml racket/base racket/draw)
 pollen/scribblings/mb-tools)
 
 @(define my-eval (make-base-eval))
@@ -491,6 +491,8 @@ What you should infer from all this is that in the usual Racket tradition, @rack
 If you're a writer, you might prefer to use the high-level representation (like Markdown) so that your experience is optimized for ease of use.
 
 If you're a developer, you might prefer to use the lower-level representation for precision. For instance, a @racketmodname[pollen] author who wanted to generate a PDF could design tag functions that emit Q-expressions, and then pass the result to Quadwriter for conversion to PDF.
+
+@margin-note{Because Q-expressions are a subset of X-expressions, you can apply any tools that work with X-expressions (for instance, the @racketmodname{txexpr} library).}
 
 Or, you can aim somewhere in between. Like everything else in Racket, you can design functions & macros to emit the pieces of a Q-expression using whatever interface you prefer. 
 
