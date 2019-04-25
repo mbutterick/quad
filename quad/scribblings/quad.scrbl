@@ -1,6 +1,6 @@
 #lang scribble/manual
 
-@(require scribble/eval (for-label (except-in pollen txexpr #%module-begin) xml racket/base racket/draw)
+@(require scribble/eval (for-label txexpr (except-in pollen #%module-begin) xml racket/base racket/draw)
 pollen/scribblings/mb-tools)
 
 @(define my-eval (make-base-eval))
@@ -496,7 +496,7 @@ If you're a developer, you might prefer to use the lower-level representation fo
 
 Or, you can aim somewhere in between. Like everything else in Racket, you can design functions & macros to emit the pieces of a Q-expression using whatever interface you prefer. 
 
-@subsection{I don't like Quadwriter}
+@subsection{``I don't like Quadwriter …''}
 
 It's a demo! Don't panic! @racket[quadwriter] itself is just meant to show how one can build an interface to @racket[quad], which if we're being honest, is basically just a home for all the generic geometric routines and technical fiddly bits (e.g., font parsing and PDF generation) without any true typographic smarts. That's what @racket[quadwriter] adds. 
 
