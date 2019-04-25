@@ -504,9 +504,13 @@ In the sample above, though you see formatting tags like @racket[background-colo
 
 That said, I imagine that most users & developers are looking for PDF generation along the lines of ``don't make me think too hard.'' So I can foresee that @racket[quadwriter] (or a better version of it) will be the preferred interface.
 
-Why? Decades of experience with HTML and its relations have acclimated us to the model of marking up a text with certain codes that denote layout, and then passing the markup to a program for output. So I think the idea of a Q-expression, and some vocabulary of markup tags will probably end up being the most natural and useful interface.
+Why? Decades of experience with HTML and its relations have acclimated us to the model of marking up a text with certain codes that denote layout, and then passing the markup to a program for output. So I think the idea of a Q-expression, with some application-specific vocabulary of markup tags, will probably end up being the most natural and useful interface. 
 
 @margin-note{Historians of desktop word processors may remember that WordPerfect has a @onscreen{Reveal codes} feature which lets you drop into the markup that represents the formatting displayed in the GUI.}
+
+Part of the idea of @racket[quad] is to make typographic layout & PDF generation a service that can be built into other Racket apps and languages. For simple jobs, you might reach for @racket[quadwriter] and make your Q-expressions using its tag vocabulary. For other jobs, you might reach for something else. For instance, I could imagine a @code{#lang résumé} that has a more limited markup vocabulary, optimized for churning out résumés with a simple layout. Or a @code{#lang tax-form} that has a more complex markup vocabulary that supports more detail and precision. As usual with domain-specific languages, we can create an interface that adjusts the level of control available to the end user, depending on what's suitable for the type of document being created.
+
+
 
 
 @section{Why is it called Quad?}
