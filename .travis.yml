@@ -9,11 +9,12 @@ env:
   global:
     - RACKET_DIR=~/racket
   matrix:
-    - RACKET_VERSION=6.12
-    - RACKET_VERSION=7.0
+    #- RACKET_VERSION=6.12
+    #- RACKET_VERSION=7.0
     - RACKET_VERSION=7.1
-    - RACKET_VERSION=HEAD
-    - RACKET_VERSION=HEADCS
+    - RACKET_VERSION=7.2
+    #- RACKET_VERSION=HEAD
+    #- RACKET_VERSION=HEADCS
 
 # You may want to test against certain versions of Racket, without
 # having them count against the overall success/failure.
@@ -34,5 +35,5 @@ before_install:
 script:
  - cd ..   # Travis did a cd into the dir. Back up, for the next:
   # don't use package server because it points to #demo branch
-# - travis_retry raco pkg install --deps search-auto https://github.com/mbutterick/quad.git
-# - raco test -p quad
+ - travis_retry raco pkg install --deps search-auto https://github.com/mbutterick/quad.git
+ - raco test -p quad
