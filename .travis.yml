@@ -9,10 +9,12 @@ env:
   global:
     - RACKET_DIR=~/racket
   matrix:
+    # natipkg builds for 6.12 and 7.0 have ssl but (see https://github.com/racket/racket/issues/2184)
     #- RACKET_VERSION=6.12
     #- RACKET_VERSION=7.0
     - RACKET_VERSION=7.1
     - RACKET_VERSION=7.2
+    # natipkg builds not available for HEAD or HEADCS
     #- RACKET_VERSION=HEAD
     #- RACKET_VERSION=HEADCS
 
