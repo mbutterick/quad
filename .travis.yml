@@ -30,7 +30,7 @@ matrix:
 
 before_install:
   - git clone https://github.com/mbutterick/travis-racket.git
-  - cat travis-racket/install-racket.sh | NATIPKG=1 bash # pipe to bash not sh!
+  - cat travis-racket/install-racket.sh | RACKET_NATIPKG=1 bash # pipe to bash not sh!
   - export PATH="${RACKET_DIR}/bin:${PATH}" #install-racket.sh can't set for us
 
 script:
