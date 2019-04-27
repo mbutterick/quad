@@ -13,6 +13,7 @@
                "markdown"
                "csp"))
 (define build-deps '("draw-lib"
+                     "draw-doc"
                      "racket-doc"
                      "scribble-lib"
                      "debug"))
