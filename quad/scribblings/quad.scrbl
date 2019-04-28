@@ -245,7 +245,7 @@ And they love to code
 
 You are welcome to paste in bigger Markdown files that you have laying around and see what happens. As a demo language, I'm sure there are tortured agglomerations of Markdown notation that will confuse to @racket[quadwriter/markdown]. But with vanilla files, even big ones, it should be fine.
 
-A question naturally arises: would it be possible to convert any Markdown file, no matter how sadistic, to PDF? .  suppose As a practical matter, I'm sure such things exist already. I have no interest in being in the Markdown-conversion business. As a theoretical matter: the problem I foresee is that Markdown — like the HTML that it lightly disguises — can have formatting entities that are nested indefinitely deep. The idea of making a layout engine that can handle that just becomes the equivalent of reinventing a web-browser engine.
+A question naturally arises: would it be possible to convert any Markdown file, no matter how sadistic, to PDF? As a practical matter, I'm sure such things exist already. I have no interest in being in the Markdown-conversion business. As a theoretical matter: the problem I foresee is that Markdown — like the HTML that it lightly disguises — can have formatting entities that are nested indefinitely deep. The idea of making a layout engine that can handle that just becomes the equivalent of reinventing a web-browser engine.
 
 Back to the demo. Curious characters can do this:
 
