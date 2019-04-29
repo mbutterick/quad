@@ -35,5 +35,8 @@ before_install:
 
 script:
  - cd ..   # Travis did a cd into the dir. Back up, for the next:
+ - travis_retry raco pkg install --deps search-auto https://github.com/mbutterick/xenomorph.git
+ - travis_retry raco pkg install --deps search-auto https://github.com/mbutterick/fontland.git
+ - travis_retry raco pkg install --deps search-auto https://github.com/mbutterick/pitfall.git
  - travis_retry raco pkg install --deps search-auto https://github.com/mbutterick/quad.git
  - raco test -p quad
