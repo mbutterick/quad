@@ -1,5 +1,35 @@
 #lang debug racket/base
+(require racket/match
+         racket/string)
 (provide (all-defined-out))
+#|
+Naming guidelines
++ shorter is better
++ general to specific: border-color-left, not border-left-color or left-border-color
++ don't refer to specific output format, e.g. PDF or HTML
++ consistency with CSS style property names is OK if the concept is mostly the same, but usually it's not
++ default value for any missing attr is #false
++ measurement units are points by default
+
+|#
+
+(define (cm->in x) (/ x 2.54))
+(define (in->pts x) (* 72 x))
+(define (mm->cm x) (/ x 10))
+
+(define (parse-points x [round? #f])
+  (define val
+    (match x
+    [(? number?) x]
+    [(? string? x)
+     (match (cdr (regexp-match #rx"^(-?[0-9\\.]+)([a-z]+)$"  (string-downcase x)))
+       [(list num-string unit)
+        ((match unit
+           [(regexp #rx"in(ch)?") in->pts]
+           [(regexp #rx"cm") (compose1 in->pts cm->in)]
+           [(regexp #rx"mm") (compose1 in->pts cm->in mm->cm)]) (string->number num-string))])]))
+  (if round? (inexact->exact (floor val)) val))
+
 (define block-attrs '(display
                       inset-top
                       inset-bottom
@@ -18,12 +48,27 @@
                       border-color-top
                       border-color-bottom
                       background-color
+
                       keep-lines
                       keep-first
                       keep-last
                       keep-all
                       keep-with-next
+
                       line-align
                       line-align-last
+
                       first-line-indent
-                      line-wrap))
+
+                      line-wrap
+
+                      page-width
+                      page-height
+                      page-size ; e.g., "letter"
+                      page-orientation ; only applies to page-size dimensions
+
+                      page-margin-top
+                      page-margin-bottom
+                      page-margin-left
+                      page-margin-right
+                      ))
