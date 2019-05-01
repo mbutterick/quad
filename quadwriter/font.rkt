@@ -67,9 +67,10 @@
 
 (define (resolve-font-path attrs)
   (define this-font-family (hash-ref! attrs 'font-family default-font-family))
-  (define this-bold (hash-ref! attrs 'font-bold #false))
-  (define this-italic (hash-ref! attrs 'font-italic #false))
-  (hash-set! attrs 'font-path (font-attrs->path this-font-family this-bold this-italic)))
+  (unless (complete-path? this-font-family)
+    (define this-bold (hash-ref! attrs 'font-bold #false))
+    (define this-italic (hash-ref! attrs 'font-italic #false))
+    (hash-set! attrs 'font-path (font-attrs->path this-font-family this-bold this-italic))))
 
 (define (parse-percentage pstr)
   (/ (string->number (string-trim pstr "%")) 100.0))
