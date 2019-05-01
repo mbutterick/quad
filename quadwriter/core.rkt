@@ -542,15 +542,18 @@
 (define/contract (render-pdf qx-arg pdf-path-arg
                              #:replace [replace? #t])
   ((qexpr? (or/c path? path-string?)) (#:replace any/c) . ->* . void?)
+  
   (define pdf-path (path->complete-path (simplify-path (expand-user-path (->path pdf-path-arg)))))
   (when (and (not replace?) (file-exists? pdf-path))
     (raise-argument-error 'render-pdf "path that doesn't exist" pdf-path))
+  
   (define qx (let* ([qx qx-arg]
                     [qx (replace-para-breaks qx)]
                     [qx (qexpr->quad  `(q ((font-family ,default-font-family)
-                                           (font-size ,(number->string default-font-size))) ,qx))]
-                    [qx (atomize qx #:attrs-proc handle-cascading-attrs)])
-               qx))
+                                           (font-size ,(number->string default-font-size))) ,qx))])
+               (setup-font-path-table! pdf-path)
+               (atomize qx #:attrs-proc handle-cascading-attrs)))
+  
   ;; page size can be specified by name, or measurements.
   ;; explicit measurements from page-height and page-width supersede those from page-size.
   (define pdf
@@ -569,17 +572,20 @@
                 #:size (quad-ref (car qx) 'page-size default-page-size)
                 #:orientation (quad-ref (car qx) 'page-orientation default-page-orientation))))
   
-  (define line-width (- (pdf-width pdf) (* 2 side-margin)))
-  (define vertical-height (- (pdf-height pdf) top-margin bottom-margin))
   (parameterize ([current-pdf pdf]
                  [verbose-quad-printing? #false])
-    (setup-font-path-table! pdf-path)
     (let* ([qx (time-name hyphenate (handle-hyphenate qx))]
            [qx (map ->string-quad qx)]
-           [qx (insert-first-line-indents qx)]  
-           [qx (time-name line-wrap (line-wrap qx line-width))]
+           [qx (insert-first-line-indents qx)]
+           [line-wrap-size (- (pdf-width pdf)
+                              (quad-ref (car qx) 'page-margin-left side-margin)
+                              (quad-ref (car qx) 'page-margin-right side-margin))]
+           [qx (time-name line-wrap (line-wrap qx line-wrap-size))]
            [qx (apply-keeps qx)]
-           [qx (time-name page-wrap (page-wrap qx vertical-height pdf-path))]
+           [page-wrap-size (- (pdf-height pdf)
+                              (quad-ref (car qx) 'page-margin-top top-margin)
+                              (quad-ref (car qx) 'page-margin-bottom bottom-margin))]
+           [qx (time-name page-wrap (page-wrap qx page-wrap-size pdf-path))]
            [qx (time-name position (position (struct-copy quad q:doc [elems qx])))])
       (time-name draw (draw qx pdf))
       (displayln (format "wrote PDF to ~a" pdf-path)))))
