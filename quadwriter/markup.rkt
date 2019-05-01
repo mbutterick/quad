@@ -3,7 +3,8 @@
          "tags.rkt"
          (only-in "markdown.rkt" doc-proc))
 (provide #%top #%datum #%app #%top-interaction
-         (all-from-out "tags.rkt"))
+         (all-from-out "tags.rkt")
+         q)
 
 (make-module-begin doc-proc)
 
