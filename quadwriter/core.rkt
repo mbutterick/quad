@@ -533,28 +533,53 @@
                   (match el
                     [(== qexpr-para-break) pbr]
                     [_ el])) x))
-                 
-(define (render-pdf x pdf-path)
-  (define pdf (make-pdf #:compress #t
-                        #:auto-first-page #f
-                        #:output-path pdf-path
-                        #:width (if zoom-mode? 350 612)
-                        #:height (if zoom-mode? 400 792)))
+
+(require racket/contract sugar/coerce pitfall/page)
+(define default-page-size (case (current-locale)
+                            [(us) "letter"]
+                            [else "a4"]))
+(define default-page-orientation "tall")
+(define/contract (render-pdf qx-arg pdf-path-arg
+                             #:replace [replace? #t])
+  ((qexpr? (or/c path? path-string?)) (#:replace any/c) . ->* . void?)
+  (define pdf-path (path->complete-path (simplify-path (expand-user-path (->path pdf-path-arg)))))
+  (when (and (not replace?) (file-exists? pdf-path))
+    (raise-argument-error 'render-pdf "path that doesn't exist" pdf-path))
+  (define qx (let* ([qx qx-arg]
+                    [qx (replace-para-breaks qx)]
+                    [qx (qexpr->quad  `(q ((font-family ,default-font-family)
+                                           (font-size ,(number->string default-font-size))) ,qx))]
+                    [qx (atomize qx #:attrs-proc handle-cascading-attrs)])
+               qx))
+  ;; page size can be specified by name, or measurements.
+  ;; explicit measurements from page-height and page-width supersede those from page-size.
+  (define pdf
+    (let ()
+      (match-define (list page-width page-height)
+        (for/list ([k '(page-width page-height)])
+          (match (quad-ref (car qx) k)
+            [#false #false]
+            [val (parse-points val 'round)])))
+      ;; `make-pdf` will sort out conflicts among page dimensions
+      (make-pdf #:compress #t
+                #:auto-first-page #f
+                #:output-path pdf-path
+                #:width page-width
+                #:height page-height
+                #:size (quad-ref (car qx) 'page-size default-page-size)
+                #:orientation (quad-ref (car qx) 'page-orientation default-page-orientation))))
+  
   (define line-width (- (pdf-width pdf) (* 2 side-margin)))
   (define vertical-height (- (pdf-height pdf) top-margin bottom-margin))
   (parameterize ([current-pdf pdf]
                  [verbose-quad-printing? #false])
     (setup-font-path-table! pdf-path)
-    (let* ([x (replace-para-breaks x)]
-           [x (qexpr->quad  `(q ((font-family ,default-font-family)
-                                 (font-size ,(number->string default-font-size))) ,x))]
-           [x (atomize x #:attrs-proc handle-cascading-attrs)]
-           [x (time-name hyphenate (handle-hyphenate x))]
-           [x (map ->string-quad x)]
-           [x (insert-first-line-indents x)]  
-           [x (time-name line-wrap (line-wrap x line-width))]
-           [x (apply-keeps x)]
-           [x (time-name page-wrap (page-wrap x vertical-height pdf-path))]
-           [x (time-name position (position (struct-copy quad q:doc [elems x])))])
-      (time-name draw (draw x pdf))
+    (let* ([qx (time-name hyphenate (handle-hyphenate qx))]
+           [qx (map ->string-quad qx)]
+           [qx (insert-first-line-indents qx)]  
+           [qx (time-name line-wrap (line-wrap qx line-width))]
+           [qx (apply-keeps qx)]
+           [qx (time-name page-wrap (page-wrap qx vertical-height pdf-path))]
+           [qx (time-name position (position (struct-copy quad q:doc [elems qx])))])
+      (time-name draw (draw qx pdf))
       (displayln (format "wrote PDF to ~a" pdf-path)))))
