@@ -2,6 +2,7 @@
 (provide (all-defined-out))
 (define current-doc (make-parameter #f))
 (define current-pdf (make-parameter #f))
+(define current-locale (make-parameter 'us))
 
 (define draw-debug? (make-parameter #f))
 (define draw-debug-line? (make-parameter #t))
