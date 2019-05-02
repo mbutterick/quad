@@ -310,6 +310,8 @@
      [else (list q:line-spacer)])))
 
 (define (line-wrap qs wrap-size)
+  (unless (positive? wrap-size)
+    (raise-argument-error 'line-wrap "positive number" wrap-size))
   (define line-q (struct-copy
                   quad q:line
                   [size (pt wrap-size (pt-y (size q:line)))]))
@@ -376,6 +378,10 @@
 
 (define (page-draw-start q doc)
   (add-page doc)
+  #R (quad-origin q)
+  #R (quad-offset q)
+  #R (quad-size q)
+  (draw-debug q doc "green" "green")
   (scale doc (if zoom-mode? zoom-scale 1) (if zoom-mode? zoom-scale 1)))
 
 (define (page-draw-end q doc)
@@ -466,10 +472,10 @@
    (contiguous-group-by values '(1 1 2 2 2 3 4 5 5 6 6 7 8 9))
    '((1 1) (2 2 2) (3) (4) (5 5) (6 6) (7) (8) (9))))
 
-(define ((page-finish-wrap path) lns q0 q idx)
-  (list (struct-copy quad q:page
+(define ((page-finish-wrap page-quad path) lns q0 q idx)
+  (list (struct-copy quad page-quad
                      [attrs (let ([page-number idx]
-                                  [h (hash-copy (quad-attrs q:page))])
+                                  [h (hash-copy (quad-attrs page-quad))])
                               (hash-set! h 'page-number page-number)
                               (define-values (dir name _)
                                 (split-path (path-replace-extension path #"")))
@@ -477,7 +483,9 @@
                               h)]
                      [elems (insert-blocks lns)])))
 
-(define (page-wrap xs vertical-height path)
+(define (page-wrap xs vertical-height [page-quad q:page])
+  (unless (positive? vertical-height)
+    (raise-argument-error 'page-wrap "positive number" vertical-height))
   ;; on timing of `insert-blocks`:
   ;; can't do it before because it depends on where pages are broken.
   ;; could do it after, but it would require going back inside each page quad
@@ -490,7 +498,7 @@
                      ;; do trial block insertions
                      (for/sum ([x (in-list (insert-blocks wrap-qs))])
                        (pt-y (size x))))                     
-        #:finish-wrap (page-finish-wrap path)))
+        #:finish-wrap (page-finish-wrap page-quad (pdf-output-path (current-pdf)))))
 
 (define (insert-blocks lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x 'display)) lines))
@@ -577,15 +585,18 @@
     (let* ([qx (time-name hyphenate (handle-hyphenate qx))]
            [qx (map ->string-quad qx)]
            [qx (insert-first-line-indents qx)]
-           [line-wrap-size (- (pdf-width pdf)
-                              (quad-ref (car qx) 'page-margin-left side-margin)
-                              (quad-ref (car qx) 'page-margin-right side-margin))]
+           [left-margin (quad-ref (car qx) 'page-margin-left side-margin)]
+           [right-margin (quad-ref (car qx) 'page-margin-right side-margin)]
+           [line-wrap-size (- (pdf-width pdf) left-margin right-margin)]
            [qx (time-name line-wrap (line-wrap qx line-wrap-size))]
            [qx (apply-keeps qx)]
-           [page-wrap-size (- (pdf-height pdf)
-                              (quad-ref (car qx) 'page-margin-top top-margin)
-                              (quad-ref (car qx) 'page-margin-bottom bottom-margin))]
-           [qx (time-name page-wrap (page-wrap qx page-wrap-size pdf-path))]
+           [top-margin (quad-ref (car qx) 'page-margin-top top-margin)]
+           [bottom-margin (quad-ref (car qx) 'page-margin-bottom bottom-margin)]
+           [page-wrap-size (- (pdf-height pdf) top-margin bottom-margin)]
+           [page-quad (struct-copy quad q:page
+                                   [offset #R (pt left-margin top-margin)]
+                                   [size #R (pt (pdf-width (current-pdf)) (pdf-height (current-pdf)))])]
+           [qx (time-name page-wrap (page-wrap qx page-wrap-size page-quad))]
            [qx (time-name position (position (struct-copy quad q:doc [elems qx])))])
       (time-name draw (draw qx pdf))
       (displayln (format "wrote PDF to ~a" pdf-path)))))
