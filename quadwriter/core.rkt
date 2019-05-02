@@ -86,10 +86,10 @@
       [size (make-size-promise q)])]))
 
 
-(define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"])
+(define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"] [the-width 0.5])
   (when (draw-debug?)
     (save doc)
-    (line-width doc 0.5)
+    (line-width doc the-width)
     (apply rect doc (append (quad-origin q) (size q)))
     (stroke doc stroke-color)
     (circle doc (pt-x (in-point q)) (pt-y (in-point q)) 2)
@@ -370,18 +370,10 @@
 
 (define zoom-mode? #f)
 (define zoom-scale 2)
-(define top-margin (/ 60 (if zoom-mode? zoom-scale 1)))
-(define bottom-margin (/ 120 (if zoom-mode? zoom-scale 1)))
-(define side-margin (/ 120 (if zoom-mode? zoom-scale 1)))
-(define page-offset (pt (/ side-margin (if zoom-mode? 3 1))
-                        (/ top-margin (if zoom-mode? 3 1))))
 
 (define (page-draw-start q doc)
   (add-page doc)
-  #R (quad-origin q)
-  #R (quad-offset q)
-  #R (quad-size q)
-  (draw-debug q doc "green" "green")
+  (draw-debug q doc "green" "green" 6)
   (scale doc (if zoom-mode? zoom-scale 1) (if zoom-mode? zoom-scale 1)))
 
 (define (page-draw-end q doc)
@@ -391,10 +383,10 @@
   (text doc (format "~a · ~a at ~a" (hash-ref (quad-attrs q) 'page-number)
                     (hash-ref (quad-attrs q) 'doc-title)
                     (date->string (current-date) #t))
-        side-margin
-        (+ (- (pdf-height doc) bottom-margin) 20)))
+        (pt-x (quad-offset q))
+        (- (pdf-height doc) 80)))
 
-(define q:page (q #:offset page-offset
+(define q:page (q #:offset '(0 0)
                   #:draw-start page-draw-start
                   #:draw-end page-draw-end))
 
@@ -579,23 +571,27 @@
                 #:height page-height
                 #:size (quad-ref (car qx) 'page-size default-page-size)
                 #:orientation (quad-ref (car qx) 'page-orientation default-page-orientation))))
-  
+
+  (define default-x-margin (min 72 (floor (* .10 (pdf-width pdf)))))
+  (define default-y-margin (min 72 (floor (* .10 (pdf-width pdf)))))
   (parameterize ([current-pdf pdf]
                  [verbose-quad-printing? #false])
     (let* ([qx (time-name hyphenate (handle-hyphenate qx))]
            [qx (map ->string-quad qx)]
            [qx (insert-first-line-indents qx)]
-           [left-margin (quad-ref (car qx) 'page-margin-left side-margin)]
-           [right-margin (quad-ref (car qx) 'page-margin-right side-margin)]
+           ;; if only left or right margin is provided, copy other value in preference to default margin
+           [left-margin (quad-ref (car qx) 'page-margin-left (λ () (quad-ref (car qx) 'page-margin-right default-x-margin)))]
+           [right-margin (quad-ref (car qx) 'page-margin-right (λ () (quad-ref (car qx) 'page-margin-left default-y-margin)))]
            [line-wrap-size (- (pdf-width pdf) left-margin right-margin)]
            [qx (time-name line-wrap (line-wrap qx line-wrap-size))]
            [qx (apply-keeps qx)]
-           [top-margin (quad-ref (car qx) 'page-margin-top top-margin)]
-           [bottom-margin (quad-ref (car qx) 'page-margin-bottom bottom-margin)]
+           ;; if only top or bottom margin is provided, copy other value in preference to default margin
+           [top-margin (quad-ref (car qx) 'page-margin-top (λ () (quad-ref (car qx) 'page-margin-bottom default-y-margin)))]
+           [bottom-margin (quad-ref (car qx) 'page-margin-bottom (λ () (quad-ref (car qx) 'page-margin-top default-y-margin)))]
            [page-wrap-size (- (pdf-height pdf) top-margin bottom-margin)]
            [page-quad (struct-copy quad q:page
-                                   [offset #R (pt left-margin top-margin)]
-                                   [size #R (pt (pdf-width (current-pdf)) (pdf-height (current-pdf)))])]
+                                   [offset (pt left-margin top-margin)]
+                                   [size (pt (pdf-width pdf) (pdf-height pdf))])]
            [qx (time-name page-wrap (page-wrap qx page-wrap-size page-quad))]
            [qx (time-name position (position (struct-copy quad q:doc [elems qx])))])
       (time-name draw (draw qx pdf))
