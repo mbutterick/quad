@@ -591,7 +591,8 @@
   (define default-x-margin (min (* 72 1.5) (floor (* .10 (pdf-width pdf)))))
   (define default-y-margin (min 72 (floor (* .10 (pdf-width pdf)))))
   (parameterize ([current-pdf pdf]
-                 [verbose-quad-printing? #false])
+                 [verbose-quad-printing? #false]
+                 [draw-debug? #true])
     (let* ([qs (time-name hyphenate (handle-hyphenate qs))]
            [qs (map ->string-quad qs)]
            [qs (insert-first-line-indents qs)]
