@@ -386,8 +386,8 @@
   (scale doc (if zoom-mode? zoom-scale 1) (if zoom-mode? zoom-scale 1)))
 
 (define (draw-page-footer q doc)
-  (define top-margin #R (pt-y (quad-offset q)))
-  (define bottom-margin (- #R (pdf-height doc) #R top-margin))
+  (define top-margin (pt-y (quad-offset q)))
+  (define bottom-margin (- (pdf-height doc) top-margin))
   (font-size doc (* .8 default-font-size))
   (font doc default-font-face)
   (fill-color doc "black")
@@ -409,6 +409,8 @@
 
 (define ((block-draw-start first-line) q doc)
   ;; adjust drawing coordinates for border inset
+  (verbose-quad-printing? #t)
+  #R q
   (match-define (list bil bit bir bib)
     (for/list ([k (in-list '(border-inset-left border-inset-top border-inset-right border-inset-bottom))])
       (quad-ref first-line k 0)))
@@ -561,20 +563,20 @@
   (when (and (not replace?) (file-exists? pdf-path))
     (raise-argument-error 'render-pdf "path that doesn't exist" pdf-path))
   
-  (define qx (let* ([qx qx-arg]
+  (define qs (let* ([qx qx-arg]
                     [qx (replace-para-breaks qx)]
                     [qx (qexpr->quad  `(q ((font-family ,default-font-family)
                                            (font-size ,(number->string default-font-size))) ,qx))])
                (setup-font-path-table! pdf-path)
                (atomize qx #:attrs-proc handle-cascading-attrs)))
-  #R qx
+  
   ;; page size can be specified by name, or measurements.
   ;; explicit measurements from page-height and page-width supersede those from page-size.
   (define pdf
     (let ()
       (match-define (list page-width page-height)
         (for/list ([k '(page-width page-height)])
-          (match (quad-ref (car qx) k)
+          (match (quad-ref (car qs) k)
             [#false #false]
             [val (parse-points val 'round)])))
       ;; `make-pdf` will sort out conflicts among page dimensions
@@ -583,30 +585,30 @@
                 #:output-path pdf-path
                 #:width page-width
                 #:height page-height
-                #:size (quad-ref (car qx) 'page-size default-page-size)
-                #:orientation (quad-ref (car qx) 'page-orientation default-page-orientation))))
+                #:size (quad-ref (car qs) 'page-size default-page-size)
+                #:orientation (quad-ref (car qs) 'page-orientation default-page-orientation))))
 
-  (define default-x-margin (min 72 (floor (* .10 (pdf-width pdf)))))
+  (define default-x-margin (min (* 72 1.5) (floor (* .10 (pdf-width pdf)))))
   (define default-y-margin (min 72 (floor (* .10 (pdf-width pdf)))))
   (parameterize ([current-pdf pdf]
                  [verbose-quad-printing? #false])
-    (let* ([qx (time-name hyphenate (handle-hyphenate qx))]
-           [qx (map ->string-quad qx)]
-           [qx (insert-first-line-indents qx)]
+    (let* ([qs (time-name hyphenate (handle-hyphenate qs))]
+           [qs (map ->string-quad qs)]
+           [qs (insert-first-line-indents qs)]
            ;; if only left or right margin is provided, copy other value in preference to default margin
-           [left-margin (quad-ref (car qx) 'page-margin-left (λ () (quad-ref (car qx) 'page-margin-right default-x-margin)))]
-           [right-margin (quad-ref (car qx) 'page-margin-right (λ () (quad-ref (car qx) 'page-margin-left default-y-margin)))]
-           [line-wrap-size (- (pdf-width pdf) left-margin right-margin)]
-           [qx (time-name line-wrap (line-wrap qx line-wrap-size))]
-           [qx (apply-keeps qx)]
+           [left-margin (quad-ref (car qs) 'page-margin-left (λ () (quad-ref (car qs) 'page-margin-right default-x-margin)))]
+           [right-margin (quad-ref (car qs) 'page-margin-right (λ () (quad-ref (car qs) 'page-margin-left default-y-margin)))]
+           [line-wrap-size (- (pdf-width pdf) #R left-margin #R right-margin)]
+           [qs (time-name line-wrap (line-wrap qs line-wrap-size))]
+           [qs (apply-keeps qs)]
            ;; if only top or bottom margin is provided, copy other value in preference to default margin
-           [top-margin (quad-ref (car qx) 'page-margin-top (λ () (quad-ref (car qx) 'page-margin-bottom default-y-margin)))]
-           [bottom-margin (quad-ref (car qx) 'page-margin-bottom (λ () (quad-ref (car qx) 'page-margin-top default-y-margin)))]
+           [top-margin (quad-ref (car qs) 'page-margin-top (λ () (quad-ref (car qs) 'page-margin-bottom default-y-margin)))]
+           [bottom-margin (quad-ref (car qs) 'page-margin-bottom (λ () (quad-ref (car qs) 'page-margin-top default-y-margin)))]
            [page-wrap-size (- (pdf-height pdf) top-margin bottom-margin)]
            [page-quad (struct-copy quad q:page
-                                   [shift #R (pt left-margin top-margin)]
+                                   [shift (pt left-margin top-margin)]
                                    [size (pt line-wrap-size page-wrap-size)])]
-           [qx (time-name page-wrap (page-wrap qx page-wrap-size page-quad))]
-           [qx (time-name position (position (struct-copy quad q:doc [elems qx])))])
-      (time-name draw (draw qx pdf))
+           [qs (time-name page-wrap (page-wrap qs page-wrap-size page-quad))]
+           [qs (time-name position (position (struct-copy quad q:doc [elems qs])))])
+      (time-name draw (draw qs pdf))
       (displayln (format "wrote PDF to ~a" pdf-path)))))
