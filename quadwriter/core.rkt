@@ -24,7 +24,7 @@
   (font-size doc (quad-ref q 'font-size 12))
   (fill-color doc (quad-ref q 'color "black"))
   (define str (unsafe-car (quad-elems q)))
-  (match-define (list x y) (quad-origin q))
+  (match-define (list x y) (quad-position q))
   (text doc str x y
         #:tracking (quad-ref q 'character-tracking 0)
         #:bg (quad-ref q 'bg)
@@ -86,15 +86,21 @@
       [size (make-size-promise q)])]))
 
 
-(define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"] [the-width 0.5])
+(define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"] [width 0.5])
+  ;; ostensibly it would be possible to control draw-debug with a quad attribute
+  ;; but that would potentially mess up unit tests (because something has to be inserted in the data)
+  ;; therefore controlling debug state with a parameter is cleaner.
   (when (draw-debug?)
     (save doc)
-    (line-width doc the-width)
-    (apply rect doc (append (pt+ (quad-origin q) (quad-offset q)) (size q)))
+    ;; draw layout box
+    (line-width doc width)
+    (apply rect doc (append (pt+ (quad-position q)) (size q)))
     (stroke doc stroke-color)
+    ;; draw in point & out point (both on layout box)
     (circle doc (pt-x (in-point q)) (pt-y (in-point q)) 2)
     (circle doc (pt-x (out-point q)) (pt-y (out-point q)) 2)
-    (fill doc fill-color)  
+    (fill doc fill-color)
+    ;; draw inner point (adjusted by offset)
     (rect-centered doc (pt-x (inner-point q)) (pt-y (inner-point q)) 2)
     (fill doc stroke-color)  
     (restore doc)))
@@ -234,7 +240,7 @@
 (define-quad offsetter quad ())
 
 (define (hr-draw dq doc)
-  (match-define (list left top) (quad-origin dq))
+  (match-define (list left top) (quad-position dq))
   (match-define (list right bottom) (size dq))
   (save doc)
   (translate doc left (+ top (/ bottom 2)))
@@ -400,7 +406,7 @@
   (match-define (list bil bit bir bib)
     (for/list ([k (in-list '(border-inset-left border-inset-top border-inset-right border-inset-bottom))])
       (quad-ref first-line k 0)))
-  (match-define (list left top) (pt+ (quad-origin q) (list bil bit)))
+  (match-define (list left top) (pt+ (quad-position q) (list bil bit)))
   (match-define (list width height) (pt- (size q) (list (+ bil bir) (+ bit bib))))
   ;; fill rect
   (cond 
@@ -592,7 +598,7 @@
            [bottom-margin (quad-ref (car qx) 'page-margin-bottom (λ () (quad-ref (car qx) 'page-margin-top default-y-margin)))]
            [page-wrap-size (- (pdf-height pdf) top-margin bottom-margin)]
            [page-quad (struct-copy quad q:page
-                                   [offset (pt left-margin top-margin)]
+                                   [shift #R (pt left-margin top-margin)]
                                    [size (pt line-wrap-size page-wrap-size)])]
            [qx (time-name page-wrap (page-wrap qx page-wrap-size page-quad))]
            [qx (time-name position (position (struct-copy quad q:doc [elems qx])))])
