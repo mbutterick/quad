@@ -78,9 +78,8 @@
 (define (position q [previous-end-pt (pt 0 0)])
   ;; recursively calculates coordinates for quad & subquads
   ;; based on starting origin point
-  #R (quad-origin q)
-  (define new-origin (pt- #R previous-end-pt #R (in-point q)))
-  (let ([q (struct-copy quad q [origin #R new-origin])])
+  (define new-origin (pt- previous-end-pt (in-point q)))
+  (let ([q (struct-copy quad q [origin new-origin])])
     (let loop ([pt (inner-point q)] [acc null] [elems (quad-elems q)])
       (match elems
         [(== empty) (struct-copy quad q [elems (reverse acc)])]

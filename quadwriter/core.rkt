@@ -90,7 +90,7 @@
   (when (draw-debug?)
     (save doc)
     (line-width doc the-width)
-    (apply rect doc (append (quad-origin q) (size q)))
+    (apply rect doc (append (pt+ (quad-origin q) (quad-offset q)) (size q)))
     (stroke doc stroke-color)
     (circle doc (pt-x (in-point q)) (pt-y (in-point q)) 2)
     (circle doc (pt-x (out-point q)) (pt-y (out-point q)) 2)
@@ -373,7 +373,7 @@
 
 (define (page-draw-start q doc)
   (add-page doc)
-  (draw-debug q doc "green" "green" 6)
+  (draw-debug q doc "aliceblue" "aliceblue" 4)
   (scale doc (if zoom-mode? zoom-scale 1) (if zoom-mode? zoom-scale 1)))
 
 (define (page-draw-end q doc)
@@ -592,7 +592,7 @@
            [bottom-margin (quad-ref (car qx) 'page-margin-bottom (λ () (quad-ref (car qx) 'page-margin-top default-y-margin)))]
            [page-wrap-size (- (pdf-height pdf) top-margin bottom-margin)]
            [page-quad (struct-copy quad q:page
-                                   [origin (pt 120 60)]
+                                   [offset (pt left-margin top-margin)]
                                    [size (pt line-wrap-size page-wrap-size)])]
            [qx (time-name page-wrap (page-wrap qx page-wrap-size page-quad))]
            [qx (time-name position (position (struct-copy quad q:doc [elems qx])))])
