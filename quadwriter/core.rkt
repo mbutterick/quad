@@ -214,7 +214,7 @@
         (match-define (list line-width line-height) (quad-size line-q))
         ;; words may still be in hyphenated fragments
         ;; (though soft hyphens would have been removed)
-        ;; so group them (but no need to consolidate — that happens elsewhere)
+        ;; so group them (but no need to consolidate — that happens elsewhere)
         (define occupied-width
           (match align-value
             ;; for justified line, we care about size of words without spaces
@@ -409,13 +409,11 @@
 
 (define ((block-draw-start first-line) q doc)
   ;; adjust drawing coordinates for border inset
-  (verbose-quad-printing? #t)
-  #R q
   (match-define (list bil bit bir bib)
     (for/list ([k (in-list '(border-inset-left border-inset-top border-inset-right border-inset-bottom))])
       (quad-ref first-line k 0)))
   (match-define (list left top) (pt+ (quad-position q) (list bil bit)))
-  (match-define (list width height) (pt- (size q) (list (+ bil bir) (+ bit bib))))
+  (match-define (list width height) (pt- (size q) (list (+ bil bir) (+ bit bib))))
   ;; fill rect
   (cond 
     [(quad-ref first-line 'background-color)
@@ -592,14 +590,14 @@
   (define default-y-margin (min 72 (floor (* .10 (pdf-width pdf)))))
   (parameterize ([current-pdf pdf]
                  [verbose-quad-printing? #false]
-                 [draw-debug? #true])
+                 [draw-debug? #false])
     (let* ([qs (time-name hyphenate (handle-hyphenate qs))]
            [qs (map ->string-quad qs)]
            [qs (insert-first-line-indents qs)]
            ;; if only left or right margin is provided, copy other value in preference to default margin
            [left-margin (quad-ref (car qs) 'page-margin-left (λ () (quad-ref (car qs) 'page-margin-right default-x-margin)))]
            [right-margin (quad-ref (car qs) 'page-margin-right (λ () (quad-ref (car qs) 'page-margin-left default-y-margin)))]
-           [line-wrap-size (- (pdf-width pdf) #R left-margin #R right-margin)]
+           [line-wrap-size (- (pdf-width pdf) left-margin right-margin)]
            [qs (time-name line-wrap (line-wrap qs line-wrap-size))]
            [qs (apply-keeps qs)]
            ;; if only top or bottom margin is provided, copy other value in preference to default margin
@@ -607,7 +605,7 @@
            [bottom-margin (quad-ref (car qs) 'page-margin-bottom (λ () (quad-ref (car qs) 'page-margin-top default-y-margin)))]
            [page-wrap-size (- (pdf-height pdf) top-margin bottom-margin)]
            [page-quad (struct-copy quad q:page
-                                   [shift (pt left-margin top-margin)]
+                                   [shift (pt 0 0)]
                                    [size (pt line-wrap-size page-wrap-size)])]
            [qs (time-name page-wrap (page-wrap qs page-wrap-size page-quad))]
            [qs (time-name position (position (struct-copy quad q:doc [elems qs])))])
