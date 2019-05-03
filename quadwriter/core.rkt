@@ -86,22 +86,24 @@
       [size (make-size-promise q)])]))
 
 
-(define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"] [width 0.5])
+(define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"] [stroke-width 0.5])
   ;; ostensibly it would be possible to control draw-debug with a quad attribute
   ;; but that would potentially mess up unit tests (because something has to be inserted in the data)
   ;; therefore controlling debug state with a parameter is cleaner.
   (when (draw-debug?)
     (save doc)
     ;; draw layout box
-    (line-width doc width)
+    (line-width doc stroke-width)
     (apply rect doc (append (pt+ (quad-position q)) (size q)))
     (stroke doc stroke-color)
     ;; draw in point & out point (both on layout box)
-    (circle doc (pt-x (in-point q)) (pt-y (in-point q)) 2)
-    (circle doc (pt-x (out-point q)) (pt-y (out-point q)) 2)
-    (fill doc fill-color)
+    (define point-draw-diameter (+ stroke-width 1.5))
+    (for ([which-point (list in-point out-point)])
+      (define pt (which-point q))
+      (circle doc (pt-x pt) (pt-y pt) point-draw-diameter)
+      (fill doc fill-color))
     ;; draw inner point (adjusted by offset)
-    (rect-centered doc (pt-x (inner-point q)) (pt-y (inner-point q)) 2)
+    (rect-centered doc (pt-x (inner-point q)) (pt-y (inner-point q)) point-draw-diameter)
     (fill doc stroke-color)  
     (restore doc)))
 
@@ -379,7 +381,7 @@
 
 (define (page-draw-start q doc)
   (add-page doc)
-  (draw-debug q doc "aliceblue" "aliceblue" 4)
+  (draw-debug q doc "aliceblue" "aliceblue" 3)
   (scale doc (if zoom-mode? zoom-scale 1) (if zoom-mode? zoom-scale 1)))
 
 (define (page-draw-end q doc)
@@ -561,7 +563,7 @@
                                            (font-size ,(number->string default-font-size))) ,qx))])
                (setup-font-path-table! pdf-path)
                (atomize qx #:attrs-proc handle-cascading-attrs)))
-  
+  #R qx
   ;; page size can be specified by name, or measurements.
   ;; explicit measurements from page-height and page-width supersede those from page-size.
   (define pdf
