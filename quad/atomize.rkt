@@ -8,6 +8,7 @@
          sugar/list
          racket/function
          "quad.rkt"
+         "qexpr.rkt"
          "param.rkt")
 (provide (all-defined-out))
 
@@ -67,7 +68,8 @@
                       (attrs-proc next-attrs)
                       (values next-key next-attrs)]))
       (match (quad-elems x)
-        [(? pair? elems)
+        [(? null?) ((quad-attrs x) . update-with! . next-attrs) (list x)]
+        [_
          ;; we don't use `struct-copy` here because it needs to have the structure id at compile time.
          ;; whereas with this technique, we can extract a constructor for any structure type.
          ;; notice that the technique depends on
@@ -76,13 +78,16 @@
          (define x-maker (let-values ([(x-structure-type _) (struct-info x)])
                            (struct-type-make-constructor x-structure-type)))
          (define x-tail (drop (struct->list x) 2))
-         (append* 
-          (for/list ([elem (in-list (merge-adjacent-strings elems 'isolate-white))])
-            (match elem
-              ["" null]
-              [(? string? str) (list (apply x-maker next-attrs (list str) x-tail))]
-              [_ (loop elem next-attrs next-key)])))]
-        [_ ((quad-attrs x) . update-with! . next-attrs) (list x)])))
+         (match (merge-adjacent-strings (quad-elems x) 'isolate-white)
+           [(? pair? merged-elems)
+            (append* 
+             (for/list ([elem (in-list merged-elems)])
+               (match elem
+                 [(? string? str) (list (apply x-maker next-attrs (list str) x-tail))]
+                 [_ (loop elem next-attrs next-key)])))]
+           ;; if merged elements are empty (for instance, series of empty strings)
+           ;; then zero out the elements in the quad.
+           [_ (list (apply x-maker next-attrs null x-tail))])])))
   #;(trimf atomized-qs (λ (q) (equal? (quad-elems q) '(" "))))
   atomized-qs)
 
@@ -101,4 +106,6 @@
          (q (hasheq 'foo 42) " ")
          (q (hasheq 'foo 42) "idiot")
          (q (hasheq 'foo 42 'bar 84) "There")
-         (q (hasheq 'foo 42) "Everyone"))))
+         (q (hasheq 'foo 42) "Everyone")))
+
+  (check-true (andmap quad=?  (atomize (qexpr->quad '(q))) (atomize (qexpr->quad '(q ""))))))
