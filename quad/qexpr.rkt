@@ -79,7 +79,7 @@
       [(cons (? valid-tag?) rest)
        (match rest
          [(list (? txexpr-attrs? attrs) (? qexpr? elems) ...)
-          (define mheq (make-hash)) ; want mutable hash
+          (define mheq (make-hasheq)) ; want mutable hash
           (for ([kv (in-list attrs)])
             (match-define (list k v) kv)
             ;; coerce number strings to actual numbers
@@ -91,9 +91,10 @@
       [_ x])))
 
 (module+ test
-  (check-equal?
-   (qexpr->quad  `(q ((font "Charter") (fontsize "12")) (q "Foo bar") ,(make-quad "zzz") (q "Zim Zam")))
-   (q (hasheq 'font "Charter" 'fontsize 12) (q "Foo bar") (q "zzz") (q "Zim Zam"))))
+  (check-true
+   (quad=?
+    (qexpr->quad  `(q ((font "charter") (fontsize "12")) (q "Foo bar") ,(make-quad "zzz") (q "Zim Zam")))
+    (q (hasheq 'font "charter" 'fontsize 12) (q "Foo bar") (q "zzz") (q "Zim Zam")))))
 
 (define (qml->qexpr x)
   (parameterize ([permissive-xexprs #t]
