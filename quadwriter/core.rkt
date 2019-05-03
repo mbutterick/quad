@@ -19,17 +19,18 @@
 (define-quad string-quad quad ())
  
 (define (q:string-draw q doc)
-  ;; draw with pdf text routine  (when (pair? (quad-elems q))
-  (font doc (path->string (quad-ref q font-path-key default-font-face)))
-  (font-size doc (quad-ref q 'font-size 12))
-  (fill-color doc (quad-ref q 'color "black"))
-  (define str (unsafe-car (quad-elems q)))
-  (match-define (list x y) (quad-position q))
-  (text doc str x y
-        #:tracking (quad-ref q 'character-tracking 0)
-        #:bg (quad-ref q 'bg)
-        #:features (list (cons #"tnum" 1))
-        #:link (quad-ref q 'link)))
+  ;; draw with pdf text routine
+  (when (pair? (quad-elems q))
+    (font doc (path->string (quad-ref q font-path-key default-font-face)))
+    (font-size doc (quad-ref q 'font-size 12))
+    (fill-color doc (quad-ref q 'color "black"))
+    (define str (unsafe-car (quad-elems q)))
+    (match-define (list x y) (quad-position q))
+    (text doc str x y
+          #:tracking (quad-ref q 'character-tracking 0)
+          #:bg (quad-ref q 'bg)
+          #:features '((#"tnum" . 1))
+          #:link (quad-ref q 'link))))
 
 (define (q:string-draw-end q doc)
   (when (draw-debug-string?)
@@ -384,10 +385,10 @@
   (draw-debug q doc "aliceblue" "aliceblue" 3)
   (scale doc (if zoom-mode? zoom-scale 1) (if zoom-mode? zoom-scale 1)))
 
-(define (page-draw-end q doc)
+(define (draw-page-footer q doc)
   (define top-margin #R (pt-y (quad-offset q)))
   (define bottom-margin (- #R (pdf-height doc) #R top-margin))
-  (font-size doc 10)
+  (font-size doc (* .8 default-font-size))
   (font doc default-font-face)
   (fill-color doc "black")
   (text doc (format "~a · ~a at ~a" (hash-ref (quad-attrs q) 'page-number)
@@ -395,6 +396,9 @@
                     (date->string (current-date) #t))
         (pt-x (quad-offset q))
         (+ (- (pdf-height doc) bottom-margin) 20)))
+
+(define (page-draw-end q doc)
+  (draw-page-footer q doc))
 
 (define q:page (q #:offset '(0 0)
                   #:draw-start page-draw-start
