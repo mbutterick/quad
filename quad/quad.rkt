@@ -29,7 +29,7 @@
   (and
    ;; exclude attrs from initial comparison
    (for/and ([getter (in-list (list quad-elems quad-size quad-in quad-out quad-inner
-                                    quad-offset quad-origin quad-printable
+                                    quad-shift quad-offset quad-position quad-printable
                                     quad-draw-start quad-draw-end quad-draw))])
             (equal? (getter q1) (getter q2)))
    ;; and compare them key-by-key
@@ -45,9 +45,17 @@
               in ; alignment point matched to previous quad
               out ; alignment point matched to next quad
               inner ; alignment point for elems (might be different from in/out)
-              ;; offset, origin are two-dim pts
-              offset ; relocation of pen before quad is drawn
-              origin ; reference point for all subsequent drawing ops in the quad. Calculated, not set directly
+              ;; offset, shift are two-dim pts
+              ;; offset= Similar to `relative` CSS positioning
+              ;; relocation of pen before quad is drawn. Does NOT change layout position.
+              ;; meaning, in and out points don't move, just the drawing.
+              offset
+              ;; shift = shift between previous out point and current in point.
+              ;; DOES change the layout position.
+              shift
+              ;; reference point (in absolute coordinates)
+              ;; for all subsequent drawing ops in the quad. Calculated, not set directly
+              position 
               printable ; whether the quad will print
               draw-start ; func called at the beginning of every draw event (for setup ops)
               draw ; func called in the middle of every daw event
@@ -99,8 +107,9 @@
          #:in [in 'nw]
          #:out [out 'ne]
          #:inner [inner #f]
+         #:shift [shift '(0 0)]
          #:offset [offset '(0 0)]
-         #:origin [origin '(0 0)]
+         #:position [position '(0 0)]
          #:printable [printable default-printable]
          #:draw-start [draw-start void]
          #:draw [draw default-draw]
@@ -120,8 +129,9 @@
                 in
                 out
                 inner
+                shift
                 offset
-                origin
+                position
                 printable
                 draw-start
                 draw

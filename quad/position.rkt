@@ -61,25 +61,25 @@
   ;; calculate absolute location of inner-point
   ;; based on current origin and point type.
   ;; include offset, because it's intended to adjust inner 
-  (pt+ (quad-origin q) (anchor->local-point q (or (quad-inner q) (quad-in q))) (quad-offset q)))
+  (pt+ (quad-position q) (anchor->local-point q (or (quad-inner q) (quad-in q))) (quad-offset q)))
 
 (define (in-point q)
   ;; calculate absolute location of in-point
   ;; based on current origin and point type.
   ;; don't include offset, so location is on bounding box
-  (pt+ (quad-origin q) (anchor->local-point q (quad-in q))))
+  (pt+ (quad-position q) (anchor->local-point q (quad-in q))))
 
 (define (out-point q)
   ;; calculate absolute location of out-point
   ;; based on current origin and point type.
   ;; don't include offset, so location is on bounding box
-  (pt+ (quad-origin q) (anchor->local-point q (quad-out q))))
+  (pt+ (quad-position q) (anchor->local-point q (quad-out q))))
 
 (define (position q [previous-end-pt (pt 0 0)])
   ;; recursively calculates coordinates for quad & subquads
   ;; based on starting origin point
-  (define new-origin (pt- previous-end-pt (in-point q)))
-  (let ([q (struct-copy quad q [origin new-origin])])
+  (define new-position (pt+ (pt- previous-end-pt (in-point q)) (quad-shift q)))
+  (let ([q (struct-copy quad q [position new-position])])
     (let loop ([pt (inner-point q)] [acc null] [elems (quad-elems q)])
       (match elems
         [(== empty) (struct-copy quad q [elems (reverse acc)])]
@@ -99,42 +99,42 @@
    "origins"
    (define size (pt 10 10))
    (define orig (pt 5 5))
-   (check-equal? (quad-origin (position (q #:in 'nw #:size size) orig)) (pt 5 5))
-   (check-equal? (quad-origin (position (q #:in 'n #:size size) orig)) (pt 0 5))
-   (check-equal? (quad-origin (position (q #:in 'ne #:size size) orig)) (pt -5 5))
-   (check-equal? (quad-origin (position (q #:in 'e #:size size) orig)) (pt -5 0))
-   (check-equal? (quad-origin (position (q #:in 'se #:size size) orig)) (pt -5 -5))
-   (check-equal? (quad-origin (position (q #:in 's #:size size) orig)) (pt 0 -5))
-   (check-equal? (quad-origin (position (q #:in 'sw #:size size) orig)) (pt 5 -5))
-   (check-equal? (quad-origin (position (q #:in 'w #:size size) orig)) (pt 5 0)))
+   (check-equal? (quad-position (position (q #:in 'nw #:size size) orig)) (pt 5 5))
+   (check-equal? (quad-position (position (q #:in 'n #:size size) orig)) (pt 0 5))
+   (check-equal? (quad-position (position (q #:in 'ne #:size size) orig)) (pt -5 5))
+   (check-equal? (quad-position (position (q #:in 'e #:size size) orig)) (pt -5 0))
+   (check-equal? (quad-position (position (q #:in 'se #:size size) orig)) (pt -5 -5))
+   (check-equal? (quad-position (position (q #:in 's #:size size) orig)) (pt 0 -5))
+   (check-equal? (quad-position (position (q #:in 'sw #:size size) orig)) (pt 5 -5))
+   (check-equal? (quad-position (position (q #:in 'w #:size size) orig)) (pt 5 0)))
 
   (test-case
    "in points"
    (define size '(10 10))
-   (define origin '(5 5))
-   (check-equal? (in-point (q #:in 'nw #:size size #:origin origin)) (pt 5 5))
-   (check-equal? (in-point (q #:in 'n #:size size #:origin origin)) (pt 10 5))
-   (check-equal? (in-point (q #:in 'ne #:size size #:origin origin)) (pt 15 5))
-   (check-equal? (in-point (q #:in 'w #:size size #:origin origin)) (pt 5 10))
-   (check-equal? (in-point (q #:in 'c #:size size #:origin origin)) (pt 10 10))
-   (check-equal? (in-point (q #:in 'e #:size size #:origin origin)) (pt 15 10))
-   (check-equal? (in-point (q #:in 'sw #:size size #:origin origin)) (pt 5 15))
-   (check-equal? (in-point (q #:in 's #:size size #:origin origin)) (pt 10 15))
-   (check-equal? (in-point (q #:in 'se #:size size #:origin origin)) (pt 15 15)))
+   (define pos '(5 5))
+   (check-equal? (in-point (q #:in 'nw #:size size #:position pos)) (pt 5 5))
+   (check-equal? (in-point (q #:in 'n #:size size #:position pos)) (pt 10 5))
+   (check-equal? (in-point (q #:in 'ne #:size size #:position pos)) (pt 15 5))
+   (check-equal? (in-point (q #:in 'w #:size size #:position pos)) (pt 5 10))
+   (check-equal? (in-point (q #:in 'c #:size size #:position pos)) (pt 10 10))
+   (check-equal? (in-point (q #:in 'e #:size size #:position pos)) (pt 15 10))
+   (check-equal? (in-point (q #:in 'sw #:size size #:position pos)) (pt 5 15))
+   (check-equal? (in-point (q #:in 's #:size size #:position pos)) (pt 10 15))
+   (check-equal? (in-point (q #:in 'se #:size size #:position pos)) (pt 15 15)))
 
   (test-case
    "out points"
    (define size (pt 10 10))
-   (define origin (pt 5 5))
-   (check-equal? (out-point (q #:out 'nw #:size size #:origin origin)) (pt 5 5))
-   (check-equal? (out-point (q #:out 'n #:size size #:origin origin)) (pt 10 5))
-   (check-equal? (out-point (q #:out 'ne #:size size #:origin origin)) (pt 15 5))
-   (check-equal? (out-point (q #:out 'w #:size size #:origin origin)) (pt 5 10))
-   (check-equal? (out-point (q #:out 'c #:size size #:origin origin)) (pt 10 10))
-   (check-equal? (out-point (q #:out 'e #:size size #:origin origin)) (pt 15 10))
-   (check-equal? (out-point (q #:out 'sw #:size size #:origin origin)) (pt 5 15))
-   (check-equal? (out-point (q #:out 's #:size size #:origin origin)) (pt 10 15))
-   (check-equal? (out-point (q #:out 'se #:size size #:origin origin)) (pt 15 15)))
+   (define pos (pt 5 5))
+   (check-equal? (out-point (q #:out 'nw #:size size #:position pos)) (pt 5 5))
+   (check-equal? (out-point (q #:out 'n #:size size #:position pos)) (pt 10 5))
+   (check-equal? (out-point (q #:out 'ne #:size size #:position pos)) (pt 15 5))
+   (check-equal? (out-point (q #:out 'w #:size size #:position pos)) (pt 5 10))
+   (check-equal? (out-point (q #:out 'c #:size size #:position pos)) (pt 10 10))
+   (check-equal? (out-point (q #:out 'e #:size size #:position pos)) (pt 15 10))
+   (check-equal? (out-point (q #:out 'sw #:size size #:position pos)) (pt 5 15))
+   (check-equal? (out-point (q #:out 's #:size size #:position pos)) (pt 10 15))
+   (check-equal? (out-point (q #:out 'se #:size size #:position pos)) (pt 15 15)))
 
   (test-case
    "inner points"
