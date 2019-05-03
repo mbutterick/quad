@@ -1,6 +1,6 @@
 #lang scribble/manual
 
-@(require scribble/eval (for-label txexpr (except-in pollen #%module-begin) xml racket/base racket/draw)
+@(require racket/runtime-path scribble/eval (for-label txexpr (except-in pollen #%module-begin) xml racket/base racket/draw)
 pollen/scribblings/mb-tools)
 
 @(define my-eval (make-base-eval))
@@ -13,7 +13,9 @@ pollen/scribblings/mb-tools)
 quadwriter/markdown
 quadwriter/markup)]
 
-@italic{This software is under development. Set expectations accordingly.}
+
+@(define-runtime-path quads.png "quads.png")
+@(image quads.png #:scale 0.4)
 
 
 @section{Installing Quad}
@@ -24,7 +26,7 @@ At the command line:
 After that, you can update the package like so:
 @verbatim{raco pkg update quad}
 
-Quad is not stable, usable software. It is currently in documented-demo mode. Fiddle with it at your own risk. I make no commitment to maintain the API in its current state.
+@margin-note{Quad is not stable, usable software. It is currently in documented-demo mode. Fiddle with it at your own risk. I make no commitment to maintain the API in its current state.}
 
 @section{What is Quad?}
 
