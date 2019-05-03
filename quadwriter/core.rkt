@@ -377,6 +377,8 @@
   (scale doc (if zoom-mode? zoom-scale 1) (if zoom-mode? zoom-scale 1)))
 
 (define (page-draw-end q doc)
+  (define top-margin #R (pt-y (quad-offset q)))
+  (define bottom-margin (- #R (pdf-height doc) #R top-margin))
   (font-size doc 10)
   (font doc default-font-face)
   (fill-color doc "black")
@@ -384,7 +386,7 @@
                     (hash-ref (quad-attrs q) 'doc-title)
                     (date->string (current-date) #t))
         (pt-x (quad-offset q))
-        (- (pdf-height doc) 80)))
+        (+ (- (pdf-height doc) bottom-margin) 20)))
 
 (define q:page (q #:offset '(0 0)
                   #:draw-start page-draw-start
@@ -590,8 +592,8 @@
            [bottom-margin (quad-ref (car qx) 'page-margin-bottom (λ () (quad-ref (car qx) 'page-margin-top default-y-margin)))]
            [page-wrap-size (- (pdf-height pdf) top-margin bottom-margin)]
            [page-quad (struct-copy quad q:page
-                                   [offset (pt left-margin top-margin)]
-                                   [size (pt (pdf-width pdf) (pdf-height pdf))])]
+                                   [origin (pt 120 60)]
+                                   [size (pt line-wrap-size page-wrap-size)])]
            [qx (time-name page-wrap (page-wrap qx page-wrap-size page-quad))]
            [qx (time-name position (position (struct-copy quad q:doc [elems qx])))])
       (time-name draw (draw qx pdf))
