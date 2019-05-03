@@ -1,6 +1,13 @@
 #lang debug racket/base
 (require (for-syntax racket/base racket/syntax)
-         racket/struct racket/format racket/list racket/string racket/promise racket/dict racket/match)
+         racket/struct
+         racket/format
+         racket/list
+         racket/string
+         racket/promise
+         racket/dict
+         racket/match
+         "param.rkt")
 (provide (all-defined-out))
 (module+ test (require rackunit))
 
@@ -25,7 +32,7 @@
        (for/and ([(k v) (in-hash h1)])
                 (and (hash-has-key? h2 k) (equal? (hash-ref h2 k) v)))))
 
-(define (quad=? q1 q2 recur?)
+(define (quad=? q1 q2 [recur? #t])
   (and
    ;; exclude attrs from initial comparison
    (for/and ([getter (in-list (list quad-elems quad-size quad-in quad-out quad-inner
@@ -35,6 +42,7 @@
    ;; and compare them key-by-key
    (hashes-equal? (quad-attrs q1) (quad-attrs q2))))
 
+;; keep this param here so you don't have to import quad/param to get it
 (define verbose-quad-printing? (make-parameter #f))
 
 (struct quad (attrs ; key-value pairs, arbitrary
