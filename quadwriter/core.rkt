@@ -97,18 +97,11 @@
     (line-width doc stroke-width)
     (apply rect doc (append (pt+ (quad-origin q)) (size q)))
     (stroke doc stroke-color)
-    ;; draw in point & out point (both on layout box)
-    (define point-draw-diameter (+ stroke-width 1.5))
-    (for ([which-point (list to-point from-point)]
-          [func (list circle circle-squared)])
-      ;; if from-point is square, then its edges are still visible
-      ;; when to-point cricle is drawn on top
-      (define pt (which-point q))
-      (func doc (pt-x pt) (pt-y pt) point-draw-diameter)
-      (fill doc fill-color))
-    ;; draw inner point (adjusted by offset)
-    #;(rect-centered doc (pt-x (inner-point q)) (pt-y (inner-point q)) point-draw-diameter)
-    #;(fill doc stroke-color)  
+    (apply rect doc (append (pt+ (quad-origin q)) (size q)))
+    (clip doc)
+    (define pt (to-point q))
+    (circle doc (pt-x pt) (pt-y pt) (+ 3 stroke-width))
+    (fill doc fill-color)
     (restore doc)))
 
 (define q:line (q #:size (pt 0 default-line-height)
@@ -119,8 +112,9 @@
 
 (struct line-spacer quad () #:transparent)
 (define q:line-spacer (q #:type line-spacer
-                         #:size (pt 0 (* default-line-height 0.6))
+                         #:size (pt 20 (* default-line-height 0.6))
                          #:from 'sw
+                         #:to 'nw
                          #:printable (λ (q sig) (not (memq sig '(start end))))
                          #:draw-start (if (draw-debug-line?) draw-debug void)))
 
@@ -388,8 +382,8 @@
 
 (define (page-draw-start q doc)
   (add-page doc)
-  (draw-debug q doc "aliceblue" "aliceblue" 3)
-  (scale doc (if zoom-mode? zoom-scale 1) (if zoom-mode? zoom-scale 1)))
+  (scale doc (zoom-factor) (zoom-factor))
+  (draw-debug q doc "aliceblue" "aliceblue" 3))
 
 (define (draw-page-footer q doc)
   (match-define (list x y) (quad-origin q))
@@ -610,7 +604,8 @@
   (define default-y-margin (min 72 (floor (* .10 (pdf-width pdf)))))
   (parameterize ([current-pdf pdf]
                  [verbose-quad-printing? #false]
-                 [draw-debug? #true])
+                 [draw-debug? #true]
+                 [zoom-factor 3])
     (let* ([qs (time-name hyphenate (handle-hyphenate qs))]
            [qs (map ->string-quad qs)]
            [qs (insert-first-line-indents qs)]
