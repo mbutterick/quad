@@ -57,17 +57,17 @@
                                    [(or 'bi 'bo 'baseline-in 'baseline-out) (vertical-baseline-offset q)]
                                    [_ 0])))))
 
-(define (in-point q)
+(define (at-point q)
   ;; calculate absolute location of in-point
   ;; based on current origin and point type.
   ;; don't include offset, so location is on bounding box
-  (anchor->global-point q (quad-in q)))
+  (anchor->global-point q (quad-at q)))
 
-(define (out-point q)
+(define (on-point q)
   ;; calculate absolute location of out-point
   ;; based on current origin and point type.
   ;; don't include offset, so location is on bounding box
-  (anchor->global-point q (quad-out q)))
+  (anchor->global-point q (quad-on q)))
 
 (define (anchor->global-point q anchor)
   ;; don't include shift here: it should be baked into origin calculation
@@ -76,10 +76,10 @@
 (define (position q [ref-src #f])
   ;; recursively calculates coordinates for quad & subquads
   (define ref-pt (cond
-                   [(quad? ref-src) (anchor->global-point ref-src (quad-out q))]
+                   [(quad? ref-src) (anchor->global-point ref-src (quad-on q))]
                    [ref-src] ; for passing explicit points in testing
                    [else (pt 0 0)]))
-  (define this-origin (pt- ref-pt (in-point q)))
+  (define this-origin (pt- ref-pt (at-point q)))
   (define shifted-origin (pt+ this-origin (quad-shift q)))
   ;; need to position before recurring, so subquads have accurate reference point
   (define positioned-q (struct-copy quad q
@@ -101,7 +101,7 @@
                             [(cons x rest) (loop (cons x prev-elems) rest)]))])))
 
 (define (distance q)
-  (match (pt- (out-point q) (in-point q))
+  (match (pt- (on-point q) (at-point q))
     [(list-no-order 0 val) val]
     [(list ∆x ∆y) (sqrt (+ (expt ∆x 2) (expt ∆y 2)))]))
 
@@ -111,14 +111,14 @@
    "origins"
    (define size (pt 10 10))
    (define orig (pt 5 5))
-   (check-equal? (quad-origin (position (q #:in 'nw #:size size) orig)) (pt 5 5))
-   (check-equal? (quad-origin (position (q #:in 'n #:size size) orig)) (pt 0 5))
-   (check-equal? (quad-origin (position (q #:in 'ne #:size size) orig)) (pt -5 5))
-   (check-equal? (quad-origin (position (q #:in 'e #:size size) orig)) (pt -5 0))
-   (check-equal? (quad-origin (position (q #:in 'se #:size size) orig)) (pt -5 -5))
-   (check-equal? (quad-origin (position (q #:in 's #:size size) orig)) (pt 0 -5))
-   (check-equal? (quad-origin (position (q #:in 'sw #:size size) orig)) (pt 5 -5))
-   (check-equal? (quad-origin (position (q #:in 'w #:size size) orig)) (pt 5 0)))
+   (check-equal? (quad-origin (position (q #:at 'nw #:size size) orig)) (pt 5 5))
+   (check-equal? (quad-origin (position (q #:at 'n #:size size) orig)) (pt 0 5))
+   (check-equal? (quad-origin (position (q #:at 'ne #:size size) orig)) (pt -5 5))
+   (check-equal? (quad-origin (position (q #:at 'e #:size size) orig)) (pt -5 0))
+   (check-equal? (quad-origin (position (q #:at 'se #:size size) orig)) (pt -5 -5))
+   (check-equal? (quad-origin (position (q #:at 's #:size size) orig)) (pt 0 -5))
+   (check-equal? (quad-origin (position (q #:at 'sw #:size size) orig)) (pt 5 -5))
+   (check-equal? (quad-origin (position (q #:at 'w #:size size) orig)) (pt 5 0)))
 
   
   (test-case
@@ -126,43 +126,43 @@
    (define size (pt 10 10))
    (define orig (pt 5 5))
    (define shift (pt 3 3))
-   (check-equal? (quad-origin (position (q #:in 'nw #:size size #:shift shift) orig)) (pt+ (pt 5 5) shift))
-   (check-equal? (quad-origin (position (q #:in 'n #:size size #:shift shift) orig)) (pt+ (pt 0 5) shift))
-   (check-equal? (quad-origin (position (q #:in 'ne #:size size #:shift shift) orig)) (pt+ (pt -5 5) shift))
-   (check-equal? (quad-origin (position (q #:in 'e #:size size #:shift shift) orig)) (pt+ (pt -5 0) shift))
-   (check-equal? (quad-origin (position (q #:in 'se #:size size #:shift shift) orig)) (pt+ (pt -5 -5) shift))
-   (check-equal? (quad-origin (position (q #:in 's #:size size #:shift shift) orig)) (pt+ (pt 0 -5) shift))
-   (check-equal? (quad-origin (position (q #:in 'sw #:size size #:shift shift) orig)) (pt+ (pt 5 -5) shift))
-   (check-equal? (quad-origin (position (q #:in 'w #:size size #:shift shift) orig)) (pt+ (pt 5 0) shift)))
+   (check-equal? (quad-origin (position (q #:at 'nw #:size size #:shift shift) orig)) (pt+ (pt 5 5) shift))
+   (check-equal? (quad-origin (position (q #:at 'n #:size size #:shift shift) orig)) (pt+ (pt 0 5) shift))
+   (check-equal? (quad-origin (position (q #:at 'ne #:size size #:shift shift) orig)) (pt+ (pt -5 5) shift))
+   (check-equal? (quad-origin (position (q #:at 'e #:size size #:shift shift) orig)) (pt+ (pt -5 0) shift))
+   (check-equal? (quad-origin (position (q #:at 'se #:size size #:shift shift) orig)) (pt+ (pt -5 -5) shift))
+   (check-equal? (quad-origin (position (q #:at 's #:size size #:shift shift) orig)) (pt+ (pt 0 -5) shift))
+   (check-equal? (quad-origin (position (q #:at 'sw #:size size #:shift shift) orig)) (pt+ (pt 5 -5) shift))
+   (check-equal? (quad-origin (position (q #:at 'w #:size size #:shift shift) orig)) (pt+ (pt 5 0) shift)))
 
   (test-case
    "in points"
    (define size '(10 10))
    (define pos '(5 5))
-   (check-equal? (in-point (q #:in 'nw #:size size #:origin pos)) (pt 5 5))
-   (check-equal? (in-point (q #:in 'n #:size size #:origin pos)) (pt 10 5))
-   (check-equal? (in-point (q #:in 'ne #:size size #:origin pos)) (pt 15 5))
-   (check-equal? (in-point (q #:in 'w #:size size #:origin pos)) (pt 5 10))
-   (check-equal? (in-point (q #:in 'c #:size size #:origin pos)) (pt 10 10))
-   (check-equal? (in-point (q #:in 'e #:size size #:origin pos)) (pt 15 10))
-   (check-equal? (in-point (q #:in 'sw #:size size #:origin pos)) (pt 5 15))
-   (check-equal? (in-point (q #:in 's #:size size #:origin pos)) (pt 10 15))
-   (check-equal? (in-point (q #:in 'se #:size size #:origin pos)) (pt 15 15)))
+   (check-equal? (at-point (q #:at 'nw #:size size #:origin pos)) (pt 5 5))
+   (check-equal? (at-point (q #:at 'n #:size size #:origin pos)) (pt 10 5))
+   (check-equal? (at-point (q #:at 'ne #:size size #:origin pos)) (pt 15 5))
+   (check-equal? (at-point (q #:at 'w #:size size #:origin pos)) (pt 5 10))
+   (check-equal? (at-point (q #:at 'c #:size size #:origin pos)) (pt 10 10))
+   (check-equal? (at-point (q #:at 'e #:size size #:origin pos)) (pt 15 10))
+   (check-equal? (at-point (q #:at 'sw #:size size #:origin pos)) (pt 5 15))
+   (check-equal? (at-point (q #:at 's #:size size #:origin pos)) (pt 10 15))
+   (check-equal? (at-point (q #:at 'se #:size size #:origin pos)) (pt 15 15)))
 
 
   (test-case
    "out points"
    (define size (pt 10 10))
    (define pos (pt 5 5))
-   (check-equal? (out-point (q #:out 'nw #:size size #:origin pos)) (pt 5 5))
-   (check-equal? (out-point (q #:out 'n #:size size #:origin pos)) (pt 10 5))
-   (check-equal? (out-point (q #:out 'ne #:size size #:origin pos)) (pt 15 5))
-   (check-equal? (out-point (q #:out 'w #:size size #:origin pos)) (pt 5 10))
-   (check-equal? (out-point (q #:out 'c #:size size #:origin pos)) (pt 10 10))
-   (check-equal? (out-point (q #:out 'e #:size size #:origin pos)) (pt 15 10))
-   (check-equal? (out-point (q #:out 'sw #:size size #:origin pos)) (pt 5 15))
-   (check-equal? (out-point (q #:out 's #:size size #:origin pos)) (pt 10 15))
-   (check-equal? (out-point (q #:out 'se #:size size #:origin pos)) (pt 15 15)))
+   (check-equal? (on-point (q #:on 'nw #:size size #:origin pos)) (pt 5 5))
+   (check-equal? (on-point (q #:on 'n #:size size #:origin pos)) (pt 10 5))
+   (check-equal? (on-point (q #:on 'ne #:size size #:origin pos)) (pt 15 5))
+   (check-equal? (on-point (q #:on 'w #:size size #:origin pos)) (pt 5 10))
+   (check-equal? (on-point (q #:on 'c #:size size #:origin pos)) (pt 10 10))
+   (check-equal? (on-point (q #:on 'e #:size size #:origin pos)) (pt 15 10))
+   (check-equal? (on-point (q #:on 'sw #:size size #:origin pos)) (pt 5 15))
+   (check-equal? (on-point (q #:on 's #:size size #:origin pos)) (pt 10 15))
+   (check-equal? (on-point (q #:on 'se #:size size #:origin pos)) (pt 15 15)))
 
   )
 

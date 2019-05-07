@@ -14,9 +14,9 @@
   (qexpr (append `(#;(first-line-indent "12")
                    #;(line-align "center")
                    #;(line-wrap "kp")
-                   #;(page-margin-left "120")
-                   #;(page-margin-top "80")
-                   #;(page-margin-bottom "120")
+                   (page-margin-left "120")
+                   (page-margin-top "80")
+                   (page-margin-bottom "120")
                    (line-height "17")
                    #;(line-align-last "center")) attrs) exprs))
 
