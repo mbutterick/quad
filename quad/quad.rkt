@@ -35,8 +35,8 @@
 (define (quad=? q1 q2 [recur? #t])
   (and
    ;; exclude attrs from initial comparison
-   (for/and ([getter (in-list (list quad-elems quad-size quad-on-parent quad-on quad-at 
-                                    quad-shift quad-offset quad-on-parent quad-origin quad-printable
+   (for/and ([getter (in-list (list quad-elems quad-size quad-from-parent quad-from quad-to 
+                                    quad-shift quad-offset quad-from-parent quad-origin quad-printable
                                     quad-draw-start quad-draw-end quad-draw))])
      (equal? (getter q1) (getter q2)))
    ;; and compare them key-by-key
@@ -50,9 +50,9 @@
               ;; size is a two-dim pt
               size ; outer size of quad for layout (though not necessarily the bounding box for drawing)
               ;; in, out are phrased in terms of cardinal position
-              on-parent ; position on parent quad?
-              on ; alignment point on ref quad
-              at ; alignment point on this quad that is matched to `out` on previous quad
+              from-parent ; position on parent quad?
+              from ; alignment point on ref quad
+              to ; alignment point on this quad that is matched to `from` on previous quad
               ;; offset, shift are two-dim pts
               ;; offset= Similar to `relative` CSS positioning
               ;; relocation of pen before quad is drawn. Does NOT change layout position.
@@ -114,9 +114,9 @@
          #:attrs [attrs (make-hasheq)]
          #:elems [elems null]
          #:size [size '(0 0)]
-         #:on-parent [on-parent #false]
-         #:on [on 'nw]
-         #:at [at 'nw]
+         #:from-parent [from-parent #false]
+         #:from [from 'ne]
+         #:to [to 'nw]
          #:shift [shift '(0 0)]
          #:offset [offset '(0 0)]
          #:origin [origin '(0 0)]
@@ -137,9 +137,9 @@
                         attrs
                         elems
                         size
-                        on-parent
-                        on
-                        at
+                        from-parent
+                        from
+                        to
                         offset
                         shift
                         origin

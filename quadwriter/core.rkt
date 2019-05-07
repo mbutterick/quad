@@ -46,9 +46,8 @@
     [_ #true]))
 
 (define q:string (q #:type string-quad
-                    #:on 'bo
-                    #:at 'bi
-                    #:on-parent #false
+                    #:from 'bo
+                    #:to 'bi
                     #:printable q:string-printable?
                     #:draw q:string-draw
                     #:draw-end q:string-draw-end))
@@ -100,9 +99,12 @@
     (stroke doc stroke-color)
     ;; draw in point & out point (both on layout box)
     (define point-draw-diameter (+ stroke-width 1.5))
-    (for ([which-point (list at-point on-point)])
+    (for ([which-point (list to-point from-point)]
+          [func (list circle circle-squared)])
+      ;; if from-point is square, then its edges are still visible
+      ;; when to-point cricle is drawn on top
       (define pt (which-point q))
-      (circle doc (pt-x pt) (pt-y pt) point-draw-diameter)
+      (func doc (pt-x pt) (pt-y pt) point-draw-diameter)
       (fill doc fill-color))
     ;; draw inner point (adjusted by offset)
     #;(rect-centered doc (pt-x (inner-point q)) (pt-y (inner-point q)) point-draw-diameter)
@@ -110,15 +112,15 @@
     (restore doc)))
 
 (define q:line (q #:size (pt 0 default-line-height)
-                  #:on 'sw
-                  #:at 'nw
+                  #:from 'sw
+                  #:to 'nw
                   #:printable #true
                   #:draw-start (if draw-debug-line? draw-debug void)))
 
 (struct line-spacer quad () #:transparent)
 (define q:line-spacer (q #:type line-spacer
                          #:size (pt 0 (* default-line-height 0.6))
-                         #:on 'sw
+                         #:from 'sw
                          #:printable (λ (q sig) (not (memq sig '(start end))))
                          #:draw-start (if (draw-debug-line?) draw-debug void)))
 
@@ -400,9 +402,9 @@
         x y))
 
 (define q:footer (q #:size (pt 50 default-line-height)
-                    #:on-parent #true
-                    #:on 'sw
-                    #:at 'nw
+                    #:from-parent #true
+                    #:from 'sw
+                    #:to 'nw
                     #:shift (pt 0 default-line-height)
                     #:printable #true
                     #:draw-start (λ (q doc)
@@ -411,7 +413,7 @@
                                    (draw-page-footer q doc))))
 
 (define q:page (q
-                #:on-parent #true
+                #:from-parent #true
                 #:draw-start page-draw-start))
 
 (define q:doc (q #:draw-start (λ (q doc) (start-doc doc))
@@ -457,9 +459,8 @@
 
 (define (block-wrap lines)
   (define first-line (car lines)) 
-  (q #:on 'sw
-     #:at 'nw
-     #:on-parent #false
+  (q #:from 'sw
+     #:to 'nw
      #:offset (pt 0 (+ (quad-ref first-line 'inset-top 0)))
      #:elems (on-parent lines 'nw)
      #:size (delay (pt (pt-x (size first-line)) ; 
@@ -495,8 +496,8 @@
   [((? null?) _) null]
   [((cons q rest) where)
    (cons (struct-copy quad q
-                      [on-parent #true]
-                      [on (or where (quad-on q))]) rest)])
+                      [from-parent #true]
+                      [from (or where (quad-from q))]) rest)])
 
 (define ((page-finish-wrap page-quad path) lns q0 q page-idx)
   (define-values (dir name _) (split-path (path-replace-extension path #"")))
@@ -600,8 +601,8 @@
       (make-pdf #:compress #t
                 #:auto-first-page #f
                 #:output-path pdf-path
-                #:width page-width
-                #:height page-height
+                #:width #;page-width 400
+                #:height #;page-height 400
                 #:size (quad-ref (car qs) 'page-size default-page-size)
                 #:orientation (quad-ref (car qs) 'page-orientation default-page-orientation))))
 
@@ -609,7 +610,7 @@
   (define default-y-margin (min 72 (floor (* .10 (pdf-width pdf)))))
   (parameterize ([current-pdf pdf]
                  [verbose-quad-printing? #false]
-                 [draw-debug? #false])
+                 [draw-debug? #true])
     (let* ([qs (time-name hyphenate (handle-hyphenate qs))]
            [qs (map ->string-quad qs)]
            [qs (insert-first-line-indents qs)]
