@@ -1,3 +1,3 @@
-#lang quadwriter
+#lang quadwriter/markdown
 
-Hello world
+Hi there

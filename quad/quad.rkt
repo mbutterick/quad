@@ -30,15 +30,15 @@
 (define (hashes-equal? h1 h2)
   (and (= (length (hash-keys h1)) (length (hash-keys h2)))
        (for/and ([(k v) (in-hash h1)])
-                (and (hash-has-key? h2 k) (equal? (hash-ref h2 k) v)))))
+         (and (hash-has-key? h2 k) (equal? (hash-ref h2 k) v)))))
 
 (define (quad=? q1 q2 [recur? #t])
   (and
    ;; exclude attrs from initial comparison
-   (for/and ([getter (in-list (list quad-elems quad-size quad-in quad-out quad-inner
-                                    quad-shift quad-offset quad-position quad-printable
+   (for/and ([getter (in-list (list quad-elems quad-size quad-in quad-out 
+                                    quad-shift quad-offset quad-on-parent quad-origin quad-printable
                                     quad-draw-start quad-draw-end quad-draw))])
-            (equal? (getter q1) (getter q2)))
+     (equal? (getter q1) (getter q2)))
    ;; and compare them key-by-key
    (hashes-equal? (quad-attrs q1) (quad-attrs q2))))
 
@@ -49,10 +49,10 @@
               elems ; subquads or text
               ;; size is a two-dim pt
               size ; outer size of quad for layout (though not necessarily the bounding box for drawing)
-              ;; in, out, inner are phrased in terms of cardinal position
-              in ; alignment point matched to previous quad
-              out ; alignment point matched to next quad
-              inner ; alignment point for elems (might be different from in/out)
+              ;; in, out are phrased in terms of cardinal position
+              in ; alignment point on this quad that is matched to `out` on previous quad
+              out ; alignment point on ref quad
+              on-parent ; position on parent quad?
               ;; offset, shift are two-dim pts
               ;; offset= Similar to `relative` CSS positioning
               ;; relocation of pen before quad is drawn. Does NOT change layout position.
@@ -63,20 +63,22 @@
               shift
               ;; reference point (in absolute coordinates)
               ;; for all subsequent drawing ops in the quad. Calculated, not set directly
-              position 
+              origin 
               printable ; whether the quad will print
               draw-start ; func called at the beginning of every draw event (for setup ops)
               draw ; func called in the middle of every daw event
               draw-end ; func called at the end of every draw event (for teardown ops)
+              id
               )
   #:transparent
   #:property prop:custom-write
   (λ (q p w?) (display
-               (format "<~a~a~a>"
+               (format "<~a-~a~a~a>"
                        (object-name q)
+                       (quad-id q)
                        (if (verbose-quad-printing?)
                            (string-join (map ~v (flatten (hash->list (quad-attrs q))))
-                                    " " #:before-first "(" #:after-last ")")
+                                        " " #:before-first "(" #:after-last ")")
                            "")
                        (match (quad-elems q)
                          [(? pair?) (string-join (map ~v (quad-elems q)) " " #:before-first " ")]
@@ -113,11 +115,11 @@
          #:elems [elems null]
          #:size [size '(0 0)]
          #:in [in 'nw]
-         #:out [out 'ne]
-         #:inner [inner #f]
+         #:out [out 'nw]
+         #:on-parent [on-parent #false]
          #:shift [shift '(0 0)]
          #:offset [offset '(0 0)]
-         #:position [position '(0 0)]
+         #:origin [origin '(0 0)]
          #:printable [printable default-printable]
          #:draw-start [draw-start void]
          #:draw [draw default-draw]
@@ -131,19 +133,22 @@
     [(list (? dict? assocs) elems ...) assocs (make-quad #:attrs (make-hasheq assocs) #:elems elems)]
     [(list elems ..1) (make-quad #:elems elems)]
     ;; all cases end up below
-    [null (type attrs
-                elems
-                size
-                in
-                out
-                inner
-                offset
-                shift
-                position
-                printable
-                draw-start
-                draw
-                draw-end)]))
+    [null (define args (list
+                              attrs
+                              elems
+                              size
+                              in
+                              out
+                              on-parent
+                              offset
+                              shift
+                              origin
+                              printable
+                              draw-start
+                              draw
+                              draw-end))
+          (define id (eq-hash-code args))
+          (apply type (append args (list id)))]))
 
 (define-syntax (define-quad stx)
   (syntax-case stx ()

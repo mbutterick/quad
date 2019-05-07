@@ -25,7 +25,7 @@
     (font-size doc (quad-ref q 'font-size 12))
     (fill-color doc (quad-ref q 'color "black"))
     (define str (unsafe-car (quad-elems q)))
-    (match-define (list x y) (quad-position q))
+    (match-define (list x y) (quad-origin q))
     (text doc str x y
           #:tracking (quad-ref q 'character-tracking 0)
           #:bg (quad-ref q 'bg)
@@ -46,8 +46,9 @@
     [_ #true]))
 
 (define q:string (q #:type string-quad
-                    #:in 'baseline-in
-                    #:out 'baseline-out
+                    #:out 'bo
+                    #:in 'bi
+                    #:on-parent #false
                     #:printable q:string-printable?
                     #:draw q:string-draw
                     #:draw-end q:string-draw-end))
@@ -95,7 +96,7 @@
     (save doc)
     ;; draw layout box
     (line-width doc stroke-width)
-    (apply rect doc (append (pt+ (quad-position q)) (size q)))
+    (apply rect doc (append (pt+ (quad-origin q)) (size q)))
     (stroke doc stroke-color)
     ;; draw in point & out point (both on layout box)
     (define point-draw-diameter (+ stroke-width 1.5))
@@ -104,13 +105,13 @@
       (circle doc (pt-x pt) (pt-y pt) point-draw-diameter)
       (fill doc fill-color))
     ;; draw inner point (adjusted by offset)
-    (rect-centered doc (pt-x (inner-point q)) (pt-y (inner-point q)) point-draw-diameter)
-    (fill doc stroke-color)  
+    #;(rect-centered doc (pt-x (inner-point q)) (pt-y (inner-point q)) point-draw-diameter)
+    #;(fill doc stroke-color)  
     (restore doc)))
 
 (define q:line (q #:size (pt 0 default-line-height)
-                  #:inner 'sw
                   #:out 'sw
+                  #:in 'nw
                   #:printable #true
                   #:draw-start (if draw-debug-line? draw-debug void)))
 
@@ -243,7 +244,7 @@
 (define-quad offsetter quad ())
 
 (define (hr-draw dq doc)
-  (match-define (list left top) (quad-position dq))
+  (match-define (list left top) (quad-origin dq))
   (match-define (list right bottom) (size dq))
   (save doc)
   (translate doc left (+ top (/ bottom 2)))
@@ -262,61 +263,64 @@
   (define pcs-printing (for/list ([pc (in-list pcs-in)]
                                   #:unless (equal? (quad-elems pc) '("\u00AD")))
                          pc))
-  (append
-   (cond
-     [(empty? pcs-printing) null]
-     [(hr-break? ending-q) (list (make-hr-quad line-q))]
-     [else
-      ;; render hyphen first so that all printable characters are available for size-dependent ops.
-      (define pcs-with-hyphen (render-hyphen pcs-printing ending-q))
-      ;; fill wrap so that consolidate-runs works properly
-      ;; (justified lines won't be totally consolidated)
-      (define pcs (fill-wrap pcs-with-hyphen ending-q line-q))
-      (match (consolidate-runs pcs ending-q)
-        [(? pair? elems)
-         (define elem (unsafe-car elems))
-         (match-define (list line-width line-height) (quad-size line-q))
-         (define new-size (let ()
-                            (define line-heights
-                              (filter-map (λ (q) (quad-ref q 'line-height)) pcs))
-                            (pt line-width (if (empty? line-heights) line-height (apply max line-heights)))))
-         (list
-          (struct-copy
-           quad line-q
-           ;; move block attrs up, so they are visible in page wrap
-           [attrs (copy-block-attrs (quad-attrs elem)
-                                    (hash-copy (quad-attrs line-q)))]
-           ;; line width is static
-           ;; line height is the max 'line-height value or the natural height of q:line
-           [size new-size]
-           ;; handle list indexes. drop new quad into line to hold list index
-           ;; could also use this for line numbers
-           [elems
-            ;; we assume here that a list item has already had extra inset-left
-            ;; with room for a bullet
-            ;; which we just insert at the front.
-            ;; this is safe because line has already been filled.
-            (append
-             ;; only put bullet into line if we're at the first line of the list item
-             (match (and (eq? idx 1) (quad-ref elem 'list-index))
-               [#false null]
-               [bullet
-                (list (struct-copy
-                       quad q:string ;; copy q:string to get draw routine
-                       ;; borrow attrs from elem
-                       [attrs (quad-attrs elem)]
-                       ;; use bullet as elems
-                       [elems (list (if (number? bullet) (format "~a." bullet) bullet))]
-                       ;; no size because it's inside inset
-                       [size (pt 0 0)]))])
-             (list (make-quad
-                    #:type offsetter
-                    #:offset (pt (quad-ref elem 'inset-left 0) 0)
-                    #:elems elems)))]))]
-        [_ null])])
-   (cond
-     [ending-q null]
-     [else (list q:line-spacer)])))
+  (define new-lines
+    (cond
+      [(empty? pcs-printing) null]
+      [(hr-break? ending-q) (list (make-hr-quad line-q))]
+      [else
+       ;; render hyphen first so that all printable characters are available for size-dependent ops.
+       (define pcs-with-hyphen (render-hyphen pcs-printing ending-q))
+       ;; fill wrap so that consolidate-runs works properly
+       ;; (justified lines won't be totally consolidated)
+       (define pcs (fill-wrap pcs-with-hyphen ending-q line-q))
+       (match (consolidate-runs pcs ending-q)
+         [(? pair? elems)
+          (define elem (unsafe-car elems))
+          (match-define (list line-width line-height) (quad-size line-q))
+          (define new-size (let ()
+                             (define line-heights
+                               (filter-map (λ (q) (quad-ref q 'line-height)) pcs))
+                             (pt line-width (if (empty? line-heights) line-height (apply max line-heights)))))
+          (list
+           (struct-copy
+            quad line-q
+            ;; move block attrs up, so they are visible in page wrap
+            [attrs (copy-block-attrs (quad-attrs elem)
+                                     (hash-copy (quad-attrs line-q)))]
+            ;; line width is static
+            ;; line height is the max 'line-height value or the natural height of q:line
+            [size new-size]
+            ;; handle list indexes. drop new quad into line to hold list index
+            ;; could also use this for line numbers
+            [elems
+             ;; we assume here that a list item has already had extra inset-left
+             ;; with room for a bullet
+             ;; which we just insert at the front.
+             ;; this is safe because line has already been filled.
+             (let ()
+               (define new-elems
+                 (append
+                  ;; only put bullet into line if we're at the first line of the list item
+                  (match (and (eq? idx 1) (quad-ref elem 'list-index))
+                    [#false null]
+                    [bullet
+                     (list (struct-copy
+                            quad q:string ;; copy q:string to get draw routine
+                            ;; borrow attrs from elem
+                            [attrs (quad-attrs elem)]
+                            ;; use bullet as elems
+                            [elems (list (if (number? bullet) (format "~a." bullet) bullet))]
+                            ;; no size because it's inside inset
+                            [size (pt 0 0)]))])
+                  (list (make-quad
+                         #:type offsetter
+                         #:offset (pt (quad-ref elem 'inset-left 0) 0)
+                         #:elems elems))))
+               (attach-to-parent new-elems 'sw))]))]
+         [_ null])]))
+  (append new-lines (cond
+                      [ending-q null]
+                      [else (list q:line-spacer)])))
 
 (define (line-wrap qs wrap-size)
   (unless (positive? wrap-size)
@@ -398,7 +402,8 @@
         (+ (- (pdf-height doc) bottom-margin) 20)))
 
 (define (page-draw-end q doc)
-  (draw-page-footer q doc))
+  #;(draw-page-footer q doc)
+  (void))
 
 (define q:page (q #:offset '(0 0)
                   #:draw-start page-draw-start
@@ -412,7 +417,7 @@
   (match-define (list bil bit bir bib)
     (for/list ([k (in-list '(border-inset-left border-inset-top border-inset-right border-inset-bottom))])
       (quad-ref first-line k 0)))
-  (match-define (list left top) (pt+ (quad-position q) (list bil bit)))
+  (match-define (list left top) (pt+ (quad-origin q) (list bil bit)))
   (match-define (list width height) (pt- (size q) (list (+ bil bir) (+ bit bib))))
   ;; fill rect
   (cond 
@@ -447,10 +452,11 @@
 
 (define (block-wrap lines)
   (define first-line (car lines)) 
-  (q #:in 'nw
-     #:out 'sw
+  (q #:out 'sw
+     #:in 'nw
+     #:on-parent #false
      #:offset (pt 0 (+ (quad-ref first-line 'inset-top 0)))
-     #:elems lines
+     #:elems (attach-to-parent lines 'nw)
      #:size (delay (pt (pt-x (size first-line)) ; 
                        (+ (for/sum ([line (in-list lines)])
                             (pt-y (size line)))
@@ -478,6 +484,16 @@
    (contiguous-group-by values '(1 1 2 2 2 3 4 5 5 6 6 7 8 9))
    '((1 1) (2 2 2) (3) (4) (5 5) (6 6) (7) (8) (9))))
 
+(define (attach-to-parent qs where)
+  ;; doesn't change any positioning. doesn't depend on state. can happen anytime.
+  ;; can be repeated without damage.
+  (match qs
+    [(? null?) null]
+    [(cons q rest)
+     (cons (struct-copy quad q
+                        [on-parent #true]
+                        [out where]) rest)]))
+
 (define ((page-finish-wrap page-quad path) lns q0 q idx)
   (list (struct-copy quad page-quad
                      [attrs (let ([page-number idx]
@@ -487,7 +503,7 @@
                                 (split-path (path-replace-extension path #"")))
                               (hash-set! h 'doc-title (string-titlecase (path->string name)))
                               h)]
-                     [elems (insert-blocks lns)])))
+                     [elems (attach-to-parent (insert-blocks lns) 'nw)])))
 
 (define (page-wrap xs vertical-height [page-quad q:page])
   (unless (positive? vertical-height)
@@ -581,8 +597,8 @@
       (make-pdf #:compress #t
                 #:auto-first-page #f
                 #:output-path pdf-path
-                #:width page-width
-                #:height page-height
+                #:width 350
+                #:height 350
                 #:size (quad-ref (car qs) 'page-size default-page-size)
                 #:orientation (quad-ref (car qs) 'page-orientation default-page-orientation))))
 
@@ -590,7 +606,7 @@
   (define default-y-margin (min 72 (floor (* .10 (pdf-width pdf)))))
   (parameterize ([current-pdf pdf]
                  [verbose-quad-printing? #false]
-                 [draw-debug? #false])
+                 [draw-debug? #true])
     (let* ([qs (time-name hyphenate (handle-hyphenate qs))]
            [qs (map ->string-quad qs)]
            [qs (insert-first-line-indents qs)]
@@ -605,7 +621,7 @@
            [bottom-margin (quad-ref (car qs) 'page-margin-bottom (λ () (quad-ref (car qs) 'page-margin-top default-y-margin)))]
            [page-wrap-size (- (pdf-height pdf) top-margin bottom-margin)]
            [page-quad (struct-copy quad q:page
-                                   [shift (pt 0 0)]
+                                   [shift (pt left-margin top-margin)]
                                    [size (pt line-wrap-size page-wrap-size)])]
            [qs (time-name page-wrap (page-wrap qs page-wrap-size page-quad))]
            [qs (time-name position (position (struct-copy quad q:doc [elems qs])))])

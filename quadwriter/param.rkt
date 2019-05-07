@@ -6,5 +6,5 @@
 
 (define draw-debug? (make-parameter #f))
 (define draw-debug-line? (make-parameter #t))
-(define draw-debug-block? (make-parameter #t))
+(define draw-debug-block? (make-parameter #f))
 (define draw-debug-string? (make-parameter #t))
