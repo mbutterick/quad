@@ -46,8 +46,8 @@
     [_ #true]))
 
 (define q:string (q #:type string-quad
-                    #:out 'bo
-                    #:in 'bi
+                    #:on 'bo
+                    #:at 'bi
                     #:on-parent #false
                     #:printable q:string-printable?
                     #:draw q:string-draw
@@ -100,7 +100,7 @@
     (stroke doc stroke-color)
     ;; draw in point & out point (both on layout box)
     (define point-draw-diameter (+ stroke-width 1.5))
-    (for ([which-point (list in-point out-point)])
+    (for ([which-point (list at-point on-point)])
       (define pt (which-point q))
       (circle doc (pt-x pt) (pt-y pt) point-draw-diameter)
       (fill doc fill-color))
@@ -110,15 +110,15 @@
     (restore doc)))
 
 (define q:line (q #:size (pt 0 default-line-height)
-                  #:out 'sw
-                  #:in 'nw
+                  #:on 'sw
+                  #:at 'nw
                   #:printable #true
                   #:draw-start (if draw-debug-line? draw-debug void)))
 
 (struct line-spacer quad () #:transparent)
 (define q:line-spacer (q #:type line-spacer
                          #:size (pt 0 (* default-line-height 0.6))
-                         #:out 'sw
+                         #:on 'sw
                          #:printable (λ (q sig) (not (memq sig '(start end))))
                          #:draw-start (if (draw-debug-line?) draw-debug void)))
 
@@ -316,7 +316,7 @@
                          #:type offsetter
                          #:offset (pt (quad-ref elem 'inset-left 0) 0)
                          #:elems elems))))
-               (attach-to-parent new-elems 'sw))]))]
+               (on-parent new-elems 'sw))]))]
          [_ null])]))
   (append new-lines (cond
                       [ending-q null]
@@ -390,24 +390,29 @@
   (scale doc (if zoom-mode? zoom-scale 1) (if zoom-mode? zoom-scale 1)))
 
 (define (draw-page-footer q doc)
-  (define top-margin (pt-y (quad-offset q)))
-  (define bottom-margin (- (pdf-height doc) top-margin))
+  (match-define (list x y) (quad-origin q))
   (font-size doc (* .8 default-font-size))
   (font doc default-font-face)
   (fill-color doc "black")
-  (text doc (format "~a · ~a at ~a" (hash-ref (quad-attrs q) 'page-number)
-                    (hash-ref (quad-attrs q) 'doc-title)
+  (text doc (format "~a · ~a at ~a" (quad-ref q 'page-number 0)
+                    (quad-ref q 'doc-title "untitled")
                     (date->string (current-date) #t))
-        (pt-x (quad-offset q))
-        (+ (- (pdf-height doc) bottom-margin) 20)))
+        x y))
 
-(define (page-draw-end q doc)
-  #;(draw-page-footer q doc)
-  (void))
+(define q:footer (q #:size (pt 50 default-line-height)
+                    #:on-parent #true
+                    #:on 'sw
+                    #:at 'nw
+                    #:shift (pt 0 default-line-height)
+                    #:printable #true
+                    #:draw-start (λ (q doc)
+                                   (when draw-debug-line?
+                                     (draw-debug q doc "goldenrod" "goldenrod")) 
+                                   (draw-page-footer q doc))))
 
-(define q:page (q #:offset '(0 0)
-                  #:draw-start page-draw-start
-                  #:draw-end page-draw-end))
+(define q:page (q
+                #:on-parent #true
+                #:draw-start page-draw-start))
 
 (define q:doc (q #:draw-start (λ (q doc) (start-doc doc))
                  #:draw-end (λ (q doc) (end-doc doc))))
@@ -452,11 +457,11 @@
 
 (define (block-wrap lines)
   (define first-line (car lines)) 
-  (q #:out 'sw
-     #:in 'nw
+  (q #:on 'sw
+     #:at 'nw
      #:on-parent #false
      #:offset (pt 0 (+ (quad-ref first-line 'inset-top 0)))
-     #:elems (attach-to-parent lines 'nw)
+     #:elems (on-parent lines 'nw)
      #:size (delay (pt (pt-x (size first-line)) ; 
                        (+ (for/sum ([line (in-list lines)])
                             (pt-y (size line)))
@@ -484,26 +489,24 @@
    (contiguous-group-by values '(1 1 2 2 2 3 4 5 5 6 6 7 8 9))
    '((1 1) (2 2 2) (3) (4) (5 5) (6 6) (7) (8) (9))))
 
-(define (attach-to-parent qs where)
+(define/match (on-parent qs [where #f])
   ;; doesn't change any positioning. doesn't depend on state. can happen anytime.
   ;; can be repeated without damage.
-  (match qs
-    [(? null?) null]
-    [(cons q rest)
-     (cons (struct-copy quad q
-                        [on-parent #true]
-                        [out where]) rest)]))
+  [((? null?) _) null]
+  [((cons q rest) where)
+   (cons (struct-copy quad q
+                      [on-parent #true]
+                      [on (or where (quad-on q))]) rest)])
 
-(define ((page-finish-wrap page-quad path) lns q0 q idx)
+(define ((page-finish-wrap page-quad path) lns q0 q page-idx)
+  (define-values (dir name _) (split-path (path-replace-extension path #"")))
+  (define footer (struct-copy quad q:footer
+                              [attrs (let ([h (hash-copy (quad-attrs q:footer))])
+                                       (hash-set! h 'page-number page-idx)
+                                       (hash-set! h 'doc-title (string-titlecase (path->string name)))
+                                       h)]))
   (list (struct-copy quad page-quad
-                     [attrs (let ([page-number idx]
-                                  [h (hash-copy (quad-attrs page-quad))])
-                              (hash-set! h 'page-number page-number)
-                              (define-values (dir name _)
-                                (split-path (path-replace-extension path #"")))
-                              (hash-set! h 'doc-title (string-titlecase (path->string name)))
-                              h)]
-                     [elems (attach-to-parent (insert-blocks lns) 'nw)])))
+                     [elems (cons footer (on-parent (insert-blocks lns) 'nw))])))
 
 (define (page-wrap xs vertical-height [page-quad q:page])
   (unless (positive? vertical-height)
@@ -597,8 +600,8 @@
       (make-pdf #:compress #t
                 #:auto-first-page #f
                 #:output-path pdf-path
-                #:width 350
-                #:height 350
+                #:width page-width
+                #:height page-height
                 #:size (quad-ref (car qs) 'page-size default-page-size)
                 #:orientation (quad-ref (car qs) 'page-orientation default-page-orientation))))
 
@@ -606,7 +609,7 @@
   (define default-y-margin (min 72 (floor (* .10 (pdf-width pdf)))))
   (parameterize ([current-pdf pdf]
                  [verbose-quad-printing? #false]
-                 [draw-debug? #true])
+                 [draw-debug? #false])
     (let* ([qs (time-name hyphenate (handle-hyphenate qs))]
            [qs (map ->string-quad qs)]
            [qs (insert-first-line-indents qs)]

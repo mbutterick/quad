@@ -35,7 +35,7 @@
 (define (quad=? q1 q2 [recur? #t])
   (and
    ;; exclude attrs from initial comparison
-   (for/and ([getter (in-list (list quad-elems quad-size quad-in quad-out 
+   (for/and ([getter (in-list (list quad-elems quad-size quad-on-parent quad-on quad-at 
                                     quad-shift quad-offset quad-on-parent quad-origin quad-printable
                                     quad-draw-start quad-draw-end quad-draw))])
      (equal? (getter q1) (getter q2)))
@@ -50,9 +50,9 @@
               ;; size is a two-dim pt
               size ; outer size of quad for layout (though not necessarily the bounding box for drawing)
               ;; in, out are phrased in terms of cardinal position
-              in ; alignment point on this quad that is matched to `out` on previous quad
-              out ; alignment point on ref quad
               on-parent ; position on parent quad?
+              on ; alignment point on ref quad
+              at ; alignment point on this quad that is matched to `out` on previous quad
               ;; offset, shift are two-dim pts
               ;; offset= Similar to `relative` CSS positioning
               ;; relocation of pen before quad is drawn. Does NOT change layout position.
@@ -114,9 +114,9 @@
          #:attrs [attrs (make-hasheq)]
          #:elems [elems null]
          #:size [size '(0 0)]
-         #:in [in 'nw]
-         #:out [out 'nw]
          #:on-parent [on-parent #false]
+         #:on [on 'nw]
+         #:at [at 'nw]
          #:shift [shift '(0 0)]
          #:offset [offset '(0 0)]
          #:origin [origin '(0 0)]
@@ -134,19 +134,19 @@
     [(list elems ..1) (make-quad #:elems elems)]
     ;; all cases end up below
     [null (define args (list
-                              attrs
-                              elems
-                              size
-                              in
-                              out
-                              on-parent
-                              offset
-                              shift
-                              origin
-                              printable
-                              draw-start
-                              draw
-                              draw-end))
+                        attrs
+                        elems
+                        size
+                        on-parent
+                        on
+                        at
+                        offset
+                        shift
+                        origin
+                        printable
+                        draw-start
+                        draw
+                        draw-end))
           (define id (eq-hash-code args))
           (apply type (append args (list id)))]))
 

@@ -14,9 +14,7 @@ At the command line:
 
 We said `raco pkg install hyphenate` dude
 
-
-enated. To hyphenate words of
-any length, use `#:min-length` `#f`.
+All right then.
 
 A [list of web colors](https://en.wikipedia.org/wiki/Web_colors).
 Certain word processors allow users to [insert soft
