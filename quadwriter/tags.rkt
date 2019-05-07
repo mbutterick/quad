@@ -14,9 +14,9 @@
   (qexpr (append `(#;(first-line-indent "12")
                    #;(line-align "center")
                    #;(line-wrap "kp")
-                   (page-margin-left "120")
-                   (page-margin-top "80")
-                   (page-margin-bottom "120")
+                   #;(page-margin-left "120")
+                   #;(page-margin-top "80")
+                   #;(page-margin-bottom "120")
                    (line-height "17")
                    #;(line-align-last "center")) attrs) exprs))
 
@@ -57,7 +57,15 @@
 (define-syntax-rule (attr-list . attrs) 'attrs)
 
 (define (heading-base font-size attrs exprs)
-  (qexpr (append `((font-family "fira-sans-light") (first-line-indent "0") (display "block") (font-size ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9") (inset-bottom "-3") (inset-top "6") (keep-with-next "true")) attrs) exprs))
+  (qexpr (append `((font-family "fira-sans-light") (first-line-indent "0") (display "block") (font-size ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size)))
+                                                   (border-width-top "1")
+                                                   (border-width-bottom "1")
+                                                   (border-width-left "1")
+                                                   (border-width-right "1")
+                                                   (inset-top "0")
+                                                   (inset-left "0")
+
+                                                   (keep-with-next "true")) attrs) exprs))
 
 (define-tag-function (h1 attrs exprs)
   (heading-base 20 (append '() attrs) exprs))
