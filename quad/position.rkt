@@ -86,19 +86,24 @@
                                     [origin shifted-origin]
                                     ;; set shift to zero because it's baked into new origin value
                                     [shift (pt 0 0)]))
-  (let ([parent-q positioned-q])
-    (struct-copy quad parent-q
-                 [elems
-                  ;; can't use for/list here because previous quads provide context for later ones
-                  (let loop ([prev-elems null] [elems (quad-elems parent-q)])
-                          (match elems
-                            [(? null?) (reverse prev-elems)]
-                            [(cons (? quad? this-q) rest)
-                             (define ref-q (if (or (quad-from-parent this-q) (null? prev-elems))
-                                               parent-q
-                                               (car prev-elems)))
-                             (loop (cons (position this-q ref-q) prev-elems) rest)]
-                            [(cons x rest) (loop (cons x prev-elems) rest)]))])))
+  (define positioned-elems
+    ;; for purposes of positioning the elements, we want to also bake in the `shift-elements` value
+    ;; but we don't want this origin to be permanent on the parent.
+    ;; akin to `push` a graphics state and then `pop` afterwards.
+    (let ([parent-q (struct-copy quad positioned-q
+                                 [origin (pt+ (quad-origin positioned-q) (quad-shift-elements positioned-q))]
+                                 [shift-elements (pt 0 0)])])
+      ;; can't use for/list here because previous quads provide context for later ones
+      (let loop ([prev-elems null] [elems (quad-elems parent-q)])
+        (match elems
+          [(? null?) (reverse prev-elems)]
+          [(cons (? quad? this-q) rest)
+           (define ref-q (if (or (quad-from-parent this-q) (null? prev-elems))
+                             parent-q
+                             (car prev-elems)))
+           (loop (cons (position this-q ref-q) prev-elems) rest)]
+          [(cons x rest) (loop (cons x prev-elems) rest)]))))
+  (struct-copy quad positioned-q [elems positioned-elems]))
 
 (define (distance q)
   (match (pt- (from-point q) (to-point q))

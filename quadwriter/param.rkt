@@ -6,7 +6,9 @@
 
 (define draw-debug? (make-parameter #false))
 (define draw-debug-line? (make-parameter #true))
-(define draw-debug-block? (make-parameter #false))
+(define draw-debug-block? (make-parameter #true))
 (define draw-debug-string? (make-parameter #true))
 
+(define debug-page-width (make-parameter #f))
+(define debug-page-height (make-parameter #f))
 (define zoom-factor (make-parameter 1))

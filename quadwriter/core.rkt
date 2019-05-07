@@ -310,7 +310,7 @@
                             [size (pt 0 0)]))])
                   (list (make-quad
                          #:type offsetter
-                         #:offset (pt (quad-ref elem 'inset-left 0) 0)
+                         #:shift-elements (pt (quad-ref elem 'inset-left 0) 0)
                          #:elems elems))))
                (on-parent new-elems 'sw))]))]
          [_ null])]))
@@ -455,13 +455,13 @@
   (define first-line (car lines)) 
   (q #:from 'sw
      #:to 'nw
-     #:offset (pt 0 (+ (quad-ref first-line 'inset-top 0)))
      #:elems (on-parent lines 'nw)
      #:size (delay (pt (pt-x (size first-line)) ; 
                        (+ (for/sum ([line (in-list lines)])
                             (pt-y (size line)))
                           (quad-ref first-line 'inset-top 0)
                           (quad-ref first-line 'inset-bottom 0))))
+     #:shift-elements (pt 0 (+ (quad-ref first-line 'inset-top 0)))
      #:draw-start (block-draw-start first-line)
      #:draw-end (if (draw-debug-block?)
                     (λ (q doc) (draw-debug q doc "#6c6" "#9c9"))
@@ -595,17 +595,15 @@
       (make-pdf #:compress #t
                 #:auto-first-page #f
                 #:output-path pdf-path
-                #:width #;page-width 400
-                #:height #;page-height 400
+                #:width (or (debug-page-width) page-width)
+                #:height (or (debug-page-height) page-height)
                 #:size (quad-ref (car qs) 'page-size default-page-size)
                 #:orientation (quad-ref (car qs) 'page-orientation default-page-orientation))))
 
   (define default-x-margin (min (* 72 1.5) (floor (* .10 (pdf-width pdf)))))
   (define default-y-margin (min 72 (floor (* .10 (pdf-width pdf)))))
   (parameterize ([current-pdf pdf]
-                 [verbose-quad-printing? #false]
-                 [draw-debug? #true]
-                 [zoom-factor 3])
+                 [verbose-quad-printing? #false])
     (let* ([qs (time-name hyphenate (handle-hyphenate qs))]
            [qs (map ->string-quad qs)]
            [qs (insert-first-line-indents qs)]
