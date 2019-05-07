@@ -36,11 +36,11 @@
   (define val (quad-ref q 'font-size current-default-font-size))
   ((if (number? val) values string->number) val))
 
-(define (vertical-baseline-offset q)
+(define (vertical-baseline-offset q [fallback-val 0])
   (cond
-    [(quad-ref q font-path-key #false)
+    [(quad-ref q font-path-key)
      (* (/ (ascender q) (units-per-em q) 1.0) (fontsize q))]
-    [else 0]))
+    [else fallback-val]))
 
 (define (anchor->local-point q anchor)
   ;; calculate the location of the anchor on the bounding box relative to '(0 0) (aka "locally")
@@ -54,7 +54,9 @@
   (match-define (list x y) (size q))
   (pt (coerce-int (* x x-fac))
       (coerce-int (+ (* y y-fac) (match anchor
-                                   [(or 'bi 'bo 'baseline-in 'baseline-out) (vertical-baseline-offset q)]
+                                   [(or 'bi 'bo 'baseline-in 'baseline-out)
+                                    ;; if no font available, match baseline to south edge by passing y as fallback value
+                                    (vertical-baseline-offset q y)]
                                    [_ 0])))))
 
 (define (to-point q)
@@ -76,7 +78,7 @@
 (define (position q [ref-src #f])
   ;; recursively calculates coordinates for quad & subquads
   (define ref-pt (cond
-                   [(quad? ref-src) (anchor->global-point ref-src (quad-from q))]
+                   [(quad? ref-src) (anchor->global-point ref-src (or (quad-from-parent q) (quad-from q)))]
                    [ref-src] ; for passing explicit points in testing
                    [else (pt 0 0)]))
   (define this-origin (pt- ref-pt (to-point q)))

@@ -49,8 +49,9 @@
               elems ; subquads or text
               ;; size is a two-dim pt
               size ; outer size of quad for layout (though not necessarily the bounding box for drawing)
-              ;; in, out are phrased in terms of cardinal position
-              from-parent ; position on parent quad?
+              ;; from-parent, from, to are phrased in terms of cardinal position
+              from-parent ; alignment point on parent. if not #f, supersedes `from`
+              ;; (this way, `from` doens't change, so a quad can "remember" its default `from` attachment point)
               from ; alignment point on ref quad
               to ; alignment point on this quad that is matched to `from` on previous quad
               ;; shift-elements, shift are two-dim pts
