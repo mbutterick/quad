@@ -293,26 +293,28 @@
              ;; with room for a bullet
              ;; which we just insert at the front.
              ;; this is safe because line has already been filled.
-             (let ()
-               (define new-elems
-                 (append
-                  ;; only put bullet into line if we're at the first line of the list item
-                  (match (and (eq? idx 1) (quad-ref elem 'list-index))
-                    [#false null]
-                    [bullet
-                     (list (struct-copy
-                            quad q:string ;; copy q:string to get draw routine
-                            ;; borrow attrs from elem
-                            [attrs (quad-attrs elem)]
-                            ;; use bullet as elems
-                            [elems (list (if (number? bullet) (format "~a." bullet) bullet))]
-                            ;; no size because it's inside inset
-                            [size (pt 0 0)]))])
-                  (list (make-quad
-                         #:type offsetter
-                         #:shift-elements (pt (quad-ref elem 'inset-left 0) 0)
-                         #:elems elems))))
-               (on-parent new-elems 'sw))]))]
+             (append
+              ;; only put bullet into line if we're at the first line of the list item
+              (match (and (eq? idx 1) (quad-ref elem 'list-index))
+                [#false null]
+                [bullet
+                 (define bq (struct-copy
+                             quad q:string ;; copy q:string to get draw routine
+                             ;; borrow attrs from elem
+                             [attrs (quad-attrs elem)]
+                             ;; use bullet as elems
+                             [elems (list (if (number? bullet) (format "~a." bullet) bullet))]
+                             ;; size doesn't matter because nothing refers to this quad
+                             ;; just for debugging box
+                             [size (pt 15 (pt-y (size line-q)))]))
+                 (from-parent (list bq) 'sw)])
+              (cons (make-quad
+                     #:draw-end q:string-draw-end
+                     #:from-parent 'sw
+                     #:to 'sw
+                     #:size (pt (quad-ref elem 'inset-left 0) 5)
+                     #:type offsetter)
+                    elems))]))]
          [_ null])]))
   (append new-lines (cond
                       [ending-q null]
@@ -396,8 +398,7 @@
         x y))
 
 (define q:footer (q #:size (pt 50 default-line-height)
-                    #:from-parent #true
-                    #:from 'sw
+                    #:from-parent 'sw
                     #:to 'nw
                     #:shift (pt 0 default-line-height)
                     #:printable #true
@@ -407,7 +408,7 @@
                                    (draw-page-footer q doc))))
 
 (define q:page (q
-                #:from-parent #true
+                #:from-parent 'nw
                 #:draw-start page-draw-start))
 
 (define q:doc (q #:draw-start (λ (q doc) (start-doc doc))
@@ -455,7 +456,7 @@
   (define first-line (car lines)) 
   (q #:from 'sw
      #:to 'nw
-     #:elems (on-parent lines 'nw)
+     #:elems (from-parent lines 'nw)
      #:size (delay (pt (pt-x (size first-line)) ; 
                        (+ (for/sum ([line (in-list lines)])
                             (pt-y (size line)))
@@ -484,14 +485,13 @@
    (contiguous-group-by values '(1 1 2 2 2 3 4 5 5 6 6 7 8 9))
    '((1 1) (2 2 2) (3) (4) (5 5) (6 6) (7) (8) (9))))
 
-(define/match (on-parent qs [where #f])
+(define/match (from-parent qs [where #f])
   ;; doesn't change any positioning. doesn't depend on state. can happen anytime.
   ;; can be repeated without damage.
   [((? null?) _) null]
   [((cons q rest) where)
    (cons (struct-copy quad q
-                      [from-parent #true]
-                      [from (or where (quad-from q))]) rest)])
+                      [from-parent (or where (quad-from q))]) rest)])
 
 (define ((page-finish-wrap page-quad path) lns q0 q page-idx)
   (define-values (dir name _) (split-path (path-replace-extension path #"")))
@@ -501,7 +501,7 @@
                                        (hash-set! h 'doc-title (string-titlecase (path->string name)))
                                        h)]))
   (list (struct-copy quad page-quad
-                     [elems (cons footer (on-parent (insert-blocks lns) 'nw))])))
+                     [elems (cons footer (from-parent (insert-blocks lns) 'nw))])))
 
 (define (page-wrap xs vertical-height [page-quad q:page])
   (unless (positive? vertical-height)
@@ -585,12 +585,10 @@
   ;; page size can be specified by name, or measurements.
   ;; explicit measurements from page-height and page-width supersede those from page-size.
   (define pdf
-    (let ()
-      (match-define (list page-width page-height)
-        (for/list ([k '(page-width page-height)])
-          (match (quad-ref (car qs) k)
-            [#false #false]
-            [val (parse-points val 'round)])))
+    (match-let ([(list page-width page-height) (for/list ([k '(page-width page-height)])
+                                                 (match (quad-ref (car qs) k)
+                                                   [#false #false]
+                                                   [val (parse-points val 'round)]))])
       ;; `make-pdf` will sort out conflicts among page dimensions
       (make-pdf #:compress #t
                 #:auto-first-page #f
@@ -608,14 +606,18 @@
            [qs (map ->string-quad qs)]
            [qs (insert-first-line-indents qs)]
            ;; if only left or right margin is provided, copy other value in preference to default margin
-           [left-margin (quad-ref (car qs) 'page-margin-left (λ () (quad-ref (car qs) 'page-margin-right default-x-margin)))]
-           [right-margin (quad-ref (car qs) 'page-margin-right (λ () (quad-ref (car qs) 'page-margin-left default-y-margin)))]
+           [left-margin (or (debug-x-margin)
+                            (quad-ref (car qs) 'page-margin-left (λ () (quad-ref (car qs) 'page-margin-right default-x-margin))))]
+           [right-margin (or (debug-x-margin)
+                             (quad-ref (car qs) 'page-margin-right (λ () (quad-ref (car qs) 'page-margin-left default-y-margin))))]
            [line-wrap-size (- (pdf-width pdf) left-margin right-margin)]
            [qs (time-name line-wrap (line-wrap qs line-wrap-size))]
            [qs (apply-keeps qs)]
            ;; if only top or bottom margin is provided, copy other value in preference to default margin
-           [top-margin (quad-ref (car qs) 'page-margin-top (λ () (quad-ref (car qs) 'page-margin-bottom default-y-margin)))]
-           [bottom-margin (quad-ref (car qs) 'page-margin-bottom (λ () (quad-ref (car qs) 'page-margin-top default-y-margin)))]
+           [top-margin (or (debug-y-margin)
+                           (quad-ref (car qs) 'page-margin-top (λ () (quad-ref (car qs) 'page-margin-bottom default-y-margin))))]
+           [bottom-margin (or (debug-y-margin)
+                              (quad-ref (car qs) 'page-margin-bottom (λ () (quad-ref (car qs) 'page-margin-top default-y-margin))))]
            [page-wrap-size (- (pdf-height pdf) top-margin bottom-margin)]
            [page-quad (struct-copy quad q:page
                                    [shift (pt left-margin top-margin)]
