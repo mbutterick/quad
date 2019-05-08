@@ -6,7 +6,7 @@
 (provide (all-defined-out))
 
 (define-runtime-path quadwriter-fonts-dir "fonts")
-(define-runtime-path default-font-face "fonts/default/regular/SourceSerifPro-Regular.otf")
+(define-runtime-path default-font-face "fonts/default/SourceSerifPro-Regular.otf")
 (define default-font-family "default-serif")
 (define default-font-size 12)
 (define default-line-height 16)
@@ -44,11 +44,13 @@
          #:when (member (path-get-extension font-path) '(#".otf" #".ttf")))
     (match-define (list font-path-string family-name)
       (map (λ (x) (path->string (find-relative-path fonts-dir x))) (list font-path font-family-subdir)))
+    ;; search for subdir in path matching style name
+    ;; note that this will work if fonts are contained in another subdirectory (e.g., real font name)
     (define path-parts (map path->string (explode-path (string->path (string-downcase font-path-string)))))
     (define key
       (cons family-name
             (cond
-              [(member "bold italic" path-parts) 'bi]
+              [(member "bold-italic" path-parts) 'bi]
               [(member "bold" path-parts) 'b]
               [(member "italic" path-parts) 'i]
               [else 'r])))
