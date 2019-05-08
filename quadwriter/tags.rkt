@@ -78,7 +78,7 @@
                      (for*/list ([expr (in-list exprs)]
                                  [str (in-list (string-split (string-join (get-elements expr) "") "\n"))])
                        `(,(get-tag expr) ,(get-attrs expr) ,(string-replace str " " " ")))
-                     lbr))
+                     qexpr-line-break))
   (qexpr (list* '(display "block") '(background-color "aliceblue")
                 '(first-line-indent "0")
                 '(font-family "fira-mono") '(font-size "11") '(line-height "14")

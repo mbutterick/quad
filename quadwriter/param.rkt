@@ -1,5 +1,5 @@
 #lang debug racket
-(define-for-syntax debug-mode #true)
+(define-for-syntax debug-mode #false)
 
 (define-syntax (go stx)
   (syntax-case stx ()
@@ -36,7 +36,7 @@
          (define debug-page-width (make-parameter #f))
          (define debug-page-height (make-parameter #f))
          (define debug-x-margin (make-parameter #f))
-         (define debug-y-margin (make-parameter 40))
+         (define debug-y-margin (make-parameter #f))
          (define zoom-factor (make-parameter 1)))]))
 
 (go)
