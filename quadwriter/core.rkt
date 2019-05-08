@@ -98,13 +98,13 @@
     (line-width doc stroke-width)
     ; subtracting stroke-width keeps adjacent boxes from overlapping
     (save doc)
-    (apply rect doc (append (pt+ (quad-origin q)) (map (λ (x) (- x stroke-width)) (size q))))
+    (apply rect doc (append (pt+ (quad-origin q)) (map (λ (x) (- x 0.5)) (size q))))
     (clip doc)
     (define pt (to-point q))
     (circle doc (pt-x pt) (pt-y pt) (+ 3 stroke-width))
     (fill doc fill-color)
     (restore doc)
-    (apply rect doc (append (pt+ (quad-origin q)) (map (λ (x) (- x stroke-width)) (size q))))
+    (apply rect doc (append (pt+ (quad-origin q)) (map (λ (x) (- x 0.5)) (size q))))
     (stroke doc stroke-color)
     (restore doc)))
 
@@ -646,8 +646,9 @@
            ;; if only top or bottom margin is provided, copy other value in preference to default margin
            [top-margin (or (debug-y-margin)
                            (quad-ref (car qs) 'page-margin-top (λ () (quad-ref (car qs) 'page-margin-bottom default-y-margin))))]
-           [bottom-margin (or (debug-y-margin)
-                              (quad-ref (car qs) 'page-margin-bottom (λ () (quad-ref (car qs) 'page-margin-top default-y-margin))))]
+           [bottom-margin (let ([vert-optical-adjustment 10])
+                            (or (debug-y-margin)
+                              (quad-ref (car qs) 'page-margin-bottom (λ () (+ vert-optical-adjustment (quad-ref (car qs) 'page-margin-top default-y-margin))))))]
            [page-wrap-size (- (pdf-height pdf) top-margin bottom-margin)]
            [page-quad (struct-copy quad q:page
                                    [shift (pt left-margin top-margin)]
