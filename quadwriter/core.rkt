@@ -48,6 +48,7 @@
 (define q:string (q #:type string-quad
                     #:from 'bo
                     #:to 'bi
+                    #:id 'str
                     #:printable q:string-printable?
                     #:draw q:string-draw
                     #:draw-end q:string-draw-end))
@@ -108,6 +109,7 @@
                   #:from 'sw
                   #:to 'nw
                   #:printable #true
+                  #:id 'line
                   #:draw-start (if draw-debug-line? draw-debug void)))
 
 (struct line-spacer quad () #:transparent)
@@ -411,6 +413,7 @@
                                    (draw-page-footer q doc))))
 
 (define q:page (q
+                #:id 'page
                 #:from-parent 'nw
                 #:draw-start page-draw-start))
 
@@ -460,6 +463,7 @@
   (q #:from 'sw
      #:to 'nw
      #:elems (from-parent lines 'nw)
+     #:id 'block
      #:size (delay (pt (pt-x (size first-line)) ; 
                        (+ (for/sum ([line (in-list lines)])
                             (pt-y (size line)))
@@ -504,7 +508,7 @@
                                        (hash-set! h 'doc-title (string-titlecase (path->string name)))
                                        h)]))
   (list (struct-copy quad page-quad
-                     [elems (cons footer (from-parent #R (insert-blocks #R lns) 'nw))])))
+                     [elems (cons footer (from-parent (insert-blocks lns) 'nw))])))
 
 (define (page-wrap xs vertical-height [page-quad q:page])
   (unless (positive? vertical-height)
@@ -526,8 +530,7 @@
 (define (insert-blocks lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x 'display)) lines))
   (append* (for/list ([line-group (in-list groups-of-lines)])
-             #R (quad-attrs (car line-group))
-             (if #R (quad-ref #R (car line-group) 'display)
+             (if (quad-ref (car line-group) 'display)
                  (list (block-wrap line-group))
                  line-group))))
 
@@ -615,7 +618,7 @@
            [right-margin (or (debug-x-margin)
                              (quad-ref (car qs) 'page-margin-right (λ () (quad-ref (car qs) 'page-margin-left default-y-margin))))]
            [line-wrap-size (- (pdf-width pdf) left-margin right-margin)]
-           [qs (time-name line-wrap (line-wrap qs line-wrap-size))]
+           [qs (time-name line-wrap #R (line-wrap qs line-wrap-size))]
            [qs (apply-keeps qs)]
            ;; if only top or bottom margin is provided, copy other value in preference to default margin
            [top-margin (or (debug-y-margin)
