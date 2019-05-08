@@ -14,7 +14,8 @@
   (qexpr (append `(#;(first-line-indent "12")
                    #;(line-align "center")
                    #;(line-wrap "kp")
-                   (page-margin-left "120")
+                   (page-margin-left "120") ; by default, is mirrored to right
+                   #;(page-margin-right "200")
                    (page-margin-top "80")
                    (page-margin-bottom "120")
                    (font-family "default-serif")
@@ -23,7 +24,7 @@
 
 (define-tag-function (p attrs exprs)
   ;; no font-family so that it adopts whatever the surrounding family is
-  (qexpr (append `((keep-first "2")(keep-last "3") (line-align "left") (font-size-adjust "100%") (character-tracking "0") (hyphenate "true") (display ,(symbol->string (gensym)))) attrs) exprs))
+  (qexpr (append `((keep-first "2")(keep-last "3") (font-size-adjust "100%") (character-tracking "0") (hyphenate "true") (display ,(symbol->string (gensym)))) attrs) exprs))
 
 (define-tag-function (hr attrs exprs)
   hrbr)
@@ -58,7 +59,7 @@
 (define-syntax-rule (attr-list . attrs) 'attrs)
 
 (define (heading-base font-size attrs exprs)
-  (qexpr (append `((font-family "default-sans-light") (first-line-indent "0") (display "block") (font-size ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9") (inset-bottom "-3") (inset-top "6") (keep-with-next "true")) attrs) exprs))
+  (qexpr (append `((font-family "default-heading") (first-line-indent "0") (display "block") (font-size ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9") (inset-bottom "-3") (inset-top "6") (keep-with-next "true")) attrs) exprs))
 
 (define-tag-function (h1 attrs exprs)
   (heading-base 20 (append '() attrs) exprs))
