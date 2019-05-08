@@ -560,9 +560,12 @@
              [next-q (in-list (cdr qs))])
     (match (and (para-break? q) (quad-ref next-q 'first-line-indent 0))
       [(or #false 0) (cons next-q qs-out)]
-      [indent-val (list* next-q (make-quad #:type first-line-indent
+      [indent-val (list* next-q (make-quad #:from 'bo
+                                           #:to 'bi
+                                           #:draw-end q:string-draw-end
+                                           #:type first-line-indent
                                            #:attrs (quad-attrs next-q)
-                                           #:size (pt indent-val 0)) qs-out)])))
+                                           #:size (pt indent-val 10)) qs-out)])))
 
 
 (define qexpr-para-break '(q ((break "paragraph"))))
@@ -617,7 +620,7 @@
                  [verbose-quad-printing? #false])
     (let* ([qs (time-name hyphenate (handle-hyphenate qs))]
            [qs (map ->string-quad qs)]
-           #;[qs (insert-first-line-indents qs)]
+           [qs (insert-first-line-indents qs)]
            ;; if only left or right margin is provided, copy other value in preference to default margin
            [left-margin (or (debug-x-margin)
                             (quad-ref (car qs) 'page-margin-left (λ () (quad-ref (car qs) 'page-margin-right default-x-margin))))]
