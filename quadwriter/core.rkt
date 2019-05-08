@@ -308,13 +308,16 @@
                              ;; just for debugging box
                              [size (pt 15 (pt-y (size line-q)))]))
                  (from-parent (list bq) 'sw)])
-              (cons (make-quad
-                     #:draw-end q:string-draw-end
-                     #:from-parent 'sw
-                     #:to 'sw
-                     #:size (pt (quad-ref elem 'inset-left 0) 5)
-                     #:type offsetter)
-                    elems))]))]
+              (from-parent
+               (match (quad-ref elem 'inset-left 0)
+                 [0 elems]
+                 [inset-val
+                  (cons (make-quad
+                         #:draw-end q:string-draw-end
+                         #:to 'sw
+                         #:size (pt inset-val 5)
+                         #:type offsetter)
+                        elems)]) 'sw))]))]
          [_ null])]))
   (append new-lines (cond
                       [ending-q null]
@@ -501,7 +504,7 @@
                                        (hash-set! h 'doc-title (string-titlecase (path->string name)))
                                        h)]))
   (list (struct-copy quad page-quad
-                     [elems (cons footer (from-parent (insert-blocks lns) 'nw))])))
+                     [elems (cons footer (from-parent #R (insert-blocks #R lns) 'nw))])))
 
 (define (page-wrap xs vertical-height [page-quad q:page])
   (unless (positive? vertical-height)
@@ -523,7 +526,8 @@
 (define (insert-blocks lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x 'display)) lines))
   (append* (for/list ([line-group (in-list groups-of-lines)])
-             (if (quad-ref (car line-group) 'display)
+             #R (quad-attrs (car line-group))
+             (if #R (quad-ref #R (car line-group) 'display)
                  (list (block-wrap line-group))
                  line-group))))
 

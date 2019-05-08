@@ -7,7 +7,8 @@
          racket/promise
          racket/dict
          racket/match
-         "param.rkt")
+         "param.rkt"
+         "rebase.rkt")
 (provide (all-defined-out))
 (module+ test (require rackunit))
 
@@ -147,7 +148,7 @@
                         draw-start
                         draw
                         draw-end))
-          (define id (eq-hash-code args))
+          (define id (string->symbol (~r (eq-hash-code args) #:base 36)))
           (apply type (append args (list id)))]))
 
 (define-syntax (define-quad stx)
