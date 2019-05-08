@@ -37,7 +37,7 @@
   (and
    ;; exclude attrs from initial comparison
    (for/and ([getter (in-list (list quad-elems quad-size quad-from-parent quad-from quad-to 
-                                    quad-shift quad-shift-elements quad-from-parent quad-origin quad-printable
+                                    quad-shift quad-shift-elems quad-from-parent quad-origin quad-printable
                                     quad-draw-start quad-draw-end quad-draw))])
      (equal? (getter q1) (getter q2)))
    ;; and compare them key-by-key
@@ -58,7 +58,7 @@
               ;; shift-elements, shift are two-dim pts
               ;; shift-elements = Similar to `relative` CSS positioning
               ;; moves origin for elements . Does NOT change layout position of parent.
-              shift-elements
+              shift-elems
               ;; shift = shift between previous out point and current in point.
               ;; DOES change the layout position.
               shift
@@ -120,7 +120,7 @@
          #:from [from 'ne]
          #:to [to 'nw]
          #:shift [shift '(0 0)]
-         #:shift-elements [shift-elements '(0 0)]
+         #:shift-elems [shift-elems '(0 0)]
          #:origin [origin '(0 0)]
          #:printable [printable default-printable]
          #:draw-start [draw-start void]
@@ -142,7 +142,7 @@
                         from-parent
                         from
                         to
-                        shift-elements
+                        shift-elems
                         shift
                         origin
                         printable
