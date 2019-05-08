@@ -114,6 +114,7 @@
          #:type [type quad]
          #:attrs [attrs (make-hasheq)]
          #:elems [elems null]
+         #:id [id #f]
          #:size [size '(0 0)]
          #:from-parent [from-parent #false]
          #:from [from 'ne]
@@ -148,8 +149,8 @@
                         draw-start
                         draw
                         draw-end))
-          (define id (string->symbol (~r (eq-hash-code args) #:base 36)))
-          (apply type (append args (list id)))]))
+          (define id-syn (string->symbol (if id (~a id) (~r (eq-hash-code args) #:base 36))))
+          (apply type (append args (list id-syn)))]))
 
 (define-syntax (define-quad stx)
   (syntax-case stx ()
