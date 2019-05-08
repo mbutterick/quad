@@ -36,9 +36,9 @@
               (define (VIEW-RESULT)
                 (define open-string
                   (case (system-type 'os)
-                    ['macosx "open ~a"]
-                    ['windows "start ~a"]
-                    ['unix   "xdg-open ~a &> /dev/null"]
+                    [(macosx) "open ~a"]
+                    [(windows) "start ~a"]
+                    [(unix) "xdg-open ~a &> /dev/null"]
                     [else (error "Don't know how to open PDF file.")]))
                 (when (file-exists? pdf-path)
                   (void (system (format open-string pdf-path)))))
