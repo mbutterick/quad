@@ -96,13 +96,16 @@
     (save doc)
     ;; draw layout box
     (line-width doc stroke-width)
-    (apply rect doc (append (pt+ (quad-origin q)) (size q)))
-    (stroke doc stroke-color)
-    (apply rect doc (append (pt+ (quad-origin q)) (size q)))
+    ; subtracting stroke-width keeps adjacent boxes from overlapping
+    (save doc)
+    (apply rect doc (append (pt+ (quad-origin q)) (map (λ (x) (- x stroke-width)) (size q))))
     (clip doc)
     (define pt (to-point q))
     (circle doc (pt-x pt) (pt-y pt) (+ 3 stroke-width))
     (fill doc fill-color)
+    (restore doc)
+    (apply rect doc (append (pt+ (quad-origin q)) (map (λ (x) (- x stroke-width)) (size q))))
+    (stroke doc stroke-color)
     (restore doc)))
 
 (define q:line (q #:size (pt 0 default-line-height)
@@ -233,14 +236,25 @@
         (match align-value
           ["justify" 
            (define space-width (/ empty-hspace (sub1 word-count)))
-           (apply append (add-between word-sublists (list (make-quad #:size (pt space-width line-height)))))]
+           (apply append (add-between word-sublists (list (make-quad
+                                                           #:from 'bo
+                                                           #:to 'bi
+                                                           #:draw-end q:string-draw-end
+                                                           #:size (pt space-width line-height)))))]
           [_
            (define space-multiplier (match align-value
                                       ["center" 0.5]
                                       ["right" 1]))
-           (cons (make-quad #:type filler
-                            #:size (pt (* empty-hspace space-multiplier) line-height)
-                            #:attrs (quad-attrs (car qs))) qs)])])]))
+           ; make filler a leading quad, not a parent / grouping quad,
+           ;; so that elements can still be reached by consolidate-runs
+           (list* (make-quad #:type filler
+                             #:from-parent (quad-from-parent (car qs))
+                             #:from 'bo
+                             #:to 'bi
+                             #:size (pt (* empty-hspace space-multiplier) 0)
+                             #:attrs (quad-attrs (car qs)))
+                  (struct-copy quad (car qs) [from-parent #f])
+                  (cdr qs))])])]))
 
 (define-quad offsetter quad ())
 
@@ -339,7 +353,7 @@
          (for/list ([qs (in-list (filter-split qs para-break?))])
            (wrap qs
                  (λ (q idx) (- wrap-size (quad-ref q 'inset-left 0) (quad-ref q 'inset-right 0)))
-                 #:nicely (match (and (pair? qs) (quad-ref (car qs) 'line-wrap))
+                 #:nicely (match (or (current-line-wrap) (and (pair? qs) (quad-ref (car qs) 'line-wrap)))
                             [(or "best" "kp") #true]
                             [_ #false])
                  #:hard-break line-break?
@@ -472,7 +486,7 @@
                             (pt-y (size line)))
                           (quad-ref first-line 'inset-top 0)
                           (quad-ref first-line 'inset-bottom 0))))
-     #:shift-elements (pt 0 (+ (quad-ref first-line 'inset-top 0)))
+     #:shift-elems (pt 0 (+ (quad-ref first-line 'inset-top 0)))
      #:draw-start (block-draw-start first-line)
      #:draw-end (if (draw-debug-block?)
                     (λ (q doc) (draw-debug q doc "#6c6" "#9c9"))
