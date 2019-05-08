@@ -14,7 +14,7 @@
          "attrs.rkt"
          "param.rkt"
          "font.rkt")
-(provide qexpr-para-break hrbr lbr pbr render-pdf)
+(provide qexpr-para-break qexpr-line-break hrbr lbr pbr render-pdf)
 
 (define-quad string-quad quad ())
  
@@ -164,12 +164,15 @@
     [_ qs]))
 
 (define-quad line-break quad ())
-(define lbr (make-line-break #:printable #f))
+(define lbr (make-line-break #:printable #f
+                             #:id 'lbr))
 ;; treat paragraph break as special kind of line break
 (define-quad para-break line-break ())
-(define pbr (make-para-break #:printable #f))
+(define pbr (make-para-break #:printable #f
+                             #:id 'pbr))
 (define-quad hr-break line-break ())
-(define hrbr (make-hr-break #:printable #t))
+(define hrbr (make-hr-break #:printable #t
+                            #:id 'hrbr))
 
 (module+ test
   (check-true (line-break? (second (quad-elems (q "foo" pbr "bar")))))
@@ -405,7 +408,7 @@
 (define q:footer (q #:size (pt 50 default-line-height)
                     #:from-parent 'sw
                     #:to 'nw
-                    #:shift (pt 0 default-line-height)
+                    #:shift (pt 0 (* 1.5 default-line-height))
                     #:printable #true
                     #:draw-start (λ (q doc)
                                    (when draw-debug-line?
@@ -563,10 +566,13 @@
 
 
 (define qexpr-para-break '(q ((break "paragraph"))))
-(define (replace-para-breaks x)
+(define qexpr-line-break '(q ((break "line"))))
+
+(define (replace-breaks x)
   (map-elements (λ (el)
                   (match el
                     [(== qexpr-para-break) pbr]
+                    [(== qexpr-line-break) lbr]
                     [_ el])) x))
 
 (require racket/contract sugar/coerce pitfall/page)
@@ -583,7 +589,7 @@
     (raise-argument-error 'render-pdf "path that doesn't exist" pdf-path))
   
   (define qs (let* ([qx qx-arg]
-                    [qx (replace-para-breaks qx)]
+                    [qx (replace-breaks qx)]
                     [qx (qexpr->quad  `(q ((font-family ,default-font-family)
                                            (font-size ,(number->string default-font-size))) ,qx))])
                (setup-font-path-table! pdf-path)
@@ -611,14 +617,14 @@
                  [verbose-quad-printing? #false])
     (let* ([qs (time-name hyphenate (handle-hyphenate qs))]
            [qs (map ->string-quad qs)]
-           [qs (insert-first-line-indents qs)]
+           #;[qs (insert-first-line-indents qs)]
            ;; if only left or right margin is provided, copy other value in preference to default margin
            [left-margin (or (debug-x-margin)
                             (quad-ref (car qs) 'page-margin-left (λ () (quad-ref (car qs) 'page-margin-right default-x-margin))))]
            [right-margin (or (debug-x-margin)
                              (quad-ref (car qs) 'page-margin-right (λ () (quad-ref (car qs) 'page-margin-left default-y-margin))))]
            [line-wrap-size (- (pdf-width pdf) left-margin right-margin)]
-           [qs (time-name line-wrap #R (line-wrap qs line-wrap-size))]
+           [qs (time-name line-wrap (line-wrap qs line-wrap-size))]
            [qs (apply-keeps qs)]
            ;; if only top or bottom margin is provided, copy other value in preference to default margin
            [top-margin (or (debug-y-margin)
