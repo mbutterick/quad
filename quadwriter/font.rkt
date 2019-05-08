@@ -6,8 +6,8 @@
 (provide (all-defined-out))
 
 (define-runtime-path quadwriter-fonts-dir "fonts")
-(define-runtime-path default-font-face "fonts/source-serif/SourceSerifPro-Regular.otf")
-(define default-font-family "source-serif")
+(define-runtime-path default-font-face "fonts/default/regular/SourceSerifPro-Regular.otf")
+(define default-font-family "default-serif")
 (define default-font-size 12)
 (define default-line-height 16)
 
@@ -26,6 +26,12 @@
   ;; though it also creates the potential for mischief,
   ;; if a font is named something that doesn't reflect its visual reality.
   ;; but we are not the font police.
+
+  ;; rules for font naming
+  ;; "fonts" subdirectory on top
+  ;; family directories inside: each named with font family name
+  ;; this makes it possible to give font families generic names (e.g., "body-text")
+  ;; and change the font files without disturbing anything else.
   (hash-clear! font-paths)
   (define-values (dir path _) (split-path base-path))
   (define doc-fonts-dir (build-path dir "fonts"))
@@ -38,13 +44,14 @@
          #:when (member (path-get-extension font-path) '(#".otf" #".ttf")))
     (match-define (list font-path-string family-name)
       (map (λ (x) (path->string (find-relative-path fonts-dir x))) (list font-path font-family-subdir)))
+    (define path-parts (map path->string (explode-path (string->path (string-downcase font-path-string)))))
     (define key
       (cons family-name
-            (match (string-downcase font-path-string)
-              [(and (regexp "bold") (regexp "it(alic)?")) 'bi]
-              [(regexp "bold") 'b]
-              [(regexp "it(alic)?") 'i]
-              [_ 'r])))
+            (cond
+              [(member "bold italic" path-parts) 'bi]
+              [(member "bold" path-parts) 'b]
+              [(member "italic" path-parts) 'i]
+              [else 'r])))
     ;; only set value if there's not one there already.
     ;; this means that we only use the first eligible font we find.
     (hash-ref! font-paths key font-path)))
