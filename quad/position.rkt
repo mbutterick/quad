@@ -93,8 +93,8 @@
     ;; but we don't want this origin to be permanent on the parent.
     ;; akin to `push` a graphics state and then `pop` afterwards.
     (let ([parent-q (struct-copy quad positioned-q
-                                 [origin (pt+ (quad-origin positioned-q) (quad-shift-elements positioned-q))]
-                                 [shift-elements (pt 0 0)])])
+                                 [origin (pt+ (quad-origin positioned-q) (quad-shift-elems positioned-q))]
+                                 [shift-elems (pt 0 0)])])
       ;; can't use for/list here because previous quads provide context for later ones
       (let loop ([prev-elems null] [elems (quad-elems parent-q)])
         (match elems
