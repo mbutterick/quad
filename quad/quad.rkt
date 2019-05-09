@@ -108,6 +108,13 @@
 ;; and everything piles up at the origin
 ;; if size is otherwise, the items don't pile up (but rather lay out in a row)
 
+(define (make-quad-constructor type)
+  (make-keyword-procedure (λ (kws kw-args . rest)
+                            (keyword-apply make-quad #:type type kws kw-args rest))))
+
+(define (derive-quad-constructor q)
+  (define-values (x-structure-type _) (struct-info q))
+  (struct-type-make-constructor x-structure-type))
 
 ;; todo: convert immutable hashes to mutable on input?
 (define (make-quad

@@ -119,8 +119,45 @@
     [(list-no-order 0 val) val]
     [(list ∆x ∆y) (sqrt (+ (expt ∆x 2) (expt ∆y 2)))]))
 
+(define (flatten-quad q)
+  (cons (struct-copy quad q [elems null])
+        (apply append (map flatten-quad (quad-elems q)))))
+
+(define (bounding-box . qs-in)
+  ;; size of box that holds q and all subqs, based on reported origin and size
+  ;; does not know anything about drawing (which may go outside the box)
+  (define qs (flatten-quad (position (make-quad #:elems qs-in))))
+  (define (outer-pt q) (pt+ (quad-origin q) (quad-size q)))
+  (define max-outer-pt (apply map max (cons '(0 0) (map outer-pt qs))))
+  (define min-origin (apply map min (cons '(0 0) (map quad-origin qs))))
+  (pt- max-outer-pt min-origin))
+
+
 (module+ test
   (require rackunit)
+
+  (test-case
+   "bounding boxes"
+   (define q10 (make-quad #:size '(10 10)))
+   (define q20 (make-quad #:size '(20 20)))
+   (check-equal? (bounding-box q10) '(10 10))
+   (check-equal? (bounding-box q10 q10) '(20 10))
+   (check-equal? (bounding-box q20) '(20 20))
+   (check-equal? (bounding-box q10 q20) '(30 20))
+   (check-equal? (bounding-box q10 q20 q20) '(50 20))
+
+   (define q1 (make-quad #:size '(20 20)))
+   (define p (make-quad #:size '(35 35)
+                        #:elems (list q1)))
+   (let ([p (position p)])
+           (println (quad-origin p))
+           (println (quad-origin (car (quad-elems p)))))
+   (let ([p p])
+           (println (quad-origin p))
+           (println (quad-origin (car (quad-elems p)))))
+   (check-equal? (bounding-box (position p)) (bounding-box p)))
+
+
   (test-case
    "origins"
    (define size (pt 10 10))
