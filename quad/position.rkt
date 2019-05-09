@@ -75,7 +75,14 @@
   ;; don't include shift here: it should be baked into origin calculation
   (pt+ (anchor->local-point q anchor) (quad-origin q)))
 
-(define (position q [ref-src #f])
+(define (position q-or-qs [ref-src #f])
+  (define-values (arg post-proc)
+    (match q-or-qs
+      [(? quad? q) (values q values)]
+      [(list (? quad? qs) ...) (values (make-quad #:elems qs) quad-elems)]))
+  (post-proc (position-one arg ref-src)))
+
+(define (position-one q ref-src)
   ;; recursively calculates coordinates for quad & subquads
   (define ref-pt (cond
                    [(quad? ref-src) (anchor->global-point ref-src (or (quad-from-parent q) (quad-from q)))]
@@ -103,7 +110,7 @@
            (define ref-q (if (or (quad-from-parent this-q) (null? prev-elems))
                              parent-q
                              (car prev-elems)))
-           (loop (cons (position this-q ref-q) prev-elems) rest)]
+           (loop (cons (position-one this-q ref-q) prev-elems) rest)]
           [(cons x rest) (loop (cons x prev-elems) rest)]))))
   (struct-copy quad positioned-q [elems positioned-elems]))
 
