@@ -75,19 +75,18 @@
          ;; notice that the technique depends on
          ;; 1) we only need to update attrs and elems
          ;; 2) we make them the first two fields, so we know to drop the first two fields of x-tail
-         (define x-maker (let-values ([(x-structure-type _) (struct-info x)])
-                           (struct-type-make-constructor x-structure-type)))
+         (define x-constructor (derive-quad-constructor x))
          (define x-tail (drop (struct->list x) 2))
          (match (merge-adjacent-strings (quad-elems x) 'isolate-white)
            [(? pair? merged-elems)
             (append* 
              (for/list ([elem (in-list merged-elems)])
                (match elem
-                 [(? string? str) (list (apply x-maker next-attrs (list str) x-tail))]
+                 [(? string? str) (list (apply x-constructor next-attrs (list str) x-tail))]
                  [_ (loop elem next-attrs next-key)])))]
            ;; if merged elements are empty (for instance, series of empty strings)
            ;; then zero out the elements in the quad.
-           [_ (list (apply x-maker next-attrs null x-tail))])])))
+           [_ (list (apply x-constructor next-attrs null x-tail))])])))
   #;(trimf atomized-qs (λ (q) (equal? (quad-elems q) '(" "))))
   atomized-qs)
 

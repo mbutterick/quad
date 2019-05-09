@@ -1,9 +1,19 @@
 #lang scribble/manual
 
 @(require racket/runtime-path scribble/eval (for-label txexpr (except-in pollen #%module-begin) xml racket/base racket/draw)
-pollen/scribblings/mb-tools)
+pollen/scribblings/mb-tools quad/repl)
 
 @(define my-eval (make-base-eval))
+@(my-eval `(require quad quad/repl pict))
+
+@examples[#:eval my-eval
+(define q1 (make-quad #:size '(20 20)))
+(define q2 (make-quad
+            #:from 'bo
+            #:to 'bi
+            #:size '(15 15)))
+(d (position (list q1 q2)))
+]
 
 @title[#:style 'toc]{Quad: document processor}
 
