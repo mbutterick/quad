@@ -1,19 +1,11 @@
 #lang scribble/manual
 
-@(require racket/runtime-path scribble/eval (for-label txexpr (except-in pollen #%module-begin) xml racket/base racket/draw)
-pollen/scribblings/mb-tools quad/repl)
+@(require racket/runtime-path scribble/example (for-label txexpr (except-in pollen #%module-begin) xml racket/base racket/draw)
+pollen/scribblings/mb-tools quad/pict)
 
 @(define my-eval (make-base-eval))
-@(my-eval `(require quad quad/repl pict))
+@(my-eval `(require quad quad/pict))
 
-@examples[#:eval my-eval
-(define q1 (make-quad #:size '(20 20)))
-(define q2 (make-quad
-            #:from 'bo
-            #:to 'bi
-            #:size '(15 15)))
-(d (position (list q1 q2)))
-]
 
 @title[#:style 'toc]{Quad: document processor}
 
@@ -529,6 +521,67 @@ Part of the idea of @racket[quad] is to make typographic layout & PDF generation
 
 In letterpress printing, a @italic{quad} was a piece of metal used as spacing material within a line.
 
+
+@section{Quad life}
+
+As mentioned above, The @racket[quad] library itself knows as little as it can about typography and fonts and pictures. Nor does it even assert a document model like Scribble. Rather, it offers a generic geometric represntation of layout elements. In turn, these elements can be combined into more useful pieces (e.g., @racket[quadwriter]).
+
+@subsection{Data model: the quad}
+
+The eponymous @racket[quad] is a structure type that represents a rectangular layout area. This rectangle is used for layout purposes only. It is not enforced during the rendering phase. Meaning, once positioned, a quad's drawing function can access this rectangle, but does not need to stay within it.
+
+Each quad has nested @deftech{elements}, which is a (possibly empty) list of subquads. Given a certain element, the quad containing it is called its @deftech{parent} quad.
+
+Quads can be freely nested. There are no rules about what kind of quad can be nested in another.
+
+
+@subsection{Wrapping}
+
+Wrapping is a optional phase where lists of quads are broken into sublists of a certain size. In @racket[quadwriter], the list of words is wrapped to produce a list of lines of a certain horizontal width. In turn, the list of lines is wrapped to produce a list of pages of a certain vertical height.
+
+@subsection{Layout}
+
+The heart of Quad's layout logic is its system of @deftech{anchor points}. A quad is positioned in a layout by aligning its anchor point to an anchor point on the previous quad.
+
+Each quad has a set of 11 anchor points on its perimeter. 
+
+Eight points are named for the compass directions: @racket['n] (= top center) @racket['e] (= right center) @racket['s] (= bottom center) @racket['w] (= left ceter) @racket['ne] (= upper right) @racket['se] (= lower right) @racket['sw] (= lower left) @racket['nw] (= upper left). 
+
+The center of the quad is @racket['c]. 
+
+The other two anchor points are @racket['baseline-in] and @racket['baseline-out] or just @racket['bi] and @racket['bo]. These points are also on the quad perimieter. They allow quads containing type to be aligned according to adjacent baselines. The exact location of these points depends on the direction of the script. For instance, in left-to-right languages, @racket['baseline-in] is on the left edge, and @racket['baseline-out] is on the right. The vertical position of these points depends on the font associated with the quad. If no font is specified, the @racket['bi] and @racket['bo] points are vertically positioned at the southern edge.
+
+By default, each subquad will ultimately be positioned relative to the immediately preceding subquad (or, if it's the first subquad, the parent). Optionally, a subquad can attach to the parent. 
+
+How does a quad know which anchor points to use? Each quad specifies a @deftech{to anchor} on its own perimeter, and a @deftech{from anchor} on the previous quad's perimeter. The quad is positioned by moving it until its @deftech{to anchor} matches the position of the (already positioned) @deftech{from anchor}. Think of it like two tiny magnets clicking together.
+
+A key benefit of the anchor-point system is that it gets rid of notions of ``horizontal'', ``vertical'', ``up'', ``down'', etc. Quads flow in whatever direction is implied by their anchor points.
+
+@examples[#:label #f #:eval my-eval
+(define q1 (make-quad #:size '(25 25)))
+(define q2 (make-quad #:size '(15 15)))
+
+(quad->pict (position (attach-to q1 'e q2 'w)))
+(quad->pict (position (attach-to q1 'nw q2 'se)))
+(quad->pict (position (attach-to q1 'e q2 'w)))
+(quad->pict (position (attach-to q1 's q2 'n)))
+(quad->pict (position (attach-to q1 'e q2 'n)))
+]
+
+
+``Wait a minute — why is the new quad specifying @emph{both} anchor points? Shouldn't the from anchor be specified by the previous quad?'' It could, but it would make the layout system less flexible, because all the subquads hanging onto a certain quad would have to emanate from a single point. This way, every subquad can attach to its neighbor (or the parent) in whatever way it prefers.
+
+
+@subsection{Rendering}
+
+Once the quads have been positioned, they are passed to the renderer, which recursively visits each quad and calls its drawing function.
+
+Though every quad has a size field, this is just the size used during layout and positioning. Quad doesn't know (or care) about whether the drawing stays within those bounds.
+
+
+@(linebreak)
+@(linebreak)
+@(linebreak)
 
 @italic{``A way of doing something original is by trying something
 so painstaking that nobody else has ever bothered with it.'' — Brian Eno}
