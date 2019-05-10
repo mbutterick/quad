@@ -20,4 +20,6 @@ Docs: http://docs.racket-lang.org/quad
 License
 ---
 
-MIT
+Code: MIT
+
+Fonts: mostly OFL, noted in each directory that contains fonts
