@@ -11,6 +11,7 @@
                "sugar"
                "txexpr"
                "markdown"
+               "pict-lib"
                "csp"))
 (define build-deps '("draw-lib"
                      "draw-doc"
