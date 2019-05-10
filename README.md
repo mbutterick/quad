@@ -24,4 +24,4 @@ Code: MIT
 
 Fonts: mostly OFL, noted in each directory that contains fonts
 
-Unicode documents: licensed under Unicode terms of use
+Unicode Consortium documents: licensed under Unicode terms of use
