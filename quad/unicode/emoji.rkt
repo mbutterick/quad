@@ -1,4 +1,4 @@
-#lang quadwriter/unicode/emoji-prep
+#lang quad/unicode/emoji-prep
 
 # emoji-sequences.txt
 # Date: 2019-01-15, 12:17:16 GMT

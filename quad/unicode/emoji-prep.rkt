@@ -19,7 +19,7 @@
               (string->symbol (string-trim tag)))))
     (strip-context
      (with-syntax ([LINES lines])
-       #'(module _ quadwriter/unicode/emoji-prep
+       #'(module _ quad/unicode/emoji-prep
            . LINES)))))
 
 (define-syntax (make-cond stx)

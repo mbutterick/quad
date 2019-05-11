@@ -7,9 +7,12 @@
          txexpr
          sugar/list
          racket/function
+         "unicode/emoji.rkt"
+         fontland
          "quad.rkt"
          "qexpr.rkt"
-         "param.rkt")
+         "param.rkt"
+         "util.rkt")
 (provide (all-defined-out))
 
 (module+ test
@@ -51,44 +54,87 @@
 (define (same-run? qa qb)
   (eq? (quad-ref qa run-key) (quad-ref qb run-key)))
 
-(define (atomize qx #:attrs-proc [attrs-proc values])
+(define handle-fallback
+  (let ([font-cache (make-hash)]
+        [gid-cache (make-hash)])
+    (λ (missing-glyph-action str attrs fallback-font emoji-font)
+      (match missing-glyph-action
+        ;; #false = no op
+        [#false (list (cons attrs str))]
+        [action
+         (define font-path (hash-ref attrs 'font-path))
+         (define f (hash-ref! font-cache font-path (λ () (open-font font-path))))
+         (define glyph-ids+chars
+           (for/list ([c (in-string str)])
+             (define glyph-id
+               (hash-ref! gid-cache (cons c font-path)
+                          (λ () (glyph-id (vector-ref (glyphrun-glyphs (layout f (string c))) 0)))))
+             (define fallback-result (and (zero? glyph-id) (if (emoji? c) 'emoji 'fallback)))
+             (cons fallback-result c)))
+         (for*/list ([cprs (in-list (contiguous-group-by car glyph-ids+chars eq?))]
+                     [fallback-val (in-value (car (car cprs)))]
+                     #:unless (and fallback-val (eq? action 'omit)))
+           (define str (list->string (map cdr cprs)))
+           (define maybe-fallback-attrs
+             (cond 
+               [(not fallback-val) attrs]
+               [(eq? action 'warning) 
+                (displayln (format "warning: glyph ~a is not available in font ~a" str (path->string font-path)))
+                attrs]
+               [(eq? action 'error)
+                (raise-argument-error 'quad (format "glyph that exists in font ~a" (path->string font-path)) str)]
+               [(eq? fallback-val 'emoji) (let ([h (hash-copy attrs)])
+                                            (hash-set! h 'font-path emoji-font)
+                                            h)]
+               [(eq? fallback-val 'fallback) (let ([h (hash-copy attrs)])
+                                               (hash-set! h 'font-path fallback-font)
+                                               h)]))
+           (cons maybe-fallback-attrs str))]))))
+
+
+(define (atomize qx #:attrs-proc [attrs-proc values]
+                 #:fallback [fallback-font #f]
+                 #:emoji [emoji-font #f])
   ;; atomize a quad by reducing it to the smallest indivisible formatting units.
   ;; which are multi-character quads with the same formatting.
-  (define atomized-qs
-    (let loop ([x (make-quad qx)]
-               [attrs (hash-copy (current-default-attrs))]
-               [key (eq-hash-code (current-default-attrs))])
-      (match-define-values (next-key next-attrs)
-        ;; make a new run when we encounter non-empty attrs
-        (match (quad-attrs x)
-          [(? hash-empty?) (values key attrs)]
-          [this-attrs (define next-key (eq-hash-code this-attrs))
-                      (define next-attrs (attrs . update-with . this-attrs))
-                      (hash-set! next-attrs run-key next-key)
-                      (attrs-proc next-attrs)
-                      (values next-key next-attrs)]))
-      (match (quad-elems x)
-        [(? null?) ((quad-attrs x) . update-with! . next-attrs) (list x)]
-        [_
-         ;; we don't use `struct-copy` here because it needs to have the structure id at compile time.
-         ;; whereas with this technique, we can extract a constructor for any structure type.
-         ;; notice that the technique depends on
-         ;; 1) we only need to update attrs and elems
-         ;; 2) we make them the first two fields, so we know to drop the first two fields of x-tail
-         (define x-constructor (derive-quad-constructor x))
-         (define x-tail (drop (struct->list x) 2))
-         (match (merge-adjacent-strings (quad-elems x) 'isolate-white)
-           [(? pair? merged-elems)
-            (append* 
-             (for/list ([elem (in-list merged-elems)])
-               (match elem
-                 [(? string? str) (list (apply x-constructor next-attrs (list str) x-tail))]
-                 [_ (loop elem next-attrs next-key)])))]
-           ;; if merged elements are empty (for instance, series of empty strings)
-           ;; then zero out the elements in the quad.
-           [_ (list (apply x-constructor next-attrs null x-tail))])])))
-  #;(trimf atomized-qs (λ (q) (equal? (quad-elems q) '(" "))))
-  atomized-qs)
+  (define missing-glyph-action (current-missing-glyph-action))
+  
+  (let loop ([x (make-quad qx)]
+             [attrs (hash-copy (current-default-attrs))]
+             [key (eq-hash-code (current-default-attrs))])
+    (match-define-values (next-key next-attrs)
+      ;; make a new run when we encounter non-empty attrs
+      (match (quad-attrs x)
+        [(? hash-empty?) (values key attrs)]
+        [this-attrs (define next-key (eq-hash-code this-attrs))
+                    (define next-attrs (attrs . update-with . this-attrs))
+                    (hash-set! next-attrs run-key next-key)
+                    (attrs-proc next-attrs)
+                    (values next-key next-attrs)]))
+    (match (quad-elems x)
+      [(? null?) ((quad-attrs x) . update-with! . next-attrs) (list x)]
+      [_
+       ;; we don't use `struct-copy` here because it needs to have the structure id at compile time.
+       ;; whereas with this technique, we can extract a constructor for any structure type.
+       ;; notice that the technique depends on
+       ;; 1) we only need to update attrs and elems
+       ;; 2) we make them the first two fields, so we know to drop the first two fields of x-tail
+       (define x-constructor (derive-quad-constructor x))
+       (define x-tail (drop (struct->list x) 2))
+       (match (merge-adjacent-strings (quad-elems x) 'isolate-white)
+         [(? pair? merged-elems)
+          (append* 
+           (for/list ([elem (in-list merged-elems)])
+             (match elem
+               [(? string? str)
+                (for/list ([attrstr (in-list
+                                     (handle-fallback missing-glyph-action str next-attrs fallback-font emoji-font))])
+                  (match-define (cons attrs str) attrstr)
+                  (apply x-constructor attrs (list str) x-tail))]
+               [_ (loop elem next-attrs next-key)])))]
+         ;; if merged elements are empty (for instance, series of empty strings)
+         ;; then zero out the elements in the quad.
+         [_ (list (apply x-constructor next-attrs null x-tail))])])))
 
 (module+ test
   (define (filter-private-keys qs)

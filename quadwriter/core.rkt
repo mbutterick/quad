@@ -178,6 +178,7 @@
                             #:id 'hrbr))
 
 (module+ test
+  (require rackunit)
   (check-true (line-break? (second (quad-elems (q "foo" pbr "bar")))))
   (check-true (line-break? (second (atomize (q "foo" pbr "bar"))))))
 
@@ -492,23 +493,6 @@
                     (λ (q doc) (draw-debug q doc "#6c6" "#9c9"))
                     void))) 
 
-(define (contiguous-group-by pred xs)
-  ;; like `group-by`, but only groups together contiguous xs with the same pred value.
-  (let loop ([xs xs][groups null])
-    (match xs
-      [(== empty) (reverse groups)]
-      [(cons first-x other-xs)
-       (define equivalence-val (pred first-x))
-       (define-values (group-members rest) (splitf-at other-xs (λ (x) (equal? (pred x) equivalence-val))))
-       (define new-group (cons first-x group-members)) ; group-members might be empty
-       (loop rest (cons new-group groups))])))
-
-(module+ test
-  (require rackunit)
-  (check-equal?
-   (contiguous-group-by values '(1 1 2 2 2 3 4 5 5 6 6 7 8 9))
-   '((1 1) (2 2 2) (3) (4) (5 5) (6 6) (7) (8) (9))))
-
 (define/match (from-parent qs [where #f])
   ;; doesn't change any positioning. doesn't depend on state. can happen anytime.
   ;; can be repeated without damage.
@@ -610,7 +594,10 @@
                     [qx (qexpr->quad  `(q ((font-family ,default-font-family)
                                            (font-size ,(number->string default-font-size))) ,qx))])
                (setup-font-path-table! pdf-path)
-               (atomize qx #:attrs-proc handle-cascading-attrs)))
+               (parameterize ([current-missing-glyph-action 'fallback])
+                 (time-name atomize (atomize qx #:attrs-proc handle-cascading-attrs
+                                             #:fallback (hash-ref font-paths (cons "default-fallback" 'r) #f)
+                                             #:emoji (hash-ref font-paths (cons "default-emoji" 'r) #f))))))
   
   ;; page size can be specified by name, or measurements.
   ;; explicit measurements from page-height and page-width supersede those from page-size.
@@ -648,7 +635,7 @@
                            (quad-ref (car qs) 'page-margin-top (λ () (quad-ref (car qs) 'page-margin-bottom default-y-margin))))]
            [bottom-margin (let ([vert-optical-adjustment 10])
                             (or (debug-y-margin)
-                              (quad-ref (car qs) 'page-margin-bottom (λ () (+ vert-optical-adjustment (quad-ref (car qs) 'page-margin-top default-y-margin))))))]
+                                (quad-ref (car qs) 'page-margin-bottom (λ () (+ vert-optical-adjustment (quad-ref (car qs) 'page-margin-top default-y-margin))))))]
            [page-wrap-size (- (pdf-height pdf) top-margin bottom-margin)]
            [page-quad (struct-copy quad q:page
                                    [shift (pt left-margin top-margin)]
