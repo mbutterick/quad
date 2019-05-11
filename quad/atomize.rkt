@@ -66,10 +66,10 @@
          (define f (hash-ref! font-cache font-path (λ () (open-font font-path))))
          (define glyph-ids+chars
            (for/list ([c (in-string str)])
-             (define glyph-id
+             (define gid
                (hash-ref! gid-cache (cons c font-path)
                           (λ () (glyph-id (vector-ref (glyphrun-glyphs (layout f (string c))) 0)))))
-             (define fallback-result (and (zero? glyph-id) (if (emoji? c) 'emoji 'fallback)))
+             (define fallback-result (and (zero? gid) (if (emoji? c) 'emoji 'fallback)))
              (cons fallback-result c)))
          (for*/list ([cprs (in-list (contiguous-group-by car glyph-ids+chars eq?))]
                      [fallback-val (in-value (car (car cprs)))]
@@ -83,12 +83,11 @@
                 attrs]
                [(eq? action 'error)
                 (raise-argument-error 'quad (format "glyph that exists in font ~a" (path->string font-path)) str)]
-               [(eq? fallback-val 'emoji) (let ([h (hash-copy attrs)])
-                                            (hash-set! h 'font-path emoji-font)
-                                            h)]
-               [(eq? fallback-val 'fallback) (let ([h (hash-copy attrs)])
-                                               (hash-set! h 'font-path fallback-font)
-                                               h)]))
+               [else (define h (hash-copy attrs))
+                     (hash-set! h 'font-path (if (eq? fallback-val 'emoji)
+                                                 emoji-font
+                                                 fallback-font))
+                     h]))
            (cons maybe-fallback-attrs str))]))))
 
 
