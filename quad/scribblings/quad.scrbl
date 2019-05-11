@@ -145,7 +145,7 @@ A document processor starts with input that we can think of as one giant line of
 More specifically:
 
 @itemlist[#:style 'ordered
-  @item{Quad starts with a source file. In this demo, we can will use the @code{#lang quadwriter} language. For the most part, it's text with markup codes (though it may also include things like diagrams and images).}
+  @item{Quad starts with a source file. In this demo, we will use the @code{#lang quadwriter} language. For the most part, it's text with markup codes (though it may also include things like diagrams and images).}
 
   @item{Each markup entity is called a @deftech{quad}. A quad roughly corresponds to a box. ``Roughly'' because quads can have zero or negative dimension. Also, at the input stage, the contents of some quads may end up being spread across multiple non-overlapping boxes (e.g., a quad containing a word might be hyphenated to appear on two lines). The more precise description of a quad is therefore ``contiguous formatting region''. Quads can be recursively nested inside other quads, thus the input file is tree-shaped.}
 
