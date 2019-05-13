@@ -22,8 +22,8 @@
   ;; draw with pdf text routine
   (when (pair? (quad-elems q))
     (font doc (path->string (quad-ref q font-path-key default-font-face)))
-    (font-size doc (quad-ref q 'font-size 12))
-    (fill-color doc (quad-ref q 'color "black"))
+    (font-size doc (quad-ref q 'font-size default-font-size))
+    (fill-color doc (quad-ref q 'color default-font-color))
     (define str (unsafe-car (quad-elems q)))
     (match-define (list x y) (quad-origin q))
     (text doc str x y
@@ -414,7 +414,7 @@
   (match-define (list x y) (quad-origin q))
   (font-size doc (* .8 default-font-size))
   (font doc default-font-face)
-  (fill-color doc "black")
+  (fill-color doc default-font-color)
   (text doc (format "~a · ~a at ~a" (quad-ref q 'page-number 0)
                     (quad-ref q 'doc-title "untitled")
                     (date->string (current-date) #t))
