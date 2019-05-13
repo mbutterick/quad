@@ -10,6 +10,7 @@
 (define default-font-family "default-serif")
 (define default-font-size 12)
 (define default-line-height 16)
+(define default-font-color "black")
 
 (define font-paths (make-hash))
 
