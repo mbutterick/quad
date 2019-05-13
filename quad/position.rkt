@@ -20,14 +20,14 @@
 
 (define ascender-cache (make-hash))
 (define (ascender q)
-  (define font-key-val (quad-ref q font-path-key #false))
+  (define font-key-val (quad-ref q font-path-key))
   (unless font-key-val
     (error 'ascender-no-font-key))
   (hash-ref! ascender-cache font-key-val (λ () (font-ascent (get-font font-key-val)))))
 
 (define units-cache (make-hash))
 (define (units-per-em q)
-  (define font-key-val (quad-ref q font-path-key #false))
+  (define font-key-val (quad-ref q font-path-key))
   (unless font-key-val
     (error 'units-per-em-no-font-key))
   (hash-ref! units-cache font-key-val (λ () (font-units-per-em (get-font font-key-val)))))
