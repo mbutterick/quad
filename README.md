@@ -14,7 +14,10 @@ And update like so:
     raco pkg update --update-deps quad
 
 
-Docs: http://docs.racket-lang.org/quad
+Docs
+---
+
+http://docs.racket-lang.org/quad
 
 
 License
