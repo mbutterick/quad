@@ -57,7 +57,7 @@
 (define handle-fallback
   (let ([font-cache (make-hash)]
         [gid-cache (make-hash)])
-    (λ (missing-glyph-action str attrs fallback-font emoji-font)
+    (λ (missing-glyph-action str attrs fallback-font-family emoji-font-family font-path-resolver)
       (match missing-glyph-action
         ;; #false = no op
         [#false (list (cons attrs str))]
@@ -83,17 +83,19 @@
                 attrs]
                [(eq? action 'error)
                 (raise-argument-error 'quad (format "glyph that exists in font ~a" (path->string font-path)) str)]
-               [else (define h (hash-copy attrs))
-                     (hash-set! h 'font-path (if (eq? fallback-val 'emoji)
-                                                 emoji-font
-                                                 fallback-font))
-                     h]))
+               [else (define new-attrs (hash-copy attrs))
+                     (hash-set! new-attrs 'font-family (if (eq? fallback-val 'emoji)
+                                                 emoji-font-family
+                                                 fallback-font-family))
+                     (font-path-resolver new-attrs)
+                     new-attrs]))
            (cons maybe-fallback-attrs str))]))))
 
 
 (define (atomize qx #:attrs-proc [attrs-proc values]
-                 #:fallback [fallback-font #f]
-                 #:emoji [emoji-font #f])
+                 #:fallback [fallback-font-family #f]
+                 #:emoji [emoji-font-family #f]
+                 #:font-path-resolver [font-path-resolver values])
   ;; atomize a quad by reducing it to the smallest indivisible formatting units.
   ;; which are multi-character quads with the same formatting.
   (define missing-glyph-action (current-missing-glyph-action))
@@ -127,7 +129,7 @@
              (match elem
                [(? string? str)
                 (for/list ([attrstr (in-list
-                                     (handle-fallback missing-glyph-action str next-attrs fallback-font emoji-font))])
+                                     (handle-fallback missing-glyph-action str next-attrs fallback-font-family emoji-font-family font-path-resolver))])
                   (match-define (cons attrs str) attrstr)
                   (apply x-constructor attrs (list str) x-tail))]
                [_ (loop elem next-attrs next-key)])))]

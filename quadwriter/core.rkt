@@ -596,8 +596,9 @@
                (setup-font-path-table! pdf-path)
                (parameterize ([current-missing-glyph-action 'fallback])
                  (time-name atomize (atomize qx #:attrs-proc handle-cascading-attrs
-                                             #:fallback (hash-ref font-paths (cons "default-fallback" 'r) #f)
-                                             #:emoji (hash-ref font-paths (cons "default-emoji" 'r) #f))))))
+                                             #:fallback "default-fallback"
+                                             #:emoji "default-emoji"
+                                             #:font-path-resolver resolve-font-path)))))
   
   ;; page size can be specified by name, or measurements.
   ;; explicit measurements from page-height and page-width supersede those from page-size.
