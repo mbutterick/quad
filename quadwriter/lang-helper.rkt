@@ -4,6 +4,7 @@
          pollen/tag
          racket/system
          racket/class
+         racket/string
          syntax/strip-context
          scribble/reader
          quadwriter/core
@@ -12,13 +13,31 @@
 
 (define q (default-tag-function 'q))
 
+
 (define ((make-read-syntax expander-mod pt-proc) path-string p)
+  ;; peel off any lines of format #:keyword val (bounded by newline)
+  ;; and turn them into qexpr attrs
+  (define kw-val-pat #px"^(#:\\S+)\\s+(\\S+)\n")
+  (define kw-attrs
+    (let loop ([acc null])
+      (cond
+        [(regexp-try-match #px"^\n+" p) (loop acc)]
+        [(regexp-try-match kw-val-pat p)
+         =>
+         (λ (m)
+           (match m
+             [(list _ kw val) (loop (cons (list kw val) acc))]))]
+        [else (for/list ([item (in-list acc)])
+                        (match-define (list kw val) (map bytes->string/utf-8 item))
+                        (list (string->symbol (string-trim kw "#:")) val))])))
   (strip-context
    (with-syntax ([PATH-STRING path-string]
+                 [((ATTR-NAME ATTR-VAL) ...) kw-attrs]
                  [PT (pt-proc path-string p)]
                  [EXPANDER-MOD expander-mod])
      #'(module _ EXPANDER-MOD
          PATH-STRING
+         ((ATTR-NAME ATTR-VAL) ...)
          . PT))))
 
 (define-syntax-rule (make-module-begin DOC-PROC)
@@ -26,12 +45,12 @@
     (provide (rename-out [new-module-begin #%module-begin]))
     (define-syntax (new-module-begin stx)
       (syntax-case stx ()
-        [(_ PATH-STRING . EXPRS)
+        [(_ PATH-STRING ATTRS . EXPRS)
          (with-syntax ([DOC (datum->syntax #'PATH-STRING 'doc)]
                        [VIEW-RESULT (datum->syntax #'PATH-STRING 'view-result)])
            #'(#%module-begin
               (provide DOC VIEW-RESULT)
-              (define DOC (DOC-PROC (list . EXPRS)))
+              (define DOC `(q ATTRS ,(DOC-PROC (list . EXPRS))))
               (define pdf-path (path-string->pdf-path 'PATH-STRING))
               (define (VIEW-RESULT)
                 (define open-string
@@ -91,7 +110,7 @@
            (or
             (for/first ([pos (in-range line-start-pos line-end-pos)]
                         #:unless (char-blank? (send text get-character pos)))
-              pos)
+                       pos)
             line-start-pos))
          (- first-vis-pos line-start-pos))]      
       [else default])))
