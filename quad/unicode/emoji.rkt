@@ -1,4 +1,5 @@
-#lang quad/unicode/emoji-prep
+#lang quad/unicode/unicode-class-prep
+emoji?
 
 # downloaded from
 # https://unicode.org/Public/emoji/12.0/emoji-data.txt

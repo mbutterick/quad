@@ -598,6 +598,7 @@
                  (time-name atomize (atomize qx #:attrs-proc handle-cascading-attrs
                                              #:fallback "default-fallback"
                                              #:emoji "default-emoji"
+                                             #:math "default-math"
                                              #:font-path-resolver resolve-font-path)))))
   
   ;; page size can be specified by name, or measurements.

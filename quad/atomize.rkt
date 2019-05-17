@@ -8,6 +8,7 @@
          sugar/list
          racket/function
          "unicode/emoji.rkt"
+         "unicode/math.rkt"
          fontland
          "quad.rkt"
          "qexpr.rkt"
@@ -57,7 +58,7 @@
 (define handle-fallback
   (let ([font-cache (make-hash)]
         [gid-cache (make-hash)])
-    (λ (missing-glyph-action str attrs fallback-font-family emoji-font-family font-path-resolver)
+    (λ (missing-glyph-action str attrs fallback-font-family emoji-font-family math-font-family font-path-resolver)
       (match missing-glyph-action
         ;; #false = no op
         [#false (list (cons attrs str))]
@@ -69,7 +70,10 @@
              (define gid
                (hash-ref! gid-cache (cons c font-path)
                           (λ () (glyph-id (vector-ref (glyphrun-glyphs (layout f (string c))) 0)))))
-             (define fallback-result (and (zero? gid) (if (emoji? c) 'emoji 'fallback)))
+             (define fallback-result (and (zero? gid) (cond
+                                                        [(emoji? c) 'emoji]
+                                                        [(math? c) 'math]
+                                                        [else 'fallback])))
              (cons fallback-result c)))
          (for*/list ([cprs (in-list (contiguous-group-by car glyph-ids+chars eq?))]
                      [fallback-val (in-value (car (car cprs)))]
@@ -84,9 +88,10 @@
                [(eq? action 'error)
                 (raise-argument-error 'quad (format "glyph that exists in font ~a" (path->string font-path)) str)]
                [else (define new-attrs (hash-copy attrs))
-                     (hash-set! new-attrs 'font-family (if (eq? fallback-val 'emoji)
-                                                 emoji-font-family
-                                                 fallback-font-family))
+                     (hash-set! new-attrs 'font-family (match fallback-val
+                                                         ['emoji  emoji-font-family]
+                                                         ['math math-font-family]
+                                                         [_ fallback-font-family]))
                      (font-path-resolver new-attrs)
                      new-attrs]))
            (cons maybe-fallback-attrs str))]))))
@@ -95,6 +100,7 @@
 (define (atomize qx #:attrs-proc [attrs-proc values]
                  #:fallback [fallback-font-family #f]
                  #:emoji [emoji-font-family #f]
+                 #:math [math-font-family #f]
                  #:font-path-resolver [font-path-resolver values])
   ;; atomize a quad by reducing it to the smallest indivisible formatting units.
   ;; which are multi-character quads with the same formatting.
@@ -129,7 +135,7 @@
              (match elem
                [(? string? str)
                 (for/list ([attrstr (in-list
-                                     (handle-fallback missing-glyph-action str next-attrs fallback-font-family emoji-font-family font-path-resolver))])
+                                     (handle-fallback missing-glyph-action str next-attrs fallback-font-family emoji-font-family math-font-family font-path-resolver))])
                   (match-define (cons attrs str) attrstr)
                   (apply x-constructor attrs (list str) x-tail))]
                [_ (loop elem next-attrs next-key)])))]
