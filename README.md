@@ -1,9 +1,7 @@
 Quad [![Build Status](https://travis-ci.org/mbutterick/quad.svg?branch=master)](https://travis-ci.org/mbutterick/quad)
 ----
 
-A document processor written in [Racket](http://racket-lang.org). 
-
-In “documented demo” mode.
+A work-in-progress document processor written in [Racket](http://racket-lang.org). 
 
 Using Racket 6.10+, install from the command line:
 
