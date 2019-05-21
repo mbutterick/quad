@@ -11,6 +11,8 @@ pollen/scribblings/mb-tools quad/pict)
 
 @author[(author+email "Matthew Butterick" "mb@mbtype.com")]
 
+@defmodule*[(quad quadwriter)]
+
 @defmodulelang*[(quadwriter
 quadwriter/markdown
 quadwriter/markup)]
@@ -102,6 +104,7 @@ Open DrRacket (or the editor you prefer) and start a new document with @code{#la
 Brennan and Dale like fancy sauce.
 }|
 ]
+
 
 Save the document. Any place, any name is fine. 
 
@@ -256,7 +259,7 @@ This Q-expression is exactly the same as the one that resulted with the @racket[
 
 @subsection{Quadwriter & Q-expressions}
 
-@racket[quadwriter/markdown] showed high-level notation (= a generous way of describing Markdown) that generated a Q-expression. Then @racket[quadwriter/markup] showed a mid-level notation that generated another (identical) Q-expression.
+@racketmodname[quadwriter/markdown] showed high-level notation (= a generous way of describing Markdown) that generated a Q-expression. Then @racketmodname[quadwriter/markup] showed a mid-level notation that generated another (identical) Q-expression.
 
 If we wish, we can also skip the notational foofaraw and just write Q-expressions directly in our source file. We do this with the basic @racket[quadwriter] language. 
 
@@ -370,39 +373,77 @@ Which yields the same PDF result. (If you've spent any time with ’90s HTML mar
 
 @subsection{Quadwriter as a library}
 
+Part of the idea of @racketmodname[quad] and @racketmodname[quadwriter] is to make typographic layout & PDF generation a service that can be built into other Racket apps and languages. 
+
+Let's see how this works by doing document layout and rendering from within good old @racketmodname[racket/base].
+
+@fileblock["test.rkt"
+@codeblock|{
+#lang racket/base
+(require quadwriter)
+(render-pdf '(q "Brennan likes fancy sauce."
+                (q ((break "paragraph")))
+                "Dale hates fancy sauce.") "~/Desktop/new.pdf")
+}|
+]
+
+
+
 @subsection{Quadwriter: the upshot}
 
-What you should infer from all this is that in the usual Racket tradition, @racket[quadwriter] and its dialects are just compiling a document from a higher-level representation to a lower-level representation. 
+In the usual Racket tradition, @racket[quadwriter] and its dialects are just compiling a document from a higher-level representation to a lower-level representation. 
 
-If you're a writer, you might prefer to use the high-level representation (like Markdown) so that your experience is optimized for ease of use.
+If you're a writer, you might prefer to use the high-level representation (like @racketmodname[quadwriter/markdown]) so that your experience is optimized for ease of use.
 
-If you're a developer, you might prefer to use the lower-level representation for precision. For instance, a @racketmodname[pollen] author who wanted to generate a PDF could design tag functions that emit Q-expressions, and then pass the result to Quadwriter for conversion to PDF.
+If you're a developer, you might prefer to use the lower-level representation for precision. For instance, a @racketmodname[pollen] author who wanted to generate a PDF could design tag functions that emit Q-expressions, and then pass the result to @racket[render-pdf].
 
 @margin-note{Because Q-expressions are a subset of X-expressions, you can apply any tools that work with X-expressions (for instance, the @racketmodname[txexpr] library).}
 
 Or, you can aim somewhere in between. Like everything else in Racket, you can design functions & macros to emit the pieces of a Q-expression using whatever interface you prefer. 
 
-@subsection{``I don't like Quadwriter …''}
-
-It's a demo! Don't panic! @racket[quadwriter] itself is just meant to show how one can build an interface to @racket[quad], which if we're being honest, is basically just a home for all the generic geometric routines and technical fiddly bits (e.g., font parsing and PDF generation) without any true typographic smarts. That's what @racket[quadwriter] adds. 
-
-In the sample above, though you see formatting tags like @racket[background-color] and @racket[font-family], those are defined by @racket[quadwriter], not @racket[quad]. So if you don't like them — no problem! You can still drop down one more layer and program your own interface to @racket[quad].
-
-That said, I imagine that most users & developers are looking for PDF generation along the lines of ``don't make me think too hard.'' So I can foresee that @racket[quadwriter] (or a better version of it) will be the preferred interface.
-
-Why? Decades of experience with HTML and its relations have acclimated us to the model of marking up a text with certain codes that denote layout, and then passing the markup to a program for output. So I think the idea of a Q-expression, with some application-specific vocabulary of markup tags, will probably end up being the most natural and useful interface. 
-
-@margin-note{Historians of desktop word processors may remember that WordPerfect has a @onscreen{Reveal codes} feature which lets you drop into the markup that represents the formatting displayed in the GUI.}
-
-Part of the idea of @racket[quad] is to make typographic layout & PDF generation a service that can be built into other Racket apps and languages. For simple jobs, you might reach for @racket[quadwriter] and make your Q-expressions using its tag vocabulary. For other jobs, you might reach for something else. For instance, I could imagine a @racketidfont{#lang resume} that has a more limited markup vocabulary, optimized for churning out résumés with a simple layout. Or a @racketidfont{#lang tax-form} that has a more complex markup vocabulary that supports more detail and precision. As usual with domain-specific languages, we can create an interface that adjusts the level of control available to the end user, depending on what's suitable for the type of document being created.
-
-
-
-
 @section{Quadwriter markup reference}
 
+These are the attributes that can be used inside a Q-expression passed to @racketmodname[quadwriter]. Inside a Q-expression, every attribute is a @tech{symbol}, and every attribute value is a @tech{string}.
+
+@deftogether[(@defthing[#:kind "attribute" inset-top symbol?]
+              @defthing[#:kind "attribute" inset-bottom symbol?]
+              @defthing[#:kind "attribute" inset-left symbol?]
+              @defthing[#:kind "attribute" inset-right symbol?])]{
+Inset values increase the layout boundary of the quad. Value is given in points. @racket["0"] by default.
+}
+
+@deftogether[(@defthing[#:kind "attribute" border-inset-top symbol?]
+              @defthing[#:kind "attribute" border-inset-bottom symbol?]
+              @defthing[#:kind "attribute" border-inset-left symbol?]
+              @defthing[#:kind "attribute" border-inset-right symbol?])]{
+Border-inset values do not change the layout boundary of the quad. Rather, they change the position of the border (if any) relative to the layout boundary. Value is given in points. @racket["0"] by default (meaning, the border sits on the layout boundary).
+}
+
+@deftogether[(@defthing[#:kind "attribute" border-width-top symbol?]
+              @defthing[#:kind "attribute" border-width-bottom symbol?]
+              @defthing[#:kind "attribute" border-width-left symbol?]
+              @defthing[#:kind "attribute" border-width-right symbol?])]{
+Width of the border on each edge of a quad. Value is given in points. @racket["0"] by default (meaning no border).
+}
+
+@deftogether[(@defthing[#:kind "attribute" border-color-top symbol?]
+              @defthing[#:kind "attribute" border-color-bottom symbol?]
+              @defthing[#:kind "attribute" border-color-left symbol?]
+              @defthing[#:kind "attribute" border-color-right symbol?])]{
+Color of the border on each edge of a quad. Value is given as a @tech{hex color} or @tech{named color}.
+}
 
 
+@defproc[
+(render-pdf
+[qx qexpr?]
+[pdf-path (or/c path? path-string?)]
+[#:replace replace? any/c #true])
+void?]{
+Compute the layout for @racket[qx] and render it as a PDF to @racket[pdf-path].
+
+The optional @racket[replace?] argument controls whether an existing file is automatically overwritten. The default is @racket[#true].
+}
 
 @section{Quad: the details}
 
