@@ -3,6 +3,7 @@
          racket/promise
          racket/match
          racket/list
+         racket/file
          sugar/list
          txexpr/base
          racket/date
@@ -578,9 +579,10 @@
 (define default-page-orientation "tall")
 (define/contract (render-pdf qx-arg pdf-path-arg
                              #:replace [replace? #t])
-  ((qexpr? (or/c path? path-string?)) (#:replace any/c) . ->* . void?)
-  
-  (define pdf-path (path->complete-path (simplify-path (expand-user-path (->path pdf-path-arg)))))
+  ((qexpr? (or/c #false path? path-string?)) (#:replace any/c) . ->* . (or/c void? bytes?))
+
+  (define fallback-path (build-path (find-system-path 'temp-dir) "quadwriter-temp.pdf"))
+  (define pdf-path (path->complete-path (simplify-path (expand-user-path (->path (or pdf-path-arg fallback-path))))))
   (when (and (not replace?) (file-exists? pdf-path))
     (raise-argument-error 'render-pdf "path that doesn't exist" pdf-path))
   
@@ -640,4 +642,9 @@
            [qs (time-name page-wrap (page-wrap qs page-wrap-size page-quad))]
            [qs (time-name position (position (struct-copy quad q:doc [elems qs])))])
       (time-name draw (draw qs pdf))
-      (displayln (format "wrote PDF to ~a" pdf-path)))))
+      (displayln (format "wrote PDF to ~a" pdf-path))))
+
+  (unless pdf-path-arg
+    (begin0
+      (file->bytes pdf-path)
+      (delete-file pdf-path))))

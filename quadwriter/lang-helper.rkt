@@ -27,9 +27,10 @@
          (λ (m)
            (match m
              [(list _ kw val) (loop (cons (list kw val) acc))]))]
-        [else (for/list ([item (in-list acc)])
+        ;; reverse in case of multiple values with same keyword, latest takes precedence (by becoming first)
+        [else (reverse (for/list ([item (in-list acc)])
                         (match-define (list kw val) (map bytes->string/utf-8 item))
-                        (list (string->symbol (string-trim kw "#:")) val))])))
+                        (list (string->symbol (string-trim kw "#:")) val)))])))
   (strip-context
    (with-syntax ([PATH-STRING path-string]
                  [((ATTR-NAME ATTR-VAL) ...) kw-attrs]
