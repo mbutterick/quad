@@ -23,7 +23,7 @@
   (when (pair? (quad-elems q))
     (font doc (path->string (quad-ref q font-path-key default-font-face)))
     (font-size doc (quad-ref q 'font-size default-font-size))
-    (fill-color doc (quad-ref q 'color default-font-color))
+    (fill-color doc (quad-ref q 'font-color default-font-color))
     (define str (unsafe-car (quad-elems q)))
     (match-define (list x y) (quad-origin q))
     (text doc str x y
@@ -122,11 +122,6 @@
                          #:to 'nw
                          #:printable (λ (q sig) (not (memq sig '(start end))))
                          #:draw-start (if (draw-debug-line?) draw-debug void)))
-
-(define q:line-spacer-unbreakable
-  (struct-copy line-spacer q:line-spacer
-               [attrs #:parent quad
-                      (make-hasheq '((keep-lines . #true)))]))
 
 (define softies (map string '(#\space #\- #\u00AD)))
 

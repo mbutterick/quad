@@ -25,7 +25,7 @@ Naming guidelines
        (match (cdr (regexp-match #rx"^(-?[0-9\\.]+)([a-z]+)$"  (string-downcase x)))
          [(list num-string unit)
           ((match unit
-             [(regexp #rx"in(ch)?") in->pts]
+             [(regexp #rx"in(ch|ches)?") in->pts]
              [(regexp #rx"cm") (compose1 in->pts cm->in)]
              [(regexp #rx"mm") (compose1 in->pts cm->in mm->cm)]) (string->number num-string))])]))
   (if round? (inexact->exact (floor val)) val))
@@ -61,10 +61,11 @@ Naming guidelines
                       border-color-bottom
                       background-color
 
-                      keep-lines
-                      keep-first
-                      keep-last
-                      keep-all
+                      
+                      keep-first-lines
+                      keep-last-lines
+                      keep-all-lines
+
                       keep-with-next
 
                       line-align

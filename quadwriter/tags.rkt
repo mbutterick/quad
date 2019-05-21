@@ -24,7 +24,7 @@
 
 (define-tag-function (p attrs exprs)
   ;; no font-family so that it adopts whatever the surrounding family is
-  (qexpr (append `((keep-first "2")(keep-last "3") (font-size-adjust "100%") (character-tracking "0") (hyphenate "true") (display ,(symbol->string (gensym)))) attrs) exprs))
+  (qexpr (append `((keep-first-lines "2")(keep-last-lines "3") (font-size-adjust "100%") (character-tracking "0") (hyphenate "true") (display ,(symbol->string (gensym)))) attrs) exprs))
 
 (define-tag-function (hr attrs exprs)
   hrbr)
@@ -39,7 +39,7 @@
                    (border-width-bottom "0.5") (border-color-bottom "gray") (border-inset-bottom "-2")
                    (border-width-right "0.5") (border-color-right "gray") (border-inset-right "20")
                    (inset-top "10") (inset-bottom "8") (inset-left "30") (inset-right "30")
-                   (keep-lines "yes"))
+                   (keep-all "yes"))
                  attrs) exprs))
 
 (define id (default-tag-function 'id))
@@ -50,7 +50,7 @@
 (define b strong)
 
 (define-tag-function (a attrs exprs)
-  (qexpr `((link ,(cadr (assoc 'href attrs)))(color "MediumVioletRed")) exprs))
+  (qexpr `((link ,(cadr (assoc 'href attrs)))(font-color "MediumVioletRed")) exprs))
 
 (define-tag-function (em attrs exprs)
   (qexpr (list* '(font-italic "true") '(font-size-adjust "100%") attrs) exprs))
