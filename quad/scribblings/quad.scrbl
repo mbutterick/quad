@@ -1,6 +1,6 @@
 #lang scribble/manual
 
-@(require racket/runtime-path scribble/example (for-label txexpr (except-in pollen #%module-begin) xml racket/base racket/draw)
+@(require racket/runtime-path scribble/example (for-label txexpr (except-in pollen #%module-begin) xml racket/base racket/draw quadwriter)
 pollen/scribblings/mb-tools quad/pict)
 
 @(define my-eval (make-base-eval))
@@ -20,10 +20,10 @@ quadwriter/markup)]
 @(define-runtime-path quads.png "quads.png")
 @(image quads.png #:scale 0.4)
 
-@margin-note{Quad is a work in progress. It works, but it is unstable in the sense that I make no commitment to maintain the API in its current state.}
+@margin-note{Quad is in progress. It works, but it is unstable — I am still changing things, small and large — and thus I make no commitment to maintain the API in its current state.}
 
 
-@section{Installing Quad}
+@section{Installing Quad & Quadwriter}
 
 At the command line:
 @verbatim{raco pkg install quad}
@@ -31,22 +31,27 @@ At the command line:
 After that, you can update the package like so:
 @verbatim{raco pkg update quad}
 
+@racketmodname[quadwriter] is installed as part of the @racketmodname[quad] package.
+
+Much of the font-parsing and PDF-rendering code in Quad is adapted from @link["http://github.com/foliojs/"]{FolioJS} by Devon Govett. I thank Mr. Govett for figuring out a lot of details that would've made me squeal in agony. 
+
 @section{What is Quad?}
 
-A document processor, which means that it a) computes the layout of your document from a series of formatting codes (not unlike a web browser) and then b) outputs to PDF (not unlike a word processor).
+A document processor, which means that it:
 
-For instance, LaTeX is a document processor. So are web browsers. Quad borrows from both traditions — it's an attempt to modernize the good ideas in LaTeX, and generalize the good ideas in web browsers.
+@itemlist[#:style 'ordered
+  @item{Computes the layout of your document from a series of formatting codes (not unlike a web browser)}
+
+  @item{Renders to PDF (not unlike a word processor).}
+]
+
+For instance, LaTeX is a document processor. So are web browsers. Quad borrows from both traditions — it's an attempt to modernize the good ideas in LaTeX, and generalize the good ideas in web browsers, while bypassing some of the limitations of LaTeX (e.g., no Unicode) and of web browsers (e.g., performance and error recovery are valued above all).
 
 Document processors sit opposite WYSIWYG tools like Microsoft Word and Adobe InDesign. There, the user controls the layout by manipulating a representation of the page on the screen. This is fine as far as it goes. But changes to the layout — for instance, a new page size — often require a new round of manual adjustments. 
 
 A document processor, by contrast, relies on markup codes within the text to determine the layout programmatically. Compared to WYSIWYG, this approach offers less granular control. But it also creates a more flexible relationship between the source and its possible layouts. 
 
-Another benefit of document processors is that it permits every document to have a high-level, text-based source file that's independent of any particular output format. Though today, Quad relies on its own PDF-rendering engine, there's no reason it couldn't render to other targets.
-
-
-@subsection{Why is it called Quad?}
-
-In letterpress printing, a @italic{quad} was a piece of metal used as spacing material within a line.
+Another benefit of document processors is that it permits every document to have a high-level, text-based source file that's independent of any particular output format.
 
 
 
@@ -62,45 +67,25 @@ Quad produces PDFs using three ingredients:
   @item{A @bold{PDF engine} that takes this layout and renders it as a finished PDF file.}
 ]
 
-While there's no reason Quad couldn't produce an HTML layout, that's an easier problem, because most of the document-layout chores can (and should) be delegated to the web browser. For now, most of Quad's apparatus is devoted to its layout engine so it can produce PDFs.
 
-Much of the font-parsing and PDF-rendering code in Quad is adapted from @link["http://github.com/foliojs/"]{FolioJS} by Devon Govett. I thank Mr. Govett for figuring out a lot of details that would've made me squeal in agony. 
-
-For the most part, neither Quad nor Quadwriter rely much on @racketmodname[racket/draw], and completely avoid its PDF-drawing functions. These facilities are provided by Pango, which has some major deficiencies in the kind of PDFs it produces (for instance, it doesn't support hyperlinks).
-
-
-@subsection{What doesn't Quad do?}
-
-@itemlist[#:style 'ordered
-@item{Quad is not a WYSIWYG or interactive previewing tool.}
-
-@item{Quad does not have user-level representations of formatting, à la Word style sheets.}
-
-@item{Quad does not handle semantic or configurable markup. Its markup is limited to its specific, layout-based vocabulary.}
-]
-Rather, it's designed to cooperate with tools that offer these facilities. For instance, Quadwriter is a demonstration language that provides an interface to a small set of word-processor-like features that are implemented with Quad.
+For the most part, neither Quad nor Quadwriter rely much on @racketmodname[racket/draw], and completely avoid its PDF-drawing functions. These facilities are provided by @link["https://www.pango.org/"]{Pango}, which has some major shortcomings in the kind of PDFs it produces (for instance, it doesn't support hyperlinks).
 
 
 @section{What is Quadwriter?}
 
 A demo app built with Quad. It takes a text-based source file as input, calculates the typesetting and layout, and then outputs a PDF.
 
-
-@subsection{What can I do with this demo?}
-
-You can fiddle with it & then submit issues and feature requests at the @link["http://github.com/mbutterick/quad"]{Quad repo}. After a few dead ends, I think I'm headed in the right direction. But I also want to open it to comments & criticism, because that can bend the thinking in productive ways.
-
-Also, I have about a hundred topics to add to the documentation. So I don't mind requests along the lines of ``can you document such-and-such'' — it's probably already on my list and I don't mind moving it to the front in response to human interest. At this point in its development, I find it easier to have a working version of the project and iterate, rather than leave it in some partially busted state for weeks on end.
+You can fiddle with it & then submit issues and feature requests at the @link["http://github.com/mbutterick/quad"]{Quad repo}. 
 
 
-@section{Quadwriter tutorial}
+@section{Quadwriter quick tour}
 
-Open DrRacket (or the editor you prefer) and start a new document with @code{#lang quadwriter/markup} as the first line:
+Open DrRacket (or whatever editor you prefer) and start a new document with @code{#lang quadwriter/markdown} as the first line:
 
 
 @fileblock["test.rkt"
 @codeblock|{
-#lang quadwriter/markup
+#lang quadwriter/markdown
 Brennan and Dale like fancy sauce.
 }|
 ]
@@ -131,22 +116,20 @@ Next, on the REPL enter this:
 > doc
 }
 
-You will see the actual input to Quadwriter, which is called a @deftech{Q-expression}:
+You will see the actual input to Quadwriter, which is called a @tech{Q-expression}:
 
 @repl-output{
-'(q ((line-height "17")) (q ((break "paragraph"))) "Brennan and Dale like fancy sauce." (q ((break "paragraph"))))
+'(q () (q ((page-margin-left "120") (page-margin-top "80") (page-margin-bottom "120") (font-family "default-serif") (line-height "17")) (q ((keep-first-lines "2") (keep-last-lines "3") (font-size-adjust "100%") (character-tracking "0") (hyphenate "true") (display "g49598")) "Brennan and Dale like fancy sauce.")))
 }
 
-A Q-expression is an @seclink["X-expressions" #:doc '(lib "pollen/scribblings/pollen.scrbl")]{X-expression} with some extra restrictions.
-
-In the demos that follow, the input language will change slightly. But the PDF will be rendered the same way (by running the source file) and you can always look at @racket[doc].
+In the demos that follow, the input language will change slightly. But the PDF will be rendered the same way (by running the source file) and you can always look at @racket[doc] or use @racket[view-result].
 
 
 @subsection{Quadwriter & Markdown}
 
 I @link["https://docs.racket-lang.org/pollen/second-tutorial.html#%28part._the-case-against-markdown%29"]{don't recommend} that writers adopt Markdown for serious projects. But for goofing around, why not.
 
-Let's update the first line of @racket["test.rkt"] so it uses the @racket[quadwriter/markdown] dialect instead of the plain @racket[quadwriter] language:
+Our first version of @racket["test.rkt"] had one line of plain text:
 
 @fileblock["test.rkt"
 @codeblock|{
@@ -155,9 +138,9 @@ Brennan and Dale like fancy sauce.
 }|
 ]
 
-Run the file. The PDF result is the same. Why? Because a short line of plain text comes out the same way in both dialects.
+Behind the scenes, @racketmodname[quadwriter/markdown] is doing more heavy lifting than this sample suggests. We can type our source in Markdown notation, and it will automatically be converted to the appropriate Quad formatting commands to make things look right. 
 
-Behind the scenes, however, @racket[quadwriter/markdown] is doing more heavy lifting. We can enter text with Markdown notation, and it will automatically be converted to the appropriate Quad formatting commands to make things look right. For instance, this sample combines a Markdown heading, bullet list, code block, and bold and italic formatting.
+For instance, try this sample, which combines a Markdown heading, bullet list, code block, and bold and italic formatting:
 
 @fileblock["test.rkt"
 @codeblock|{
@@ -175,9 +158,7 @@ And they love to code
 }|
 ]
 
-You are welcome to paste in bigger Markdown files that you have laying around and see what happens. As a demo language, I'm sure there are tortured agglomerations of Markdown notation that will confuse to @racket[quadwriter/markdown]. But with vanilla files, even big ones, it should be fine.
-
-@margin-note{Would it be possible to convert any Markdown file, no matter how sadistic, to PDF? As a practical matter, I'm sure such things exist already. I have no interest in being in the Markdown-conversion business.}
+You're welcome to paste in bigger Markdown files that you have laying around and see what happens. As a demo language, I'm sure there are tortured agglomerations of Markdown notation that will confuse @racketmodname[quadwriter/markdown]. But vanilla files should be fine.
 
 Back to the demo. Curious characters can do this:
 
@@ -189,26 +170,17 @@ To see this:
 
 @repl-output{
 '(q
-  ((line-height "17"))
-  (q ((break "paragraph")))
+  ()
   (q
-   ((font-family "fira-sans-light")
-    (first-line-indent "0")
-    (display "block")
-    (font-size "20")
-    (line-height "24.0")
-    (border-width-top "0.5")
-    (border-inset-top "9")
-    (inset-bottom "-3")
-    (inset-top "6")
-    (keep-with-next "true")
-    (id "did-you-know"))
-   "Did you know?")
+   ((page-margin-left "120") (page-margin-top "80") (page-margin-bottom "120") (font-family "default-serif") (line-height "17"))
+   (q ((break "paragraph")))
+   (q ((font-family "default-heading") (first-line-indent "0") (display "block") (font-size "20") (line-height "24.0") (border-width-top "0.5") (border-inset-top "9") (inset-bottom "-3") (inset-top "6") (keep-with-next "true") (id "did-you-know")) "Did you know?")
    ···
 }
 
-This is part of the @tech{Q-expression} that the source file produces. This Q-expression is passed to Quadwriter for layout and rendering.
+This is the first part of the @tech{Q-expression} that the source file produces when it runs and exports via @racket[doc]. This Q-expression is passed to Quadwriter for layout and rendering.
 
+@margin-note{Yes, you can generate your own Q-expressions by other means and pass them to @racketmodname[quadwriter] for layout & rendering. See @racket[render-pdf].}
 
 @subsection{Quadwriter & markup}
 
@@ -221,9 +193,9 @@ Brennan and Dale like fancy sauce.
 }|
 ]
 
-We get the same PDF result as before, again because a short line of plain text is the same in this dialect as the others.
+We get the same PDF result as before, again because a short line of plain text is the same in this dialect as the last.
 
-But if we want to reproduce the result of the Markdown notation, this time we use the equivalent markup tags:
+But if we want to reproduce the result of the Markdown notation, this time we use the equivalent HTML-ish markup tags:
 
 @fileblock["test.rkt"
 @codeblock|{
@@ -247,7 +219,7 @@ And they love to code
 
 The special @litchar{◊} character is called a @deftech{lozenge}. It introduces markup tags. @link["https://docs.racket-lang.org/pollen/pollen-command-syntax.html#%28part._the-lozenge%29"]{Instructions for typing it}, but for now it suffices to copy & paste, or use the @onscreen{Insert Command Char} button in the DrRacket toolbar.
 
-Under the hood, the @racket[quadwriter/markdown] dialect is converting the Markdown surface notation into markup tags that look like this. So the @racket[quadwriter/markup] dialect just lets us start with those tags. 
+Under the hood, the @racketmodname[quadwriter/markdown] dialect is converting the Markdown surface notation into markup tags that look like this. So the @racket[quadwriter/markup] dialect just lets us start with those tags. 
 
 Curious characters can prove that this is so by again typing at the REPL:
 
@@ -255,13 +227,13 @@ Curious characters can prove that this is so by again typing at the REPL:
 > doc
 }
 
-This Q-expression is exactly the same as the one that resulted with the @racket[quadwriter/markdown] source file.
+This @tech{Q-expression} is exactly the same as the one that resulted with the @racketmodname[quadwriter/markdown] source file.
 
 @subsection{Quadwriter & Q-expressions}
 
 @racketmodname[quadwriter/markdown] showed high-level notation (= a generous way of describing Markdown) that generated a Q-expression. Then @racketmodname[quadwriter/markup] showed a mid-level notation that generated another (identical) Q-expression.
 
-If we wish, we can also skip the notational foofaraw and just write Q-expressions directly in our source file. We do this with the basic @racket[quadwriter] language. 
+If we wish, we can also skip the notational foofaraw and just write Q-expressions directly in our source file. We do this with the basic @racketmodname[quadwriter] language. 
 
 Recall our very first example:
 
@@ -275,7 +247,7 @@ Brennan and Dale like fancy sauce.
 In the REPL, the @racket[doc] was this Q-expression:
 
 @repl-output{
-'(q ((line-height "17")) (q ((break "paragraph"))) "Brennan and Dale like fancy sauce." (q ((break "paragraph"))))
+'(q () (q ((page-margin-left "120") (page-margin-top "80") (page-margin-bottom "120") (font-family "default-serif") (line-height "17")) "Brennan and Dale like fancy sauce."))
 }
 
 Let's copy this Q-expression and use it as our new source code. This time, however, we'll switch to plain @code{#lang quadwriter} (instead of the @racket[markup] or @racket[markdown] dialects):
@@ -283,8 +255,9 @@ Let's copy this Q-expression and use it as our new source code. This time, howev
 @fileblock["test.rkt"
 @codeblock|{
 #lang quadwriter
-'(q ((line-height "17")) (q ((break "paragraph"))) 
-"Brennan and Dale like fancy sauce." (q ((break "paragraph"))))
+'(q () (q ((page-margin-left "120") (page-margin-top "80") 
+(page-margin-bottom "120") (font-family "default-serif") 
+(line-height "17")) "Brennan and Dale like fancy sauce."))
 }|
 ]
 
@@ -308,87 +281,123 @@ And they love to code
 }|
 
 
-And again, use this Q-expression as the source for a new @racket[quadwriter] program:
+And again, use the resulting Q-expression in @racket[doc] as the source for a new @racket[quadwriter] program, which will result in the same PDF.
+
+@subsection{Setting top-level attributes}
+
+Even if you're using a @racketmodname[quadwriter] dialect, you can still set top-level formatting attributes for the document. For instance, suppose we wanted to make our original @racketmodname[quadwriter/markdown] example 24 points and red, and put the PDF on wide tabloid (17in × 11in) paper. We can add these top-level attributes to the beginning of our source file as keyword arguments:
 
 @fileblock["test.rkt"
 @codeblock|{
-#lang quadwriter
-'(q
-  ((line-height "17"))
-  (q ((break "paragraph")))
-  (q
-   ((font-family "fira-sans-light")
-    (first-line-indent "0")
-    (display "block")
-    (font-size "20")
-    (line-height "24.0")
-    (border-width-top "0.5")
-    (border-inset-top "9")
-    (inset-bottom "-3")
-    (inset-top "6")
-    (keep-with-next "true")
-    (id "did-you-know"))
-   "Did you know?")
-  (q ((break "paragraph")))
-  (q
-   ((keep-first "2") (keep-last "3") (line-align "left") 
-   (font-size-adjust "100%") (character-tracking "0") 
-   (hyphenate "true") (display "g146739"))
-   (q ((font-bold "true") (font-size-adjust "100%")) "Brennan")
-   " and "
-   (q ((font-bold "true") (font-size-adjust "100%")) "Dale")
-   " like:")
-  (q ((break "paragraph")))
-  (q
-   ((inset-left "30.0"))
-   (q ((list-index "•")) (q ((font-italic "true") 
-   (font-size-adjust "100%")) "Fancy") " sauce")
-   (q ((break "paragraph")))
-   (q ((list-index "•")) (q ((font-italic "true") 
-   (font-size-adjust "100%")) "Chicken") " fingers"))
-  (q ((break "paragraph")))
-  (q
-   ((display "block")
-    (background-color "aliceblue")
-    (first-line-indent "0")
-    (font-family "fira-mono")
-    (font-size "11")
-    (line-height "14")
-    (border-inset-top "10")
-    (border-width-left "2")
-    (border-color-left "#669")
-    (border-inset-left "0")
-    (border-inset-bottom "-4")
-    (inset-left "12")
-    (inset-top "12")
-    (inset-bottom "8"))
-   (q ((font-family "fira-mono") (font-size "10") 
-   (bg "aliceblue")) "And they love to code"))
-  (q ((break "paragraph"))))
+#lang quadwriter/markdown
+
+#:page-size tabloid
+#:page-orientation wide
+#:font-size 18
+#:font-color red
+
+Brennan and Dale like fancy sauce.
 }|
 ]
 
-Which yields the same PDF result. (If you've spent any time with ’90s HTML markup, the above probably looks familiar.)
+Any of the @secref{Markup} attributes documented below can be used as keyword arguments. The syntax follows the pattern above: one attribute + value pair per line, with the attribute prefixed with @litchar{#:} to make it a keyword, and the value unquoted. 
+
+This keyword syntax works in the @racketmodname[quadwriter], @racketmodname[quadwriter/markdown], and @racketmodname[quadwriter/markup] languages. The idea is to make it easy to adjust the default layout behavior without going outside the source file.
 
 
-@subsection{Quadwriter as a library}
+@subsection{Invoking Quadwriter as a library}
 
 Part of the idea of @racketmodname[quad] and @racketmodname[quadwriter] is to make typographic layout & PDF generation a service that can be built into other Racket apps and languages. 
 
-Let's see how this works by doing document layout and rendering from within good old @racketmodname[racket/base].
+Let's see how this works by doing document layout and rendering from within good old @racketmodname[racket/base]:
 
 @fileblock["test.rkt"
 @codeblock|{
 #lang racket/base
 (require quadwriter)
-(render-pdf '(q "Brennan likes fancy sauce."
+(define qx '(q "Brennan likes fancy sauce."
                 (q ((break "paragraph")))
-                "Dale hates fancy sauce.") "~/Desktop/new.pdf")
+                "Dale hates fancy sauce."))
+(define pdf-path "~/Desktop/new.pdf")
+(render-pdf qx pdf-path)
 }|
 ]
 
+Here, we create a little @tech{Q-expression}, which we pass to @racket[render-pdf] with a @racket[pdf-path] argument.
 
-@section{Fonts in Quadwriter}
+@subsection{Combining Quadwriter with Pollen}
+
+Fans of @racketmodname[pollen] might be glad to hear that @racketmodname[quadwriter] can be used to handle layout and PDF rendering for Pollen source files. As usual we start with a Pollen source file, this time with the @racket[pdf.pm] extension to indicate that it's a Pollen markup file that will produce a PDF:
+
+@fileblock["test.pdf.pm"
+@codeblock|{
+#lang pollen
+
+Brennan likes fancy sauce.
+
+Dale hates fancy sauce.
+
+}|
+]
+
+Then we add a simple @racket["pollen.rkt"] that converts the output of our source file into a @tech{Q-expression}:
+
+@fileblock["pollen.rkt"
+@codeblock|{
+#lang racket
+(require pollen/decode)
+(provide (all-defined-out))
+         
+(define (root . xs)
+  `(q ,@(add-between (decode-paragraphs xs 'q)
+                     '(q ((break "paragraph"))))))
+}|
+]
+
+All we're doing here is wrapping our paragraphs in @racket[q] tags (rather than the default @racket[p] tags) and then adding explicit Quadwriter paragraph breaks between them (= @racket['(q ((break "paragraph")))]).
+
+Finally, we add a @racket["template.pdf.p"] that passes the @racket[doc] from the Pollen source to @racket[render-pdf]:
+
+@fileblock["template.pdf.p"
+@codeblock|{
+◊(local-require quadwriter)
+◊(render-pdf doc #false)
+}|
+]
+
+In this case, we pass @racket[#false] as the path argument to @racket[render-pdf] so that it returns the actual bytes, which the Pollen renderer will put in the right place.
+
+You can fire up the Pollen project server and see how this works. As usual with Pollen sources, when you make changes to the source file, the rendered PDF will be dynamically updated.
+
+
+@margin-note{Though a @racketmodname[quadwriter] source file and a @racketmodname[pollen] source file both export something called @racket[doc], these exports don't share any deeper connection. (The name was chosen to be consistent with Scribble, which also exports a @racket[doc].)}
+
+@subsection{Quick tour complete}
+
+In the usual Racket tradition, @racket[quadwriter] and its dialects are just compiling a document from a higher-level representation to a lower-level representation. 
+
+If you're a writer, you might prefer to use the high-level representation (like @racketmodname[quadwriter/markdown]) so that your experience is optimized for ease of use.
+
+If you're a developer, you might prefer to use the lower-level representation for precision. For instance, a @racketmodname[pollen] author who wanted to generate a PDF could design tag functions that emit Q-expressions, and then pass the result to @racket[render-pdf].
+
+Or, you can aim somewhere in between. Like everything else in Racket, you can design functions & macros to emit the pieces of a Q-expression using whatever interface you prefer. 
+
+
+@section{Quadwriter: developer guide}
+
+@defthing[doc qexpr?]{
+Every source file written in a @racketmodname[quadwriter] dialect exports an identifier called @racket[doc] that contains the @tech{Q-expression} that results from running the source.
+}
+
+@subsection{Q-expressions}
+
+A Q-expression is an @seclink["X-expressions" #:doc '(lib "pollen/scribblings/pollen.scrbl")]{X-expression} with some extra restrictions.
+
+
+@margin-note{Because Q-expressions are a subset of X-expressions, you can apply any tools that work with X-expressions (for instance, the @racketmodname[txexpr] library).}
+
+
+@subsection{Fonts}
 
 A design goal of Quadwriter is to treat document layout as the result of a program. Along those lines, fonts are handled differently than usual. When you use a word processor, you choose from whatever fonts might be installed on your system. 
 
@@ -411,7 +420,7 @@ Though this system may seem like a lot of housekeeping, it's nice for two reason
 
 TK: example of font setup
 
-@section{Quadwriter markup reference}
+@subsection{Markup}
 
 These are the attributes that can be used inside a Q-expression passed to @racketmodname[quadwriter]. Inside a Q-expression, every attribute is a @tech{symbol}, and every attribute value is a @tech{string}.
 
@@ -513,7 +522,7 @@ Two ways of setting the point size for text. @racket[font-size] takes a size str
 }
 
 @defthing[#:kind "attribute" font-family symbol?]{
-Name of the font family. Value is a string with the font-family name. See @secref{Fonts in Quadwriter} for where these names come from.
+Name of the font family. Value is a string with the font-family name. See @secref["Fonts"] for where these names come from.
 }
 
 @defthing[#:kind "attribute" font-color symbol?]{
@@ -532,31 +541,31 @@ Whether the quad has italic styling applied. Activated only when value is @racke
 Distance between baselines. Value is a @tech{dimension string}.
 }
 
-TK: OT feature attributes
+TK: OT feature attributes, bullet attributes
+
+
+@subsection{Rendering}
 
 @defproc[
 (render-pdf
 [qx qexpr?]
-[pdf-path (or/c path? path-string?)]
+[pdf-path (or/c path? path-string? #false)]
 [#:replace replace? any/c #true])
-void?]{
-Compute the layout for @racket[qx] and render it as a PDF to @racket[pdf-path].
+(or/c void? bytes?)]{
+Compute the layout for @racket[qx] and render it as a PDF to @racket[pdf-path]. If @racket[pdf-path] is @racket[#false], then the rendered PDF is returned as a @tech{byte string}. Otherwise it is written to @racket[pdf-path]. 
 
 The optional @racket[replace?] argument controls whether an existing file is automatically overwritten. The default is @racket[#true].
 }
 
+@subsection{Utility}
 
-@subsection{Quadwriter: the upshot}
+@defproc[
+(view-result)
+void?]{
+On the REPL, after running a @racketmodname[quadwriter] dialect and generating a PDF, this function will open the PDF.
+}
 
-In the usual Racket tradition, @racket[quadwriter] and its dialects are just compiling a document from a higher-level representation to a lower-level representation. 
 
-If you're a writer, you might prefer to use the high-level representation (like @racketmodname[quadwriter/markdown]) so that your experience is optimized for ease of use.
-
-If you're a developer, you might prefer to use the lower-level representation for precision. For instance, a @racketmodname[pollen] author who wanted to generate a PDF could design tag functions that emit Q-expressions, and then pass the result to @racket[render-pdf].
-
-@margin-note{Because Q-expressions are a subset of X-expressions, you can apply any tools that work with X-expressions (for instance, the @racketmodname[txexpr] library).}
-
-Or, you can aim somewhere in between. Like everything else in Racket, you can design functions & macros to emit the pieces of a Q-expression using whatever interface you prefer. 
 
 @section{Quad: the details}
 
@@ -630,6 +639,12 @@ Some things I personally plan to use Quad for:
 @item{@bold{Book publishing}. My wife is a lawyer and wants to publish a book about a certain area of the law that involves a zillion fiddly charts. If I had to do it by hand, it would take months. But with a Quad program, it could be easy.}
 
 ]
+
+
+@subsection{Why is it called Quad?}
+
+In letterpress printing, a @italic{quad} was a piece of metal used as spacing material within a line.
+
 
 
 @(linebreak)
