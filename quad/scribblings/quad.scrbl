@@ -388,6 +388,163 @@ Let's see how this works by doing document layout and rendering from within good
 ]
 
 
+@section{Fonts in Quadwriter}
+
+A design goal of Quadwriter is to treat document layout as the result of a program. Along those lines, fonts are handled differently than usual. When you use a word processor, you choose from whatever fonts might be installed on your system. 
+
+Quadwriter, by contrast, relies only on fonts that are @emph{in the same directory} as your other project source files. This is a feature: it means that everything  necessary to render the document travels together in the same directory. You can re-render it anywhere with identical results. You never have the problem — still with us after 35 years of desktop word processing — that ``oh, you need to install such-and-such font in your system before it will work.'' Bah!
+
+Quadwriter supports the usual TrueType (.ttf) and OpenType (.otf) font files. To add fonts to your Quadwriter experience:
+
+@itemlist[#:style 'ordered
+
+@item{Within your project directory, create a subdirectory called @racket["fonts"].}
+
+@item{Within @racket["fonts"], create a subdirectory for each font family you want to use in your Quadwriter document. The names of these subdirectories will become the acceptable values for the @racket[font-family] attribute in your documents.}
+
+@item{If there is only one font file in the family subdirectory, then it is used every time the font family is requested.}
+
+@item{Alternatively, you can specify styled variants by creating within the family directory style subdirectories called @racket["regular"], @racket["bold"], @racket["italic"], and @racket["bold-italic"].}
+]
+
+Though this system may seem like a lot of housekeeping, it's nice for two reasons. First, we use the filesystem to map font names to font files, and avoid having another configuration file floating around our project. Second, we create a layer of abstraction between font names and files. This makes it easy to change the fonts in the document: you just put new fonts in the appropriate font-family directory, and you don't need to faff about with the source file itself.
+
+TK: example of font setup
+
+@section{Quadwriter markup reference}
+
+These are the attributes that can be used inside a Q-expression passed to @racketmodname[quadwriter]. Inside a Q-expression, every attribute is a @tech{symbol}, and every attribute value is a @tech{string}.
+
+A @deftech{dimension string} represents a distance in the plane. If unitless, it is treated as points (where 1 point = 1/72 of an inch). If the number has @racket[in], @racket[cm], or @racket[mm] as a suffix, it is treated as inches, centimeters, or millimeters respectively.
+
+
+@subsection{Page-level attributes}
+
+@deftogether[(@defthing[#:kind "attribute" page-size symbol?]
+              @defthing[#:kind "attribute" page-orientation symbol?])]{
+The usual way of setting the overall page dimensions of the rendered PDF. The value of @racket[page-size] is a @tech{named page size}. The value of @racket[page-orientation] can be either @racket["tall"] or @racket["portrait"] (which both put the longer edge vertically) or @racket["wide"] or @racket["landscape"] (which put the longer edge horizontally).
+}
+
+
+@deftogether[(@defthing[#:kind "attribute" page-width symbol?]
+              @defthing[#:kind "attribute" page-height symbol?])]{
+The unusual way of setting the overall page dimensions of the rendered PDF. Both values are given as a @tech{dimension string}.
+}
+
+@deftogether[(@defthing[#:kind "attribute" page-margin-top symbol?]
+              @defthing[#:kind "attribute" page-margin-bottom symbol?]
+              @defthing[#:kind "attribute" page-margin-left symbol?]
+              @defthing[#:kind "attribute" page-margin-right symbol?])]{
+Inset values from the page edges. Value is given as a @tech{dimension string}. Default values depend on size of the page: they are chosen to be not completely bananas.
+}
+
+
+@subsection{Block-level attributes}
+
+A block is a paragraph or other rectangular item (say, a blockquote or code block) with paragraph breaks around it.
+
+@deftogether[(@defthing[#:kind "attribute" inset-top symbol?]
+              @defthing[#:kind "attribute" inset-bottom symbol?]
+              @defthing[#:kind "attribute" inset-left symbol?]
+              @defthing[#:kind "attribute" inset-right symbol?])]{
+Inset values increase the layout boundary of the quad. Value is given as a @tech{dimension string}. @racket["0"] by default.
+}
+
+@deftogether[(@defthing[#:kind "attribute" border-inset-top symbol?]
+              @defthing[#:kind "attribute" border-inset-bottom symbol?]
+              @defthing[#:kind "attribute" border-inset-left symbol?]
+              @defthing[#:kind "attribute" border-inset-right symbol?])]{
+Border-inset values do not change the layout boundary of the quad. Rather, they change the position of the border (if any) relative to the layout boundary. Value is given as a @tech{dimension string}. @racket["0"] by default (meaning, the border sits on the layout boundary).
+}
+
+@deftogether[(@defthing[#:kind "attribute" border-width-top symbol?]
+              @defthing[#:kind "attribute" border-width-bottom symbol?]
+              @defthing[#:kind "attribute" border-width-left symbol?]
+              @defthing[#:kind "attribute" border-width-right symbol?])]{
+Width of the border on each edge of the quad. Value is given as a @tech{dimension string}. @racket["0"] by default (meaning no border).
+}
+
+@deftogether[(@defthing[#:kind "attribute" border-color-top symbol?]
+              @defthing[#:kind "attribute" border-color-bottom symbol?]
+              @defthing[#:kind "attribute" border-color-left symbol?]
+              @defthing[#:kind "attribute" border-color-right symbol?])]{
+Color of the border on each edge of the quad. Value is a @tech{hex color} string or @tech{named color} string.
+}
+
+@defthing[#:kind "attribute" background-color symbol?]{
+Color of the background of the quad. Value is a @tech{hex color} string or @tech{named color} string.
+}
+
+@deftogether[(@defthing[#:kind "attribute" keep-first-lines symbol?]
+              @defthing[#:kind "attribute" keep-last-lines symbol?]
+              @defthing[#:kind "attribute" keep-all-lines symbol?])]{
+How many lines of the quad are kept together near a page break. @racket[keep-first-lines] sets the minimum number of lines that appear before a page break; @racket[keep-last-lines] sets the minimum number that appear after. In bother cases, they take a non-negative integer string as a value.
+
+@racket[keep-all-lines] keeps all the lines of a quad on the same page. Activated only when value is @racket["true"]. Be careful with this option — it's possible to make a single quad that is longer than one page, in which case @racketmodname[quadwriter] will ignore the setting to prevent an impossible situation.
+}
+
+@defthing[#:kind "attribute" keep-with-next symbol?]{
+Whether a quad appears on the same page with the following quad. Activated only when value is @racket["true"]. Essentially this is the "nonbreaking paragraph space".
+}
+
+@deftogether[(@defthing[#:kind "attribute" line-align symbol?]
+              @defthing[#:kind "attribute" line-align-last symbol?])]{
+How the lines are aligned horizontally in the quad. Possibilities are @racket["left"], @racket["center"], @racket["left"], and @racket["justify"]. @racket[line-align-last] controls the alignment of the last line; @racket[line-align] controls the others.
+}
+
+@defthing[#:kind "attribute" first-line-indent symbol?]{
+The indent of the first line in the quad. Value is given as a @tech{dimension string}.
+}
+
+
+@defthing[#:kind "attribute" line-wrap symbol?]{
+Selects the linebreak algorithm. A value of @racket["best"] or @racket["kp"] invokes the @link["http://defoe.sourceforge.net/folio/knuth-plass.html"]{Knuth–Plass linebreaking algorithm}, which finds the optimal set of linebreaks (defined as the set that gives the most even spacing throughout the paragraph). Otherwise, you get the ordinary linebreak algorithm, which just puts as many words as it can on each line. The Knuth–Plass algorithm is slower, of course.
+}
+
+@defthing[#:kind "attribute" hyphenate symbol?]{
+Whether the block is hyphenated. Activated only when value is @racket["true"]. 
+}
+
+@subsection{Other attributes}
+
+@deftogether[(@defthing[#:kind "attribute" font-size symbol?]
+              @defthing[#:kind "attribute" font-size-adjust symbol?])]{
+Two ways of setting the point size for text. @racket[font-size] takes a size string. @racket[font-size-adjust] takes a string representing a percentage (like @racket["120%"] or @racket["1.2"]) and sets the font size to the size of the parent, multiplied by the percentage.
+}
+
+@defthing[#:kind "attribute" font-family symbol?]{
+Name of the font family. Value is a string with the font-family name. See @secref{Fonts in Quadwriter} for where these names come from.
+}
+
+@defthing[#:kind "attribute" font-color symbol?]{
+The color of the rendered font. Value is a @tech{hex color} string or @tech{named color} string.
+}
+
+@defthing[#:kind "attribute" font-bold symbol?]{
+Whether the quad has bold styling applied. Activated only when value is @racket["true"]. 
+}
+
+@defthing[#:kind "attribute" font-italic symbol?]{
+Whether the quad has italic styling applied. Activated only when value is @racket["true"]. 
+}
+
+@defthing[#:kind "attribute" line-height symbol?]{
+Distance between baselines. Value is a @tech{dimension string}.
+}
+
+TK: OT feature attributes
+
+@defproc[
+(render-pdf
+[qx qexpr?]
+[pdf-path (or/c path? path-string?)]
+[#:replace replace? any/c #true])
+void?]{
+Compute the layout for @racket[qx] and render it as a PDF to @racket[pdf-path].
+
+The optional @racket[replace?] argument controls whether an existing file is automatically overwritten. The default is @racket[#true].
+}
+
 
 @subsection{Quadwriter: the upshot}
 
@@ -400,50 +557,6 @@ If you're a developer, you might prefer to use the lower-level representation fo
 @margin-note{Because Q-expressions are a subset of X-expressions, you can apply any tools that work with X-expressions (for instance, the @racketmodname[txexpr] library).}
 
 Or, you can aim somewhere in between. Like everything else in Racket, you can design functions & macros to emit the pieces of a Q-expression using whatever interface you prefer. 
-
-@section{Quadwriter markup reference}
-
-These are the attributes that can be used inside a Q-expression passed to @racketmodname[quadwriter]. Inside a Q-expression, every attribute is a @tech{symbol}, and every attribute value is a @tech{string}.
-
-@deftogether[(@defthing[#:kind "attribute" inset-top symbol?]
-              @defthing[#:kind "attribute" inset-bottom symbol?]
-              @defthing[#:kind "attribute" inset-left symbol?]
-              @defthing[#:kind "attribute" inset-right symbol?])]{
-Inset values increase the layout boundary of the quad. Value is given in points. @racket["0"] by default.
-}
-
-@deftogether[(@defthing[#:kind "attribute" border-inset-top symbol?]
-              @defthing[#:kind "attribute" border-inset-bottom symbol?]
-              @defthing[#:kind "attribute" border-inset-left symbol?]
-              @defthing[#:kind "attribute" border-inset-right symbol?])]{
-Border-inset values do not change the layout boundary of the quad. Rather, they change the position of the border (if any) relative to the layout boundary. Value is given in points. @racket["0"] by default (meaning, the border sits on the layout boundary).
-}
-
-@deftogether[(@defthing[#:kind "attribute" border-width-top symbol?]
-              @defthing[#:kind "attribute" border-width-bottom symbol?]
-              @defthing[#:kind "attribute" border-width-left symbol?]
-              @defthing[#:kind "attribute" border-width-right symbol?])]{
-Width of the border on each edge of a quad. Value is given in points. @racket["0"] by default (meaning no border).
-}
-
-@deftogether[(@defthing[#:kind "attribute" border-color-top symbol?]
-              @defthing[#:kind "attribute" border-color-bottom symbol?]
-              @defthing[#:kind "attribute" border-color-left symbol?]
-              @defthing[#:kind "attribute" border-color-right symbol?])]{
-Color of the border on each edge of a quad. Value is given as a @tech{hex color} or @tech{named color}.
-}
-
-
-@defproc[
-(render-pdf
-[qx qexpr?]
-[pdf-path (or/c path? path-string?)]
-[#:replace replace? any/c #true])
-void?]{
-Compute the layout for @racket[qx] and render it as a PDF to @racket[pdf-path].
-
-The optional @racket[replace?] argument controls whether an existing file is automatically overwritten. The default is @racket[#true].
-}
 
 @section{Quad: the details}
 
@@ -486,7 +599,7 @@ A key benefit of the anchor-point system is that it gets rid of notions of ``hor
 
 (quad->pict (position (attach-to q1 'e q2 'w)))
 (quad->pict (position (attach-to q1 'nw q2 'se)))
-(quad->pict (position (attach-to q1 'e q2 'w)))
+(quad->pict (position (attach-to q1 'w q2 'e)))
 (quad->pict (position (attach-to q1 's q2 'n)))
 (quad->pict (position (attach-to q1 'e q2 'n)))
 ]
