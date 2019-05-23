@@ -15,7 +15,7 @@
          "attrs.rkt"
          "param.rkt"
          "font.rkt")
-(provide qexpr-para-break qexpr-line-break hrbr lbr pbr render-pdf)
+(provide para-break line-break page-break hrbr lbr pbr render-pdf)
 
 (define-quad string-quad quad ())
  
@@ -78,7 +78,7 @@
 
 (define (->string-quad q)
   (cond
-    [(line-break? q) q]
+    [(q:line-break? q) q]
     [else
      (struct-copy
       quad q:string
@@ -162,21 +162,21 @@
                                 [size (make-size-promise last-q str+hyphen)])))]
     [_ qs]))
 
-(define-quad line-break quad ())
-(define lbr (make-line-break #:printable #f
-                             #:id 'lbr))
+(define-quad q:line-break quad ())
+(define lbr (make-q:line-break #:printable #f
+                               #:id 'lbr))
 ;; treat paragraph break as special kind of line break
-(define-quad para-break line-break ())
-(define pbr (make-para-break #:printable #f
-                             #:id 'pbr))
-(define-quad hr-break line-break ())
-(define hrbr (make-hr-break #:printable #t
-                            #:id 'hrbr))
+(define-quad q:para-break q:line-break ())
+(define pbr (make-q:para-break #:printable #f
+                               #:id 'pbr))
+(define-quad q:hr-break q:line-break ())
+(define hrbr (make-q:hr-break #:printable #t
+                              #:id 'hrbr))
 
 (module+ test
   (require rackunit)
-  (check-true (line-break? (second (quad-elems (q "foo" pbr "bar")))))
-  (check-true (line-break? (second (atomize (q "foo" pbr "bar"))))))
+  (check-true (q:line-break? (second (quad-elems (q "foo" pbr "bar")))))
+  (check-true (q:line-break? (second (atomize (q "foo" pbr "bar"))))))
 
 (define (copy-block-attrs source-hash dest-hash)
   (for* ([k (in-list block-attrs)]
@@ -278,7 +278,7 @@
   (define new-lines
     (cond
       [(empty? pcs-printing) null]
-      [(hr-break? ending-q) (list (make-hr-quad line-q))]
+      [(q:hr-break? ending-q) (list (make-hr-quad line-q))]
       [else
        ;; render hyphen first so that all printable characters are available for size-dependent ops.
        (define pcs-with-hyphen (render-hyphen pcs-printing ending-q))
@@ -347,13 +347,13 @@
                   [size (pt wrap-size (pt-y (size q:line)))]))
   (apply append
          ;; next line removes all para-break? quads as a consequence
-         (for/list ([qs (in-list (filter-split qs para-break?))])
+         (for/list ([qs (in-list (filter-split qs q:para-break?))])
            (wrap qs
                  (λ (q idx) (- wrap-size (quad-ref q 'inset-left 0) (quad-ref q 'inset-right 0)))
                  #:nicely (match (or (current-line-wrap) (and (pair? qs) (quad-ref (car qs) 'line-wrap)))
                             [(or "best" "kp") #true]
                             [_ #false])
-                 #:hard-break line-break?
+                 #:hard-break q:line-break?
                  #:soft-break soft-break-for-line?
                  #:finish-wrap (finish-line-wrap line-q)))))
 
@@ -546,13 +546,13 @@
   ;; stick a pbr on the front if there isn't one already
   ;; because of the "lookahead" style of iteration
   (define qs (match qs-in
-               [(list (? para-break?) _ ...) qs-in]
+               [(list (? q:para-break?) _ ...) qs-in]
                [_ (cons pbr qs-in)]))
   (for/fold ([qs-out null]
              #:result (reverse qs-out))
             ([q (in-list qs)]
              [next-q (in-list (cdr qs))])
-    (match (and (para-break? q) (quad-ref next-q 'first-line-indent 0))
+    (match (and (q:para-break? q) (quad-ref next-q 'first-line-indent 0))
       [(or #false 0) (cons next-q qs-out)]
       [indent-val (list* next-q (make-quad #:from 'bo
                                            #:to 'bi
@@ -562,14 +562,15 @@
                                            #:size (pt indent-val 10)) qs-out)])))
 
 
-(define qexpr-para-break '(q ((break "paragraph"))))
-(define qexpr-line-break '(q ((break "line"))))
+(define para-break '(q ((break "para"))))
+(define line-break '(q ((break "line"))))
+(define page-break '(q ((break "page"))))
 
 (define (replace-breaks x)
   (map-elements (λ (el)
                   (match el
-                    [(== qexpr-para-break) pbr]
-                    [(== qexpr-line-break) lbr]
+                    [(== para-break) pbr]
+                    [(== line-break) lbr]
                     [_ el])) x))
 
 (require racket/contract sugar/coerce pitfall/page)
@@ -642,7 +643,8 @@
            [qs (time-name page-wrap (page-wrap qs page-wrap-size page-quad))]
            [qs (time-name position (position (struct-copy quad q:doc [elems qs])))])
       (time-name draw (draw qs pdf))
-      (displayln (format "wrote PDF to ~a" pdf-path))))
+      (when pdf-path-arg
+        (displayln (format "wrote PDF to ~a" pdf-path)))))
 
   (unless pdf-path-arg
     (begin0

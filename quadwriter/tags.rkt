@@ -80,7 +80,7 @@
                      (for*/list ([expr (in-list exprs)]
                                  [str (in-list (string-split (string-join (get-elements expr) "") "\n"))])
                        `(,(get-tag expr) ,(get-attrs expr) ,(string-replace str " " " ")))
-                     qexpr-line-break))
+                     line-break))
   (qexpr (list* '(display "block") '(background-color "aliceblue")
                 '(first-line-indent "0")
                 '(font-family "default-mono") '(font-size "11") '(line-height "14")
@@ -99,7 +99,7 @@
           (for/list ([(expr idx) (in-indexed exprs)]
                      #:when (txexpr? expr))
             (list* (get-tag expr) (cons (list 'list-index (or bullet-val (format "~a" (add1 idx)))) (get-attrs expr)) (get-elements expr)))
-          qexpr-para-break)))
+          para-break)))
 
 (define-tag-function (ol attrs exprs) (list-base attrs exprs))
 (define-tag-function (ul attrs exprs) (list-base attrs exprs "•"))

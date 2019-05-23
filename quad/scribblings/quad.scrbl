@@ -1,6 +1,6 @@
 #lang scribble/manual
 
-@(require racket/runtime-path scribble/example (for-label txexpr (except-in pollen #%module-begin) xml racket/base racket/draw quadwriter)
+@(require racket/runtime-path scribble/example quadwriter (for-label txexpr (except-in pollen #%module-begin) xml racket/base racket/draw quadwriter)
 pollen/scribblings/mb-tools quad/pict)
 
 @(define my-eval (make-base-eval))
@@ -173,7 +173,7 @@ To see this:
   ()
   (q
    ((page-margin-left "120") (page-margin-top "80") (page-margin-bottom "120") (font-family "default-serif") (line-height "17"))
-   (q ((break "paragraph")))
+   (q ((break "para")))
    (q ((font-family "default-heading") (first-line-indent "0") (display "block") (font-size "20") (line-height "24.0") (border-width-top "0.5") (border-inset-top "9") (inset-bottom "-3") (inset-top "6") (keep-with-next "true") (id "did-you-know")) "Did you know?")
    ···
 }
@@ -315,8 +315,8 @@ Let's see how this works by doing document layout and rendering from within good
 @codeblock|{
 #lang racket/base
 (require quadwriter)
-(define qx '(q "Brennan likes fancy sauce."
-                (q ((break "paragraph")))
+(define qx `(q "Brennan likes fancy sauce."
+                ,para-break
                 "Dale hates fancy sauce."))
 (define pdf-path "~/Desktop/new.pdf")
 (render-pdf qx pdf-path)
@@ -345,22 +345,20 @@ Then we add a simple @racket["pollen.rkt"] that converts the output of our sourc
 @fileblock["pollen.rkt"
 @codeblock|{
 #lang racket
-(require pollen/decode)
-(provide (all-defined-out))
-         
+(require pollen/decode quadwriter)
+(provide root render-pdf)
+ 
 (define (root . xs)
-  `(q ,@(add-between (decode-paragraphs xs 'q)
-                     '(q ((break "paragraph"))))))
+  `(q ,@(add-between (decode-paragraphs xs 'q) para-break)))
 }|
 ]
 
-All we're doing here is wrapping our paragraphs in @racket[q] tags (rather than the default @racket[p] tags) and then adding explicit Quadwriter paragraph breaks between them (= @racket['(q ((break "paragraph")))]).
+All we're doing here is wrapping our paragraphs in @racket[q] tags (rather than the default @racket[p] tags) and then adding explicit Quadwriter paragraph breaks between them (see @racket[para-break]).
 
 Finally, we add a @racket["template.pdf.p"] that passes the @racket[doc] from the Pollen source to @racket[render-pdf]:
 
 @fileblock["template.pdf.p"
 @codeblock|{
-◊(local-require quadwriter)
 ◊(render-pdf doc #false)
 }|
 ]
@@ -391,43 +389,59 @@ Every source file written in a @racketmodname[quadwriter] dialect exports an ide
 
 @subsection{Q-expressions}
 
-A Q-expression is an @seclink["X-expressions" #:doc '(lib "pollen/scribblings/pollen.scrbl")]{X-expression} with some extra restrictions.
+A Q-expression is an @seclink["X-expressions" #:doc '(lib "pollen/scribblings/pollen.scrbl")]{X-expression}, but more restricted:
 
-
-@margin-note{Because Q-expressions are a subset of X-expressions, you can apply any tools that work with X-expressions (for instance, the @racketmodname[txexpr] library).}
-
-
-@subsection{Fonts}
-
-A design goal of Quadwriter is to treat document layout as the result of a program. Along those lines, fonts are handled differently than usual. When you use a word processor, you choose from whatever fonts might be installed on your system. 
-
-Quadwriter, by contrast, relies only on fonts that are @emph{in the same directory} as your other project source files. This is a feature: it means that everything  necessary to render the document travels together in the same directory. You can re-render it anywhere with identical results. You never have the problem — still with us after 35 years of desktop word processing — that ``oh, you need to install such-and-such font in your system before it will work.'' Bah!
-
-Quadwriter supports the usual TrueType (.ttf) and OpenType (.otf) font files. To add fonts to your Quadwriter experience:
-
-@itemlist[#:style 'ordered
-
-@item{Within your project directory, create a subdirectory called @racket["fonts"].}
-
-@item{Within @racket["fonts"], create a subdirectory for each font family you want to use in your Quadwriter document. The names of these subdirectories will become the acceptable values for the @racket[font-family] attribute in your documents.}
-
-@item{If there is only one font file in the family subdirectory, then it is used every time the font family is requested.}
-
-@item{Alternatively, you can specify styled variants by creating within the family directory style subdirectories called @racket["regular"], @racket["bold"], @racket["italic"], and @racket["bold-italic"].}
+@racketgrammar[
+#:literals (list q)
+qexpr string
+      (list q (list (list attr-name attr-val) ...) qexpr ...)
+      (list q (list qexpr ...))
 ]
 
-Though this system may seem like a lot of housekeeping, it's nice for two reasons. First, we use the filesystem to map font names to font files, and avoid having another configuration file floating around our project. Second, we create a layer of abstraction between font names and files. This makes it easy to change the fonts in the document: you just put new fonts in the appropriate font-family directory, and you don't need to faff about with the source file itself.
+This grammar means that a Q-expression is either a) a string, b) an X-expression whose tag is @racket[q] and whose elements are themselves Q-expressions.
 
-TK: example of font setup
+@examples[#:eval my-eval
+(qexpr? "Hello world")
+(qexpr? '(q "Hello world"))
+(qexpr? '(q () "Hello world"))
+(qexpr? '(q ((font-color "pink")) "Hello world"))
+(qexpr? '(q ((font-color "pink")) (q "Hello world")))
+(code:comment @#,t{malformed Q-expressions})
+(qexpr? 42)
+(qexpr? '(div "Hello world"))
+(qexpr? '(q (("pink" font-color)) "Hello world"))
+] 
+
+Because Q-expressions are a subset of X-expressions, you can apply any tools that work with X-expressions (for instance, the @racketmodname[txexpr] library).
+
+@margin-note{Unlike X-expressions, Q-expressions do not support character entities or CDATA, because those are inherent to XML-ish markup.}
+
+
 
 @subsection{Markup}
+
+@subsection{Hard breaks}
+
+
+@deftogether[(@defthing[line-break qexpr?]
+@defthing[page-break qexpr?])]{
+The Q-expressions @racketresult['#,line-break] and @racketresult['#,page-break], respectively. Quadwriter will automatically insert line breaks and page breaks as needed. But you can also add them explicitly (aka ``hard'' breaks) by inserting the Q-expression denoting the break.
+}
+
+
+@defthing[para-break qexpr?]{
+The Q-expression @racketresult['#,para-break]. Used to denote the start of a new paragraph.
+}
+
+
+@subsection{Attributes}
 
 These are the attributes that can be used inside a Q-expression passed to @racketmodname[quadwriter]. Inside a Q-expression, every attribute is a @tech{symbol}, and every attribute value is a @tech{string}.
 
 A @deftech{dimension string} represents a distance in the plane. If unitless, it is treated as points (where 1 point = 1/72 of an inch). If the number has @racket[in], @racket[cm], or @racket[mm] as a suffix, it is treated as inches, centimeters, or millimeters respectively.
 
 
-@subsection{Page-level attributes}
+@subsubsection{Page-level attributes}
 
 @deftogether[(@defthing[#:kind "attribute" page-size symbol?]
               @defthing[#:kind "attribute" page-orientation symbol?])]{
@@ -448,7 +462,7 @@ Inset values from the page edges. Value is given as a @tech{dimension string}. D
 }
 
 
-@subsection{Block-level attributes}
+@subsubsection{Block-level attributes}
 
 A block is a paragraph or other rectangular item (say, a blockquote or code block) with paragraph breaks around it.
 
@@ -493,7 +507,7 @@ How many lines of the quad are kept together near a page break. @racket[keep-fir
 }
 
 @defthing[#:kind "attribute" keep-with-next symbol?]{
-Whether a quad appears on the same page with the following quad. Activated only when value is @racket["true"]. Essentially this is the "nonbreaking paragraph space".
+Whether a quad appears on the same page with the following quad. Activated only when value is @racket["true"]. Essentially this is the ``nonbreaking paragraph space''.
 }
 
 @deftogether[(@defthing[#:kind "attribute" line-align symbol?]
@@ -514,7 +528,7 @@ Selects the linebreak algorithm. A value of @racket["best"] or @racket["kp"] inv
 Whether the block is hyphenated. Activated only when value is @racket["true"]. 
 }
 
-@subsection{Other attributes}
+@subsubsection{Other attributes}
 
 @deftogether[(@defthing[#:kind "attribute" font-size symbol?]
               @defthing[#:kind "attribute" font-size-adjust symbol?])]{
@@ -556,6 +570,30 @@ Compute the layout for @racket[qx] and render it as a PDF to @racket[pdf-path]. 
 
 The optional @racket[replace?] argument controls whether an existing file is automatically overwritten. The default is @racket[#true].
 }
+
+
+@subsection{Fonts}
+
+A design goal of Quadwriter is to treat document layout as the result of a program. Along those lines, fonts are handled differently than usual. When you use a word processor, you choose from whatever fonts might be installed on your system. 
+
+Quadwriter, by contrast, relies only on fonts that are @emph{in the same directory} as your other project source files. This is a feature: it means that everything  necessary to render the document travels together in the same directory. You can re-render it anywhere with identical results. You never have the problem — still with us after 35 years of desktop word processing — that ``oh, you need to install such-and-such font in your system before it will work.'' Bah!
+
+Quadwriter supports the usual TrueType (.ttf) and OpenType (.otf) font files. To add fonts to your Quadwriter experience:
+
+@itemlist[#:style 'ordered
+
+@item{Within your project directory, create a subdirectory called @racket["fonts"].}
+
+@item{Within @racket["fonts"], create a subdirectory for each font family you want to use in your Quadwriter document. The names of these subdirectories will become the acceptable values for the @racket[font-family] attribute in your documents.}
+
+@item{If there is only one font file in the family subdirectory, then it is used every time the font family is requested.}
+
+@item{Alternatively, you can specify styled variants by creating within the family directory style subdirectories called @racket["regular"], @racket["bold"], @racket["italic"], and @racket["bold-italic"].}
+]
+
+Though this system may seem like a lot of housekeeping, it's nice for two reasons. First, we use the filesystem to map font names to font files, and avoid having another configuration file floating around our project. Second, we create a layer of abstraction between font names and files. This makes it easy to change the fonts in the document: you just put new fonts in the appropriate font-family directory, and you don't need to faff about with the source file itself.
+
+TK: example of font setup
 
 @subsection{Utility}
 
