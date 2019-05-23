@@ -477,7 +477,18 @@
   (box-side (+ right (half bw-right)) bottom (- left (half bw-left)) bottom
             (quad-ref first-line 'border-color-bottom) bw-bottom)
   (box-side left (+ bottom (half bw-bottom)) left (- top (half bw-top))
-            (quad-ref first-line 'border-color-left) bw-left))
+            (quad-ref first-line 'border-color-left) bw-left)
+  (case (quad-ref first-line 'clip #false)
+    [(#true "true")
+     (save doc)
+     (rect doc left top width height)
+     (clip doc)]))
+
+(define ((block-draw-end first-line) q doc)
+  (case (quad-ref first-line 'clip #false)
+    [(#true "true") (restore doc)])
+  (when (draw-debug-block?)
+    (draw-debug q doc "#6c6" "#9c9")))
 
 (define (block-wrap lines)
   (define first-line (car lines)) 
@@ -485,6 +496,7 @@
      #:to 'nw
      #:elems (from-parent lines 'nw)
      #:id 'block
+     #:attrs (quad-attrs first-line)
      #:size (delay (pt (pt-x (size first-line)) ; 
                        (+ (for/sum ([line (in-list lines)])
                             (pt-y (size line)))
@@ -492,9 +504,7 @@
                           (quad-ref first-line 'inset-bottom 0))))
      #:shift-elems (pt 0 (+ (quad-ref first-line 'inset-top 0)))
      #:draw-start (block-draw-start first-line)
-     #:draw-end (if (draw-debug-block?)
-                    (λ (q doc) (draw-debug q doc "#6c6" "#9c9"))
-                    void))) 
+     #:draw-end (block-draw-end first-line)))
 
 (define/match (from-parent qs [where #f])
   ;; doesn't change any positioning. doesn't depend on state. can happen anytime.

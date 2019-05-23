@@ -61,6 +61,7 @@ Naming guidelines
                       border-color-bottom
                       background-color
 
+                      clip ; whether box boundary clips its contents
                       
                       keep-first-lines
                       keep-last-lines
