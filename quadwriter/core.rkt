@@ -174,7 +174,7 @@
 (define hrbr (make-q:hr-break #:printable #t
                               #:id 'hrbr))
 
-(define-quad q:page-break quad ())
+(define-quad q:page-break q:line-break ())
 (define pgbr (make-q:page-break #:printable #f #:id 'pgbr))
 
 (module+ test
@@ -340,8 +340,9 @@
                         elems)]) 'sw))]))]
          [_ null])]))
   (append new-lines (cond
-                      [ending-q null]
-                      [else (list q:line-spacer)])))
+                      [(q:page-break? ending-q) (list ending-q)] ; hard page break
+                      [ending-q null] ; hard line break
+                      [else (list q:line-spacer)]))) ; paragraph break
 
 (define (line-wrap qs wrap-size)
   (unless (positive? wrap-size)
