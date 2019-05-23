@@ -1,6 +1,5 @@
 #lang debug racket/base
-(require (for-syntax)
-         racket/promise
+(require racket/promise
          racket/match
          racket/list
          racket/file
@@ -12,6 +11,8 @@
          sugar/debug
          racket/unsafe/ops
          hyphenate
+         racket/contract
+         sugar/coerce
          "attrs.rkt"
          "param.rkt"
          "font.rkt")
@@ -172,6 +173,9 @@
 (define-quad q:hr-break q:line-break ())
 (define hrbr (make-q:hr-break #:printable #t
                               #:id 'hrbr))
+
+(define-quad q:page-break quad ())
+(define pgbr (make-q:page-break #:printable #f #:id 'pgbr))
 
 (module+ test
   (require rackunit)
@@ -517,6 +521,7 @@
   ;; `page-wrap` should emit quads that are complete.
   (wrap xs vertical-height
         #:soft-break (λ (q) #true)
+        #:hard-break q:page-break?
         #:no-break (λ (q) (quad-ref q 'no-pbr))
         #:distance (λ (q dist-so-far wrap-qs)
                      ;; do trial block insertions
@@ -571,9 +576,9 @@
                   (match el
                     [(== para-break) pbr]
                     [(== line-break) lbr]
+                    [(== page-break) pgbr]
                     [_ el])) x))
 
-(require racket/contract sugar/coerce pitfall/page)
 (define default-page-size "letter")
 (define default-page-orientation "tall")
 (define/contract (render-pdf qx-arg pdf-path-arg
