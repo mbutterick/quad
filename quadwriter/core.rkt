@@ -16,7 +16,7 @@
          "attrs.rkt"
          "param.rkt"
          "font.rkt")
-(provide para-break line-break page-break hrbr lbr pbr render-pdf)
+(provide para-break line-break page-break bullet-quad hrbr lbr pbr render-pdf)
 
 (define-quad string-quad quad ())
  
@@ -272,6 +272,8 @@
 
 (define (make-hr-quad line-q)
   (struct-copy quad line-q [draw-start hr-draw]))
+
+(define bullet-quad '(q ((special "bullet"))))
 
 (define ((finish-line-wrap line-q) pcs-in opening-q ending-q idx)
   ;; we curry line-q so that the wrap size can be communicated to this operation

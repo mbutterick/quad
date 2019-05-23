@@ -103,4 +103,4 @@
 
 (define-tag-function (ol attrs exprs) (list-base attrs exprs))
 (define-tag-function (ul attrs exprs) (list-base attrs exprs "•"))
-(define-tag-function (li attrs exprs) (qexpr attrs exprs))
+(define-tag-function (li attrs exprs) (qexpr attrs (cons bullet-quad exprs)))
