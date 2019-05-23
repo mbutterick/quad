@@ -574,9 +574,7 @@
                     [_ el])) x))
 
 (require racket/contract sugar/coerce pitfall/page)
-(define default-page-size (case (current-locale)
-                            [(us) "letter"]
-                            [else "a4"]))
+(define default-page-size "letter")
 (define default-page-orientation "tall")
 (define/contract (render-pdf qx-arg pdf-path-arg
                              #:replace [replace? #t])
