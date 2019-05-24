@@ -37,12 +37,12 @@
   (define-values (dir path _) (split-path base-path))
   (define doc-fonts-dir (build-path dir "fonts"))
   ;; run doc-fonts-dir first because earlier fonts take precedence
-  (for* ([fonts-dir (in-list (list quadwriter-fonts-dir doc-fonts-dir ))]
+  (for* ([fonts-dir (in-list (list quadwriter-fonts-dir doc-fonts-dir))]
          #:when (directory-exists? fonts-dir)
          [font-family-subdir (in-directory fonts-dir)]
          #:when (directory-exists? font-family-subdir)
          [font-path (in-directory font-family-subdir)]
-         #:when (member (path-get-extension font-path) '(#".otf" #".ttf")))
+         #:when (member (path-get-extension font-path) '(#".otf" #".ttf" #".woff")))
     (match-define (list font-path-string family-name)
       (map (λ (x) (path->string (find-relative-path fonts-dir x))) (list font-path font-family-subdir)))
     ;; search for subdir in path matching style name
