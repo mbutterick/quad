@@ -11,16 +11,8 @@
 (provide (all-defined-out))
 
 (define (root attrs exprs)
-  (qexpr (append `(#;(first-line-indent "12")
-                   #;(line-align "center")
-                   #;(line-wrap "kp")
-                   (page-margin-left "120") ; by default, is mirrored to right
-                   #;(page-margin-right "200")
-                   (page-margin-top "80")
-                   (page-margin-bottom "120")
-                   (font-family "default-serif")
-                   (line-height "17")
-                   #;(line-align-last "center")) attrs) exprs))
+  ;; don't put any attributes in root, so they can be overriden by top-level attributes in source
+  (qexpr attrs exprs))
 
 (define-tag-function (p attrs exprs)
   ;; no font-family so that it adopts whatever the surrounding family is

@@ -606,7 +606,8 @@
   (define qs (let* ([qx qx-arg]
                     [qx (replace-breaks qx)]
                     [qx (qexpr->quad  `(q ((font-family ,default-font-family)
-                                           (font-size ,(number->string default-font-size))) ,qx))])
+                                           (font-size ,(number->string default-font-size))
+                                           (line-height ,(number->string (floor (* 1.42 default-font-size))))) ,qx))])
                (setup-font-path-table! pdf-path)
                (parameterize ([current-missing-glyph-action 'fallback])
                  (time-name atomize (atomize qx #:attrs-proc handle-cascading-attrs
