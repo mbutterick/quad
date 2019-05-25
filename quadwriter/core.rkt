@@ -632,8 +632,8 @@
                 #:size (quad-ref (car qs) 'page-size default-page-size)
                 #:orientation (quad-ref (car qs) 'page-orientation default-page-orientation))))
 
-  (define default-x-margin (min (* 72 1.5) (floor (* .10 (pdf-width pdf)))))
-  (define default-y-margin (min 72 (floor (* .10 (pdf-width pdf)))))
+  (define default-side-margin (min (* 72 1.5) (floor (* .20 (pdf-width pdf)))))
+  (define default-top-margin (min 72 (floor (* .10 (pdf-height pdf)))))
   (parameterize ([current-pdf pdf]
                  [verbose-quad-printing? #false])
     (let* ([qs (time-name hyphenate (handle-hyphenate qs))]
@@ -641,18 +641,18 @@
            [qs (insert-first-line-indents qs)]
            ;; if only left or right margin is provided, copy other value in preference to default margin
            [left-margin (or (debug-x-margin)
-                            (quad-ref (car qs) 'page-margin-left (λ () (quad-ref (car qs) 'page-margin-right default-x-margin))))]
+                            (quad-ref (car qs) 'page-margin-left (λ () (quad-ref (car qs) 'page-margin-right default-side-margin))))]
            [right-margin (or (debug-x-margin)
-                             (quad-ref (car qs) 'page-margin-right (λ () (quad-ref (car qs) 'page-margin-left default-y-margin))))]
+                             (quad-ref (car qs) 'page-margin-right (λ () (quad-ref (car qs) 'page-margin-left default-side-margin))))]
            [line-wrap-size (- (pdf-width pdf) left-margin right-margin)]
            [qs (time-name line-wrap (line-wrap qs line-wrap-size))]
            [qs (apply-keeps qs)]
            ;; if only top or bottom margin is provided, copy other value in preference to default margin
            [top-margin (or (debug-y-margin)
-                           (quad-ref (car qs) 'page-margin-top (λ () (quad-ref (car qs) 'page-margin-bottom default-y-margin))))]
-           [bottom-margin (let ([vert-optical-adjustment 10])
+                           (quad-ref (car qs) 'page-margin-top (λ () (quad-ref (car qs) 'page-margin-bottom default-top-margin))))]
+           [bottom-margin #R (let ([vert-optical-adjustment 10])
                             (or (debug-y-margin)
-                                (quad-ref (car qs) 'page-margin-bottom (λ () (+ vert-optical-adjustment (quad-ref (car qs) 'page-margin-top default-y-margin))))))]
+                                (quad-ref (car qs) 'page-margin-bottom (λ () (+ vert-optical-adjustment (quad-ref (car qs) 'page-margin-top (* default-top-margin 1.4)))))))]
            [page-wrap-size (- (pdf-height pdf) top-margin bottom-margin)]
            [page-quad (struct-copy quad q:page
                                    [shift (pt left-margin top-margin)]
