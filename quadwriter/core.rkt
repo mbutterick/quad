@@ -650,7 +650,7 @@
            ;; if only top or bottom margin is provided, copy other value in preference to default margin
            [top-margin (or (debug-y-margin)
                            (quad-ref (car qs) 'page-margin-top (λ () (quad-ref (car qs) 'page-margin-bottom default-top-margin))))]
-           [bottom-margin #R (let ([vert-optical-adjustment 10])
+           [bottom-margin (let ([vert-optical-adjustment 10])
                             (or (debug-y-margin)
                                 (quad-ref (car qs) 'page-margin-bottom (λ () (+ vert-optical-adjustment (quad-ref (car qs) 'page-margin-top (* default-top-margin 1.4)))))))]
            [page-wrap-size (- (pdf-height pdf) top-margin bottom-margin)]
