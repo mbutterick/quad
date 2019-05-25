@@ -47,9 +47,9 @@
       (map (λ (x) (path->string (find-relative-path fonts-dir x))) (list font-path font-family-subdir)))
     ;; search for subdir in path matching style name
     ;; note that this will work if fonts are contained in another subdirectory (e.g., real font name)
-    (define path-parts (map path->string (explode-path (string->path (string-downcase font-path-string)))))
+    (define path-parts (map string-downcase (map path->string (explode-path (string->path (string-downcase font-path-string))))))
     (define key
-      (cons family-name
+      (cons (string-downcase family-name)
             (cond
               [(member "bold-italic" path-parts) 'bi]
               [(member "bold" path-parts) 'b]
@@ -61,7 +61,7 @@
 
 (define (font-attrs->path font-family bold italic)
   ;; find the font-path corresponding to a certain family name and style.
-  (define key (cons font-family
+  (define key (cons (string-downcase font-family)
                     (cond
                       [(and bold italic) 'bi]
                       [bold 'b]
