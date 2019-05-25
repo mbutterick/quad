@@ -156,11 +156,14 @@
   ;; for instance, kerning between last letter and hyphen.
   (match (and ending-q (equal? (quad-elems ending-q) '("\u00AD")) qs)
     [(list head ... last-q)
-     (define str+hyphen (string-append (car (quad-elems last-q)) "-"))
+     (define str (car (quad-elems last-q)))
+     (define str+hyphen (string-append str "-"))
+     (define hang-hyphens? #true)
+     (define size-basis (if hang-hyphens? str str+hyphen))
      (append head
              (list (struct-copy quad last-q
                                 [elems (list str+hyphen)]
-                                [size (make-size-promise last-q str+hyphen)])))]
+                                [size (make-size-promise last-q size-basis)])))]
     [_ qs]))
 
 (define-quad q:line-break quad ())
@@ -202,7 +205,7 @@
              [_ (for*/list ([str (in-list (quad-elems q))]
                             [hyphen-char (in-value #\u00AD)]
                             [hstr (in-value (hyphenate str hyphen-char
-                                                       #:min-left-length 4
+                                                       #:min-left-length 3
                                                        #:min-right-length 3))]
                             [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
                   (struct-copy quad q [elems (list substr)]))]))))
