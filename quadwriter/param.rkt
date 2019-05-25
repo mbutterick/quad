@@ -21,6 +21,8 @@
          (define debug-page-height (make-parameter 400))
          (define debug-x-margin (make-parameter 40))
          (define debug-y-margin (make-parameter 40))
+         (define debug-column-count (make-parameter 2))
+         (define debug-column-gap (make-parameter 36))
          (define zoom-factor (make-parameter 1.5)))]
     [_
      #'(begin
@@ -39,6 +41,8 @@
          (define debug-page-height (make-parameter #f))
          (define debug-x-margin (make-parameter #f))
          (define debug-y-margin (make-parameter #f))
+         (define debug-column-count (make-parameter #f))
+         (define debug-column-gap (make-parameter #f))
          (define zoom-factor (make-parameter 1)))]))
 
 (go)

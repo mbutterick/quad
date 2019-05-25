@@ -32,7 +32,7 @@
                    (border-width-bottom "0.5") (border-color-bottom "gray") (border-inset-bottom "-2")
                    (border-width-right "0.5") (border-color-right "gray") (border-inset-right "20")
                    (inset-top "10") (inset-bottom "8") (inset-left "30") (inset-right "30")
-                   (keep-all "yes"))
+                   (keep-all-lines "yes"))
                  attrs) exprs))
 
 (define id (default-tag-function 'id))

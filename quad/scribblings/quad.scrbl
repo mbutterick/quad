@@ -461,6 +461,10 @@ The unusual way of setting the overall page dimensions of the rendered PDF. Both
 Inset values from the page edges. Value is given as a @tech{dimension string}. Default values depend on size of the page: they are chosen to be not completely bananas.
 }
 
+@deftogether[(@defthing[#:kind "attribute" column-count symbol?]
+              @defthing[#:kind "attribute" column-gap symbol?])]{
+Columns per page. @racket[column-count] is a positive integer; @racket[column-gap] (the space between columns) is a @tech{dimension string}.
+}
 
 @subsubsection{Block-level attributes}
 

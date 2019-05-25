@@ -62,6 +62,9 @@ Naming guidelines
                       background-color
 
                       clip ; whether box boundary clips its contents
+
+                      column-count
+                      column-gap
                       
                       keep-first-lines
                       keep-last-lines

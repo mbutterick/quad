@@ -16,7 +16,7 @@
          "attrs.rkt"
          "param.rkt"
          "font.rkt")
-(provide para-break line-break page-break bullet-quad hrbr lbr pbr render-pdf)
+(provide para-break line-break page-break column-break bullet-quad hrbr lbr pbr render-pdf)
 
 (define-quad string-quad quad ())
  
@@ -173,6 +173,9 @@
 (define-quad q:hr-break q:line-break ())
 (define hrbr (make-q:hr-break #:printable #t
                               #:id 'hrbr))
+
+(define-quad q:col-break q:line-break ())
+(define colbr (make-q:col-break #:printable #f #:id 'colbr))
 
 (define-quad q:page-break q:line-break ())
 (define pgbr (make-q:page-break #:printable #f #:id 'pgbr))
@@ -364,7 +367,7 @@
                  #:soft-break soft-break-for-line?
                  #:finish-wrap (finish-line-wrap line-q)))))
 
-(define (make-nobreak! q) (quad-set! q 'no-pbr "true"))
+(define (make-nobreak! q) (quad-set! q 'no-colbr "true")) ; cooperates with col-wrap
 
 (define (do-keep-with-next! reversed-lines)
   ;; paints nobreak onto spacers that follow keep-with-next lines
@@ -394,13 +397,13 @@
     (unless (eq? idx group-len)
       (cond
         ;; if we have 'keep-all we can skip 'keep-first and 'keep-last cases
-        [(quad-ref ln 'keep-all) (make-nobreak! ln)]
+        [(quad-ref ln 'keep-all-lines) (make-nobreak! ln)]
         ;; to keep n lines, we only paint the first n - 1
         ;; (because each nobr line sticks to the next)
-        [(let ([keep-first (quad-ref ln 'keep-first)])
+        [(let ([keep-first (quad-ref ln 'keep-first-lines)])
            (and (number? keep-first) (< idx keep-first)))
          (make-nobreak! ln)]
-        [(let ([keep-last (quad-ref ln 'keep-last)])
+        [(let ([keep-last (quad-ref ln 'keep-last-lines)])
            (and (number? keep-last) (< (- group-len keep-last) idx)))
          (make-nobreak! ln)]))
     (cons ln reversed-lines)))
@@ -432,6 +435,17 @@
                                    (when draw-debug-line?
                                      (draw-debug q doc "goldenrod" "goldenrod")) 
                                    (draw-page-footer q doc))))
+
+(define q:column (q
+                  #:id 'col
+                  #:from 'ne
+                  #:to 'nw))
+
+(struct column-spacer quad () #:transparent)
+(define q:column-spacer (q #:type column-spacer
+                           #:from 'ne
+                           #:to 'nw
+                           #:printable (λ (q sig) (not (memq sig '(start end))))))
 
 (define q:page (q
                 #:id 'page
@@ -514,7 +528,35 @@
    (cons (struct-copy quad q
                       [from-parent (or where (quad-from q))]) rest)])
 
-(define ((page-finish-wrap page-quad path) lns q0 q page-idx)
+
+(define ((col-finish-wrap col-quad) lns . _)
+  (list (struct-copy quad col-quad
+                     [elems (from-parent (insert-blocks lns) 'nw)])))
+
+(define (col-wrap qs vertical-height col-gap [col-quad q:column])
+  (unless (positive? vertical-height)
+    (raise-argument-error 'col-wrap "positive number" vertical-height))
+  
+  ;; on timing of `insert-blocks`:
+  ;; can't do it before because it depends on where columns are broken.
+  ;; could do it after, but it would require going back inside each col quad
+  ;; which seems overly interdependent, because `insert-blocks` is used to determine break locations.
+  ;; `col-wrap` should emit quads that are complete.
+  (define col-spacer (struct-copy quad q:column-spacer
+                                  [size (pt col-gap 100)]))
+  (add-between
+   (wrap qs vertical-height
+        #:soft-break (λ (q) #true)
+        #:hard-break q:col-break?
+        #:no-break (λ (q) (quad-ref q 'no-colbr)) ; cooperates with make-nobreak
+        #:distance (λ (q dist-so-far wrap-qs)
+                     ;; do trial block insertions
+                     (for/sum ([x (in-list (insert-blocks wrap-qs))])
+                       (pt-y (size x))))                     
+        #:finish-wrap (col-finish-wrap col-quad))
+   col-spacer))
+
+(define ((page-finish-wrap page-quad path) cols q0 q page-idx)
   (define-values (dir name _) (split-path (path-replace-extension path #"")))
   (define footer (struct-copy quad q:footer
                               [attrs (let ([h (hash-copy (quad-attrs q:footer))])
@@ -522,25 +564,21 @@
                                        (hash-set! h 'doc-title (string-titlecase (path->string name)))
                                        h)]))
   (list (struct-copy quad page-quad
-                     [elems (cons footer (from-parent (insert-blocks lns) 'nw))])))
+                     [elems (cons footer (from-parent cols 'nw))])))
 
-(define (page-wrap xs vertical-height [page-quad q:page])
-  (unless (positive? vertical-height)
-    (raise-argument-error 'page-wrap "positive number" vertical-height))
-  ;; on timing of `insert-blocks`:
-  ;; can't do it before because it depends on where pages are broken.
-  ;; could do it after, but it would require going back inside each page quad
-  ;; which seems overly interdependent, because `insert-blocks` is used to determine break locations.
-  ;; `page-wrap` should emit quads that are complete.
-  (wrap xs vertical-height
+(define (page-wrap qs width [page-quad q:page])
+  (unless (positive? width)
+    (raise-argument-error 'page-wrap "positive number" width))
+  (wrap qs width
         #:soft-break (λ (q) #true)
         #:hard-break q:page-break?
         #:no-break (λ (q) (quad-ref q 'no-pbr))
         #:distance (λ (q dist-so-far wrap-qs)
-                     ;; do trial block insertions
-                     (for/sum ([x (in-list (insert-blocks wrap-qs))])
-                       (pt-y (size x))))                     
+                     (for/sum ([x (in-list wrap-qs)])
+                       (pt-x (size x))))
         #:finish-wrap (page-finish-wrap page-quad (pdf-output-path (current-pdf)))))
+
+
 
 (define (insert-blocks lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x 'display)) lines))
@@ -583,12 +621,14 @@
 (define para-break '(q ((break "para"))))
 (define line-break '(q ((break "line"))))
 (define page-break '(q ((break "page"))))
+(define column-break '(q ((break "column"))))
 
 (define (replace-breaks x)
   (map-elements (λ (el)
                   (match el
                     [(== para-break) pbr]
                     [(== line-break) lbr]
+                    [(== column-break) colbr]
                     [(== page-break) pgbr]
                     [_ el])) x))
 
@@ -634,6 +674,8 @@
 
   (define default-side-margin (min (* 72 1.5) (floor (* .20 (pdf-width pdf)))))
   (define default-top-margin (min 72 (floor (* .10 (pdf-height pdf)))))
+  (define default-column-count 1)
+  (define default-column-gap 36)
   (parameterize ([current-pdf pdf]
                  [verbose-quad-printing? #false])
     (let* ([qs (time-name hyphenate (handle-hyphenate qs))]
@@ -644,7 +686,13 @@
                             (quad-ref (car qs) 'page-margin-left (λ () (quad-ref (car qs) 'page-margin-right default-side-margin))))]
            [right-margin (or (debug-x-margin)
                              (quad-ref (car qs) 'page-margin-right (λ () (quad-ref (car qs) 'page-margin-left default-side-margin))))]
-           [line-wrap-size (- (pdf-width pdf) left-margin right-margin)]
+           [column-count (let ([cc (or (debug-column-count) (quad-ref (car qs) 'column-count default-column-count))])
+                           (unless (exact-nonnegative-integer? cc)
+                             (raise-argument-error 'render-pdf "positive integer" cc))
+                           cc)]
+           [column-gap (or (debug-column-gap) (quad-ref (car qs) 'column-gap default-column-gap))]
+           [printable-width (- (pdf-width pdf) left-margin right-margin)]
+           [line-wrap-size (/ (- printable-width (* (sub1 column-count) column-gap)) column-count)]
            [qs (time-name line-wrap (line-wrap qs line-wrap-size))]
            [qs (apply-keeps qs)]
            ;; if only top or bottom margin is provided, copy other value in preference to default margin
@@ -653,17 +701,22 @@
            [bottom-margin (let ([vert-optical-adjustment 10])
                             (or (debug-y-margin)
                                 (quad-ref (car qs) 'page-margin-bottom (λ () (+ vert-optical-adjustment (quad-ref (car qs) 'page-margin-top (* default-top-margin 1.4)))))))]
-           [page-wrap-size (- (pdf-height pdf) top-margin bottom-margin)]
+           [col-wrap-size (- (pdf-height pdf) top-margin bottom-margin)]
+           [col-quad (struct-copy quad q:column
+                                  [size (pt line-wrap-size col-wrap-size)])]
+           [cols (time-name col-wrap (col-wrap qs col-wrap-size column-gap col-quad))]
+           
+           [printable-height (- (pdf-height pdf) top-margin bottom-margin)]
            [page-quad (struct-copy quad q:page
                                    [shift (pt left-margin top-margin)]
-                                   [size (pt line-wrap-size page-wrap-size)])]
-           [qs (time-name page-wrap (page-wrap qs page-wrap-size page-quad))]
-           [qs (time-name position (position (struct-copy quad q:doc [elems qs])))])
-      (time-name draw (draw qs pdf))
-      (when pdf-path-arg
-        (displayln (format "wrote PDF to ~a" pdf-path)))))
+                                   [size (pt line-wrap-size printable-height)])]
 
-  (unless pdf-path-arg
-    (begin0
-      (file->bytes pdf-path)
-      (delete-file pdf-path))))
+           [qs (time-name page-wrap (page-wrap cols printable-width page-quad))]
+           [qs (time-name position (position (struct-copy quad q:doc [elems qs])))])
+      (time-name draw (draw qs pdf))))
+
+  (if pdf-path-arg
+      (displayln (format "wrote PDF to ~a" pdf-path))
+      (begin0
+        (file->bytes pdf-path)
+        (delete-file pdf-path))))
