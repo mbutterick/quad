@@ -186,13 +186,6 @@
   (check-true (q:line-break? (second (quad-elems (q "foo" pbr "bar")))))
   (check-true (q:line-break? (second (atomize (q "foo" pbr "bar"))))))
 
-(define (copy-block-attrs source-hash dest-hash)
-  (for* ([k (in-list block-attrs)]
-         [v (in-value (hash-ref source-hash k #f))]
-         #:when v)
-    (hash-set! dest-hash k v))
-  dest-hash)
-
 (define (handle-hyphenate qs)
   ;; find quads that want hyphenation and split them into smaller pieces
   ;; do this before ->string-quad so that it can handle the sizing promises
@@ -328,7 +321,7 @@
           (list
            (struct-copy
             quad line-q
-            ;; move block attrs up, so they are visible in page wrap
+            ;; move block attrs up, so they are visible in col wrap
             [attrs (copy-block-attrs (quad-attrs elem)
                                      (hash-copy (quad-attrs line-q)))]
             ;; line width is static
@@ -567,6 +560,9 @@
 
 (define ((col-finish-wrap col-quad) lns . _)
   (list (struct-copy quad col-quad
+                     ;; move block attrs up, so they are visible in page wrap
+                     [attrs (copy-block-attrs (quad-attrs (car lns))
+                                              (hash-copy (quad-attrs col-quad)))]
                      [elems (from-parent (insert-blocks lns) 'nw)])))
 
 (define (col-wrap qs vertical-height col-gap [col-quad q:column])
@@ -593,14 +589,18 @@
    col-spacer))
 
 (define ((page-finish-wrap page-quad path) cols q0 q page-idx)
-  (define-values (dir name _) (split-path (path-replace-extension path #"")))
-  (define footer (struct-copy quad q:footer
-                              [attrs (let ([h (hash-copy (quad-attrs q:footer))])
-                                       (hash-set! h 'page-number page-idx)
-                                       (hash-set! h 'doc-title (string-titlecase (path->string name)))
-                                       h)]))
-  (list (struct-copy quad page-quad
-                     [elems (cons footer (from-parent cols 'nw))])))
+  (define elems
+    (match (quad-ref (car cols) 'footer-display "true")
+      [(or "false" "none") (from-parent cols 'nw)]
+      [_
+       (define-values (dir name _) (split-path (path-replace-extension path #"")))
+       (define footer (struct-copy quad q:footer
+                                   [attrs (let ([h (hash-copy (quad-attrs q:footer))])
+                                            (hash-set! h 'page-number page-idx)
+                                            (hash-set! h 'doc-title (string-titlecase (path->string name)))
+                                            h)]))
+       (cons footer (from-parent cols 'nw))]))
+  (list (struct-copy quad page-quad [elems elems])))
 
 (define (page-wrap qs width [page-quad q:page])
   (unless (positive? width)

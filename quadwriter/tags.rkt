@@ -7,7 +7,8 @@
          racket/dict
          racket/match
          txexpr/base
-         "font.rkt")
+         "font.rkt"
+         "attrs.rkt")
 (provide (all-defined-out))
 
 (define (root attrs exprs)
@@ -101,6 +102,10 @@
   (define new-bullet-quad (match exprs
                             [(cons (txexpr _ attrs _) _)
                              (match bullet-quad
-                               [(txexpr tag battrs elems) (txexpr tag (append attrs battrs) elems)])]
+                               [(txexpr tag battrs elems)
+                                (define new-attrs
+                                  (hash->attrs
+                                   (copy-block-attrs (attrs->hash attrs) (attrs->hash battrs))))
+                                (txexpr tag new-attrs elems)])]
                             [_ bullet-quad]))
   (qexpr attrs (cons new-bullet-quad exprs)))

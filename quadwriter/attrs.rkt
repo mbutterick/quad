@@ -30,6 +30,16 @@ Naming guidelines
              [(regexp #rx"mm") (compose1 in->pts cm->in mm->cm)]) (string->number num-string))])]))
   (if round? (inexact->exact (floor val)) val))
 
+(define (copy-block-attrs source-hash dest-hash)
+  (define new-hash (make-hasheq))
+  (for ([(k v) (in-hash dest-hash)])
+    (hash-set! new-hash k v))
+  (for* ([k (in-list block-attrs)]
+         [v (in-value (hash-ref source-hash k #f))]
+         #:when v)
+    (hash-set! new-hash k v))
+  new-hash)
+
 (define block-attrs '(display
                       ;; inset values increase the layout size of the quad.
                       ;; they are relative to the natural layout box.
@@ -88,4 +98,6 @@ Naming guidelines
                       page-margin-bottom
                       page-margin-left
                       page-margin-right
+
+                      footer-display
                       ))
