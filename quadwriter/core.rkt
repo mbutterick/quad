@@ -158,12 +158,10 @@
     [(list head ... last-q)
      (define str (car (quad-elems last-q)))
      (define str+hyphen (string-append str "-"))
-     (define hang-hyphens? #true)
-     (define size-basis (if hang-hyphens? str str+hyphen))
      (append head
              (list (struct-copy quad last-q
                                 [elems (list str+hyphen)]
-                                [size (make-size-promise last-q size-basis)])))]
+                                [size (make-size-promise last-q str+hyphen)])))]
     [_ qs]))
 
 (define-quad q:line-break quad ())
@@ -232,23 +230,39 @@
        [1 #:when (equal? align-value "justify") qs] ; can't justify single word
        [word-count
         (match-define (list line-width line-height) (quad-size line-q))
-        (define word-width (sum-of-widths word-sublists))
+        (define hung-word-sublists
+          (match word-sublists
+            [(list sublists ... (list prev-qs ... last-q))
+             (define last-char-str (regexp-match #rx"[.,!’-]$" (car (quad-elems last-q))))
+             (match last-char-str
+               [#false word-sublists]
+               [_
+                (define hanger-q (struct-copy quad last-q
+                                              [elems null]
+                                              [size (let ([p (make-size-promise last-q (car last-char-str))])
+                                                      (delay
+                                                        (match-define (list x y) (force p))
+                                                        (pt (- x) y)))]))
+                (define last-sublist (append prev-qs (list last-q hanger-q)))
+                (append sublists (list last-sublist))])]))
+        (define word-width (sum-of-widths hung-word-sublists))
         (define word-space-width (sum-of-widths word-space-sublists))
         (define empty-hspace (- line-width
                                 (quad-ref (car qs) 'inset-left 0)
                                 word-width
                                 (quad-ref (car qs) 'inset-right 0)))
         (define line-overfull? (negative? (- empty-hspace word-space-width)))
+
         (cond
           [(or (equal? align-value "justify")
                ;; force justification upon overfull lines
                line-overfull?)
            (define justified-space-width (/ empty-hspace (sub1 word-count)))
-           (apply append (add-between word-sublists (list (make-quad
-                                                           #:from 'bo
-                                                           #:to 'bi
-                                                           #:draw-end q:string-draw-end
-                                                           #:size (pt justified-space-width line-height)))))]
+           (apply append (add-between hung-word-sublists (list (make-quad
+                                                                #:from 'bo
+                                                                #:to 'bi
+                                                                #:draw-end q:string-draw-end
+                                                                #:size (pt justified-space-width line-height)))))]
           
           [(equal? align-value "left") qs] ; no filling needed 
           [else
