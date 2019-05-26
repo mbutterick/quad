@@ -226,18 +226,17 @@
         (define hung-word-sublists
           (match word-sublists
             [(list sublists ... (list prev-qs ... last-q))
-             (define last-char-str (regexp-match #rx"[.,!’-]$" (car (quad-elems last-q))))
+             (define last-char-str (regexp-match #rx"[.,:;’-]$" (car (quad-elems last-q))))
              (match last-char-str
                [#false word-sublists]
-               [_
-                (define hanger-q (struct-copy quad last-q
-                                              [elems null]
-                                              [size (let ([p (make-size-promise last-q (car last-char-str))])
-                                                      (delay
-                                                        (match-define (list x y) (force p))
-                                                        (pt (- x) y)))]))
-                (define last-sublist (append prev-qs (list last-q hanger-q)))
-                (append sublists (list last-sublist))])]))
+               [_ (define hanger-q (struct-copy quad last-q
+                                                [elems null]
+                                                [size (let ([p (make-size-promise last-q (car last-char-str))])
+                                                        (delay
+                                                          (match-define (list x y) (force p))
+                                                          (pt (- x) y)))]))
+                  (define last-sublist (append prev-qs (list last-q hanger-q)))
+                  (append sublists (list last-sublist))])]))
         (define word-width (sum-of-widths hung-word-sublists))
         (define word-space-width (sum-of-widths word-space-sublists))
         (define empty-hspace (- line-width
@@ -591,15 +590,15 @@
 (define ((page-finish-wrap page-quad path) cols q0 q page-idx)
   (define elems
     (match (quad-ref (car cols) 'footer-display "true")
-                              [(or "false" "none") (from-parent cols 'nw)]
-                              [_
-                               (define-values (dir name _) (split-path (path-replace-extension path #"")))
-                               (define footer (struct-copy quad q:footer
-                                                           [attrs (let ([h (hash-copy (quad-attrs q:footer))])
-                                                                    (hash-set! h 'page-number page-idx)
-                                                                    (hash-set! h 'doc-title (string-titlecase (path->string name)))
-                                                                    h)]))
-                               (cons footer (from-parent cols 'nw))]))
+      [(or "false" "none") (from-parent cols 'nw)]
+      [_
+       (define-values (dir name _) (split-path (path-replace-extension path #"")))
+       (define footer (struct-copy quad q:footer
+                                   [attrs (let ([h (hash-copy (quad-attrs q:footer))])
+                                            (hash-set! h 'page-number page-idx)
+                                            (hash-set! h 'doc-title (string-titlecase (path->string name)))
+                                            h)]))
+       (cons footer (from-parent cols 'nw))]))
   (list (struct-copy quad page-quad [elems elems])))
 
 (define (page-wrap qs width [page-quad q:page])
