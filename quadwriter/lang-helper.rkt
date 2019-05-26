@@ -21,7 +21,7 @@
   (define kw-attrs
     (let loop ([acc null])
       (cond
-        [(regexp-try-match #px"^\n+" p) (loop acc)]
+        [(regexp-try-match #px"^\\s+" p) (loop acc)]
         [(regexp-try-match kw-val-pat p)
          =>
          (λ (m)
