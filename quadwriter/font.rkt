@@ -36,8 +36,8 @@
   (hash-clear! font-paths)
   (define-values (dir path _) (split-path base-path))
   (define doc-fonts-dir (build-path dir "fonts"))
-  ;; run doc-fonts-dir first because earlier fonts take precedence
-  (for* ([fonts-dir (in-list (list quadwriter-fonts-dir doc-fonts-dir))]
+  ;; run doc-fonts-dir first because earlier fonts take precedence (using hash-ref! below)
+  (for* ([fonts-dir (in-list (list doc-fonts-dir quadwriter-fonts-dir))]
          #:when (directory-exists? fonts-dir)
          [font-family-subdir (in-directory fonts-dir)]
          #:when (directory-exists? font-family-subdir)
