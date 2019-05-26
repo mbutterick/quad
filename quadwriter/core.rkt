@@ -249,7 +249,7 @@
         (cond
           [(or (equal? align-value "justify")
                ;; force justification upon overfull lines
-               line-overfull?)
+               (and line-overfull? (> word-count 1)))
            (define justified-space-width (/ empty-hspace (sub1 word-count)))
            (apply append (add-between hung-word-sublists (list (make-quad
                                                                 #:from 'bo
@@ -591,15 +591,15 @@
 (define ((page-finish-wrap page-quad path) cols q0 q page-idx)
   (define elems
     (match (quad-ref (car cols) 'footer-display "true")
-      [(or "false" "none") (from-parent cols 'nw)]
-      [_
-       (define-values (dir name _) (split-path (path-replace-extension path #"")))
-       (define footer (struct-copy quad q:footer
-                                   [attrs (let ([h (hash-copy (quad-attrs q:footer))])
-                                            (hash-set! h 'page-number page-idx)
-                                            (hash-set! h 'doc-title (string-titlecase (path->string name)))
-                                            h)]))
-       (cons footer (from-parent cols 'nw))]))
+                              [(or "false" "none") (from-parent cols 'nw)]
+                              [_
+                               (define-values (dir name _) (split-path (path-replace-extension path #"")))
+                               (define footer (struct-copy quad q:footer
+                                                           [attrs (let ([h (hash-copy (quad-attrs q:footer))])
+                                                                    (hash-set! h 'page-number page-idx)
+                                                                    (hash-set! h 'doc-title (string-titlecase (path->string name)))
+                                                                    h)]))
+                               (cons footer (from-parent cols 'nw))]))
   (list (struct-copy quad page-quad [elems elems])))
 
 (define (page-wrap qs width [page-quad q:page])
