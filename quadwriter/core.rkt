@@ -211,54 +211,60 @@
                   (struct-copy quad q [elems (list substr)]))]))))
 
 (define-quad filler quad ())
+
+(define (sum-of-widths qss)
+  (for*/sum ([qs (in-list qss)]
+             [q (in-list qs)])
+    (pt-x (size q))))
+
+(define (space-quad? q) (equal? (quad-elems q) (list " ")))
+
 (define (fill-wrap qs ending-q line-q)
   (match (and (pair? qs) (quad-ref (car qs) (if ending-q
                                                 'line-align
                                                 'line-align-last) "left"))
-    [(or #false "left") qs] ; default is left aligned, no filling needed 
     [align-value
-     (define word-sublists (filter-split qs (λ (q) (match (quad-elems q)
-                                                     [(cons " " _) #true]
-                                                     [_ #false]))))
+     ;; words may still be in hyphenated fragments
+     ;; (though soft hyphens would have been removed)
+     ;; so group them (but no need to consolidate — that happens elsewhere)
+     (define-values (word-space-sublists word-sublists) (partition* space-quad? qs))
      (match (length word-sublists)
        [1 #:when (equal? align-value "justify") qs] ; can't justify single word
        [word-count
         (match-define (list line-width line-height) (quad-size line-q))
-        ;; words may still be in hyphenated fragments
-        ;; (though soft hyphens would have been removed)
-        ;; so group them (but no need to consolidate — that happens elsewhere)
-        (define occupied-width
-          (match align-value
-            ;; for justified line, we care about size of words without spaces
-            ["justify" (for*/sum ([word-sublist (in-list word-sublists)]
-                                  [word (in-list word-sublist)])
-                         (pt-x (size word)))]
-            ;; for others, we care about size with spaces
-            [_ (for/sum ([q (in-list qs)])
-                 (pt-x (size q)))]))
+        (define word-width (sum-of-widths word-sublists))
+        (define word-space-width (sum-of-widths word-space-sublists))
         (define empty-hspace (- line-width
                                 (quad-ref (car qs) 'inset-left 0)
-                                occupied-width
+                                word-width
                                 (quad-ref (car qs) 'inset-right 0)))
-        (match align-value
-          ["justify" 
-           (define space-width (/ empty-hspace (sub1 word-count)))
+        (define line-overfull? (negative? (- empty-hspace word-space-width)))
+        (cond
+          [(or (equal? align-value "justify")
+               ;; force justification upon overfull lines
+               line-overfull?)
+           (define justified-space-width (/ empty-hspace (sub1 word-count)))
            (apply append (add-between word-sublists (list (make-quad
                                                            #:from 'bo
                                                            #:to 'bi
                                                            #:draw-end q:string-draw-end
-                                                           #:size (pt space-width line-height)))))]
-          [_
+                                                           #:size (pt justified-space-width line-height)))))]
+          
+          [(equal? align-value "left") qs] ; no filling needed 
+          [else
            (define space-multiplier (match align-value
                                       ["center" 0.5]
                                       ["right" 1]))
+           ;; subtact space-width because that appears between words
+           ;; we only care about redistributing the space on the ends
+           (define end-hspace (- empty-hspace word-space-width))
            ; make filler a leading quad, not a parent / grouping quad,
            ;; so that elements can still be reached by consolidate-runs
            (list* (make-quad #:type filler
                              #:from-parent (quad-from-parent (car qs))
                              #:from 'bo
                              #:to 'bi
-                             #:size (pt (* empty-hspace space-multiplier) 0)
+                             #:size (pt (* end-hspace space-multiplier) 0)
                              #:attrs (quad-attrs (car qs)))
                   (struct-copy quad (car qs) [from-parent #f])
                   (cdr qs))])])]))
@@ -353,22 +359,35 @@
                       [else (list q:line-spacer)]))) ; paragraph break
 
 (define (line-wrap qs wrap-size)
-  (unless (positive? wrap-size)
-    (raise-argument-error 'line-wrap "positive number" wrap-size))
-  (define line-q (struct-copy
-                  quad q:line
-                  [size (pt wrap-size (pt-y (size q:line)))]))
-  (apply append
-         ;; next line removes all para-break? quads as a consequence
-         (for/list ([qs (in-list (filter-split qs q:para-break?))])
-           (wrap qs
-                 (λ (q idx) (- wrap-size (quad-ref q 'inset-left 0) (quad-ref q 'inset-right 0)))
-                 #:nicely (match (or (current-line-wrap) (and (pair? qs) (quad-ref (car qs) 'line-wrap)))
-                            [(or "best" "kp") #true]
-                            [_ #false])
-                 #:hard-break q:line-break?
-                 #:soft-break soft-break-for-line?
-                 #:finish-wrap (finish-line-wrap line-q)))))
+  (match qs
+    [(? pair?)
+     (unless (positive? wrap-size)
+       (raise-argument-error 'line-wrap "positive number" wrap-size))
+     (define line-q (struct-copy
+                     quad q:line
+                     [size (pt wrap-size (pt-y (size q:line)))]))
+     (define justify-factor (match (quad-ref (car qs) 'line-align #f)
+                              ;; allow justified lines to go wider,
+                              ;; and then fill-wrap will tighten the word spaces
+                              ;; this makes justified paragraphs more even, becuase
+                              ;; some lines are a little tight, as opposed to all of them being loose
+                              ["justify" 1.04]
+                              [_ 1]))
+     (apply append
+            ;; next line removes all para-break? quads as a consequence
+            (for/list ([qs (in-list (filter-split qs q:para-break?))])
+              (wrap qs
+                    (λ (q idx) (* (- wrap-size
+                                     (quad-ref (car qs) 'inset-left 0)
+                                     (quad-ref (car qs) 'inset-right 0))
+                                  justify-factor))
+                    #:nicely (match (or (current-line-wrap) (quad-ref (car qs) 'line-wrap))
+                               [(or "best" "kp") #true]
+                               [_ #false])
+                    #:hard-break q:line-break?
+                    #:soft-break soft-break-for-line?
+                    #:finish-wrap (finish-line-wrap line-q))))]
+    [_ null]))
 
 (define (make-nobreak! q) (quad-set! q 'no-colbr "true")) ; cooperates with col-wrap
 
@@ -549,14 +568,14 @@
                                   [size (pt col-gap 100)]))
   (add-between
    (wrap qs vertical-height
-        #:soft-break (λ (q) #true)
-        #:hard-break q:col-break?
-        #:no-break (λ (q) (quad-ref q 'no-colbr)) ; cooperates with make-nobreak
-        #:distance (λ (q dist-so-far wrap-qs)
-                     ;; do trial block insertions
-                     (for/sum ([x (in-list (insert-blocks wrap-qs))])
-                       (pt-y (size x))))                     
-        #:finish-wrap (col-finish-wrap col-quad))
+         #:soft-break (λ (q) #true)
+         #:hard-break q:col-break?
+         #:no-break (λ (q) (quad-ref q 'no-colbr)) ; cooperates with make-nobreak
+         #:distance (λ (q dist-so-far wrap-qs)
+                      ;; do trial block insertions
+                      (for/sum ([x (in-list (insert-blocks wrap-qs))])
+                        (pt-y (size x))))                     
+         #:finish-wrap (col-finish-wrap col-quad))
    col-spacer))
 
 (define ((page-finish-wrap page-quad path) cols q0 q page-idx)
