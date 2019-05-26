@@ -1,4 +1,4 @@
-#lang racket/base
+#lang debug racket/base
 (require quad/qexpr
          pollen/tag
          quadwriter/core
@@ -97,4 +97,10 @@
 
 (define-tag-function (ol attrs exprs) (list-base attrs exprs))
 (define-tag-function (ul attrs exprs) (list-base attrs exprs "•"))
-(define-tag-function (li attrs exprs) (qexpr attrs (cons bullet-quad exprs)))
+(define-tag-function (li attrs exprs)
+  (define new-bullet-quad (match exprs
+                            [(cons (txexpr _ attrs _) _)
+                             (match bullet-quad
+                               [(txexpr tag battrs elems) (txexpr tag (append attrs battrs) elems)])]
+                            [_ bullet-quad]))
+  (qexpr attrs (cons new-bullet-quad exprs)))
