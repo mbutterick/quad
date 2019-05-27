@@ -27,7 +27,7 @@
                    (first-line-indent "0") 
                    (background-color "#eee")
                    (clip "true")
-                   (font-family "default-sans") (font-size "10") (line-height "14")
+                   (font-family "blockquote") (font-size "10") (line-height "14")
                    (border-width-top "0.5") (border-color-top "gray") (border-inset-top "8")
                    (border-width-left "3") (border-color-left "gray") (border-inset-left "20")
                    (border-width-bottom "0.5") (border-color-bottom "gray") (border-inset-bottom "-2")
@@ -53,7 +53,7 @@
 (define-syntax-rule (attr-list . attrs) 'attrs)
 
 (define (heading-base font-size attrs exprs)
-  (qexpr (append `((font-family "default-heading") (first-line-indent "0") (display "block") (font-size ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9") (inset-bottom "-3") (inset-top "6") (keep-with-next "true")) attrs) exprs))
+  (qexpr (append `((font-family "heading") (first-line-indent "0") (display "block") (font-size ,(number->string font-size))(line-height ,(number->string (* 1.2 font-size))) (border-width-top "0.5")(border-inset-top "9") (inset-bottom "-3") (inset-top "6") (keep-with-next "true")) attrs) exprs))
 
 (define-tag-function (h1 attrs exprs)
   (heading-base 20 (append '() attrs) exprs))
@@ -66,7 +66,7 @@
 (define h6 h3)
 
 (define-tag-function (code attrs exprs)
-  (qexpr (append '((font-family "default-mono")#;(line-align "right")(font-size "10")(bg "aliceblue")) attrs) exprs))
+  (qexpr (append '((font-family "code")#;(line-align "right")(font-size "10")(bg "aliceblue")) attrs) exprs))
 
 (define-tag-function (pre attrs exprs)
   ;; pre needs to convert white space to equivalent layout elements
@@ -78,7 +78,7 @@
   (qexpr (list* '(display "block") '(background-color "aliceblue")
                 '(first-line-indent "0")
                 '(clip "true")
-                '(font-family "default-mono") '(font-size "11") '(line-height "14")
+                '(font-family "code") '(font-size "11") '(line-height "14")
                 '(border-inset-top "10")
                 '(border-width-left "2") '(border-color-left "#669") '(border-inset-left "0")
                 '(border-inset-bottom "-4")

@@ -7,7 +7,7 @@
 
 (define-runtime-path quadwriter-fonts-dir "fonts")
 (define-runtime-path default-font-face "fonts/default/SourceSerifPro-Regular.otf")
-(define default-font-family "default-serif")
+(define default-font-family "text")
 (define default-font-size 12)
 (define default-line-height 16)
 (define default-font-color "black")

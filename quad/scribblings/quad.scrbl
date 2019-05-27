@@ -119,7 +119,7 @@ Next, on the REPL enter this:
 You will see the actual input to Quadwriter, which is called a @tech{Q-expression}:
 
 @repl-output{
-'(q () (q ((page-margin-left "120") (page-margin-top "80") (page-margin-bottom "120") (font-family "default-serif") (line-height "17")) (q ((keep-first-lines "2") (keep-last-lines "3") (font-size-adjust "100%") (character-tracking "0") (hyphenate "true") (display "g49598")) "Brennan and Dale like fancy sauce.")))
+'(q () (q ((page-margin-left "120") (page-margin-top "80") (page-margin-bottom "120") (font-family "text") (line-height "17")) (q ((keep-first-lines "2") (keep-last-lines "3") (font-size-adjust "100%") (character-tracking "0") (hyphenate "true") (display "g49598")) "Brennan and Dale like fancy sauce.")))
 }
 
 In the demos that follow, the input language will change slightly. But the PDF will be rendered the same way (by running the source file) and you can always look at @racket[doc] or use @racket[view-result].
@@ -172,9 +172,9 @@ To see this:
 '(q
   ()
   (q
-   ((page-margin-left "120") (page-margin-top "80") (page-margin-bottom "120") (font-family "default-serif") (line-height "17"))
+   ((page-margin-left "120") (page-margin-top "80") (page-margin-bottom "120") (font-family "text") (line-height "17"))
    (q ((break "para")))
-   (q ((font-family "default-heading") (first-line-indent "0") (display "block") (font-size "20") (line-height "24.0") (border-width-top "0.5") (border-inset-top "9") (inset-bottom "-3") (inset-top "6") (keep-with-next "true") (id "did-you-know")) "Did you know?")
+   (q ((font-family "heading") (first-line-indent "0") (display "block") (font-size "20") (line-height "24.0") (border-width-top "0.5") (border-inset-top "9") (inset-bottom "-3") (inset-top "6") (keep-with-next "true") (id "did-you-know")) "Did you know?")
    ···
 }
 
@@ -247,7 +247,7 @@ Brennan and Dale like fancy sauce.
 In the REPL, the @racket[doc] was this Q-expression:
 
 @repl-output{
-'(q () (q ((page-margin-left "120") (page-margin-top "80") (page-margin-bottom "120") (font-family "default-serif") (line-height "17")) "Brennan and Dale like fancy sauce."))
+'(q () (q ((page-margin-left "120") (page-margin-top "80") (page-margin-bottom "120") (font-family "text") (line-height "17")) "Brennan and Dale like fancy sauce."))
 }
 
 Let's copy this Q-expression and use it as our new source code. This time, however, we'll switch to plain @code{#lang quadwriter} (instead of the @racket[markup] or @racket[markdown] dialects):
@@ -256,7 +256,7 @@ Let's copy this Q-expression and use it as our new source code. This time, howev
 @codeblock|{
 #lang quadwriter
 '(q () (q ((page-margin-left "120") (page-margin-top "80") 
-(page-margin-bottom "120") (font-family "default-serif") 
+(page-margin-bottom "120") (font-family "text") 
 (line-height "17")) "Brennan and Dale like fancy sauce."))
 }|
 ]
