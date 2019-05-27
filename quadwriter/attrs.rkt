@@ -1,5 +1,6 @@
 #lang debug racket/base
-(require racket/match
+(require (for-syntax racket/base racket/syntax)
+         racket/match
          racket/string)
 (provide (all-defined-out))
 #|
@@ -40,64 +41,88 @@ Naming guidelines
     (hash-set! new-hash k v))
   new-hash)
 
-(define block-attrs '(display
-                      ;; inset values increase the layout size of the quad.
-                      ;; they are relative to the natural layout box.
-                      inset-top
-                      inset-bottom
-                      inset-left
-                      inset-right
-                      ;; border-inset values do not increase the layout size of the quad.
-                      ;; they are relative to the layout size of the quad, with inset values included.
-                      ;; this is different from CSS, where margin + padding increase the size of the layout.
-                      ;; one has to be dependent on the other, so a choice must be made.
-                      ;; I find this approach more sensible because
-                      ;; borders are a styling element, not a layout element.
-                      ;; this means that changing the inset values will change the position of the border.
-                      ;; but this is preferable to the CSS model, where moving the border changes the layout.
-                      ;; principle: minimize the number of values that affect the layout,
-                      ;; so it's easier to reason about programmatically.
-                      border-inset-top
-                      border-inset-bottom
-                      border-inset-left
-                      border-inset-right
-                      border-width-left
-                      border-width-right
-                      border-width-top
-                      border-width-bottom
-                      border-color-left
-                      border-color-right
-                      border-color-top
-                      border-color-bottom
-                      background-color
+(define @font-size 'font-size)
+(define @font-color 'font-color)
+(define @character-tracking 'character-tracking)
+(define @bg 'bg)
+(define @link 'link)
+(define @line-height 'line-height)
+(define @hyphenate 'hyphenate)
+(define @list-index 'list-index)
+(define @no-colbr 'no-colbr)
+(define @no-pbr 'no-pbr)
+(define @page-number 'page-number)
+(define @doc-title 'doc-title)
 
-                      clip ; whether box boundary clips its contents
+(define-syntax (define-attrs stx)
+  (syntax-case stx ()
+    [(_ ID (ATTR-NAME ...))
+     (with-syntax ([(ATTR-ID ...) (for/list ([attr-id (in-list (syntax->list #'(ATTR-NAME ...)))])
+                                    (format-id #'ID "@~a" (syntax-e attr-id)))])
+     #'(begin
+         (define ATTR-ID 'ATTR-NAME) ...
+         (define ID (list ATTR-ID ...))))]))
+  
 
-                      column-count
-                      column-gap
+(define-attrs block-attrs (
+                           block-display
+                           ;; inset values increase the layout size of the quad.
+                           ;; they are relative to the natural layout box.
+                           inset-top
+                           inset-bottom
+                           inset-left
+                           inset-right
+                           ;; border-inset values do not increase the layout size of the quad.
+                           ;; they are relative to the layout size of the quad, with inset values included.
+                           ;; this is different from CSS, where margin + padding increase the size of the layout.
+                           ;; one has to be dependent on the other, so a choice must be made.
+                           ;; I find this approach more sensible because
+                           ;; borders are a styling element, not a layout element.
+                           ;; this means that changing the inset values will change the position of the border.
+                           ;; but this is preferable to the CSS model, where moving the border changes the layout.
+                           ;; principle: minimize the number of values that affect the layout,
+                           ;; so it's easier to reason about programmatically.
+                           border-inset-top
+                           border-inset-bottom
+                           border-inset-left
+                           border-inset-right
+                           border-width-left
+                           border-width-right
+                           border-width-top
+                           border-width-bottom
+                           border-color-left
+                           border-color-right
+                           border-color-top
+                           border-color-bottom
+                           background-color
+
+                           block-clip ; whether box boundary clips its contents
+
+                           column-count
+                           column-gap
                       
-                      keep-first-lines
-                      keep-last-lines
-                      keep-all-lines
+                           keep-first-lines
+                           keep-last-lines
+                           keep-all-lines
 
-                      keep-with-next
+                           keep-with-next
 
-                      line-align
-                      line-align-last
+                           line-align
+                           line-align-last
 
-                      first-line-indent
+                           first-line-indent
 
-                      line-wrap
+                           line-wrap
 
-                      page-width
-                      page-height
-                      page-size ; e.g., "letter"
-                      page-orientation ; only applies to page-size dimensions
+                           page-width
+                           page-height
+                           page-size ; e.g., "letter"
+                           page-orientation ; only applies to page-size dimensions
 
-                      page-margin-top
-                      page-margin-bottom
-                      page-margin-left
-                      page-margin-right
+                           page-margin-top
+                           page-margin-bottom
+                           page-margin-left
+                           page-margin-right
 
-                      footer-display
-                      ))
+                           footer-display
+                           ))
