@@ -532,6 +532,10 @@ Selects the linebreak algorithm. A value of @racket["best"] or @racket["kp"] inv
 Whether the block is hyphenated. Activated only when value is @racket["true"]. 
 }
 
+@defthing[#:kind "attribute" clip symbol?]{
+Whether the contents of the block are clipped to its boundary. Activated only when value is @racket["true"]. 
+}
+
 @subsubsection{Other attributes}
 
 @deftogether[(@defthing[#:kind "attribute" font-size symbol?]
