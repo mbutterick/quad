@@ -698,7 +698,7 @@
     (match-let ([(list page-width page-height) (for/list ([k (list @page-width @page-height)])
                                                  (match (quad-ref (car qs) k)
                                                    [#false #false]
-                                                   [val (parse-points val 'round)]))])
+                                                   [val (parse-dimension val 'round)]))])
       ;; `make-pdf` will sort out conflicts among page dimensions
       (make-pdf #:compress #t
                 #:auto-first-page #f

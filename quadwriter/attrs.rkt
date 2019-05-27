@@ -18,7 +18,7 @@ Naming guidelines
 (define (in->pts x) (* 72 x))
 (define (mm->cm x) (/ x 10))
 
-(define (parse-points x [round? #f])
+(define (parse-dimension x [round? #f])
   (define val
     (match x
       [(? number?) x]
@@ -26,9 +26,10 @@ Naming guidelines
        (match (cdr (regexp-match #rx"^(-?[0-9\\.]+)([a-z]+)$"  (string-downcase x)))
          [(list num-string unit)
           ((match unit
-             [(regexp #rx"in(ch|ches)?") in->pts]
-             [(regexp #rx"cm") (compose1 in->pts cm->in)]
-             [(regexp #rx"mm") (compose1 in->pts cm->in mm->cm)]) (string->number num-string))])]))
+             [(regexp #rx"in(ch(es)?)?$") in->pts]
+             [(regexp #rx"cm$") (compose1 in->pts cm->in)]
+             [(regexp #rx"mm$") (compose1 in->pts cm->in mm->cm)]
+             [_ (raise-argument-error 'parse-dimension "dimension string" x)]) (string->number num-string))])]))
   (if round? (inexact->exact (floor val)) val))
 
 (define (copy-block-attrs source-hash dest-hash)
