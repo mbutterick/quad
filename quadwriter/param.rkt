@@ -9,7 +9,6 @@
          (provide (all-defined-out))
          (define current-doc (make-parameter #false))
          (define current-pdf (make-parameter #false))
-         (define current-locale (make-parameter 'us))
          (define current-line-wrap (make-parameter #f)) ; because kp is slow and maybe we want to disable for "draft" mode
          (define quadwriter-test-mode (make-parameter #f)) ; used during rackunit to suppress nondeterministic elements, like timestamp in header
 
@@ -30,7 +29,6 @@
          (provide (all-defined-out))
          (define current-doc (make-parameter #false))
          (define current-pdf (make-parameter #false))
-         (define current-locale (make-parameter 'us))
          (define current-line-wrap (make-parameter #f))
          (define quadwriter-test-mode (make-parameter #f))
 
