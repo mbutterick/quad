@@ -42,31 +42,31 @@ Naming guidelines
     (hash-set! new-hash k v))
   new-hash)
 
-(define @font-size 'font-size)
-(define @font-color 'font-color)
-(define @character-tracking 'character-tracking)
-(define @bg 'bg)
-(define @link 'link)
-(define @line-height 'line-height)
-(define @hyphenate 'hyphenate)
-(define @list-index 'list-index)
-(define @no-colbr 'no-colbr)
-(define @no-pbr 'no-pbr)
-(define @page-number 'page-number)
-(define @doc-title 'doc-title)
+(define :font-size 'font-size)
+(define :font-color 'font-color)
+(define :character-tracking 'character-tracking)
+(define :bg 'bg)
+(define :link 'link)
+(define :line-height 'line-height)
+(define :hyphenate 'hyphenate)
+(define :list-index 'list-index)
+(define :no-colbr 'no-colbr)
+(define :no-pbr 'no-pbr)
+(define :page-number 'page-number)
+(define :doc-title 'doc-title)
 
 (define-syntax (define-attrs stx)
   (syntax-case stx ()
     [(_ ID (ATTR-NAME ...))
      (with-syntax ([(ATTR-ID ...) (for/list ([attr-id (in-list (syntax->list #'(ATTR-NAME ...)))])
-                                    (format-id #'ID "@~a" (syntax-e attr-id)))])
+                                    (format-id #'ID ":~a" (syntax-e attr-id)))])
      #'(begin
          (define ATTR-ID 'ATTR-NAME) ...
          (define ID (list ATTR-ID ...))))]))
   
 
 (define-attrs block-attrs (
-                           block-display
+                           display
                            ;; inset values increase the layout size of the quad.
                            ;; they are relative to the natural layout box.
                            inset-top

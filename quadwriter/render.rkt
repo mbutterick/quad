@@ -60,7 +60,7 @@
 (define (setup-pdf qs pdf-path)
   ;; page size can be specified by name, or measurements.
   ;; explicit measurements from page-height and page-width supersede those from page-size.
-  (match-define (list page-width page-height) (for/list ([k (list @page-width @page-height)])
+  (match-define (list page-width page-height) (for/list ([k (list :page-width :page-height)])
                                                 (match (quad-ref (car qs) k)
                                                   [#false #false]
                                                   [val (parse-dimension val 'round)])))
@@ -70,8 +70,8 @@
             #:output-path pdf-path
             #:width (or (debug-page-width) page-width)
             #:height (or (debug-page-height) page-height)
-            #:size (quad-ref (car qs) @page-size default-page-size)
-            #:orientation (quad-ref (car qs) @page-orientation default-page-orientation)))
+            #:size (quad-ref (car qs) :page-size default-page-size)
+            #:orientation (quad-ref (car qs) :page-orientation default-page-orientation)))
 
 (define (setup-margins qs pdf)
   (define default-side-margin (min (* 72 1.5) (floor (* .20 (pdf-width pdf)))))
@@ -80,33 +80,33 @@
   ;; if only left or right margin is provided, copy other value in preference to default margin
   (define left
     (or (debug-x-margin)
-        (quad-ref (car qs) @page-margin-left
-                  (λ () (quad-ref (car qs) @page-margin-right default-side-margin)))))
+        (quad-ref (car qs) :page-margin-left
+                  (λ () (quad-ref (car qs) :page-margin-right default-side-margin)))))
   (define right
     (or (debug-x-margin)
-        (quad-ref (car qs) @page-margin-right
-                  (λ () (quad-ref (car qs) @page-margin-left default-side-margin)))))
+        (quad-ref (car qs) :page-margin-right
+                  (λ () (quad-ref (car qs) :page-margin-left default-side-margin)))))
   (define top
     (or (debug-y-margin)
-        (quad-ref (car qs) @page-margin-top
-                  (λ () (quad-ref (car qs) @page-margin-bottom default-top-margin)))))
+        (quad-ref (car qs) :page-margin-top
+                  (λ () (quad-ref (car qs) :page-margin-bottom default-top-margin)))))
   (define vert-optical-adjustment 10)
   (define bottom
     (or (debug-y-margin)
-        (quad-ref (car qs) @page-margin-bottom
-                  (λ () (+ vert-optical-adjustment (quad-ref (car qs) @page-margin-top (* default-top-margin 1.4)))))))
+        (quad-ref (car qs) :page-margin-bottom
+                  (λ () (+ vert-optical-adjustment (quad-ref (car qs) :page-margin-top (* default-top-margin 1.4)))))))
   (list left top right bottom))
 
 (define default-column-count 1)
 (define (setup-column-count qs)
-  (define cc (or (debug-column-count) (quad-ref (car qs) @column-count default-column-count)))
+  (define cc (or (debug-column-count) (quad-ref (car qs) :column-count default-column-count)))
   (unless (exact-nonnegative-integer? cc)
     (raise-argument-error 'render-pdf "positive integer" cc))
   cc)
 
 (define default-column-gap 36)
 (define (setup-column-gap qs)
-  (or (debug-column-gap) (quad-ref (car qs) @column-gap default-column-gap)))
+  (or (debug-column-gap) (quad-ref (car qs) :column-gap default-column-gap)))
 
 
 (define/contract (render-pdf qx-arg pdf-path-arg #:replace [replace? #t])

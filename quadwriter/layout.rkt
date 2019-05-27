@@ -21,15 +21,15 @@
   ;; draw with pdf text routine
   (when (pair? (quad-elems q))
     (font doc (path->string (quad-ref q font-path-key default-font-face)))
-    (font-size doc (quad-ref q @font-size default-font-size))
-    (fill-color doc (quad-ref q @font-color default-font-color))
+    (font-size doc (quad-ref q :font-size default-font-size))
+    (fill-color doc (quad-ref q :font-color default-font-color))
     (define str (unsafe-car (quad-elems q)))
     (match-define (list x y) (quad-origin q))
     (text doc str x y
-          #:tracking (quad-ref q @character-tracking 0)
-          #:bg (quad-ref q @bg)
+          #:tracking (quad-ref q :character-tracking 0)
+          #:bg (quad-ref q :bg)
           #:features '((#"tnum" . 1))
-          #:link (quad-ref q @link))))
+          #:link (quad-ref q :link))))
 
 (define (q:string-draw-end q doc)
   (when (draw-debug-string?)
@@ -63,16 +63,16 @@
     (define string-size
       (cond
         [str
-         (font-size pdf (quad-ref q @font-size default-font-size))
+         (font-size pdf (quad-ref q :font-size default-font-size))
          (font pdf (path->string (quad-ref q font-path-key default-font-face)))
          (+ (string-width pdf str
-                          #:tracking (quad-ref q @character-tracking 0))
+                          #:tracking (quad-ref q :character-tracking 0))
             ;; add one more dose because `string-width` only adds it intercharacter,
             ;; and this quad will be adjacent to another
             ;; (so we need to account for the "inter-quad" space
-            (quad-ref q @character-tracking 0))]
+            (quad-ref q :character-tracking 0))]
         [else 0]))
-    (list string-size (quad-ref q @line-height (current-line-height pdf)))))
+    (list string-size (quad-ref q :line-height (current-line-height pdf)))))
 
 (define (->string-quad q)
   (cond
@@ -81,7 +81,7 @@
      (struct-copy
       quad q:string
       [attrs (let ([attrs (quad-attrs q)])
-               (hash-ref! attrs @font-size default-font-size)
+               (hash-ref! attrs :font-size default-font-size)
                attrs)]
       [elems (quad-elems q)]
       [size (make-size-promise q)])]))
@@ -188,7 +188,7 @@
   ;; do this before ->string-quad so that it can handle the sizing promises
   (apply append
          (for/list ([q (in-list qs)])
-           (match (quad-ref q @hyphenate)
+           (match (quad-ref q :hyphenate)
              [(or #false "false") (list q)]
              [_ (for*/list ([str (in-list (quad-elems q))]
                             [hyphen-char (in-value #\u00AD)]
@@ -209,8 +209,8 @@
 
 (define (fill-wrap qs ending-q line-q)
   (match (and (pair? qs) (quad-ref (car qs) (if ending-q
-                                                @line-align
-                                                @line-align-last) "left"))
+                                                :line-align
+                                                :line-align-last) "left"))
     [align-value
      ;; words may still be in hyphenated fragments
      ;; (though soft hyphens would have been removed)
@@ -237,9 +237,9 @@
         (define word-width (sum-of-widths hung-word-sublists))
         (define word-space-width (sum-of-widths word-space-sublists))
         (define empty-hspace (- line-width
-                                (quad-ref (car qs) @inset-left 0)
+                                (quad-ref (car qs) :inset-left 0)
                                 word-width
-                                (quad-ref (car qs) @inset-right 0)))
+                                (quad-ref (car qs) :inset-right 0)))
         (define line-overfull? (negative? (- empty-hspace word-space-width)))
 
         (cond
@@ -312,7 +312,7 @@
           (match-define (list line-width line-height) (quad-size line-q))
           (define new-size (let ()
                              (define line-heights
-                               (filter-map (λ (q) (quad-ref q @line-height)) pcs))
+                               (filter-map (λ (q) (quad-ref q :line-height)) pcs))
                              (pt line-width (if (empty? line-heights) line-height (apply max line-heights)))))
           (list
            (struct-copy
@@ -332,7 +332,7 @@
              ;; this is safe because line has already been filled.
              (append
               ;; only put bullet into line if we're at the first line of the list item
-              (match (and (eq? idx 1) (quad-ref elem @list-index))
+              (match (and (eq? idx 1) (quad-ref elem :list-index))
                 [#false null]
                 [bullet
                  (define bq (struct-copy
@@ -346,7 +346,7 @@
                              [size (pt 15 (pt-y (size line-q)))]))
                  (from-parent (list bq) 'sw)])
               (from-parent
-               (match (quad-ref elem @inset-left 0)
+               (match (quad-ref elem :inset-left 0)
                  [0 elems]
                  [inset-val
                   (cons (make-quad
@@ -369,7 +369,7 @@
      (define line-q (struct-copy
                      quad q:line
                      [size (pt wrap-size (pt-y (size q:line)))]))
-     (define justify-factor (match (quad-ref (car qs) @line-align #f)
+     (define justify-factor (match (quad-ref (car qs) :line-align #f)
                               ;; allow justified lines to go wider,
                               ;; and then fill-wrap will tighten the word spaces
                               ;; this makes justified paragraphs more even, becuase
@@ -381,8 +381,8 @@
             (for/list ([qs (in-list (filter-split qs q:para-break?))])
               (wrap qs
                     (λ (q idx) (* (- wrap-size
-                                     (quad-ref (car qs) @inset-left 0)
-                                     (quad-ref (car qs) @inset-right 0))
+                                     (quad-ref (car qs) :inset-left 0)
+                                     (quad-ref (car qs) :inset-right 0))
                                   justify-factor))
                     #:nicely (match (or (current-line-wrap) (quad-ref (car qs) 'line-wrap))
                                [(or "best" "kp") #true]
@@ -392,7 +392,7 @@
                     #:finish-wrap (finish-line-wrap line-q))))]
     [_ null]))
 
-(define (make-nobreak! q) (quad-set! q @no-colbr "true")) ; cooperates with col-wrap
+(define (make-nobreak! q) (quad-set! q :no-colbr "true")) ; cooperates with col-wrap
 
 (define (do-keep-with-next! reversed-lines)
   ;; paints nobreak onto spacers that follow keep-with-next lines
@@ -403,12 +403,12 @@
      (for ([this-ln (in-list reversed-lines)]
            [prev-ln (in-list (cdr reversed-lines))]
            #:when (and (line-spacer? this-ln)
-                       (quad-ref prev-ln @keep-with-next)))
+                       (quad-ref prev-ln :keep-with-next)))
        (make-nobreak! prev-ln)
        (make-nobreak! this-ln))]))
 
 (define (apply-keeps lines)
-  (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x @block-display)) lines))
+  (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x :display)) lines))
   (for*/fold ([reversed-lines null]
               #:result (begin
                          (do-keep-with-next! reversed-lines)
@@ -421,14 +421,14 @@
     ;; so later cases are guaranteed to have earlier lines.
     (unless (eq? idx group-len)
       (cond
-        ;; if we have @keep-all we can skip @keep-first and @keep-last cases
-        [(quad-ref ln @keep-all-lines) (make-nobreak! ln)]
+        ;; if we have :keep-all we can skip :keep-first and :keep-last cases
+        [(quad-ref ln :keep-all-lines) (make-nobreak! ln)]
         ;; to keep n lines, we only paint the first n - 1
         ;; (because each nobr line sticks to the next)
-        [(let ([keep-first (quad-ref ln @keep-first-lines)])
+        [(let ([keep-first (quad-ref ln :keep-first-lines)])
            (and (number? keep-first) (< idx keep-first)))
          (make-nobreak! ln)]
-        [(let ([keep-last (quad-ref ln @keep-last-lines)])
+        [(let ([keep-last (quad-ref ln :keep-last-lines)])
            (and (number? keep-last) (< (- group-len keep-last) idx)))
          (make-nobreak! ln)]))
     (cons ln reversed-lines)))
@@ -446,8 +446,8 @@
   (font-size doc (* .8 default-font-size))
   (font doc default-font-face)
   (fill-color doc default-font-color)
-  (text doc (format "~a · ~a at ~a" (quad-ref q @page-number 0)
-                    (quad-ref q @doc-title "untitled")
+  (text doc (format "~a · ~a at ~a" (quad-ref q :page-number 0)
+                    (quad-ref q :doc-title "untitled")
                     (date->string (current-date) #t))
         x y))
 
@@ -483,23 +483,23 @@
 (define ((block-draw-start first-line) q doc)
   ;; adjust drawing coordinates for border inset
   (match-define (list bil bit bir bib)
-    (for/list ([k (in-list (list @border-inset-left @border-inset-top @border-inset-right @border-inset-bottom))])
+    (for/list ([k (in-list (list :border-inset-left :border-inset-top :border-inset-right :border-inset-bottom))])
       (quad-ref first-line k 0)))
   (match-define (list left top) (pt+ (quad-origin q) (list bil bit)))
   (match-define (list width height) (pt- (size q) (list (+ bil bir) (+ bit bib))))
   ;; fill rect
   (cond 
-    [(quad-ref first-line @background-color)
+    [(quad-ref first-line :background-color)
      => (λ (bgcolor)
           (rect doc left top width height)
           (fill doc bgcolor))])
   ;; draw border
   (match-define (list bw-left bw-top bw-right bw-bottom)
     (map (λ (k) (max 0 (quad-ref first-line k 0))) (list
-                                                    @border-width-left
-                                                    @border-width-top
-                                                    @border-width-right
-                                                    @border-width-bottom)))
+                                                    :border-width-left
+                                                    :border-width-top
+                                                    :border-width-right
+                                                    :border-width-bottom)))
   ;; adjust start and end points based on adjacent border width
   ;; so all borders overlap rectangularly
   (define (half x) (/ x 2.0))
@@ -511,21 +511,21 @@
       (line-to doc x2 y2)
       (stroke doc (or color "black") stroke-width)))
   (box-side (- left (half bw-left)) top (+ right (half bw-right)) top
-            (quad-ref first-line @border-color-top) bw-top)
+            (quad-ref first-line :border-color-top) bw-top)
   (box-side right (- top (half bw-top)) right (+ bottom (half bw-bottom))
-            (quad-ref first-line @border-color-right) bw-right)
+            (quad-ref first-line :border-color-right) bw-right)
   (box-side (+ right (half bw-right)) bottom (- left (half bw-left)) bottom
-            (quad-ref first-line @border-color-bottom) bw-bottom)
+            (quad-ref first-line :border-color-bottom) bw-bottom)
   (box-side left (+ bottom (half bw-bottom)) left (- top (half bw-top))
-            (quad-ref first-line @border-color-left) bw-left)
-  (case (quad-ref first-line @block-clip #false)
+            (quad-ref first-line :border-color-left) bw-left)
+  (case (quad-ref first-line :block-clip #false)
     [(#true "true")
      (save doc)
      (rect doc left top width height)
      (clip doc)]))
 
 (define ((block-draw-end first-line) q doc)
-  (case (quad-ref first-line @block-clip #false)
+  (case (quad-ref first-line :block-clip #false)
     [(#true "true") (restore doc)])
   (when (draw-debug-block?)
     (draw-debug q doc "#6c6" "#9c9")))
@@ -540,9 +540,9 @@
      #:size (delay (pt (pt-x (size first-line)) ; 
                        (+ (for/sum ([line (in-list lines)])
                             (pt-y (size line)))
-                          (quad-ref first-line @inset-top 0)
-                          (quad-ref first-line @inset-bottom 0))))
-     #:shift-elems (pt 0 (+ (quad-ref first-line @inset-top 0)))
+                          (quad-ref first-line :inset-top 0)
+                          (quad-ref first-line :inset-bottom 0))))
+     #:shift-elems (pt 0 (+ (quad-ref first-line :inset-top 0)))
      #:draw-start (block-draw-start first-line)
      #:draw-end (block-draw-end first-line)))
 
@@ -577,7 +577,7 @@
    (wrap qs vertical-height
          #:soft-break (λ (q) #true)
          #:hard-break q:col-break?
-         #:no-break (λ (q) (quad-ref q @no-colbr)) ; cooperates with make-nobreak
+         #:no-break (λ (q) (quad-ref q :no-colbr)) ; cooperates with make-nobreak
          #:distance (λ (q dist-so-far wrap-qs)
                       ;; do trial block insertions
                       (for/sum ([x (in-list (insert-blocks wrap-qs))])
@@ -587,14 +587,14 @@
 
 (define ((page-finish-wrap page-quad path) cols q0 q page-idx)
   (define elems
-    (match (quad-ref (car cols) @footer-display "true")
+    (match (quad-ref (car cols) :footer-display "true")
       [(or "false" "none") (from-parent cols 'nw)]
       [_
        (define-values (dir name _) (split-path (path-replace-extension path #"")))
        (define footer (struct-copy quad q:footer
                                    [attrs (let ([h (hash-copy (quad-attrs q:footer))])
-                                            (hash-set! h @page-number page-idx)
-                                            (hash-set! h @doc-title (string-titlecase (path->string name)))
+                                            (hash-set! h :page-number page-idx)
+                                            (hash-set! h :doc-title (string-titlecase (path->string name)))
                                             h)]))
        (cons footer (from-parent cols 'nw))]))
   (list (struct-copy quad page-quad [elems elems])))
@@ -605,7 +605,7 @@
   (wrap qs width
         #:soft-break (λ (q) #true)
         #:hard-break q:page-break?
-        #:no-break (λ (q) (quad-ref q @no-pbr))
+        #:no-break (λ (q) (quad-ref q :no-pbr))
         #:distance (λ (q dist-so-far wrap-qs)
                      (for/sum ([x (in-list wrap-qs)])
                        (pt-x (size x))))
@@ -614,9 +614,9 @@
 
 
 (define (insert-blocks lines)
-  (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x @block-display)) lines))
+  (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x :display)) lines))
   (append* (for/list ([line-group (in-list groups-of-lines)])
-             (if (quad-ref (car line-group) @block-display)
+             (if (quad-ref (car line-group) :display)
                  (list (block-wrap line-group))
                  line-group))))
 
@@ -641,7 +641,7 @@
              #:result (reverse qs-out))
             ([q (in-list qs)]
              [next-q (in-list (cdr qs))])
-    (match (and (q:para-break? q) (quad-ref next-q @first-line-indent 0))
+    (match (and (q:para-break? q) (quad-ref next-q :first-line-indent 0))
       [(or #false 0) (cons next-q qs-out)]
       [indent-val (list* next-q (make-quad #:from 'bo
                                            #:to 'bi
