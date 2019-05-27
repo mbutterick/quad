@@ -1,6 +1,7 @@
 #lang debug racket/base
 (require "layout.rkt"
-         "render.rkt")
+         "render.rkt"
+         "param.rkt")
 (provide render-pdf
          para-break
          line-break
@@ -9,5 +10,6 @@
          bullet-quad
          hrbr
          lbr
-         pbr)
+         pbr
+         (all-from-out "param.rkt"))
 

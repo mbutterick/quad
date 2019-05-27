@@ -458,8 +458,9 @@
                     #:printable #true
                     #:draw-start (λ (q doc)
                                    (when draw-debug-line?
-                                     (draw-debug q doc "goldenrod" "goldenrod")) 
-                                   (draw-page-footer q doc))))
+                                     (draw-debug q doc "goldenrod" "goldenrod"))
+                                   (unless (quadwriter-test-mode)
+                                     (draw-page-footer q doc)))))
 
 (define q:column (q
                   #:id 'col

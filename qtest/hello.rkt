@@ -1,3 +1,3 @@
-#lang qtest/typewriter 1
+#lang quadwriter/markdown
 
 Hello world

@@ -57,7 +57,7 @@
   [define indented-qs (insert-first-line-indents stringified-qs)]
   indented-qs)
 
-(define (setup-pdf qs pdf-path)
+(define (setup-pdf qs pdf-path compress?)
   ;; page size can be specified by name, or measurements.
   ;; explicit measurements from page-height and page-width supersede those from page-size.
   (match-define (list page-width page-height) (for/list ([k (list :page-width :page-height)])
@@ -65,7 +65,7 @@
                                                   [#false #false]
                                                   [val (parse-dimension val 'round)])))
   ;; `make-pdf` will sort out conflicts among page dimensions
-  (make-pdf #:compress #true
+  (make-pdf #:compress compress?
             #:auto-first-page #false
             #:output-path pdf-path
             #:width (or (debug-page-width) page-width)
@@ -109,8 +109,11 @@
   (or (debug-column-gap) (quad-ref (car qs) :column-gap default-column-gap)))
 
 
-(define/contract (render-pdf qx-arg pdf-path-arg #:replace [replace? #t])
-  ((qexpr? (or/c #false path? path-string?)) (#:replace any/c) . ->* . (or/c void? bytes?))
+(define/contract (render-pdf qx-arg pdf-path-arg
+                             #:replace [replace? #t]
+                             #:compress [compress? #t])
+  ((qexpr? (or/c #false path? path-string?)) (#:replace any/c
+                                              #:compress any/c) . ->* . (or/c void? bytes?))
 
   (define pdf-path (setup-pdf-path pdf-path-arg))
   (when (and (not replace?) (file-exists? pdf-path))
@@ -118,7 +121,7 @@
   
   (define qs (setup-qs qx-arg pdf-path))
 
-  (parameterize ([current-pdf (setup-pdf qs pdf-path)]
+  (parameterize ([current-pdf (setup-pdf qs pdf-path compress?)]
                  [verbose-quad-printing? #false])
     (match-define (list left-margin top-margin right-margin bottom-margin) (setup-margins qs (current-pdf)))
     (define printable-width (- (pdf-width (current-pdf)) left-margin right-margin))
