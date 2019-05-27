@@ -98,13 +98,13 @@
 
 
 (define (atomize qx #:attrs-proc [attrs-proc values]
+                 #:missing-glyph-action [missing-glyph-action (current-missing-glyph-action)]
                  #:fallback [fallback-font-family #f]
                  #:emoji [emoji-font-family #f]
                  #:math [math-font-family #f]
                  #:font-path-resolver [font-path-resolver values])
   ;; atomize a quad by reducing it to the smallest indivisible formatting units.
   ;; which are multi-character quads with the same formatting.
-  (define missing-glyph-action (current-missing-glyph-action))
   
   (let loop ([x (make-quad qx)]
              [attrs (hash-copy (current-default-attrs))]
