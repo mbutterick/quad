@@ -1,3 +1,6 @@
+![Quad](https://docs.racket-lang.org/quad/quads.png)
+
+
 Quad [![Build Status](https://travis-ci.org/mbutterick/quad.svg?branch=master)](https://travis-ci.org/mbutterick/quad)
 ----
 
