@@ -124,12 +124,13 @@
                   #:draw-start (if draw-debug-line? draw-debug void)))
 
 (define-quad line-spacer-quad line-break-quad ())
-(define q:line-spacer (q #:type line-spacer-quad
-                         #:size (pt 20 (* default-line-height 0.6))
-                         #:from 'sw
-                         #:to 'nw
-                         #:printable (λ (q sig) (not (memq sig '(start end))))
-                         #:draw-start (if (draw-debug-line?) draw-debug void)))
+(define (make-post-paragraph-spacer)
+  (q #:type line-spacer-quad
+     #:size (pt 20 (* default-line-height 0.6))
+     #:from 'sw
+     #:to 'nw
+     #:printable (λ (q sig) (not (memq sig '(start end))))
+     #:draw-start (if (draw-debug-line?) draw-debug void)))
 
 (define softies (map string '(#\space #\- #\u00AD)))
 
@@ -333,10 +334,10 @@
                         elems)]) 'sw))]))]
          [_ null])]))
   (append new-lines (match ending-q
-                      [(? page-break-quad?) (list ending-q)] ; hard page break
-                      [any #:when any null] ; hard line break
-                      [_ (list (struct-copy quad q:line-spacer
-                                            [attrs (hash-copy (quad-attrs q:line-spacer))]))]))) ; paragraph break
+                      [(? page-break-quad? page-break) (list page-break)] ; hard page break
+                      [#false (list (make-post-paragraph-spacer))] ; paragraph break
+                      [_ null]))) ; hard line break
+                       
 
 (define (line-wrap qs wrap-size)
   (match qs
