@@ -2,7 +2,7 @@
 (require quadwriter pitfall/check-pdf racket/runtime-path)
 
 (define-for-syntax (test-pdf-name path)
-  (path-add-extension (path-replace-extension path #".pdf") #"" #" copy."))
+  (path-add-extension (path-replace-extension path #".pdf") #"" #" tester."))
 
 (define-syntax (make-test-pdf stx)
   (syntax-case stx ()
