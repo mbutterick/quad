@@ -107,6 +107,24 @@
     (stroke doc stroke-color)
     (restore doc)))
 
+
+(define-quad q:line-break quad ())
+(define lbr (make-q:line-break #:printable #f
+                               #:id 'lbr))
+;; treat paragraph break as special kind of line break
+(define-quad q:para-break q:line-break ())
+(define pbr (make-q:para-break #:printable #f
+                               #:id 'pbr))
+(define-quad q:hr-break q:line-break ())
+(define hrbr (make-q:hr-break #:printable #t
+                              #:id 'hrbr))
+
+(define-quad q:col-break q:line-break ())
+(define colbr (make-q:col-break #:printable #f #:id 'colbr))
+
+(define-quad q:page-break q:line-break ())
+(define pgbr (make-q:page-break #:printable #f #:id 'pgbr))
+
 (define q:line (q #:size (pt 0 default-line-height)
                   #:from 'sw
                   #:to 'nw
@@ -114,7 +132,7 @@
                   #:id 'line
                   #:draw-start (if draw-debug-line? draw-debug void)))
 
-(struct line-spacer quad () #:transparent)
+(struct line-spacer q:line-break () #:transparent)
 (define q:line-spacer (q #:type line-spacer
                          #:size (pt 20 (* default-line-height 0.6))
                          #:from 'sw
@@ -161,22 +179,6 @@
                                 [size (make-size-promise last-q str+hyphen)])))]
     [_ qs]))
 
-(define-quad q:line-break quad ())
-(define lbr (make-q:line-break #:printable #f
-                               #:id 'lbr))
-;; treat paragraph break as special kind of line break
-(define-quad q:para-break q:line-break ())
-(define pbr (make-q:para-break #:printable #f
-                               #:id 'pbr))
-(define-quad q:hr-break q:line-break ())
-(define hrbr (make-q:hr-break #:printable #t
-                              #:id 'hrbr))
-
-(define-quad q:col-break q:line-break ())
-(define colbr (make-q:col-break #:printable #f #:id 'colbr))
-
-(define-quad q:page-break q:line-break ())
-(define pgbr (make-q:page-break #:printable #f #:id 'pgbr))
 
 (module+ test
   (require rackunit)
@@ -359,7 +361,8 @@
   (append new-lines (cond
                       [(q:page-break? ending-q) (list ending-q)] ; hard page break
                       [ending-q null] ; hard line break
-                      [else (list q:line-spacer)]))) ; paragraph break
+                      [else (list (struct-copy quad q:line-spacer
+                                               [attrs (hash-copy (quad-attrs q:line-spacer))]))]))) ; paragraph break
 
 (define (line-wrap qs wrap-size)
   (match qs
@@ -404,8 +407,8 @@
            [prev-ln (in-list (cdr reversed-lines))]
            #:when (and (line-spacer? this-ln)
                        (quad-ref prev-ln :keep-with-next)))
-       (make-nobreak! prev-ln)
-       (make-nobreak! this-ln))]))
+       (make-nobreak! this-ln)
+       (make-nobreak! prev-ln))]))
 
 (define (apply-keeps lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x :display)) lines))
