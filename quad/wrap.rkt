@@ -20,15 +20,21 @@
     [(list (list)) (list)]
     [wraps wraps]))
 
+(define (arg->proc arg [arity 1])
+  (match arg
+    [(? procedure? proc) proc]
+    [val #:when (eq? arity 2) (λ (q idx) val)]
+    [val (λ (q) val)]))
+
 (define (wrap qs
               [max-distance-proc-arg (current-wrap-distance)]
               [debug #f]
               ;; hard break: must wrap
-              #:hard-break [hard-break-func (λ (x) #f)]
+              #:hard-break [hard-break-func-arg #false]
               ;; soft break: can wrap
-              #:soft-break [soft-break-func (λ (x) #f)]
+              #:soft-break [soft-break-func-arg #false]
               ;; no break: must not wrap (exception to hard / soft predicates)
-              #:no-break [no-break-func #f]
+              #:no-break [no-break-func-arg #false]
               ;; size of potential wrap.
               ;; simple: measure q and add it to last-dist
               ;; sophisticated: process all wrap-qs and measure resulting 
@@ -49,11 +55,12 @@
               #:finish-wrap [finish-wrap-func default-finish-wrap-func]
               #:nicely [nicely? #f])
   (define wrap-proc (if nicely? wrap-best wrap-first))
-  (define (hard-break? x) (and (hard-break-func x) (or (not no-break-func) (not (no-break-func x)))))
-  (define (soft-break? x) (and (soft-break-func x) (or (not no-break-func) (not (no-break-func x)))))
-  (define max-distance-proc (match max-distance-proc-arg
-                              [(? procedure? proc) proc]
-                              [val (λ (q idx) val)]))
+  (define hard-break-func (arg->proc hard-break-func-arg))
+  (define soft-break-func (arg->proc soft-break-func-arg))
+  (define no-break-func (arg->proc no-break-func-arg))
+  (define (hard-break? x) (and (hard-break-func x) (not (no-break-func x))))
+  (define (soft-break? x) (and (soft-break-func x) (not (no-break-func x))))
+  (define max-distance-proc (arg->proc max-distance-proc-arg 2))
   ; takes quads in wrap, triggering quad, and wrap idx; returns list containing wrap (and maybe other things)
   (define (finish-wrap qs previous-wrap-ender wrap-idx [wrap-triggering-q (car qs)])
     ;; reverse because quads accumulated in reverse
