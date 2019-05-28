@@ -3,13 +3,12 @@
          "render.rkt"
          "param.rkt")
 (provide render-pdf
-         para-break
-         line-break
-         page-break
-         column-break
-         bullet-quad
-         hrbr
-         lbr
-         pbr
+         q:para-break
+         q:line-break
+         q:page-break
+         q:column-break
+         q:hr-break
+         q:line-break
+         q:page-break
          (all-from-out "param.rkt"))
 

@@ -5,6 +5,7 @@
          racket/file
          pitfall
          quad
+         hyphenate
          sugar/coerce
          sugar/debug
          "attrs.rkt"
@@ -12,9 +13,6 @@
          "font.rkt"
          "layout.rkt")
 (provide (all-defined-out))
-
-
-
 
 (define default-page-size "letter")
 (define default-page-orientation "tall")
@@ -31,22 +29,43 @@
 (define (replace-breaks x)
   (map-elements (λ (el)
                   (match el
-                    [(== para-break) pbr]
-                    [(== line-break) lbr]
-                    [(== column-break) colbr]
-                    [(== page-break) pgbr]
+                    [(== para-break) q:para-break]
+                    [(== line-break) q:line-break]
+                    [(== column-break) q:column-break]
+                    [(== page-break) q:page-break]
                     [_ el])) x))
+
+(define (handle-hyphenate qs)
+  ;; find quads that want hyphenation and split them into smaller pieces
+  ;; do this before ->string-quad so that it can handle the sizing promises
+  (apply append
+         (for/list ([q (in-list qs)])
+           (match (quad-ref q :hyphenate)
+             [(or #false "false") (list q)]
+             [_ (for*/list ([str (in-list (quad-elems q))]
+                            [hyphen-char (in-value #\u00AD)]
+                            [hstr (in-value (hyphenate str hyphen-char
+                                                       #:min-left-length 3
+                                                       #:min-right-length 3))]
+                            [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
+                  (struct-copy quad q [elems (list substr)]))]))))
+
+(define (handle-cascading-attrs attrs)
+  (resolve-font-path attrs)
+  (resolve-font-size attrs))
 
 (define default-line-height-multiplier 1.42)
 (define (setup-qs qx-arg pdf-path)
   [define qexpr (replace-breaks qx-arg)]
   [define the-quad
-    (qexpr->quad  `(q ((font-family ,default-font-family)
-                       (font-size ,(number->string default-font-size))
-                       (line-height ,(number->string (floor (* default-line-height-multiplier default-font-size))))) ,qexpr))]
+    (qexpr->quad (list 'q (list->attrs
+                           :font-family default-font-family
+                           :font-size (number->string default-font-size)
+                           :line-height (number->string (floor (* default-line-height-multiplier default-font-size)))) qexpr))]
   (setup-font-path-table! pdf-path)
   [define atomized-qs
-    (time-name atomize (atomize the-quad #:attrs-proc handle-cascading-attrs
+    (time-name atomize (atomize the-quad
+                                #:attrs-proc handle-cascading-attrs
                                 #:missing-glyph-action 'fallback
                                 #:fallback "fallback"
                                 #:emoji "emoji"

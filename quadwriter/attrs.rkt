@@ -1,18 +1,13 @@
 #lang debug racket/base
-(require (for-syntax racket/base racket/syntax)
+(require (for-syntax racket/base racket/syntax syntax/strip-context)
          racket/match
+         racket/sequence
          racket/string)
 (provide (all-defined-out))
-#|
-Naming guidelines
-+ shorter is better
-+ general to specific: border-color-left, not border-left-color or left-border-color
-+ don't refer to specific output format, e.g. PDF or HTML
-+ consistency with CSS style property names is OK if the concept is mostly the same, but usually it's not
-+ default value for any missing attr is #false
-+ measurement units are points by default
 
-|#
+(define (list->attrs . kvs)
+  (for/list ([kv (in-slice 2 kvs)])
+    kv))
 
 (define (cm->in x) (/ x 2.54))
 (define (in->pts x) (* 72 x))
@@ -42,36 +37,52 @@ Naming guidelines
     (hash-set! new-hash k v))
   new-hash)
 
-(define :font-family 'font-family)
-(define :font-size 'font-size)
-(define :font-size-adjust 'font-size-adjust)
-(define :font-color 'font-color)
-(define :font-italic 'font-italic)
-(define :font-bold 'font-bold)
-(define :character-tracking 'character-tracking)
-(define :bg 'bg)
-(define :link 'link)
-(define :href 'href)
-(define :line-height 'line-height)
-(define :hyphenate 'hyphenate)
-(define :list-index 'list-index)
-(define :no-colbr 'no-colbr)
-(define :no-pbr 'no-pbr)
-(define :page-number 'page-number)
-(define :doc-title 'doc-title)
-
 (define-syntax (define-attrs stx)
   (syntax-case stx ()
-    [(_ ID (ATTR-NAME ...))
+    [(_ (ATTR-NAME ...))
      (with-syntax ([(ATTR-ID ...) (for/list ([attr-id (in-list (syntax->list #'(ATTR-NAME ...)))])
-                                    (format-id #'ID ":~a" (syntax-e attr-id)))])
-     #'(begin
-         (define ATTR-ID 'ATTR-NAME) ...
-         (define ID (list ATTR-ID ...))))]))
+                                    (format-id stx ":~a" (syntax-e attr-id)))])
+       #'(begin
+           (define ATTR-ID 'ATTR-NAME) ...))]
+    [(_ ID (ATTR-NAME ...))
+     (replace-context stx
+                      #'(begin
+                          (define ID (list 'ATTR-NAME ...))
+                          (define-attrs (ATTR-NAME ...))))]))
+
+
+#|
+Naming guidelines
++ shorter is better
++ general to specific: border-color-left, not border-left-color or left-border-color
++ don't refer to specific output format, e.g. PDF or HTML
++ consistency with CSS style property names is OK if the concept is mostly the same, but usually it's not
++ default value for any missing attr is #false
++ measurement units are points by default
+
+|#
+
+(define-attrs (font-family
+               font-size
+               font-size-adjust
+               font-color
+               font-features
+               font-italic
+               font-bold
+               character-tracking
+               bg
+               link
+               href
+               line-height
+               hyphenate
+               list-index
+               no-colbr
+               no-pbr
+               page-number
+               doc-title))
   
 
-(define-attrs block-attrs (
-                           display
+(define-attrs block-attrs (display
                            ;; inset values increase the layout size of the quad.
                            ;; they are relative to the natural layout box.
                            inset-top
@@ -130,5 +141,4 @@ Naming guidelines
                            page-margin-left
                            page-margin-right
 
-                           footer-display
-                           ))
+                           footer-display))

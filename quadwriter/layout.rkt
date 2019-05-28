@@ -8,7 +8,6 @@
          pitfall
          quad
          racket/unsafe/ops
-         hyphenate
          "attrs.rkt"
          "param.rkt"
          "font.rkt")
@@ -18,7 +17,6 @@
 (define-quad string-quad quad ())
  
 (define (q:string-draw q doc)
-  ;; draw with pdf text routine
   (when (pair? (quad-elems q))
     (font doc (path->string (quad-ref q font-path-key default-font-face)))
     (font-size doc (quad-ref q :font-size default-font-size))
@@ -28,7 +26,7 @@
     (text doc str x y
           #:tracking (quad-ref q :character-tracking 0)
           #:bg (quad-ref q :bg)
-          #:features '((#"tnum" . 1))
+          #:features (quad-ref q :font-features default-font-features)
           #:link (quad-ref q :link))))
 
 (define (q:string-draw-end q doc)
@@ -66,18 +64,15 @@
          (font-size pdf (quad-ref q :font-size default-font-size))
          (font pdf (path->string (quad-ref q font-path-key default-font-face)))
          (+ (string-width pdf str
-                          #:tracking (quad-ref q :character-tracking 0))
-            ;; add one more dose because `string-width` only adds it intercharacter,
-            ;; and this quad will be adjacent to another
-            ;; (so we need to account for the "inter-quad" space
-            (quad-ref q :character-tracking 0))]
+                          #:tracking (quad-ref q :character-tracking 0)
+                          #:features (quad-ref q :font-features default-font-features)))]
         [else 0]))
     (list string-size (quad-ref q :line-height (current-line-height pdf)))))
 
 (define (->string-quad q)
-  (cond
-    [(q:line-break? q) q]
-    [else
+  (match q
+    [(? line-break-quad?) q]
+    [_
      (struct-copy
       quad q:string
       [attrs (let ([attrs (quad-attrs q)])
@@ -88,42 +83,38 @@
 
 
 (define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"] [stroke-width 0.5])
-  ;; ostensibly it would be possible to control draw-debug with a quad attribute
-  ;; but that would potentially mess up unit tests (because something has to be inserted in the data)
-  ;; therefore controlling debug state with a parameter is cleaner.
   (when (draw-debug?)
     (save doc)
     ;; draw layout box
     (line-width doc stroke-width)
     ; subtracting stroke-width keeps adjacent boxes from overlapping
     (save doc)
-    (apply rect doc (append (pt+ (quad-origin q)) (map (λ (x) (- x 0.5)) (size q))))
+    (apply rect doc (append (pt+ (quad-origin q)) (map (λ (x) (- x stroke-width)) (size q))))
     (clip doc)
     (define pt (to-point q))
     (circle doc (pt-x pt) (pt-y pt) (+ 3 stroke-width))
     (fill doc fill-color)
     (restore doc)
-    (apply rect doc (append (pt+ (quad-origin q)) (map (λ (x) (- x 0.5)) (size q))))
+    (apply rect doc (append (pt+ (quad-origin q)) (map (λ (x) (- x stroke-width)) (size q))))
     (stroke doc stroke-color)
     (restore doc)))
 
 
-(define-quad q:line-break quad ())
-(define lbr (make-q:line-break #:printable #f
-                               #:id 'lbr))
-;; treat paragraph break as special kind of line break
-(define-quad q:para-break q:line-break ())
-(define pbr (make-q:para-break #:printable #f
-                               #:id 'pbr))
-(define-quad q:hr-break q:line-break ())
-(define hrbr (make-q:hr-break #:printable #t
-                              #:id 'hrbr))
-
-(define-quad q:col-break q:line-break ())
-(define colbr (make-q:col-break #:printable #f #:id 'colbr))
-
-(define-quad q:page-break q:line-break ())
-(define pgbr (make-q:page-break #:printable #f #:id 'pgbr))
+(define-quad line-break-quad quad ())
+(define q:line-break (make-line-break-quad #:printable #f
+                                           #:id 'line-break))
+(define-quad para-break-quad line-break-quad ())
+(define q:para-break (make-para-break-quad #:printable #f
+                                           #:id 'para-break))
+(define-quad hr-break-quad line-break-quad ())
+(define q:hr-break (make-hr-break-quad #:printable #t
+                                       #:id 'hr-break))
+(define-quad column-break-quad line-break-quad ())
+(define q:column-break (make-column-break-quad #:printable #f
+                                               #:id 'column-break))
+(define-quad page-break-quad line-break-quad ())
+(define q:page-break (make-page-break-quad #:printable #f
+                                           #:id 'page-break))
 
 (define q:line (q #:size (pt 0 default-line-height)
                   #:from 'sw
@@ -132,8 +123,8 @@
                   #:id 'line
                   #:draw-start (if draw-debug-line? draw-debug void)))
 
-(struct line-spacer q:line-break () #:transparent)
-(define q:line-spacer (q #:type line-spacer
+(define-quad line-spacer-quad line-break-quad ())
+(define q:line-spacer (q #:type line-spacer-quad
                          #:size (pt 20 (* default-line-height 0.6))
                          #:from 'sw
                          #:to 'nw
@@ -182,25 +173,10 @@
 
 (module+ test
   (require rackunit)
-  (check-true (q:line-break? (second (quad-elems (q "foo" pbr "bar")))))
-  (check-true (q:line-break? (second (atomize (q "foo" pbr "bar"))))))
+  (check-true (line-break-quad? (second (quad-elems (q "foo" q:page-break "bar")))))
+  (check-true (line-break-quad? (second (atomize (q "foo" q:page-break "bar"))))))
 
-(define (handle-hyphenate qs)
-  ;; find quads that want hyphenation and split them into smaller pieces
-  ;; do this before ->string-quad so that it can handle the sizing promises
-  (apply append
-         (for/list ([q (in-list qs)])
-           (match (quad-ref q :hyphenate)
-             [(or #false "false") (list q)]
-             [_ (for*/list ([str (in-list (quad-elems q))]
-                            [hyphen-char (in-value #\u00AD)]
-                            [hstr (in-value (hyphenate str hyphen-char
-                                                       #:min-left-length 3
-                                                       #:min-right-length 3))]
-                            [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
-                  (struct-copy quad q [elems (list substr)]))]))))
-
-(define-quad filler quad ())
+(define-quad filler-quad quad ())
 
 (define (sum-of-widths qss)
   (for*/sum ([qs (in-list qss)]
@@ -265,7 +241,7 @@
            (define end-hspace (- empty-hspace word-space-width))
            ; make filler a leading quad, not a parent / grouping quad,
            ;; so that elements can still be reached by consolidate-runs
-           (list* (make-quad #:type filler
+           (list* (make-quad #:type filler-quad
                              #:from-parent (quad-from-parent (car qs))
                              #:from 'bo
                              #:to 'bi
@@ -274,7 +250,7 @@
                   (struct-copy quad (car qs) [from-parent #f])
                   (cdr qs))])])]))
 
-(define-quad offsetter quad ())
+(define-quad offsetter-quad quad ())
 
 (define (hr-draw dq doc)
   (match-define (list left top) (quad-origin dq))
@@ -290,8 +266,6 @@
 (define (make-hr-quad line-q)
   (struct-copy quad line-q [draw-start hr-draw]))
 
-(define bullet-quad '(q ((special "bullet"))))
-
 (define ((finish-line-wrap line-q) pcs-in opening-q ending-q idx)
   ;; we curry line-q so that the wrap size can be communicated to this operation
   ;; remove unused soft hyphens so they don't affect final shaping
@@ -301,7 +275,7 @@
   (define new-lines
     (cond
       [(empty? pcs-printing) null]
-      [(q:hr-break? ending-q) (list (make-hr-quad line-q))]
+      [(hr-break-quad? ending-q) (list (make-hr-quad line-q))]
       [else
        ;; render hyphen first so that all printable characters are available for size-dependent ops.
        (define pcs-with-hyphen (render-hyphen pcs-printing ending-q))
@@ -355,60 +329,59 @@
                          #:draw-end q:string-draw-end
                          #:to 'sw
                          #:size (pt inset-val 5)
-                         #:type offsetter)
+                         #:type offsetter-quad)
                         elems)]) 'sw))]))]
          [_ null])]))
-  (append new-lines (cond
-                      [(q:page-break? ending-q) (list ending-q)] ; hard page break
-                      [ending-q null] ; hard line break
-                      [else (list (struct-copy quad q:line-spacer
-                                               [attrs (hash-copy (quad-attrs q:line-spacer))]))]))) ; paragraph break
+  (append new-lines (match ending-q
+                      [(? page-break-quad?) (list ending-q)] ; hard page break
+                      [any #:when any null] ; hard line break
+                      [_ (list (struct-copy quad q:line-spacer
+                                            [attrs (hash-copy (quad-attrs q:line-spacer))]))]))) ; paragraph break
 
 (define (line-wrap qs wrap-size)
   (match qs
-    [(? pair?)
+    [(? null?) null]
+    [_
      (unless (positive? wrap-size)
        (raise-argument-error 'line-wrap "positive number" wrap-size))
-     (define line-q (struct-copy
-                     quad q:line
-                     [size (pt wrap-size (pt-y (size q:line)))]))
-     (define justify-factor (match (quad-ref (car qs) :line-align #f)
-                              ;; allow justified lines to go wider,
-                              ;; and then fill-wrap will tighten the word spaces
-                              ;; this makes justified paragraphs more even, becuase
-                              ;; some lines are a little tight, as opposed to all of them being loose
-                              ["justify" 1.04]
-                              [_ 1]))
+     (define line-q (struct-copy quad q:line
+                                 [size (pt wrap-size (pt-y (size q:line)))]))
+     (define permitted-justify-overfill
+       (match (quad-ref (car qs) :line-align)
+         ;; allow justified lines to go wider,
+         ;; and then fill-wrap will tighten thes word spaces
+         ;; this makes justified paragraphs more even, becuase
+         ;; some lines are a little tight, as opposed to all of them being loose
+         ["justify" 1.04]
+         [_ 1]))
      (apply append
             ;; next line removes all para-break? quads as a consequence
-            (for/list ([qs (in-list (filter-split qs q:para-break?))])
+            (for/list ([qs (in-list (filter-split qs para-break-quad?))])
               (wrap qs
                     (λ (q idx) (* (- wrap-size
                                      (quad-ref (car qs) :inset-left 0)
                                      (quad-ref (car qs) :inset-right 0))
-                                  justify-factor))
+                                  permitted-justify-overfill))
                     #:nicely (match (or (current-line-wrap) (quad-ref (car qs) 'line-wrap))
                                [(or "best" "kp") #true]
                                [_ #false])
-                    #:hard-break q:line-break?
+                    #:hard-break line-break-quad?
                     #:soft-break soft-break-for-line?
-                    #:finish-wrap (finish-line-wrap line-q))))]
-    [_ null]))
+                    #:finish-wrap (finish-line-wrap line-q))))]))
 
 (define (make-nobreak! q) (quad-set! q :no-colbr "true")) ; cooperates with col-wrap
 
 (define (do-keep-with-next! reversed-lines)
   ;; paints nobreak onto spacers that follow keep-with-next lines
   ;; (we are iterating backward, so the geometrically previous ln follows the spacer)
-  (cond
-    [(null? reversed-lines) null]
-    [else
-     (for ([this-ln (in-list reversed-lines)]
-           [prev-ln (in-list (cdr reversed-lines))]
-           #:when (and (line-spacer? this-ln)
-                       (quad-ref prev-ln :keep-with-next)))
-       (make-nobreak! this-ln)
-       (make-nobreak! prev-ln))]))
+  (match reversed-lines
+    [(? null?) null]
+    [_ (for ([this-ln (in-list reversed-lines)]
+             [prev-ln (in-list (cdr reversed-lines))]
+             #:when (and (line-spacer-quad? this-ln)
+                         (quad-ref prev-ln :keep-with-next)))
+         (make-nobreak! this-ln)
+         (make-nobreak! prev-ln))]))
 
 (define (apply-keeps lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x :display)) lines))
@@ -435,9 +408,6 @@
            (and (number? keep-last) (< (- group-len keep-last) idx)))
          (make-nobreak! ln)]))
     (cons ln reversed-lines)))
-
-(define zoom-mode? #f)
-(define zoom-scale 2)
 
 (define (page-draw-start q doc)
   (add-page doc)
@@ -470,8 +440,8 @@
                   #:from 'ne
                   #:to 'nw))
 
-(struct column-spacer quad () #:transparent)
-(define q:column-spacer (q #:type column-spacer
+(struct column-spacer-quad quad () #:transparent)
+(define q:column-spacer (q #:type column-spacer-quad
                            #:from 'ne
                            #:to 'nw
                            #:printable (λ (q sig) (not (memq sig '(start end))))))
@@ -534,21 +504,21 @@
   (when (draw-debug-block?)
     (draw-debug q doc "#6c6" "#9c9")))
 
-(define (block-wrap lines)
-  (define first-line (car lines)) 
-  (q #:from 'sw
-     #:to 'nw
-     #:elems (from-parent lines 'nw)
-     #:id 'block
-     #:attrs (quad-attrs first-line)
-     #:size (delay (pt (pt-x (size first-line)) ; 
-                       (+ (for/sum ([line (in-list lines)])
-                            (pt-y (size line)))
-                          (quad-ref first-line :inset-top 0)
-                          (quad-ref first-line :inset-bottom 0))))
-     #:shift-elems (pt 0 (+ (quad-ref first-line :inset-top 0)))
-     #:draw-start (block-draw-start first-line)
-     #:draw-end (block-draw-end first-line)))
+(define/match (lines->block lines)
+  [((cons ln0 _))
+   (q #:from 'sw
+      #:to 'nw
+      #:elems (from-parent lines 'nw)
+      #:id 'block
+      #:attrs (quad-attrs ln0)
+      #:size (delay (pt (pt-x (size ln0)) ; 
+                        (+ (for/sum ([line (in-list lines)])
+                             (pt-y (size line)))
+                           (quad-ref ln0 :inset-top 0)
+                           (quad-ref ln0 :inset-bottom 0))))
+      #:shift-elems (pt 0 (+ (quad-ref ln0 :inset-top 0)))
+      #:draw-start (block-draw-start ln0)
+      #:draw-end (block-draw-end ln0))])
 
 (define/match (from-parent qs [where #f])
   ;; doesn't change any positioning. doesn't depend on state. can happen anytime.
@@ -580,7 +550,7 @@
   (add-between
    (wrap qs vertical-height
          #:soft-break (λ (q) #true)
-         #:hard-break q:col-break?
+         #:hard-break column-break-quad?
          #:no-break (λ (q) (quad-ref q :no-colbr)) ; cooperates with make-nobreak
          #:distance (λ (q dist-so-far wrap-qs)
                       ;; do trial block insertions
@@ -608,27 +578,21 @@
     (raise-argument-error 'page-wrap "positive number" width))
   (wrap qs width
         #:soft-break (λ (q) #true)
-        #:hard-break q:page-break?
+        #:hard-break page-break-quad?
         #:no-break (λ (q) (quad-ref q :no-pbr))
         #:distance (λ (q dist-so-far wrap-qs)
                      (for/sum ([x (in-list wrap-qs)])
                        (pt-x (size x))))
         #:finish-wrap (page-finish-wrap page-quad (pdf-output-path (current-pdf)))))
 
-
-
 (define (insert-blocks lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x :display)) lines))
   (append* (for/list ([line-group (in-list groups-of-lines)])
              (if (quad-ref (car line-group) :display)
-                 (list (block-wrap line-group))
+                 (list (lines->block line-group))
                  line-group))))
 
-(define (handle-cascading-attrs attrs)
-  (resolve-font-path attrs)
-  (resolve-font-size attrs))
-
-(define-quad first-line-indent quad ())
+(define-quad first-line-indent-quad quad ())
 
 (define (insert-first-line-indents qs-in)
   ;; first line indents are quads inserted at the beginning of a paragraph
@@ -639,17 +603,17 @@
   ;; stick a pbr on the front if there isn't one already
   ;; because of the "lookahead" style of iteration
   (define qs (match qs-in
-               [(list (? q:para-break?) _ ...) qs-in]
-               [_ (cons pbr qs-in)]))
+               [(list (? para-break-quad?) _ ...) qs-in]
+               [_ (cons q:page-break qs-in)]))
   (for/fold ([qs-out null]
              #:result (reverse qs-out))
             ([q (in-list qs)]
              [next-q (in-list (cdr qs))])
-    (match (and (q:para-break? q) (quad-ref next-q :first-line-indent 0))
+    (match (and (para-break-quad? q) (quad-ref next-q :first-line-indent 0))
       [(or #false 0) (cons next-q qs-out)]
       [indent-val (list* next-q (make-quad #:from 'bo
                                            #:to 'bi
                                            #:draw-end q:string-draw-end
-                                           #:type first-line-indent
+                                           #:type first-line-indent-quad
                                            #:attrs (quad-attrs next-q)
                                            #:size (pt indent-val 10)) qs-out)])))

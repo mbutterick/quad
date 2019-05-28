@@ -11,23 +11,14 @@
 (define default-font-size 12)
 (define default-line-height 16)
 (define default-font-color "black")
+(define default-font-features (list (cons #"tnum" 1)))
 
 (define font-paths (make-hash))
 
-(define (setup-font-path-table! base-path)
-  ;; populate `font-paths` table with font paths
-  ;; search "fonts" subdirectory in project for other subdirectories
-  ;; which are presumed to contain fonts.
-  ;; and link them to their family names & styles.
-  ;; this allows a flexible mapping from internal to external names, like @font-face
-  ;; note that all the semantics are derived from the file system
-  ;; not any metadata fields within the font.
-  ;; this is faster and easier, because you can just muck with the directory and filenames
-  ;; to change the font mapping.
-  ;; though it also creates the potential for mischief,
-  ;; if a font is named something that doesn't reflect its visual reality.
-  ;; but we are not the font police.
+(define top-font-directory "fonts")
+(define font-file-extensions '(#".otf" #".ttf" #".woff"))
 
+(define (setup-font-path-table! base-path)
   ;; rules for font naming
   ;; "fonts" subdirectory on top
   ;; family directories inside: each named with font family name
@@ -35,19 +26,19 @@
   ;; and change the font files without disturbing anything else.
   (hash-clear! font-paths)
   (define-values (dir path _) (split-path base-path))
-  (define doc-fonts-dir (build-path dir "fonts"))
+  (define doc-fonts-dir (build-path dir top-font-directory))
   ;; run doc-fonts-dir first because earlier fonts take precedence (using hash-ref! below)
   (for* ([fonts-dir (in-list (list doc-fonts-dir quadwriter-fonts-dir))]
          #:when (directory-exists? fonts-dir)
          [font-family-subdir (in-directory fonts-dir)]
          #:when (directory-exists? font-family-subdir)
          [font-path (in-directory font-family-subdir)]
-         #:when (member (path-get-extension font-path) '(#".otf" #".ttf" #".woff")))
+         #:when (member (path-get-extension font-path) font-file-extensions))
     (match-define (list font-path-string family-name)
-      (map (λ (x) (path->string (find-relative-path fonts-dir x))) (list font-path font-family-subdir)))
-    ;; search for subdir in path matching style name
-    ;; note that this will work if fonts are contained in another subdirectory (e.g., real font name)
-    (define path-parts (map string-downcase (map path->string (explode-path (string->path (string-downcase font-path-string))))))
+      (for/list ([x (list font-path font-family-subdir)])
+        (path->string (find-relative-path fonts-dir x))))
+    (define path-parts (for/list ([part (in-list (explode-path (string->path (string-downcase font-path-string))))])
+                         (path->string part)))
     (define key
       (cons (string-downcase family-name)
             (cond
@@ -70,9 +61,7 @@
   (define regular-key (cons font-family 'r))
   (cond
     [(hash-ref font-paths key #false)]
-    ;; if there isn't one, try the regular style.
     [(hash-ref font-paths regular-key #false)]
-    ;; If there isn't one, use the default.
     [else default-font-face]))
 
 (define (resolve-font-path attrs)
