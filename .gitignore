@@ -17,7 +17,6 @@ Icon
 
 *logger.txt
 *log.txt
-*.pdf
 *.cache
 quad/scribblings/manual-fonts.css
 quad/scribblings/manual-racket.css
