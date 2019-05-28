@@ -144,13 +144,13 @@
       [(? empty?) (reverse runs)]
       [(cons (? string-quad? strq) rest)
        (define-values (run-pcs rest) (splitf-at pcs (λ (p) (same-run? strq p))))
-       (define new-run (struct-copy quad q:string
-                                    [attrs (quad-attrs strq)]
-                                    [elems (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
-                                                                                   (quad-elems pc))))]
-                                    [size (delay (pt (for/sum ([pc (in-list run-pcs)])
-                                                       (pt-x (size pc)))
-                                                     (pt-y (size strq))))]))
+       (define new-run (quad-copy q:string
+                                  [attrs (quad-attrs strq)]
+                                  [elems (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
+                                                                                 (quad-elems pc))))]
+                                  [size (delay (pt (for/sum ([pc (in-list run-pcs)])
+                                                     (pt-x (size pc)))
+                                                   (pt-y (size strq))))]))
        (loop (cons new-run runs) rest)]
       [(cons first rest) (loop (cons first runs) rest)])))
 
@@ -166,9 +166,9 @@
      (define str (car (quad-elems last-q)))
      (define str+hyphen (string-append str "-"))
      (append head
-             (list (struct-copy quad last-q
-                                [elems (list str+hyphen)]
-                                [size (make-size-promise last-q str+hyphen)])))]
+             (list (quad-copy last-q
+                              [elems (list str+hyphen)]
+                              [size (make-size-promise last-q str+hyphen)])))]
     [_ qs]))
 
 
@@ -205,12 +205,12 @@
              (define last-char-str (regexp-match #rx"[.,:;’-]$" (car (quad-elems last-q))))
              (match last-char-str
                [#false word-sublists]
-               [_ (define hanger-q (struct-copy quad last-q
-                                                [elems null]
-                                                [size (let ([p (make-size-promise last-q (car last-char-str))])
-                                                        (delay
-                                                          (match-define (list x y) (force p))
-                                                          (pt (- x) y)))]))
+               [_ (define hanger-q (quad-copy last-q
+                                              [elems null]
+                                              [size (let ([p (make-size-promise last-q (car last-char-str))])
+                                                      (delay
+                                                        (match-define (list x y) (force p))
+                                                        (pt (- x) y)))]))
                   (define last-sublist (append prev-qs (list last-q hanger-q)))
                   (append sublists (list last-sublist))])]))
         (define word-width (sum-of-widths hung-word-sublists))
@@ -248,7 +248,7 @@
                              #:to 'bi
                              #:size (pt (* end-hspace space-multiplier) 0)
                              #:attrs (quad-attrs (car qs)))
-                  (struct-copy quad (car qs) [from-parent #f])
+                  (quad-copy (car qs) [from-parent #f])
                   (cdr qs))])])]))
 
 (define-quad offsetter-quad quad ())
@@ -265,7 +265,7 @@
   (restore doc))
 
 (define (make-hr-quad line-q)
-  (struct-copy quad line-q [draw-start hr-draw]))
+  (quad-copy line-q [draw-start hr-draw]))
 
 (define ((finish-line-wrap line-q) pcs-in opening-q ending-q idx)
   ;; we curry line-q so that the wrap size can be communicated to this operation
@@ -345,8 +345,7 @@
     [_
      (unless (positive? wrap-size)
        (raise-argument-error 'line-wrap "positive number" wrap-size))
-     (define line-q (struct-copy quad q:line
-                                 [size (pt wrap-size (pt-y (size q:line)))]))
+     (define line-q (quad-copy q:line [size (pt wrap-size (pt-y (size q:line)))]))
      (define permitted-justify-overfill
        (match (quad-ref (car qs) :line-align)
          ;; allow justified lines to go wider,
@@ -363,7 +362,7 @@
                                      (quad-ref (car qs) :inset-left 0)
                                      (quad-ref (car qs) :inset-right 0))
                                   permitted-justify-overfill))
-                    #:nicely (match (or (current-line-wrap) (quad-ref (car qs) 'line-wrap))
+                    #:nicely (match (or (current-line-wrap) (quad-ref (car qs) :line-wrap))
                                [(or "best" "kp") #true]
                                [_ #false])
                     #:hard-break line-break-quad?
@@ -425,16 +424,19 @@
                     (date->string (current-date) #t))
         x y))
 
-(define q:footer (q #:size (pt 50 default-line-height)
-                    #:from-parent 'sw
-                    #:to 'nw
-                    #:shift (pt 0 (* 1.5 default-line-height))
-                    #:printable #true
-                    #:draw-start (λ (q doc)
-                                   (when draw-debug-line?
-                                     (draw-debug q doc "goldenrod" "goldenrod"))
-                                   (unless (quadwriter-test-mode)
-                                     (draw-page-footer q doc)))))
+(define (make-footer-quad page-idx path)
+  (define-values (dir name _) (split-path (path-replace-extension path #"")))
+  (q #:size (pt 50 default-line-height)
+     #:attrs (hasheq :page-number page-idx :doc-title (string-titlecase (path->string name)))
+     #:from-parent 'sw
+     #:to 'nw
+     #:shift (pt 0 (* 1.5 default-line-height))
+     #:printable #true
+     #:draw-start (λ (q doc)
+                    (when draw-debug-line?
+                      (draw-debug q doc "goldenrod" "goldenrod"))
+                    (unless (quadwriter-test-mode)
+                      (draw-page-footer q doc)))))
 
 (define q:column (q
                   #:id 'col
@@ -526,16 +528,14 @@
   ;; can be repeated without damage.
   [((? null?) _) null]
   [((cons q rest) where)
-   (cons (struct-copy quad q
-                      [from-parent (or where (quad-from q))]) rest)])
-
+   (cons (quad-copy q [from-parent (or where (quad-from q))]) rest)])
 
 (define ((col-finish-wrap col-quad) lns . _)
-  (list (struct-copy quad col-quad
-                     ;; move block attrs up, so they are visible in page wrap
-                     [attrs (copy-block-attrs (quad-attrs (car lns))
-                                              (hash-copy (quad-attrs col-quad)))]
-                     [elems (from-parent (insert-blocks lns) 'nw)])))
+  (list (quad-copy col-quad
+                   ;; move block attrs up, so they are visible in page wrap
+                   [attrs (copy-block-attrs (quad-attrs (car lns))
+                                            (hash-copy (quad-attrs col-quad)))]
+                   [elems (from-parent (insert-blocks lns) 'nw)])))
 
 (define (col-wrap qs vertical-height col-gap [col-quad q:column])
   (unless (positive? vertical-height)
@@ -546,11 +546,10 @@
   ;; could do it after, but it would require going back inside each col quad
   ;; which seems overly interdependent, because `insert-blocks` is used to determine break locations.
   ;; `col-wrap` should emit quads that are complete.
-  (define col-spacer (struct-copy quad q:column-spacer
-                                  [size (pt col-gap 100)]))
+  (define col-spacer (quad-copy q:column-spacer [size (pt col-gap 100)]))
   (add-between
    (wrap qs vertical-height
-         #:soft-break (λ (q) #true)
+         #:soft-break #true
          #:hard-break column-break-quad?
          #:no-break (λ (q) (quad-ref q :no-colbr)) ; cooperates with make-nobreak
          #:distance (λ (q dist-so-far wrap-qs)
@@ -564,21 +563,14 @@
   (define elems
     (match (quad-ref (car cols) :footer-display "true")
       [(or "false" "none") (from-parent cols 'nw)]
-      [_
-       (define-values (dir name _) (split-path (path-replace-extension path #"")))
-       (define footer (struct-copy quad q:footer
-                                   [attrs (let ([h (hash-copy (quad-attrs q:footer))])
-                                            (hash-set! h :page-number page-idx)
-                                            (hash-set! h :doc-title (string-titlecase (path->string name)))
-                                            h)]))
-       (cons footer (from-parent cols 'nw))]))
-  (list (struct-copy quad page-quad [elems elems])))
+      [_ (cons (make-footer-quad page-idx path) (from-parent cols 'nw))]))
+  (list (quad-copy page-quad [elems elems])))
 
 (define (page-wrap qs width [page-quad q:page])
   (unless (positive? width)
     (raise-argument-error 'page-wrap "positive number" width))
   (wrap qs width
-        #:soft-break (λ (q) #true)
+        #:soft-break #true
         #:hard-break page-break-quad?
         #:no-break (λ (q) (quad-ref q :no-pbr))
         #:distance (λ (q dist-so-far wrap-qs)

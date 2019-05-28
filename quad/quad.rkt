@@ -89,6 +89,12 @@
    (define (hash-proc h recur) (equal-hash-code h))
    (define (hash2-proc h recur) (equal-secondary-hash-code h))])
 
+(define-syntax-rule (quad-copy QID [K V] ...)
+  (struct-copy quad QID [K V] ...))
+
+(define-syntax-rule (quad-clone QID [K V] ...)
+  (struct-copy quad QID [K V] ... [attrs (hash-copy (quad-attrs QID))]))
+
 (define (quad-ref q key [default-val #f])
   (hash-ref (quad-attrs q) key (match default-val
                                  [(? procedure? proc) (proc)]
