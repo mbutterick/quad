@@ -68,7 +68,7 @@ Quad produces PDFs using three ingredients:
 ]
 
 
-For the most part, neither Quad nor Quadwriter rely much on @racketmodname[racket/draw], and completely avoid its PDF-drawing functions. These facilities are provided by @link["https://www.pango.org/"]{Pango}, which has some major shortcomings in the kind of PDFs it produces (for instance, it doesn't support hyperlinks).
+For the most part, neither Quad nor Quadwriter rely much on @racketmodname[racket/draw]. In particular, Quad completely ignores Racket's PDF-drawing functions, which are provided by @link["https://www.pango.org/"]{Pango}, because of major shortcomings in the kind of PDFs it produces (for instance, it doesn't support hyperlinks).
 
 
 @section{What is Quadwriter?}
