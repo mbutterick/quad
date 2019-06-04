@@ -1,5 +1,6 @@
 #lang debug racket/base
-(require racket/match
+(require (for-syntax racket/base racket/syntax)
+         racket/match
          txexpr/base
          racket/contract
          racket/file
@@ -21,35 +22,51 @@
 (define (setup-pdf-path pdf-path-arg)
   (define fallback-path (build-path (find-system-path 'temp-dir) "quadwriter-temp.pdf"))
   (path->complete-path (simplify-path (expand-user-path (->path (or pdf-path-arg fallback-path))))))
-
+#|
 (define para-break '(q ((break "para"))))
 (define line-break '(q ((break "line"))))
 (define page-break '(q ((break "page"))))
 (define column-break '(q ((break "column"))))
+(define hr-break '(q ((break "hr"))))
+|#
+
+
+(define-syntax (define-break-types stx)
+  (syntax-case stx ()
+    [(_ ALL-BREAKS-ID . TYPES)
+     (with-syntax ([((TYPE-BREAK TYPE-STR Q:TYPE-BREAK) ...)
+                    (for/list ([type (in-list (syntax->list #'TYPES))])
+                              (list
+                               (format-id #'TYPES "~a-break" type)
+                               (symbol->string (syntax->datum type))
+                               (format-id #'TYPES "q:~a-break" type)))])
+       #'(begin
+           (define TYPE-BREAK '(q ((break TYPE-STR)))) ...
+           (define ALL-BREAKS-ID (list (cons TYPE-BREAK Q:TYPE-BREAK) ...))))]))
+
+(define-break-types all-breaks para line page column hr)
 
 (define (replace-breaks x)
   (map-elements (λ (el)
-                  (match el
-                    [(== para-break) q:para-break]
-                    [(== line-break) q:line-break]
-                    [(== column-break) q:column-break]
-                    [(== page-break) q:page-break]
-                    [_ el])) x))
+                  (cond
+                    [(assoc el all-breaks) => cdr]
+                    [else el])) x))
+
 
 (define (handle-hyphenate qs)
   ;; find quads that want hyphenation and split them into smaller pieces
   ;; do this before ->string-quad so that it can handle the sizing promises
   (apply append
          (for/list ([q (in-list qs)])
-           (match (quad-ref q :hyphenate)
-             [#false (list q)]
-             [_ (for*/list ([str (in-list (quad-elems q))]
-                            [hyphen-char (in-value #\u00AD)]
-                            [hstr (in-value (hyphenate str hyphen-char
-                                                       #:min-left-length 3
-                                                       #:min-right-length 3))]
-                            [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
-                  (struct-copy quad q [elems (list substr)]))]))))
+                   (match (quad-ref q :hyphenate)
+                     [#false (list q)]
+                     [_ (for*/list ([str (in-list (quad-elems q))]
+                                    [hyphen-char (in-value #\u00AD)]
+                                    [hstr (in-value (hyphenate str hyphen-char
+                                                               #:min-left-length 3
+                                                               #:min-right-length 3))]
+                                    [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
+                                   (struct-copy quad q [elems (list substr)]))]))))
 
 (define (handle-cascading-attrs attrs)
   (resolve-font-path attrs)
@@ -66,12 +83,12 @@
   (setup-font-path-table! pdf-path)
   [define atomized-qs
     (time-log atomize (atomize the-quad
-                                #:attrs-proc handle-cascading-attrs
-                                #:missing-glyph-action 'fallback
-                                #:fallback "fallback"
-                                #:emoji "emoji"
-                                #:math "math"
-                                #:font-path-resolver resolve-font-path))]
+                               #:attrs-proc handle-cascading-attrs
+                               #:missing-glyph-action 'fallback
+                               #:fallback "fallback"
+                               #:emoji "emoji"
+                               #:math "math"
+                               #:font-path-resolver resolve-font-path))]
   [define hyphenated-qs (time-log hyphenate (handle-hyphenate atomized-qs))]
   [define stringified-qs (map ->string-quad hyphenated-qs)]
   [define indented-qs (insert-first-line-indents stringified-qs)]
@@ -81,9 +98,9 @@
   ;; page size can be specified by name, or measurements.
   ;; explicit measurements from page-height and page-width supersede those from page-size.
   (match-define (list page-width page-height) (for/list ([k (list :page-width :page-height)])
-                                                (match (quad-ref (car qs) k)
-                                                  [#false #false]
-                                                  [val (parse-dimension val 'round)])))
+                                                        (match (quad-ref (car qs) k)
+                                                          [#false #false]
+                                                          [val (parse-dimension val 'round)])))
   ;; `make-pdf` will sort out conflicts among page dimensions
   (make-pdf #:compress compress?
             #:auto-first-page #false

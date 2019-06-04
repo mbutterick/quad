@@ -7,6 +7,7 @@
          line-break
          page-break
          column-break
+         hr-break
          q:para-break
          q:line-break
          q:page-break

@@ -23,9 +23,9 @@
   ;; markdown parser returns list of paragraphs
   (root null (match strs
                [(list str) strs]
-               [_ (add-between strs (list q:para-break)
-                               #:before-first (list q:para-break)
-                               #:after-last (list q:para-break)
+               [_ (add-between strs (list para-break)
+                               #:before-first (list para-break)
+                               #:after-last (list para-break)
                                #:splice? #true)])))
 (make-module-begin doc-proc)
 

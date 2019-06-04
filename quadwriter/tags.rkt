@@ -26,8 +26,7 @@
                   :display (symbol->string (gensym)))
                  attrs) exprs))
 
-(define-tag-function (hr attrs exprs)
-  q:hr-break)
+(define-tag-function (hr attrs exprs) hr-break)
 
 (define-tag-function (blockquote attrs exprs)
   (qexpr (append (list->attrs
