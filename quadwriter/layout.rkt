@@ -203,6 +203,7 @@
         (define hung-word-sublists
           (match word-sublists
             [(list sublists ... (list prev-qs ... last-q))
+             #:when (pair? (quad-elems last-q))
              (define last-char-str (regexp-match #rx"[.,:;’-]$" (car (quad-elems last-q))))
              (match last-char-str
                [#false word-sublists]
@@ -213,7 +214,8 @@
                                                         (match-define (list x y) (force p))
                                                         (pt (- x) y)))]))
                   (define last-sublist (append prev-qs (list last-q hanger-q)))
-                  (append sublists (list last-sublist))])]))
+                  (append sublists (list last-sublist))])]
+            [_ word-sublists]))
         (define word-width (sum-of-widths hung-word-sublists))
         (define word-space-width (sum-of-widths word-space-sublists))
         (define empty-hspace (- line-width
