@@ -42,7 +42,7 @@
   (apply append
          (for/list ([q (in-list qs)])
            (match (quad-ref q :hyphenate)
-             [(or #false "false") (list q)]
+             [#false (list q)]
              [_ (for*/list ([str (in-list (quad-elems q))]
                             [hyphen-char (in-value #\u00AD)]
                             [hstr (in-value (hyphenate str hyphen-char

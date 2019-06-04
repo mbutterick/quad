@@ -23,7 +23,8 @@
          (define debug-y-margin (make-parameter 40))
          (define debug-column-count (make-parameter 2))
          (define debug-column-gap (make-parameter 36))
-         (define zoom-factor (make-parameter 1.5)))]
+         (define zoom-factor (make-parameter 1.5))
+         (define log-clipping? (make-parameter 'warn)))]
     [_
      #'(begin
          (provide (all-defined-out))
@@ -43,6 +44,7 @@
          (define debug-y-margin (make-parameter #f))
          (define debug-column-count (make-parameter #f))
          (define debug-column-gap (make-parameter #f))
-         (define zoom-factor (make-parameter 1)))]))
+         (define zoom-factor (make-parameter 1))
+         (define log-clipping? (make-parameter 'warn)))]))
 
 (go)
