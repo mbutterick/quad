@@ -1,12 +1,16 @@
 #lang debug racket
 (require racket/list racket/match sugar/debug sugar/list
-         "param.rkt" "quad.rkt" "atomize.rkt" "position.rkt" "ocm.rkt")
+         "param.rkt" "quad.rkt" "atomize.rkt" "position.rkt" "ocm.rkt" "log.rkt")
 (provide wrap)
 
 (define-syntax (debug-report stx)
   (syntax-case stx ()
-    [(_ EXPR ...) (with-syntax ([debug (datum->syntax stx 'debug)])
-                    #'(when debug (report EXPR ...)))]))
+    [(_ SYM)
+     (with-syntax ([DEBUG (datum->syntax stx 'debug)])
+       #'(when DEBUG (log-quad-debug (format "~a" SYM))))]
+    [(_ VAL SYM)
+     (with-syntax ([DEBUG (datum->syntax stx 'debug)])
+       #'(when DEBUG (log-quad-debug (format "~a: ~a" SYM VAL))))]))
 
 (define (nonprinting-at-start? x) (not (printable? x 'start)))
 (define (nonprinting-at-end? x) (not (printable? x 'end)))
