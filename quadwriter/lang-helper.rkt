@@ -9,6 +9,7 @@
          scribble/reader
          quadwriter/core
          txexpr
+         quad/log
          "log.rkt")
 (provide (all-defined-out))
 
@@ -66,10 +67,13 @@
               (module+ main
                 (with-logging-to-port
                  (current-output-port)
-                 (λ () (render-pdf DOC pdf-path))
-                 #:logger quadwriter-logger
-                 'info
-                 'quadwriter))))]))))
+                 (λ () (with-logging-to-port
+                        (current-output-port)
+                        (λ () (render-pdf DOC pdf-path))
+                        #:logger quadwriter-logger
+                        'debug))
+                 #:logger quad-logger
+                 'debug))))]))))
 
 (define (path-string->pdf-path path-string)
   (match (format "~a" path-string)
