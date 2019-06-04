@@ -8,7 +8,8 @@
          syntax/strip-context
          scribble/reader
          quadwriter/core
-         txexpr)
+         txexpr
+         "log.rkt")
 (provide (all-defined-out))
 
 (define q (default-tag-function 'q))
@@ -29,8 +30,8 @@
              [(list _ kw val) (loop (cons (list kw val) acc))]))]
         ;; reverse in case of multiple values with same keyword, latest takes precedence (by becoming first)
         [else (reverse (for/list ([item (in-list acc)])
-                        (match-define (list kw val) (map bytes->string/utf-8 item))
-                        (list (string->symbol (string-trim kw "#:")) val)))])))
+                                 (match-define (list kw val) (map bytes->string/utf-8 item))
+                                 (list (string->symbol (string-trim kw "#:")) val)))])))
   (strip-context
    (with-syntax ([PATH-STRING path-string]
                  [((ATTR-NAME ATTR-VAL) ...) kw-attrs]
@@ -63,7 +64,12 @@
                 (when (file-exists? pdf-path)
                   (void (system (format open-string pdf-path)))))
               (module+ main
-                (render-pdf DOC pdf-path))))]))))
+                (with-logging-to-port
+                 (current-output-port)
+                 (λ () (render-pdf DOC pdf-path))
+                 #:logger quadwriter-logger
+                 'info
+                 'quadwriter))))]))))
 
 (define (path-string->pdf-path path-string)
   (match (format "~a" path-string)

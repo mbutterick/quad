@@ -11,7 +11,8 @@
          "attrs.rkt"
          "param.rkt"
          "font.rkt"
-         "layout.rkt")
+         "layout.rkt"
+         "log.rkt")
 (provide (all-defined-out))
 
 (define default-page-size "letter")
@@ -64,14 +65,14 @@
                            :line-height (number->string (floor (* default-line-height-multiplier default-font-size)))) qexpr))]
   (setup-font-path-table! pdf-path)
   [define atomized-qs
-    (time-name atomize (atomize the-quad
+    (time-log atomize (atomize the-quad
                                 #:attrs-proc handle-cascading-attrs
                                 #:missing-glyph-action 'fallback
                                 #:fallback "fallback"
                                 #:emoji "emoji"
                                 #:math "math"
                                 #:font-path-resolver resolve-font-path))]
-  [define hyphenated-qs (time-name hyphenate (handle-hyphenate atomized-qs))]
+  [define hyphenated-qs (time-log hyphenate (handle-hyphenate atomized-qs))]
   [define stringified-qs (map ->string-quad hyphenated-qs)]
   [define indented-qs (insert-first-line-indents stringified-qs)]
   indented-qs)
@@ -149,22 +150,22 @@
     (define column-gap (setup-column-gap qs))
     
     (define line-wrap-size (/ (- printable-width (* (sub1 column-count) column-gap)) column-count))
-    (define line-qs (time-name line-wrap (apply-keeps (line-wrap qs line-wrap-size))))
+    (define line-qs (time-log line-wrap (apply-keeps (line-wrap qs line-wrap-size))))
     
     (define col-quad-prototype (struct-copy quad q:column
                                             [size (pt line-wrap-size printable-height)]))
-    (define column-qs (time-name col-wrap (col-wrap line-qs printable-height column-gap col-quad-prototype)))
+    (define column-qs (time-log column-wrap (column-wrap line-qs printable-height column-gap col-quad-prototype)))
     
     (define page-quad-prototype (struct-copy quad q:page
                                              [shift (pt left-margin top-margin)]
                                              [size (pt line-wrap-size printable-height)]))
-    (define page-qs (time-name page-wrap (page-wrap column-qs printable-width page-quad-prototype)))
+    (define page-qs (time-log page-wrap (page-wrap column-qs printable-width page-quad-prototype)))
     
-    (define positioned-qs (time-name position (position (struct-copy quad q:doc [elems page-qs]))))
-    (time-name draw (draw positioned-qs (current-pdf))))
+    (define positioned-qs (time-log position (position (struct-copy quad q:doc [elems page-qs]))))
+    (time-log draw (draw positioned-qs (current-pdf))))
 
   (if pdf-path-arg
-      (displayln (format "wrote PDF to ~a" pdf-path))
+      (log-quadwriter-info (format "wrote PDF to ~a" pdf-path))
       (begin0
         (file->bytes pdf-path)
         (delete-file pdf-path))))

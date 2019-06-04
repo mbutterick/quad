@@ -96,12 +96,14 @@ Save the document. Any place, any name is fine.
 @onscreen{Run} the document. You'll get REPL output like this:
 
 @repl-output{
-hyphenate: cpu time: 0 real time: 0 gc time: 0
-line-wrap: cpu time: 27 real time: 30 gc time: 0
-page-wrap: cpu time: 0 real time: 1 gc time: 0
-position: cpu time: 1 real time: 0 gc time: 0
-draw: cpu time: 77 real time: 76 gc time: 23
-wrote PDF to /Desktop/test.pdf
+quadwriter: atomize: 2ms
+quadwriter: hyphenate: 1ms
+quadwriter: line-wrap: 21ms
+quadwriter: col-wrap: 0ms
+quadwriter: page-wrap: 0ms
+quadwriter: position: 1ms
+quadwriter: draw: 75ms
+quadwriter: wrote PDF to /Users/Desktop/test.pdf
 }
 
 Congratulations — you just made your first PDF. If you want to have a look, either open the file manually, or enter this command on the REPL, which will open the PDF in your default viewer:

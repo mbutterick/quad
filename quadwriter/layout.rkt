@@ -537,7 +537,7 @@
                                             (hash-copy (quad-attrs col-quad)))]
                    [elems (from-parent (insert-blocks lns) 'nw)])))
 
-(define (col-wrap qs vertical-height col-gap [col-quad q:column])
+(define (column-wrap qs vertical-height column-gap [column-quad q:column])
   (unless (positive? vertical-height)
     (raise-argument-error 'col-wrap "positive number" vertical-height))
   
@@ -546,7 +546,7 @@
   ;; could do it after, but it would require going back inside each col quad
   ;; which seems overly interdependent, because `insert-blocks` is used to determine break locations.
   ;; `col-wrap` should emit quads that are complete.
-  (define col-spacer (quad-copy q:column-spacer [size (pt col-gap 100)]))
+  (define col-spacer (quad-copy q:column-spacer [size (pt column-gap 100)]))
   (add-between
    (wrap qs vertical-height
          #:soft-break #true
@@ -556,7 +556,7 @@
                       ;; do trial block insertions
                       (for/sum ([x (in-list (insert-blocks wrap-qs))])
                         (pt-y (size x))))                     
-         #:finish-wrap (col-finish-wrap col-quad))
+         #:finish-wrap (col-finish-wrap column-quad))
    col-spacer))
 
 (define ((page-finish-wrap page-quad path) cols q0 q page-idx)
