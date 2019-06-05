@@ -116,7 +116,7 @@
                      (for*/list ([expr (in-list exprs)]
                                  [str (in-list (string-split (string-join (get-elements expr) "") "\n"))])
                        (list (get-tag expr) (get-attrs expr) (string-replace str " " " ")))
-                     q:line-break))
+                     line-break))
   (qexpr (append (list->attrs
                   :display "block"
                   :background-color "aliceblue"
@@ -144,7 +144,7 @@
           (for/list ([(expr idx) (in-indexed exprs)]
                      #:when (txexpr? expr))
             (list* (get-tag expr) (cons (list :list-index (or bullet-val (format "~a" (add1 idx)))) (get-attrs expr)) (get-elements expr)))
-          q:para-break)))
+          para-break)))
 
 (define bullet-quad '(q ((special "bullet"))))
 
