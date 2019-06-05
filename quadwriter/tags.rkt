@@ -95,7 +95,7 @@
                   :keep-with-next "true") attrs) exprs))
 
 (define-tag-function (h1 attrs exprs)
-  (heading-base 20 attrs exprs))
+  (qexpr null (list page-break (heading-base 20 attrs exprs))))
 
 (define-tag-function (h2 attrs exprs) (heading-base 16 attrs exprs))
 (define-tag-function (h3 attrs exprs) (heading-base 14 attrs exprs))
