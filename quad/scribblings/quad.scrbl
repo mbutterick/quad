@@ -31,9 +31,11 @@ At the command line:
 After that, you can update the package like so:
 @verbatim{raco pkg update quad}
 
-@racketmodname[quadwriter] is installed as part of the @racketmodname[quad] package.
+Or, without the command line: Launch Dr­Racket. Use the @onscreen{File} → @onscreen{Install Package ...} command to install @racketmodname[quad].
 
-Much of the font-parsing and PDF-rendering code in Quad is adapted from @link["http://github.com/foliojs/"]{FolioJS} by Devon Govett. I thank Mr. Govett for figuring out a lot of details that would've made me squeal in agony. 
+Either way, @racketmodname[quadwriter] is installed as part of the @racketmodname[quad] package.
+
+@margin-note{If you're new to Racket and want to configure your system to use the terminal commands, follow the @link["https://beautifulracket.com/setup.html#full-setup"]{instructions here}.}
 
 @section{What is Quad?}
 
@@ -53,7 +55,7 @@ A document processor, by contrast, relies on markup codes within the text to det
 
 Another benefit of document processors is that it permits every document to have a high-level, text-based source file that's independent of any particular output format.
 
-
+Much of the font-parsing and PDF-rendering code in Quad is adapted from @link["http://github.com/foliojs/"]{FolioJS} by Devon Govett. I thank Mr. Govett for figuring out a lot of details that would've made me squeal in agony. 
 
 @subsection{How does Quad work?}
 
