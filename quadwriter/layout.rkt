@@ -341,7 +341,7 @@
                          #:type offsetter-quad)
                         elems)]) 'sw))]))]
          [_ null])]))
-  (define maybe-first-line (and (pair? new-lines) (car new-lines)))
+  (define maybe-first-line (match new-lines [(cons line0 _) line0][_ #false]))
   (append (match opening-q
             [#false (list (make-paragraph-spacer maybe-first-line :space-before 0))] ; paragraph break
             [_ null])
@@ -437,10 +437,11 @@
                     (date->string (current-date) #t))
         x y))
 
-(define (make-footer-quad page-idx path)
+(define (make-footer-quad col-q page-idx path)
   (define-values (dir name _) (split-path (path-replace-extension path #"")))
   (q #:size (pt 50 default-line-height)
-     #:attrs (hasheq :page-number page-idx :doc-title (string-titlecase (path->string name)))
+     #:attrs (hasheq :page-number (+ (quad-ref col-q :page-number-start 1) (sub1 page-idx))
+                     :doc-title (string-titlecase (path->string name)))
      #:from-parent 'sw
      #:to 'nw
      #:shift (pt 0 (* 1.5 default-line-height))
@@ -590,7 +591,7 @@
   (define elems
     (match (quad-ref (car cols) :footer-display #true)
       [(or #false "none") (from-parent cols 'nw)]
-      [_ (cons (make-footer-quad page-idx path) (from-parent cols 'nw))]))
+      [_ (cons (make-footer-quad (car cols) page-idx path) (from-parent cols 'nw))]))
   (list (quad-copy page-quad [elems elems])))
 
 (define (page-wrap qs width [page-quad q:page])

@@ -138,6 +138,7 @@ Naming guidelines
                            page-height
                            page-size ; e.g., "letter"
                            page-orientation ; only applies to page-size dimensions
+                           page-number-start ; 1
 
                            page-margin-top
                            page-margin-bottom
