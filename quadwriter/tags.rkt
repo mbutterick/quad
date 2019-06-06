@@ -26,6 +26,8 @@
                   :display (symbol->string (gensym)))
                  attrs) exprs))
 
+(define-tag-function (br attrs exprs) line-break)
+
 (define-tag-function (hr attrs exprs) hr-break)
 
 (define-tag-function (blockquote attrs exprs)

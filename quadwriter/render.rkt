@@ -36,10 +36,10 @@
     [(_ ALL-BREAKS-ID . TYPES)
      (with-syntax ([((TYPE-BREAK TYPE-STR Q:TYPE-BREAK) ...)
                     (for/list ([type (in-list (syntax->list #'TYPES))])
-                              (list
-                               (format-id #'TYPES "~a-break" type)
-                               (symbol->string (syntax->datum type))
-                               (format-id #'TYPES "q:~a-break" type)))])
+                      (list
+                       (format-id #'TYPES "~a-break" type)
+                       (symbol->string (syntax->datum type))
+                       (format-id #'TYPES "q:~a-break" type)))])
        #'(begin
            (define TYPE-BREAK '(q ((break TYPE-STR)))) ...
            (define ALL-BREAKS-ID (list (cons TYPE-BREAK Q:TYPE-BREAK) ...))))]))
@@ -58,15 +58,17 @@
   ;; do this before ->string-quad so that it can handle the sizing promises
   (apply append
          (for/list ([q (in-list qs)])
-                   (match (quad-ref q :hyphenate)
-                     [#false (list q)]
-                     [_ (for*/list ([str (in-list (quad-elems q))]
-                                    [hyphen-char (in-value #\u00AD)]
-                                    [hstr (in-value (hyphenate str hyphen-char
-                                                               #:min-left-length 3
-                                                               #:min-right-length 3))]
-                                    [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
-                                   (struct-copy quad q [elems (list substr)]))]))))
+           (match (quad-ref q :hyphenate)
+             [#true #:when (and (pair? (quad-elems q))
+                            (andmap string? (quad-elems q)))
+                (for*/list ([str (in-list (quad-elems q))]
+                            [hyphen-char (in-value #\u00AD)]
+                            [hstr (in-value (hyphenate str hyphen-char
+                                                       #:min-left-length 3
+                                                       #:min-right-length 3))]
+                            [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
+                  (struct-copy quad q [elems (list substr)]))]
+             [_ (list q)]))))
 
 (define (handle-cascading-attrs attrs)
   (resolve-font-path attrs)
@@ -98,9 +100,9 @@
   ;; page size can be specified by name, or measurements.
   ;; explicit measurements from page-height and page-width supersede those from page-size.
   (match-define (list page-width page-height) (for/list ([k (list :page-width :page-height)])
-                                                        (match (quad-ref (car qs) k)
-                                                          [#false #false]
-                                                          [val (parse-dimension val 'round)])))
+                                                (match (quad-ref (car qs) k)
+                                                  [#false #false]
+                                                  [val (parse-dimension val 'round)])))
   ;; `make-pdf` will sort out conflicts among page dimensions
   (make-pdf #:compress compress?
             #:auto-first-page #false
