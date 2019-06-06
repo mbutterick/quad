@@ -342,7 +342,9 @@
                         elems)]) 'sw))]))]
          [_ null])]))
   (define maybe-first-line (and (pair? new-lines) (car new-lines)))
-  (append (list (make-paragraph-spacer maybe-first-line :space-before 0))
+  (append (match opening-q
+            [#false (list (make-paragraph-spacer maybe-first-line :space-before 0))] ; paragraph break
+            [_ null])
           new-lines
           (match ending-q
             [(? page-break-quad? page-break) (list page-break)] ; hard page break
