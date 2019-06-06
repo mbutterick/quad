@@ -115,6 +115,9 @@ Naming guidelines
 
                            block-clip ; whether box boundary clips its contents
 
+                           space-after ; space after a block, like a paragraph
+                           space-before
+                           
                            column-count
                            column-gap
                       

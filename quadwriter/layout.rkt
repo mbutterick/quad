@@ -125,12 +125,17 @@
                   #:draw-start (if draw-debug-line? draw-debug void)))
 
 (define-quad line-spacer-quad line-break-quad ())
-(define (make-post-paragraph-spacer)
+
+(define only-prints-in-middle (λ (q sig) (not (memq sig '(start end)))))
+(define (make-paragraph-spacer maybe-first-line-q key default-val)
+  (define arbitrary-width 20)
   (q #:type line-spacer-quad
-     #:size (pt 20 (* default-line-height 0.6))
+     #:size (pt arbitrary-width (cond
+                                  [(and maybe-first-line-q (quad-ref maybe-first-line-q key))]
+                                  [else default-val]))
      #:from 'sw
      #:to 'nw
-     #:printable (λ (q sig) (not (memq sig '(start end))))
+     #:printable only-prints-in-middle
      #:draw-start (if (draw-debug-line?) draw-debug void)))
 
 (define softies (map string '(#\space #\- #\u00AD)))
@@ -336,10 +341,13 @@
                          #:type offsetter-quad)
                         elems)]) 'sw))]))]
          [_ null])]))
-  (append new-lines (match ending-q
-                      [(? page-break-quad? page-break) (list page-break)] ; hard page break
-                      [#false (list (make-post-paragraph-spacer))] ; paragraph break
-                      [_ null]))) ; hard line break
+  (define maybe-first-line (and (pair? new-lines) (car new-lines)))
+  (append (list (make-paragraph-spacer maybe-first-line :space-before 0))
+          new-lines
+          (match ending-q
+            [(? page-break-quad? page-break) (list page-break)] ; hard page break
+            [#false (list (make-paragraph-spacer maybe-first-line :space-after (* default-line-height 0.6)))] ; paragraph break
+            [_ null]))) ; hard line break
                        
 
 (define (line-wrap qs wrap-size)
@@ -450,7 +458,7 @@
 (define q:column-spacer (q #:type column-spacer-quad
                            #:from 'ne
                            #:to 'nw
-                           #:printable (λ (q sig) (not (memq sig '(start end))))))
+                           #:printable only-prints-in-middle))
 
 (define q:page (q
                 #:id 'page

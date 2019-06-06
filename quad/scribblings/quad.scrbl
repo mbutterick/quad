@@ -504,6 +504,11 @@ Color of the border on each edge of the quad. Value is a @tech{hex color} string
 Color of the background of the quad. Value is a @tech{hex color} string or @tech{named color} string.
 }
 
+@deftogether[(@defthing[#:kind "attribute" space-before symbol?]
+              @defthing[#:kind "attribute" space-after symbol?])]{
+Vertical space added around a block. Value is given as a @tech{dimension string}.
+}
+
 @deftogether[(@defthing[#:kind "attribute" keep-first-lines symbol?]
               @defthing[#:kind "attribute" keep-last-lines symbol?]
               @defthing[#:kind "attribute" keep-all-lines symbol?])]{
