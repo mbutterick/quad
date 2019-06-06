@@ -25,7 +25,7 @@
     (define str (unsafe-car (quad-elems q)))
     (match-define (list x y) (quad-origin q))
     (text doc str x y
-          #:tracking (quad-ref q :character-tracking 0)
+          #:tracking (quad-ref q :font-tracking 0)
           #:bg (quad-ref q :bg)
           #:features (quad-ref q :font-features default-font-features)
           #:link (quad-ref q :link))))
@@ -65,7 +65,7 @@
          (font-size pdf (quad-ref q :font-size default-font-size))
          (font pdf (path->string (quad-ref q font-path-key default-font-face)))
          (+ (string-width pdf str
-                          #:tracking (quad-ref q :character-tracking 0)
+                          #:tracking (quad-ref q :font-tracking 0)
                           #:features (quad-ref q :font-features default-font-features)))]
         [else 0]))
     (list string-size (quad-ref q :line-height (current-line-height pdf)))))

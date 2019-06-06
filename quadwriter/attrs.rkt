@@ -69,7 +69,7 @@ Naming guidelines
                font-features
                font-italic
                font-bold
-               character-tracking
+               font-tracking
                bg
                link
                href
