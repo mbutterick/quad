@@ -92,6 +92,7 @@
                                                          ['emoji  emoji-font-family]
                                                          ['math math-font-family]
                                                          [_ fallback-font-family]))
+                     (hash-set! new-attrs run-key (eq-hash-code new-attrs))
                      (font-path-resolver new-attrs)
                      new-attrs]))
            (cons maybe-fallback-attrs str))]))))

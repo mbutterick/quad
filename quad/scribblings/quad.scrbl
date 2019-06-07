@@ -572,6 +572,10 @@ Whether the quad has bold styling applied. Activated only when value is @racket[
 Whether the quad has italic styling applied. Activated only when value is @racket["true"]. 
 }
 
+@defthing[#:kind "attribute" font-tracking symbol?]{
+Spacing between characters. Value is given as a @tech{dimension string}.
+}
+
 @defthing[#:kind "attribute" line-height symbol?]{
 Distance between baselines. Value is a @tech{dimension string}.
 }

@@ -25,7 +25,7 @@
     (define str (unsafe-car (quad-elems q)))
     (match-define (list x y) (quad-origin q))
     (text doc str x y
-          #:tracking (quad-ref q :character-tracking 0)
+          #:tracking (quad-ref q :font-tracking 0)
           #:bg (quad-ref q :bg)
           #:features (quad-ref q :font-features default-font-features)
           #:link (quad-ref q :link))))
@@ -64,9 +64,11 @@
         [str
          (font-size pdf (quad-ref q :font-size default-font-size))
          (font pdf (path->string (quad-ref q font-path-key default-font-face)))
-         (+ (string-width pdf str
-                          #:tracking (quad-ref q :character-tracking 0)
-                          #:features (quad-ref q :font-features default-font-features)))]
+         (if (equal? str "\u00AD")
+             (quad-ref q :font-tracking 0)
+             (+ (string-width pdf str
+                              #:tracking (quad-ref q :font-tracking 0)
+                              #:features (quad-ref q :font-features default-font-features))))]
         [else 0]))
     (list string-size (quad-ref q :line-height (current-line-height pdf)))))
 
@@ -75,12 +77,12 @@
     [(? line-break-quad?) q]
     [_
      (struct-copy
-      quad q:string
-      [attrs (let ([attrs (quad-attrs q)])
+      string-quad q:string
+      [attrs #:parent quad (let ([attrs (quad-attrs q)])
                (hash-ref! attrs :font-size default-font-size)
                attrs)]
-      [elems (quad-elems q)]
-      [size (make-size-promise q)])]))
+      [elems #:parent quad (quad-elems q)]
+      [size #:parent quad (make-size-promise q)])]))
 
 
 (define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"] [stroke-width 0.5])
