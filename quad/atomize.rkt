@@ -88,10 +88,12 @@
                [(eq? action 'error)
                 (raise-argument-error 'quad (format "glyph that exists in font ~a" (path->string font-path)) str)]
                [else (define new-attrs (hash-copy attrs))
+                     (define new-run (eq-hash-code new-attrs))
                      (hash-set! new-attrs 'font-family (match fallback-val
                                                          ['emoji  emoji-font-family]
                                                          ['math math-font-family]
                                                          [_ fallback-font-family]))
+                     (hash-set! new-attrs run-key new-run)
                      (font-path-resolver new-attrs)
                      new-attrs]))
            (cons maybe-fallback-attrs str))]))))
