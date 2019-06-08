@@ -88,8 +88,8 @@
                                #:attrs-proc handle-cascading-attrs
                                #:missing-glyph-action 'fallback
                                #:fallback "fallback"
-                               #:emoji "emoji"
-                               #:math "math"
+                               #:emoji "fallback-emoji"
+                               #:math "fallback-math"
                                #:font-path-resolver resolve-font-path))]
   [define hyphenated-qs (time-log hyphenate (handle-hyphenate atomized-qs))]
   [define stringified-qs (map ->string-quad hyphenated-qs)]

@@ -620,6 +620,46 @@ Though this system may seem like a lot of housekeeping, it's nice for two reason
 
 TK: example of font setup
 
+@subsubsection{Default font families}
+
+Quadwriter typesets documents by looking up families with the names below. You can override the default selections by providing a family in the @racket[fonts] folder of your project that has the same name.
+
+@defthing[#:kind "font directory" text path-string?]{
+Used for all body text. Default is a serif font.
+}
+
+@defthing[#:kind "font directory" heading path-string?]{
+Used for headings. Default is a sans serif font..
+}
+
+@defthing[#:kind "font directory" code path-string?]{
+Used for code. Default is a monospaced font.
+}
+
+@defthing[#:kind "font directory" blockquote path-string?]{
+Used for blockquote boxes. Defaults is a sans serif font.
+}
+
+
+@defthing[#:kind "font directory" default path-string?]{
+Used for any miscellaneous elements. Default is same as @racket[text].
+}
+
+
+@defthing[#:kind "font directory" fallback-emoji path-string?]{
+Fallback only. Used for emoji not present in the currently selected font.
+}
+
+@defthing[#:kind "font directory" fallback-math path-string?]{
+Fallback only. Used for math symbols not present in the currently selected font.
+}
+
+@defthing[#:kind "font directory" fallback path-string?]{
+Fallback only. Used for other glyphs not present in the currently selected font.
+}
+
+
+
 @subsection{Utility}
 
 @defproc[
