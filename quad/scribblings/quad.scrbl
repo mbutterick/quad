@@ -428,8 +428,9 @@ Because Q-expressions are a subset of X-expressions, you can apply any tools tha
 
 
 @deftogether[(@defthing[line-break qexpr?]
+@defthing[column-break qexpr?]
 @defthing[page-break qexpr?])]{
-The Q-expressions @racketresult['#,line-break] and @racketresult['#,page-break], respectively. Quadwriter will automatically insert line breaks and page breaks as needed. But you can also add them explicitly (aka ``hard'' breaks) by inserting the Q-expression denoting the break.
+The Q-expressions @racketresult['#,line-break], @racketresult['#,column-break], and @racketresult['#,page-break], respectively. Quadwriter will automatically insert  these breaks as needed. But you can also add them explicitly (aka ``hard'' breaks) by inserting the Q-expression denoting the break.
 }
 
 
