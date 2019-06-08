@@ -1,6 +1,6 @@
 #lang scribble/manual
 
-@(require racket/runtime-path scribble/example quadwriter pitfall/page racket/format (for-label txexpr (except-in pollen #%module-begin) xml racket/base racket/draw quadwriter)
+@(require racket/runtime-path scribble/example quadwriter pitfall/page pitfall/color racket/format (for-label txexpr (except-in pollen #%module-begin) xml racket/base racket/draw quadwriter)
 pollen/scribblings/mb-tools quad/pict)
 
 @(define my-eval (make-base-eval))
@@ -182,9 +182,9 @@ To see this:
    ···
 }
 
-This is the first part of the @tech{Q-expression} that the source file produces when it runs and exports via @racket[doc]. This Q-expression is passed to Quadwriter for layout and rendering.
+This is the first part of the @tech{Q-expression} that the source file produces when it runs and exports via @racket[doc]. This @tech{Q-expression} is passed to Quadwriter for layout and rendering.
 
-@margin-note{Yes, you can generate your own Q-expressions by other means and pass them to @racketmodname[quadwriter] for layout & rendering. See @racket[render-pdf].}
+@margin-note{Yes, you can generate your own @tech{Q-expressions} by other means and pass them to @racketmodname[quadwriter] for layout & rendering. See @racket[render-pdf].}
 
 @subsection{Quadwriter & markup}
 
@@ -235,9 +235,9 @@ This @tech{Q-expression} is exactly the same as the one that resulted with the @
 
 @subsection{Quadwriter & Q-expressions}
 
-@racketmodname[quadwriter/markdown] showed high-level notation (= a generous way of describing Markdown) that generated a Q-expression. Then @racketmodname[quadwriter/markup] showed a mid-level notation that generated another (identical) Q-expression.
+@racketmodname[quadwriter/markdown] showed high-level notation (= a generous way of describing Markdown) that generated a @tech{Q-expression}. Then @racketmodname[quadwriter/markup] showed a mid-level notation that generated another (identical) @tech{Q-expression}.
 
-If we wish, we can also skip the notational foofaraw and just write Q-expressions directly in our source file. We do this with the basic @racketmodname[quadwriter] language. 
+If we wish, we can also skip the notational foofaraw and just write @tech{Q-expressions} directly in our source file. We do this with the basic @racketmodname[quadwriter] language. 
 
 Recall our very first example:
 
@@ -248,13 +248,13 @@ Brennan and Dale like fancy sauce.
 }|
 ]
 
-In the REPL, the @racket[doc] was this Q-expression:
+In the REPL, the @racket[doc] was this @tech{Q-expression}:
 
 @repl-output{
 '(q () (q ((page-margin-left "120") (page-margin-top "80") (page-margin-bottom "120") (font-family "text") (line-height "17")) "Brennan and Dale like fancy sauce."))
 }
 
-Let's copy this Q-expression and use it as our new source code. This time, however, we'll switch to plain @code{#lang quadwriter} (instead of the @racket[markup] or @racket[markdown] dialects):
+Let's copy this @tech{Q-expression} and use it as our new source code. This time, however, we'll switch to plain @code{#lang quadwriter} (instead of the @racket[markup] or @racket[markdown] dialects):
 
 @fileblock["test.rkt"
 @codeblock|{
@@ -285,7 +285,7 @@ And they love to code
 }|
 
 
-And again, use the resulting Q-expression in @racket[doc] as the source for a new @racket[quadwriter] program, which will result in the same PDF.
+And again, use the resulting @tech{Q-expression} in @racket[doc] as the source for a new @racket[quadwriter] program, which will result in the same PDF.
 
 @subsection{Setting top-level attributes}
 
@@ -382,7 +382,7 @@ If you're a writer, you might prefer to use the high-level representation (like 
 
 If you're a developer, you might prefer to use the lower-level representation for precision. For instance, a @racketmodname[pollen] author who wanted to generate a PDF could design tag functions that emit Q-expressions, and then pass the result to @racket[render-pdf].
 
-Or, you can aim somewhere in between. Like everything else in Racket, you can design functions & macros to emit the pieces of a Q-expression using whatever interface you prefer. 
+Or, you can aim somewhere in between. Like everything else in Racket, you can design functions & macros to emit the pieces of a @tech{Q-expression} using whatever interface you prefer. 
 
 
 @section{Quadwriter: developer guide}
@@ -393,7 +393,7 @@ Every source file written in a @racketmodname[quadwriter] dialect exports an ide
 
 @subsection{Q-expressions}
 
-A Q-expression is an @seclink["X-expressions" #:doc '(lib "pollen/scribblings/pollen.scrbl")]{X-expression}, but more restricted:
+A @deftech{Q-expression} is an @seclink["X-expressions" #:doc '(lib "pollen/scribblings/pollen.scrbl")]{X-expression}, but more restricted:
 
 @racketgrammar[
 #:literals (list q)
@@ -402,7 +402,7 @@ qexpr string
       (list q (list qexpr ...))
 ]
 
-This grammar means that a Q-expression is either a) a string, b) an X-expression whose tag is @racket[q] and whose elements are themselves Q-expressions.
+This grammar means that a @tech{Q-expression} is either a) a string, b) an X-expression whose tag is @racket[q] and whose elements are themselves Q-expressions.
 
 @examples[#:eval my-eval
 (qexpr? "Hello world")
@@ -430,18 +430,18 @@ Because Q-expressions are a subset of X-expressions, you can apply any tools tha
 @deftogether[(@defthing[line-break qexpr?]
 @defthing[column-break qexpr?]
 @defthing[page-break qexpr?])]{
-The Q-expressions @racketresult['#,line-break], @racketresult['#,column-break], and @racketresult['#,page-break], respectively. Quadwriter will automatically insert  these breaks as needed. But you can also add them explicitly (aka ``hard'' breaks) by inserting the Q-expression denoting the break.
+The Q-expressions @racketresult['#,line-break], @racketresult['#,column-break], and @racketresult['#,page-break], respectively. Quadwriter will automatically insert  these breaks as needed. But you can also add them explicitly (aka ``hard'' breaks) by inserting the @tech{Q-expression} denoting the break.
 }
 
 
 @defthing[para-break qexpr?]{
-The Q-expression @racketresult['#,para-break]. Used to denote the start of a new paragraph.
+The @tech{Q-expression} @racketresult['#,para-break]. Used to denote the start of a new paragraph.
 }
 
 
 @subsection{Attributes}
 
-These are the attributes that can be used inside a Q-expression passed to @racketmodname[quadwriter]. Inside a Q-expression, every attribute is a @tech{symbol}, and every attribute value is a @tech{string}.
+These are the attributes that can be used inside a @tech{Q-expression} passed to @racketmodname[quadwriter]. Inside a Q-expression, every attribute is a @tech[#:doc '(lib "scribblings/guide/guide.scrbl")]{symbol}, and every attribute value is a @tech[#:doc '(lib "scribblings/guide/guide.scrbl")]{string}.
 
 A @deftech{dimension string} represents a distance in the plane. If unitless, it is treated as points (where 1 point = 1/72 of an inch). If the number has @racket[in], @racket[cm], or @racket[mm] as a suffix, it is treated as inches, centimeters, or millimeters respectively.
 
@@ -457,8 +457,8 @@ The @deftech{named page sizes} are listed below. Names are case-insensitive. Dim
 
 @(tabular 
 #:sep @hspace[2] 
-(cons (list @bold{name} @bold{short side} @bold{long side})
-(map (λ (args) (map ~a args)) 
+(cons (list @bold{name} @bold{short edge} @bold{long edge})
+(map (λ (args) (map (λ (x) (tt (~a x))) args)) 
 (sort (hash->list page-sizes) string<? #:key car))))
 }
 
@@ -601,7 +601,7 @@ TK: OT feature attributes, bullet attributes
 [pdf-path (or/c path? path-string? #false)]
 [#:replace replace? any/c #true])
 (or/c void? bytes?)]{
-Compute the layout for @racket[qx] and render it as a PDF to @racket[pdf-path]. If @racket[pdf-path] is @racket[#false], then the rendered PDF is returned as a @tech{byte string}. Otherwise it is written to @racket[pdf-path]. 
+Compute the layout for @racket[qx] and render it as a PDF to @racket[pdf-path]. If @racket[pdf-path] is @racket[#false], then the rendered PDF is returned as a @tech[#:doc '(lib "scribblings/guide/guide.scrbl")]{byte string}. Otherwise it is written to @racket[pdf-path]. 
 
 The optional @racket[replace?] argument controls whether an existing file is automatically overwritten. The default is @racket[#true].
 }
@@ -667,6 +667,21 @@ Fallback only. Used for math symbols not present in the currently selected font.
 @defthing[#:kind "font directory" fallback path-string?]{
 Fallback only. Used for other glyphs not present in the currently selected font.
 }
+
+@subsection{Colors}
+
+A @deftech{hex color} is a case-insensitive string of six hex digits prefixed with @litchar{#}, such as @racket["#fe456a"] or @racket["#cc6633"]. The pairs of digits represent the red, green, and blue components of the color respectively, each pair taking on hex values between 0 (@racket["00"]) and 255 (@racket[ff]), inclusive. As optional shorthand, a three-digit hex color such as @racket["#c63"] is equivalent to @racket["#cc6633"].
+
+A @deftech{named color} is a hex color with a pre-existing name.
+
+@(define (tuple->hexstring triple)
+(apply string-append "#" (map (λ(x) (~r x #:base 16 #:min-width 2 #:pad-string "0")) triple)))
+
+@(tabular 
+#:sep @hspace[2] 
+(cons (list @bold{name} @bold{hex color equivalent})
+(map (λ (args) (list (tt (car args)) (tt (tuple->hexstring (cdr args))))) 
+(sort (hash->list named-colors) string<? #:key car))))
 
 
 
