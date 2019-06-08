@@ -387,6 +387,8 @@ Or, you can aim somewhere in between. Like everything else in Racket, you can de
 
 @section{Quadwriter: developer guide}
 
+@declare-exporting[quadwriter]
+
 @defthing[doc qexpr?]{
 Every source file written in a @racketmodname[quadwriter] dialect exports an identifier called @racket[doc] that contains the @tech{Q-expression} that results from running the source.
 }
@@ -697,7 +699,7 @@ On the REPL, after running a @racketmodname[quadwriter] dialect and generating a
 
 @section{Quad: the details}
 
-As mentioned above, The @racket[quad] library itself knows as little as it can about typography and fonts and pictures. Nor does it even assert a document model like Scribble. Rather, it offers a generic geometric represntation of layout elements. In turn, these elements can be combined into more useful pieces (e.g., @racket[quadwriter]).
+As mentioned above, The @racket[quad] library itself knows as little as it can about typography and fonts and pictures. Nor does it even assert a document model like Scribble. Rather, it offers a generic geometric represntation of layout elements. In turn, these elements can be combined into more useful pieces (e.g., @racketmodname[quadwriter]).
 
 @subsection{Data model: the quad}
 
@@ -710,7 +712,7 @@ Quads can be freely nested. There are no rules about what kind of quad can be ne
 
 @subsection{Wrapping}
 
-Wrapping is a optional phase where lists of quads are broken into sublists of a certain size. In @racket[quadwriter], the list of words is wrapped to produce a list of lines of a certain horizontal width. In turn, the list of lines is wrapped to produce a list of pages of a certain vertical height.
+Wrapping is a optional phase where lists of quads are broken into sublists of a certain size. In @racketmodname[quadwriter], the list of words is wrapped to produce a list of lines of a certain horizontal width. In turn, the list of lines is wrapped to produce a list of pages of a certain vertical height.
 
 @subsection{Layout}
 
