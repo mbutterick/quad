@@ -1,6 +1,6 @@
 #lang scribble/manual
 
-@(require racket/runtime-path scribble/example quadwriter (for-label txexpr (except-in pollen #%module-begin) xml racket/base racket/draw quadwriter)
+@(require racket/runtime-path scribble/example quadwriter pitfall/page racket/format (for-label txexpr (except-in pollen #%module-begin) xml racket/base racket/draw quadwriter)
 pollen/scribblings/mb-tools quad/pict)
 
 @(define my-eval (make-base-eval))
@@ -450,6 +450,15 @@ A @deftech{dimension string} represents a distance in the plane. If unitless, it
 @deftogether[(@defthing[#:kind "attribute" page-size symbol?]
               @defthing[#:kind "attribute" page-orientation symbol?])]{
 The usual way of setting the overall page dimensions of the rendered PDF. The value of @racket[page-size] is a @tech{named page size}. The value of @racket[page-orientation] can be either @racket["tall"] or @racket["portrait"] (which both put the longer edge vertically) or @racket["wide"] or @racket["landscape"] (which put the longer edge horizontally).
+
+The @deftech{named page sizes} are listed below. Names are case-insensitive. Dimensions below are in points.
+
+
+@(tabular 
+#:sep @hspace[2] 
+(cons (list @bold{name} @bold{short side} @bold{long side})
+(map (λ (args) (map ~a args)) 
+(sort (hash->list page-sizes) string<? #:key car))))
 }
 
 
