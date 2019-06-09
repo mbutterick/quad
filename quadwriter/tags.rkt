@@ -25,6 +25,14 @@
                   :display (symbol->string (gensym)))
                  attrs) exprs))
 
+(define div p)
+
+(define-tag-function (img attrs exprs)
+  (qexpr (list->attrs
+                  :image-data (second (assq 'src attrs))
+                  :image-alt (second (assq 'alt attrs))
+                  :display (symbol->string (gensym))) exprs))
+
 (define-tag-function (br attrs exprs) line-break)
 
 (define-tag-function (hr attrs exprs) hr-break)

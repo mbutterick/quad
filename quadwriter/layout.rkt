@@ -51,6 +51,28 @@
                     #:draw q:string-draw
                     #:draw-end q:string-draw-end))
 
+(define-quad image-quad quad ())
+
+(define (q:image-draw q doc)
+  (define src (quad-ref q :image-data))
+  (match-define (list x y) (quad-origin q))
+  (match-define (list w h) (size q))
+  (image doc src x y
+         #:width w
+         #:height h))
+
+(define (q:image-draw-end q doc)
+  (when (draw-debug-image?)
+    (draw-debug q doc "orange" "orange")))
+
+(define q:image (q #:type image-quad
+                   #:from 'bo
+                   #:to 'bi
+                   #:id 'image
+                   #:printable #true
+                   #:draw q:image-draw
+                   #:draw-end q:image-draw-end))
+
 (define (make-size-promise q [str-arg #f])
   (delay
     (define pdf (current-pdf))
@@ -72,15 +94,26 @@
         [else 0]))
     (list string-size (quad-ref q :line-height (current-line-height pdf)))))
 
-(define (->string-quad q)
-  (match q
-    [(? line-break-quad?) q]
-    [_
+(define (generic->typed-quad q)
+  (cond
+    [(line-break-quad? q) q]
+    [(match (quad-ref q :image-data)
+       [#false #false]
+       [(? file-exists?)
+        (struct-copy
+         image-quad q:image
+         [attrs #:parent quad (let ([h (hash-copy (quad-attrs q))])
+                                ;; defeat 'bi 'bo positioning by removing font reference
+                                (hash-set! h font-path-key #false)
+                                h)]
+         [size #:parent quad (pt 100 100)])]
+       [bad-path (raise-argument-error 'quadwriter "image path that exists" bad-path)])]
+    [else
      (struct-copy
       string-quad q:string
       [attrs #:parent quad (let ([attrs (quad-attrs q)])
-               (hash-ref! attrs :font-size default-font-size)
-               attrs)]
+                             (hash-ref! attrs :font-size default-font-size)
+                             attrs)]
       [elems #:parent quad (quad-elems q)]
       [size #:parent quad (make-size-promise q)])]))
 
@@ -299,7 +332,7 @@
           (match-define (list line-width line-height) (quad-size line-q))
           (define new-size (let ()
                              (define line-heights
-                               (filter-map (λ (q) (quad-ref q :line-height)) pcs))
+                               (filter-map (λ (q) (pt-y (size q))) pcs))
                              (pt line-width (if (empty? line-heights) line-height (apply max line-heights)))))
           (list
            (struct-copy

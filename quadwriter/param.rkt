@@ -12,10 +12,11 @@
          (define current-line-wrap (make-parameter #f)) ; because kp is slow and maybe we want to disable for "draft" mode
          (define quadwriter-test-mode (make-parameter #f)) ; used during rackunit to suppress nondeterministic elements, like timestamp in header
 
-         (define draw-debug? (make-parameter #t))
+         (define draw-debug? (make-parameter #true))
          (define draw-debug-line? (make-parameter #true))
          (define draw-debug-block? (make-parameter #true))
          (define draw-debug-string? (make-parameter #true))
+         (define draw-debug-image? (make-parameter #true))
 
          (define debug-page-width (make-parameter 400))
          (define debug-page-height (make-parameter 400))
@@ -37,6 +38,7 @@
          (define draw-debug-line? (make-parameter #true))
          (define draw-debug-block? (make-parameter #true))
          (define draw-debug-string? (make-parameter #true))
+         (define draw-debug-image? (make-parameter #true))
 
          (define debug-page-width (make-parameter #f))
          (define debug-page-height (make-parameter #f))

@@ -134,6 +134,9 @@ Naming guidelines
 
                            line-wrap
 
+                           image-data
+                           image-alt
+
                            page-width
                            page-height
                            page-size ; e.g., "letter"

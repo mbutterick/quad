@@ -22,13 +22,6 @@
 (define (setup-pdf-path pdf-path-arg)
   (define fallback-path (build-path (find-system-path 'temp-dir) "quadwriter-temp.pdf"))
   (path->complete-path (simplify-path (expand-user-path (->path (or pdf-path-arg fallback-path))))))
-#|
-(define para-break '(q ((break "para"))))
-(define line-break '(q ((break "line"))))
-(define page-break '(q ((break "page"))))
-(define column-break '(q ((break "column"))))
-(define hr-break '(q ((break "hr"))))
-|#
 
 
 (define-syntax (define-break-types stx)
@@ -92,8 +85,8 @@
                                #:math "fallback-math"
                                #:font-path-resolver resolve-font-path))]
   [define hyphenated-qs (time-log hyphenate (handle-hyphenate atomized-qs))]
-  [define stringified-qs (map ->string-quad hyphenated-qs)]
-  [define indented-qs (insert-first-line-indents stringified-qs)]
+  [define typed-quads (map generic->typed-quad hyphenated-qs)]
+  [define indented-qs (insert-first-line-indents typed-quads)]
   indented-qs)
 
 (define (setup-pdf qs pdf-path compress?)
