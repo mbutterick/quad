@@ -17,15 +17,17 @@
 (define-syntax (test-each stx)
   (syntax-case stx ()
     [(_) #'(begin)]
-    [(_ PATH . REST)
-     (with-syntax ([PDF-NAME (test-pdf-name (syntax-e #'PATH))])
+    [(_ MOD-PATH . REST)
+     (with-syntax ([PDF-NAME (test-pdf-name (syntax-e #'MOD-PATH))])
        #'(begin
-           (define-runtime-path path-to-test PATH)
+           (define-runtime-path path-to-test MOD-PATH)
            (define-runtime-path test-base PDF-NAME)
-           (println PATH)
+           (println MOD-PATH)
+           (define-runtime-path path (path-replace-extension MOD-PATH #".pdf"))
            (check-pdfs-equal? (time (parameterize ([quadwriter-test-mode #t]
                                                    [current-output-port (open-output-nowhere)])
-                                      (render-pdf (dynamic-require path-to-test 'doc) #f))) test-base)
+                                      (render-pdf (dynamic-require path-to-test 'doc) path)
+                                      path)) test-base)
            (test-each . REST)))]))
 
 (test-each "test-docs.rkt"
