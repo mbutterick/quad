@@ -620,11 +620,19 @@ The optional @racket[replace?] argument controls whether an existing file is aut
 
 @subsection{Fonts}
 
-A design goal of Quadwriter is to treat document layout as the result of a program. Along those lines, fonts are handled differently than usual. When you use a word processor, you choose from whatever fonts might be installed on your system. 
+Quadwriter supports the usual TrueType (@racket[.ttf]) and OpenType (@racket[.otf]) font files. It also supports WOFF files (@racket[.woff]).
 
-Quadwriter, by contrast, relies only on fonts that are @emph{in the same directory} as your other project source files. This is a feature: it means that everything  necessary to render the document travels together in the same directory. You can re-render it anywhere with identical results. You never have the problem — still with us after 35 years of desktop word processing — that ``oh, you need to install such-and-such font in your system before it will work.'' Bah!
+@subsection{System fonts}
 
-Quadwriter supports the usual TrueType (@racket[.ttf]) and OpenType (@racket[.otf]) font files. It also supports WOFF files (@racket[.woff]). To add fonts to your Quadwriter experience:
+When you use a word processor, you choose from whatever fonts might be installed on your system. Quadwriter can do this too: just use a system font name for any @racket[font-family] value. 
+
+On the one hand, it's so easy. On the other, it creates a dependency between your document and the current system.
+
+@margin-note{This dependency consideration only matters when you want to render the original source file elsewhere. Once you've rendered a PDF, however, the fonts are embedded on the PDF, and those who receive the PDF don't need to install any fonts.}
+
+@subsection{Project fonts}
+
+Quadwriter can also rely on fonts that are stored in the same directory as your other project source files. This means that everything necessary to render the document travels together in the same directory, and can be tracked in a source-control system. You can re-render the project anywhere with identical results. 
 
 @itemlist[#:style 'ordered
 
@@ -639,7 +647,34 @@ Quadwriter supports the usual TrueType (@racket[.ttf]) and OpenType (@racket[.ot
 
 Though this system may seem like a lot of housekeeping, it's nice for two reasons. First, we use the filesystem to map font names to font files, and avoid having another configuration file floating around our project. Second, we create a layer of abstraction between font names and files. This makes it easy to change the fonts in the document: you just put new fonts in the appropriate font-family directory, and you don't need to faff about with the source file itself.
 
-TK: example of font setup
+@subsection{Local fonts}
+
+@defmodulelang[quadwriter/fontinfo]
+
+You can also use fonts outside the project directory but not installed as system fonts. This time, we'll need to make a configuration file.
+
+@itemlist[#:style 'ordered
+
+@item{As above, within your project directory, create a subdirectory called @racket["fonts"]. Then, within @racket["fonts"], create a subdirectory for each font family you want to use in your Quadwriter document.}
+
+@item{This time, however, instead of putting font files in the family subdirectory, put a new Racket source file called @filepath{fontinfo.rkt} that starts with @code{#lang quadwriter/fontinfo}, and has up to four key/value pairs for the styles of the family:
+
+@fileblock["family-name/fontinfo.rkt"
+@codeblock|{
+#lang quadwriter/fontinfo
+
+#:regular "../charter/charter.woff"
+#:bold "../charter/charter-bold.woff"
+#:italic "../charter/charter-italic.woff"
+#:bold-italic "../charter/charter-bold-italic.woff"
+}|
+]
+}
+
+@item{The result is the same as before: the path strings on the right-hand side are mapped to the respective styles on the left.}
+
+]
+
 
 @subsubsection{Default font families}
 

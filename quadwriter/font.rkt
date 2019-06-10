@@ -3,6 +3,7 @@
          racket/string
          racket/path
          racket/match
+         fontland/font
          "attrs.rkt")
 (provide (all-defined-out))
 
@@ -19,6 +20,13 @@
 (define top-font-directory "fonts")
 (define font-file-extensions '(#".otf" #".ttf" #".woff"))
 
+(define (is-font? font-path)
+  (member (path-get-extension font-path) font-file-extensions))
+
+(define (is-font-info? font-path)
+  (define-values (dir filename _) (split-path font-path))
+  (equal? (path->string filename) "fontinfo.rkt"))
+
 (define (setup-font-path-table! base-path)
   ;; rules for font naming
   ;; "fonts" subdirectory on top
@@ -33,23 +41,36 @@
          #:when (directory-exists? fonts-dir)
          [font-family-subdir (in-directory fonts-dir)]
          #:when (directory-exists? font-family-subdir)
-         [font-path (in-directory font-family-subdir)]
-         #:when (member (path-get-extension font-path) font-file-extensions))
+         [font-or-info-path (in-directory font-family-subdir)]
+         #:when (or (is-font? font-or-info-path) (is-font-info? font-or-info-path)))
     (match-define (list font-path-string family-name)
-      (for/list ([x (list font-path font-family-subdir)])
+      (for/list ([x (list font-or-info-path font-family-subdir)])
         (path->string (find-relative-path fonts-dir x))))
-    (define path-parts (for/list ([part (in-list (explode-path (string->path (string-downcase font-path-string))))])
-                         (path->string part)))
-    (define key
-      (cons (string-downcase family-name)
-            (cond
-              [(member "bold-italic" path-parts) 'bi]
-              [(member "bold" path-parts) 'b]
-              [(member "italic" path-parts) 'i]
-              [else 'r])))
-    ;; only set value if there's not one there already.
-    ;; this means that we only use the first eligible font we find.
-    (hash-ref! font-paths key font-path)))
+    (match font-or-info-path
+      [(? is-font?)
+       (define path-parts
+         (for/list ([part (in-list (explode-path (string->path (string-downcase font-path-string))))])
+           (path->string part)))
+       (define key
+         (cons (string-downcase family-name)
+               (cond
+                 [(member "bold-italic" path-parts) 'bi]
+                 [(member "bold" path-parts) 'b]
+                 [(member "italic" path-parts) 'i]
+                 [else 'r])))
+       ;; only set value if there's not one there already.
+       ;; this means that we only use the first eligible font we find.
+       (hash-ref! font-paths key font-or-info-path)]
+      [(? is-font-info?)
+       (for ([(k v) (in-hash (dynamic-require font-or-info-path 'fontinfo))])
+         (define key
+           (cons (string-downcase family-name)
+                 (match k
+                   ['regular 'r]
+                   ['italic 'i]
+                   ['bold 'b]
+                   ['bold-italic 'bi])))
+         (hash-ref! font-paths key v))])))
 
 (define (font-attrs->path font-family bold italic)
   ;; find the font-path corresponding to a certain family name and style.
@@ -63,6 +84,7 @@
   (cond
     [(hash-ref font-paths key #false)]
     [(hash-ref font-paths regular-key #false)]
+    [(family->path font-family #:bold bold #:italic italic)]
     [else default-font-face]))
 
 (define (resolve-font-path! attrs)

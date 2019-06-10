@@ -19,7 +19,7 @@
 (define ((make-read-syntax expander-mod pt-proc) path-string p)
   ;; peel off any lines of format #:keyword val (bounded by newline)
   ;; and turn them into qexpr attrs
-  (define kw-val-pat #px"^(#:\\S+)\\s+([\\w ]*)\n")
+  (define kw-val-pat #px"^(#:\\S+)\\s+([^\n]*)")
   (define kw-attrs
     (let loop ([acc null])
       (cond
@@ -32,7 +32,7 @@
         ;; reverse in case of multiple values with same keyword, latest takes precedence (by becoming first)
         [else (reverse (for/list ([item (in-list acc)])
                                  (match-define (list kw val) (map bytes->string/utf-8 item))
-                                 (list (string->symbol (string-trim kw "#:")) val)))])))
+                                 (list (string->symbol (string-trim kw "#:")) (string-trim val "\""))))])))
   (strip-context
    (with-syntax ([PATH-STRING path-string]
                  [((ATTR-NAME ATTR-VAL) ...) kw-attrs]
