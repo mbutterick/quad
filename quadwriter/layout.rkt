@@ -332,7 +332,7 @@
           (match-define (list line-width line-height) (quad-size line-q))
           (define new-size (let ()
                              (define line-heights
-                               (filter-map (λ (q) (pt-y (size q))) pcs))
+                               (filter-map (λ (q) (quad-ref q :line-height (λ () (pt-y (size q))))) pcs))
                              (pt line-width (if (empty? line-heights) line-height (apply max line-heights)))))
           (list
            (struct-copy
