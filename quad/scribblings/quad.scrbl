@@ -11,19 +11,13 @@ pollen/scribblings/mb-tools quad/pict)
 
 @author[(author+email "Matthew Butterick" "mb@mbtype.com")]
 
-@defmodule*[(quad quadwriter)]
-
-@defmodulelang*[(quadwriter
-quadwriter/markdown
-quadwriter/markup)]
-
 @(define-runtime-path quads.png "quads.png")
 @(image quads.png #:scale 0.4)
 
 @margin-note{Quad is in progress. It works, but it is unstable — I am still changing things, small and large — and thus I make no commitment to maintain the API in its current state.}
 
 
-@section{Installing Quad & Quadwriter}
+@section{Installing Quad & Quadwriter} 
 
 At the command line:
 @verbatim{raco pkg install quad}
@@ -81,6 +75,7 @@ You can fiddle with it & then submit issues and feature requests at the @link["h
 
 
 @section{Quadwriter quick tour}
+
 
 Open DrRacket (or whatever editor you prefer) and start a new document with @code{#lang quadwriter/markdown} as the first line:
 
@@ -387,7 +382,10 @@ Or, you can aim somewhere in between. Like everything else in Racket, you can de
 
 @section{Quadwriter: developer guide}
 
-@declare-exporting[quadwriter]
+@defmodulelang*[(quadwriter
+quadwriter/markdown
+quadwriter/markup)]
+
 
 @defthing[doc qexpr?]{
 Every source file written in a @racketmodname[quadwriter] dialect exports an identifier called @racket[doc] that contains the @tech{Q-expression} that results from running the source.
@@ -707,6 +705,8 @@ On the REPL, after running a @racketmodname[quadwriter] dialect and generating a
 
 @section{Quad: the details}
 
+@defmodule[quad]
+
 As mentioned above, The @racket[quad] library itself knows as little as it can about typography and fonts and pictures. Nor does it even assert a document model like Scribble. Rather, it offers a generic geometric represntation of layout elements. In turn, these elements can be combined into more useful pieces (e.g., @racketmodname[quadwriter]).
 
 @subsection{Data model: the quad}
@@ -732,11 +732,11 @@ Eight points are named for the compass directions: @racket['n] (= top center) @r
 
 The center of the quad is @racket['c]. 
 
-The other two anchor points are @racket['baseline-in] and @racket['baseline-out] or just @racket['bi] and @racket['bo]. These points are also on the quad perimieter. They allow quads containing type to be aligned according to adjacent baselines. The exact location of these points depends on the direction of the script. For instance, in left-to-right languages, @racket['baseline-in] is on the left edge, and @racket['baseline-out] is on the right. The vertical position of these points depends on the font associated with the quad. If no font is specified, the @racket['bi] and @racket['bo] points are vertically positioned at the southern edge.
+The other two anchor points are @racket['baseline-in] and @racket['baseline-out] or just @racket['bi] and @racket['bo]. These points are also on the quad perimeter. They allow quads containing type to be aligned according to adjacent baselines. The exact location of these points depends on the direction of the script. For instance, in left-to-right languages, @racket['baseline-in] is on the left edge, and @racket['baseline-out] is on the right. The vertical position of these points depends on the font associated with the quad. If no font is specified, the @racket['bi] and @racket['bo] points are vertically positioned at the southern edge.
 
 By default, each subquad will ultimately be positioned relative to the immediately preceding subquad (or, if it's the first subquad, the parent). Optionally, a subquad can attach to the parent. 
 
-How does a quad know which anchor points to use? Each quad specifies a @deftech{to anchor} on its own perimeter, and a @deftech{from anchor} on the previous quad's perimeter. The quad is positioned by moving it until its @deftech{to anchor} matches the position of the (already positioned) @deftech{from anchor}. Think of it like two tiny magnets clicking together.
+How does a quad know which anchor points to use? Each quad specifies a @deftech{to anchor} on its own perimeter, and a @deftech{from anchor} on the previous quad's perimeter. The quad is positioned by moving it until its to anchor matches the position of the (already positioned) from anchor. Think of it like two tiny magnets clicking together.
 
 A key benefit of the anchor-point system is that it gets rid of notions of ``horizontal'', ``vertical'', ``up'', ``down'', etc. Quads flow in whatever direction is implied by their anchor points.
 
@@ -755,7 +755,7 @@ A key benefit of the anchor-point system is that it gets rid of notions of ``hor
 ``Wait a minute — why is the new quad specifying @emph{both} anchor points? Shouldn't the from anchor be specified by the previous quad?'' It could, but it would make the layout system less flexible, because all the subquads hanging onto a certain quad would have to emanate from a single point. This way, every subquad can attach to its neighbor (or the parent) in whatever way it prefers.
 
 
-@subsection{Rendering}
+@subsection[#:tag "quad-rendering"]{Rendering}
 
 Once the quads have been positioned, they are passed to the renderer, which recursively visits each quad and calls its drawing function.
 
