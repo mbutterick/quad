@@ -19,7 +19,7 @@
 (define ((make-read-syntax expander-mod pt-proc) path-string p)
   ;; peel off any lines of format #:keyword val (bounded by newline)
   ;; and turn them into qexpr attrs
-  (define kw-val-pat #px"^(#:\\S+)\\s+(\\S+)\n")
+  (define kw-val-pat #px"^(#:\\S+)\\s+([\\w ]*)\n")
   (define kw-attrs
     (let loop ([acc null])
       (cond
