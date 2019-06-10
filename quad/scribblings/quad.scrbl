@@ -382,10 +382,13 @@ Or, you can aim somewhere in between. Like everything else in Racket, you can de
 
 @section{Quadwriter: developer guide}
 
-@defmodulelang*[(quadwriter
+@defmodule[quadwriter #:link-target? #f #:no-declare]
+
+@defmodulelang*/no-declare[(quadwriter
 quadwriter/markdown
 quadwriter/markup)]
 
+@declare-exporting[quadwriter]
 
 @defthing[doc qexpr?]{
 Every source file written in a @racketmodname[quadwriter] dialect exports an identifier called @racket[doc] that contains the @tech{Q-expression} that results from running the source.
