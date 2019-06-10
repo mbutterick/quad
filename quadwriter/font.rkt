@@ -2,7 +2,8 @@
 (require racket/runtime-path
          racket/string
          racket/path
-         racket/match)
+         racket/match
+         "attrs.rkt")
 (provide (all-defined-out))
 
 (define-runtime-path quadwriter-fonts-dir "fonts")
@@ -64,20 +65,20 @@
     [(hash-ref font-paths regular-key #false)]
     [else default-font-face]))
 
-(define (resolve-font-path attrs)
-  (define this-font-family (hash-ref! attrs 'font-family default-font-family))
+(define (resolve-font-path! attrs)
+  (define this-font-family (hash-ref! attrs :font-family default-font-family))
   (unless (complete-path? this-font-family)
-    (define this-bold (hash-ref! attrs 'font-bold #false))
-    (define this-italic (hash-ref! attrs 'font-italic #false))
-    (hash-set! attrs 'font-path (font-attrs->path this-font-family this-bold this-italic))))
+    (define this-bold (hash-ref! attrs :font-bold #false))
+    (define this-italic (hash-ref! attrs :font-italic #false))
+    (hash-set! attrs :font-path (font-attrs->path this-font-family this-bold this-italic))))
 
 (define (parse-percentage pstr)
   (/ (string->number (string-trim pstr "%")) 100.0))
 
-(define (resolve-font-size attrs)
-  (define this-font-size (hash-ref! attrs 'font-size default-font-size))
-  (define this-font-size-adjust (parse-percentage (hash-ref! attrs 'font-size-adjust "100%")))
+(define (resolve-font-size! attrs)
+  (define this-font-size (hash-ref! attrs :font-size default-font-size))
+  (define this-font-size-adjust (parse-percentage (hash-ref! attrs :font-size-adjust "100%")))
   ;; we bake the adjustment into the font size...
-  (hash-set! attrs 'font-size (* this-font-size this-font-size-adjust))
+  (hash-set! attrs :font-size (* this-font-size this-font-size-adjust))
   ;; and then set the adjustment back to 100% (since it's now accounted for)
-  (hash-set! attrs 'font-size-adjust "100%"))
+  (hash-set! attrs :font-size-adjust "100%"))

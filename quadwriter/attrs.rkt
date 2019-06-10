@@ -63,10 +63,12 @@ Naming guidelines
 |#
 
 (define-attrs (font-family
+               font-path
                font-size
                font-size-adjust
                font-color
                font-features
+               font-features-adjust
                font-italic
                font-bold
                font-tracking
