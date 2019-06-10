@@ -624,7 +624,7 @@ A design goal of Quadwriter is to treat document layout as the result of a progr
 
 Quadwriter, by contrast, relies only on fonts that are @emph{in the same directory} as your other project source files. This is a feature: it means that everything  necessary to render the document travels together in the same directory. You can re-render it anywhere with identical results. You never have the problem — still with us after 35 years of desktop word processing — that ``oh, you need to install such-and-such font in your system before it will work.'' Bah!
 
-Quadwriter supports the usual TrueType (.ttf) and OpenType (.otf) font files. To add fonts to your Quadwriter experience:
+Quadwriter supports the usual TrueType (@racket[.ttf]) and OpenType (@racket[.otf]) font files. It also supports WOFF files (@racket[.woff]). To add fonts to your Quadwriter experience:
 
 @itemlist[#:style 'ordered
 
