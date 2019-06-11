@@ -1,7 +1,11 @@
 #lang quadwriter/markdown
 
-Foo
+Here's a jpeg
 
 ![alt text](test.jpeg)
 
-Bar
+And a png
+
+![alt text](test.png)
+
+Done.

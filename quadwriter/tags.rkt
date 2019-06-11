@@ -32,9 +32,11 @@
 
 (define-tag-function (img attrs exprs)
   (qexpr (list->attrs
+          :line-height "false"
+          :line-align-last "center" ; need `last` because img is a block-level element.
           :image-data (second (assq 'src attrs))
           :image-alt (second (assq 'alt attrs))
-          :display (symbol->string (gensym))) exprs))
+          :display "block") exprs))
 
 (define-tag-function (br attrs exprs) line-break)
 
