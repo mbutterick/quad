@@ -16,22 +16,25 @@
   (qexpr attrs exprs))
 
 (define-tag-function (p attrs exprs)
-  ;; no font-family so that it adopts whatever the surrounding family is
-  (qexpr (append (list->attrs
-                  :keep-first-lines "2"
-                  :keep-last-lines "3"
-                  :font-size-adjust "100%"
-                  :hyphenate "true"
-                  :display (symbol->string (gensym)))
-                 attrs) exprs))
-
-(define div p)
+  (match exprs
+    [(cons (? txexpr? tx) _)
+     #:when (equal? (attr-ref tx :font-family #false) "code")
+     ;; wrap code blocks in `pre` to distinguish them from inline
+     (apply pre attrs exprs)]
+    ;; no font-family so that it adopts whatever the surrounding family is
+    [_ (qexpr (append (list->attrs
+                       :keep-first-lines "2"
+                       :keep-last-lines "3"
+                       :font-size-adjust "100%"
+                       :hyphenate "true"
+                       :display (symbol->string (gensym)))
+                      attrs) exprs)]))
 
 (define-tag-function (img attrs exprs)
   (qexpr (list->attrs
-                  :image-data (second (assq 'src attrs))
-                  :image-alt (second (assq 'alt attrs))
-                  :display (symbol->string (gensym))) exprs))
+          :image-data (second (assq 'src attrs))
+          :image-alt (second (assq 'alt attrs))
+          :display (symbol->string (gensym))) exprs))
 
 (define-tag-function (br attrs exprs) line-break)
 
@@ -86,6 +89,7 @@
           (list->attrs
            :font-italic "true"
            :font-size-adjust "100%") attrs) exprs))
+
 (define i em)
 
 (define-syntax-rule (attr-list . attrs) 'attrs)
@@ -124,7 +128,7 @@
   (define new-exprs (add-between
                      (for*/list ([expr (in-list exprs)]
                                  [str (in-list (string-split (string-join (get-elements expr) "") "\n"))])
-                       (list (get-tag expr) (get-attrs expr) (string-replace str " " " ")))
+                                (list (get-tag expr) (get-attrs expr) (string-replace str " " " ")))
                      line-break))
   (qexpr (append (list->attrs
                   :display "block"
@@ -152,7 +156,7 @@
          (add-between
           (for/list ([(expr idx) (in-indexed exprs)]
                      #:when (txexpr? expr))
-            (list* (get-tag expr) (cons (list :list-index (or bullet-val (format "~a" (add1 idx)))) (get-attrs expr)) (get-elements expr)))
+                    (list* (get-tag expr) (cons (list :list-index (or bullet-val (format "~a" (add1 idx)))) (get-attrs expr)) (get-elements expr)))
           para-break)))
 
 (define bullet-quad '(q ((special "bullet"))))

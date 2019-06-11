@@ -8,14 +8,6 @@
          #%app #%top #%datum #%top-interaction require
          (all-from-out "tags.rkt"))
 
-(define rsquo "’")
-(define rdquo "”")
-(define lsquo "‘")
-(define ldquo "“")
-(define hellip "…")
-(define ndash "–")
-(define mdash "—")
-
 (define (doc-proc exprs)
   (define strs (match exprs
                  [(? null?) '(" ")] ; single nonbreaking space, so something prints
@@ -32,8 +24,7 @@
 (module reader racket/base
   (require racket/port markdown "lang-helper.rkt")
   (provide read-syntax get-info)
-  (define read-syntax
-    (make-read-syntax 'quadwriter/markdown
-                      (λ (path-string p) (xexpr->parse-tree
-                                          (parameterize ([current-strict-markdown? #true])
-                                            (parse-markdown (port->string p))))))))
+  (define read-syntax (make-read-syntax 'quadwriter/markdown
+                                        (λ (path-string p) (xexpr->parse-tree
+                                                            (parameterize ([current-strict-markdown? #t])
+                                                              (parse-markdown (port->string p))))))))
