@@ -10,6 +10,8 @@
          pitfall
          quad
          hyphenate
+         pollen/unstable/typography
+         pollen/decode
          sugar/coerce
          sugar/debug
          "attrs.rkt"
@@ -94,24 +96,27 @@
 
 (define default-line-height-multiplier 1.42)
 (define (setup-qs qx-arg pdf-path)
-  [define qexpr (replace-breaks qx-arg)]
-  [define the-quad
+  (define qexpr (decode qx-arg
+                        #:string-proc (λ (str) (smart-ellipses (smart-dashes str)))
+                        #:txexpr-proc smart-quotes))
+  (define super-qexpr (replace-breaks qexpr))
+  (define the-quad
     (qexpr->quad (list 'q (list->attrs
                            :font-family default-font-family
                            :font-size (number->string default-font-size)
-                           :line-height (number->string (floor (* default-line-height-multiplier default-font-size)))) qexpr))]
+                           :line-height (number->string (floor (* default-line-height-multiplier default-font-size)))) super-qexpr)))
   (setup-font-path-table! pdf-path)
-  [define atomized-qs
+  (define atomized-qs
     (time-log atomize (atomize the-quad
                                #:attrs-proc handle-cascading-attrs
                                #:missing-glyph-action 'fallback
                                #:fallback "fallback"
                                #:emoji "fallback-emoji"
                                #:math "fallback-math"
-                               #:font-path-resolver resolve-font-path!))]
-  [define hyphenated-qs (time-log hyphenate (handle-hyphenate atomized-qs))]
-  [define typed-quads (map generic->typed-quad hyphenated-qs)]
-  [define indented-qs (insert-first-line-indents typed-quads)]
+                               #:font-path-resolver resolve-font-path!)))
+  (define hyphenated-qs (time-log hyphenate (handle-hyphenate atomized-qs)))
+  (define typed-quads (map generic->typed-quad hyphenated-qs))
+  (define indented-qs (insert-first-line-indents typed-quads))
   indented-qs)
 
 (define (setup-pdf qs pdf-path compress?)
