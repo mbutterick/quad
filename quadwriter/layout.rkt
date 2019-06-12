@@ -109,7 +109,8 @@
             [(list #false (? number? h)) (define ratio (/ h img-height))
                                          (list (* ratio img-width) h)]
             [(list (? number? w) #false) (define ratio (/ w img-width))
-                                         (list w (* ratio img-height))]))
+                                         (list w (* ratio img-height))]
+            [(list #false #false) (list img-width img-height)]))
         (struct-copy
          image-quad q:image
          [attrs #:parent quad (let ([h (hash-copy (quad-attrs q))])
