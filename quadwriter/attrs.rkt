@@ -137,7 +137,10 @@ Naming guidelines
                            line-wrap
 
                            image-data
+                           image-object
                            image-alt
+                           image-height
+                           image-width
 
                            page-width
                            page-height
