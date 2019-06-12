@@ -136,7 +136,7 @@ Naming guidelines
 
                            line-wrap
 
-                           image-data
+                           image-file
                            image-object
                            image-alt
                            image-height

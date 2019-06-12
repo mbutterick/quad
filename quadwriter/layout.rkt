@@ -97,7 +97,7 @@
 (define (generic->typed-quad q)
   (cond
     [(line-break-quad? q) q]
-    [(match (quad-ref q :image-data)
+    [(match (quad-ref q :image-file)
        [#false #false]
        [(? file-exists? path-string)
         (define img-obj (open-image (current-pdf) path-string))

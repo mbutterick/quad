@@ -562,6 +562,15 @@ Whether the block is hyphenated. Activated only when value is @racket["true"].
 Whether the contents of the block are clipped to its boundary. Activated only when value is @racket["true"]. 
 }
 
+@deftogether[(@defthing[#:kind "attribute" image-file symbol?]
+              @defthing[#:kind "attribute" image-alt symbol?]
+              @defthing[#:kind "attribute" image-height symbol?]
+              @defthing[#:kind "attribute" image-width symbol?])]{
+Specify a quad with an image (either @racket{.png} or @racket{.jpeg}). @racket[image-file] is a string containg the path to the image file. @racket[image-alt] is optional text. 
+
+@racket[image-height] and @racket[image-width] are optional sizing values, each of which is a @tech{dimension string}. If neither @racket[image-height] nor @racket[image-width] are provided, the image is displayed at ``full size'' (meaning one pixel = one point, or 72 dpi). If both @racket[image-height] and @racket[image-width] are provided, the image is displayed at exactly that size. If only @racket[image-height] or @racket[image-width] is provided, the image is scaled by the proportion implied by the value. That is, if @racket[image-height] is @racket{50} and the image is 200 pixels high by 100 pixels wide, then the image will be displayed 50 pixels high by 25 pixels wide.
+}
+
 @subsubsection{Other attributes}
 
 @deftogether[(@defthing[#:kind "attribute" font-size symbol?]
