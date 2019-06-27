@@ -34,10 +34,10 @@
     [(_ ALL-BREAKS-ID . TYPES)
      (with-syntax ([((TYPE-BREAK TYPE-STR Q:TYPE-BREAK) ...)
                     (for/list ([type (in-list (syntax->list #'TYPES))])
-                      (list
-                       (format-id #'TYPES "~a-break" type)
-                       (symbol->string (syntax->datum type))
-                       (format-id #'TYPES "q:~a-break" type)))])
+                              (list
+                               (format-id #'TYPES "~a-break" type)
+                               (symbol->string (syntax->datum type))
+                               (format-id #'TYPES "q:~a-break" type)))])
        #'(begin
            (define TYPE-BREAK '(q ((break TYPE-STR)))) ...
            (define ALL-BREAKS-ID (list (cons TYPE-BREAK Q:TYPE-BREAK) ...))))]))
@@ -56,22 +56,22 @@
   ;; do this before ->string-quad so that it can handle the sizing promises
   (apply append
          (for/list ([q (in-list qs)])
-           (match (quad-ref q :hyphenate)
-             [#true #:when (and (pair? (quad-elems q))
-                                (andmap string? (quad-elems q)))
-                    (for*/list ([str (in-list (quad-elems q))]
-                                [hyphen-char (in-value #\u00AD)]
-                                [hstr (in-value (hyphenate str hyphen-char
-                                                           #:min-left-length 3
-                                                           #:min-right-length 3))]
-                                [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
-                      (struct-copy quad q [elems (list substr)]))]
-             [_ (list q)]))))
+                   (match (quad-ref q :hyphenate)
+                     [#true #:when (and (pair? (quad-elems q))
+                                        (andmap string? (quad-elems q)))
+                            (for*/list ([str (in-list (quad-elems q))]
+                                        [hyphen-char (in-value #\u00AD)]
+                                        [hstr (in-value (hyphenate str hyphen-char
+                                                                   #:min-left-length 3
+                                                                   #:min-right-length 3))]
+                                        [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
+                                       (struct-copy quad q [elems (list substr)]))]
+                     [_ (list q)]))))
 
 
 (define (string->feature-list str)
   (for/list ([kv (in-slice 2 (string-split str))])
-    (cons (string->bytes/utf-8 (first kv)) (string->number (second kv)))))
+            (cons (string->bytes/utf-8 (first kv)) (string->number (second kv)))))
 
 (define (parse-font-features! attrs)
   (cond
@@ -89,7 +89,15 @@
              (hash-set! attrs :font-features parsed-features)]
             [_ #false])]))
 
+
+(define (parse-dimension-strings! attrs)
+  (for ([k (in-hash-keys attrs)]
+        #:when (takes-dimension-string? k))
+       (hash-set! attrs k (parse-dimension (hash-ref attrs k))))
+  attrs)
+
 (define (handle-cascading-attrs attrs)
+  (parse-dimension-strings! attrs)
   (resolve-font-path! attrs)
   (resolve-font-size! attrs)
   (parse-font-features! attrs))
@@ -126,20 +134,20 @@
   (define left
     (or (debug-x-margin)
         (quad-ref (car qs) :page-margin-left
-                  (λ () (parse-dimension (quad-ref (car qs) :page-margin-right default-side-margin))))))
+                  (λ ()  (quad-ref (car qs) :page-margin-right default-side-margin)))))
   (define right
     (or (debug-x-margin)
         (quad-ref (car qs) :page-margin-right
-                  (λ () (parse-dimension (quad-ref (car qs) :page-margin-left default-side-margin))))))
+                  (λ ()  (quad-ref (car qs) :page-margin-left default-side-margin)))))
   (define top
     (or (debug-y-margin)
         (quad-ref (car qs) :page-margin-top
-                  (λ () (parse-dimension (quad-ref (car qs) :page-margin-bottom default-top-margin))))))
+                  (λ ()  (quad-ref (car qs) :page-margin-bottom default-top-margin)))))
   (define vert-optical-adjustment 10)
   (define bottom
     (or (debug-y-margin)
-        (parse-dimension (quad-ref (car qs) :page-margin-bottom
-                  (λ () (+ vert-optical-adjustment (quad-ref (car qs) :page-margin-top (* default-top-margin 1.4))))))))
+        (quad-ref (car qs) :page-margin-bottom
+                  (λ () (+ vert-optical-adjustment (quad-ref (car qs) :page-margin-top (* default-top-margin 1.4)))))))
   (list left top right bottom))
 
 (define default-column-count 1)
@@ -151,21 +159,21 @@
 
 (define default-column-gap 36)
 (define (setup-column-gap qs)
-  (or (debug-column-gap) (parse-dimension (quad-ref (car qs) :column-gap default-column-gap))))
+  (or (debug-column-gap)  (quad-ref (car qs) :column-gap default-column-gap)))
 
 (define (set-page-size! the-pdf qs)
-    ;; page size can be specified by name, or measurements.
-    ;; explicit measurements from page-height and page-width supersede those from page-size.
-    (match-define (list page-width page-height)
-        (for/list ([k (list :page-width :page-height)])
-          (match (and (pair? qs) (quad-ref (car qs) k))
-            [#false #false]
-            [val (parse-dimension val 'round)])))
-    (resolve-page-size! the-pdf
-                        (or (debug-page-width) page-width)
-                        (or (debug-page-height) page-height)
-                        (quad-ref (car qs) :page-size default-page-size)
-                        (quad-ref (car qs) :page-orientation default-page-orientation)))
+  ;; page size can be specified by name, or measurements.
+  ;; explicit measurements from page-height and page-width supersede those from page-size.
+  (match-define (list page-width page-height)
+    (for/list ([k (list :page-width :page-height)])
+              (and (pair? qs) (match (quad-ref (car qs) k)
+                                [#false #false]
+                                [val (inexact->exact (floor val))]))))
+  (resolve-page-size! the-pdf
+                      (or (debug-page-width) page-width)
+                      (or (debug-page-height) page-height)
+                      (quad-ref (car qs) :page-size default-page-size)
+                      (quad-ref (car qs) :page-orientation default-page-orientation)))
 
 (define/contract (render-pdf qx-arg pdf-path-arg
                              #:replace [replace? #t]
@@ -178,8 +186,8 @@
     (raise-argument-error 'render-pdf "path that doesn't exist" pdf-path))
 
   (define the-pdf (make-pdf #:compress compress?
-            #:auto-first-page #false
-            #:output-path pdf-path))
+                            #:auto-first-page #false
+                            #:output-path pdf-path))
   (parameterize ([current-pdf the-pdf]
                  [verbose-quad-printing? #false])
     (define qs (time-log setup-qs (setup-qs qx-arg pdf-path)))

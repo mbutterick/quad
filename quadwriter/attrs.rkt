@@ -7,42 +7,40 @@
 
 (define (list->attrs . kvs)
   (for/list ([kv (in-slice 2 kvs)])
-    kv))
+            kv))
 
 (define (cm->in x) (/ x 2.54))
 (define (in->pts x) (* 72 x))
 (define (mm->cm x) (/ x 10))
 
-(define (parse-dimension x [round? #f])
-  (define val
-    (match x
-      [#false #false]
-      [(? number?) x]
-      [(? string? x)
-       (match (cdr (regexp-match #rx"^(-?[0-9\\.]+)([a-z]+)$"  (string-downcase x)))
-         [(list num-string unit)
-          ((match unit
-             [(regexp #rx"in(ch(es)?)?$") in->pts]
-             [(regexp #rx"cm$") (compose1 in->pts cm->in)]
-             [(regexp #rx"mm$") (compose1 in->pts cm->in mm->cm)]
-             [_ (raise-argument-error 'parse-dimension "dimension string" x)]) (string->number num-string))])]))
-  (if round? (inexact->exact (floor val)) val))
+(define (parse-dimension x)
+  (match x
+    [#false #false]
+    [(? number?) x]
+    [(? string? x)
+     (match (cdr (regexp-match #rx"^(-?[0-9\\.]+)([a-z]+)$"  (string-downcase x)))
+       [(list num-string unit)
+        ((match unit
+           [(regexp #rx"in(ch(es)?)?$") in->pts]
+           [(regexp #rx"cm$") (compose1 in->pts cm->in)]
+           [(regexp #rx"mm$") (compose1 in->pts cm->in mm->cm)]
+           [_ (raise-argument-error 'parse-dimension "dimension string" x)]) (string->number num-string))])]))
 
 (define (copy-block-attrs source-hash dest-hash)
   (define new-hash (make-hasheq))
   (for ([(k v) (in-hash dest-hash)])
-    (hash-set! new-hash k v))
+       (hash-set! new-hash k v))
   (for* ([k (in-list block-attrs)]
          [v (in-value (hash-ref source-hash k #f))]
          #:when v)
-    (hash-set! new-hash k v))
+        (hash-set! new-hash k v))
   new-hash)
 
 (define-syntax (define-attrs stx)
   (syntax-case stx ()
     [(_ (ATTR-NAME ...))
      (with-syntax ([(ATTR-ID ...) (for/list ([attr-id (in-list (syntax->list #'(ATTR-NAME ...)))])
-                                    (format-id stx ":~a" (syntax-e attr-id)))])
+                                            (format-id stx ":~a" (syntax-e attr-id)))])
        #'(begin
            (define ATTR-ID 'ATTR-NAME) ...))]
     [(_ ID (ATTR-NAME ...))
@@ -62,6 +60,7 @@ Naming guidelines
 + measurement units are points by default
 
 |#
+
 
 (define-attrs (font-family
                font-path
@@ -156,3 +155,32 @@ Naming guidelines
                            page-margin-right
 
                            footer-display))
+
+(define (takes-dimension-string? k)
+  (and (memq k (list :page-width
+                     :page-height
+                     :page-margin-top
+                     :page-margin-bottom
+                     :page-margin-left
+                     :page-margin-right
+                     :column-gap
+                     :inset-top
+                     :inset-bottom
+                     :inset-left
+                     :inset-right
+                     :border-inset-top
+                     :border-inset-bottom
+                     :border-inset-left
+                     :border-inset-right
+                     :border-width-left
+                     :border-width-right
+                     :border-width-top
+                     :border-width-bottom
+                     :space-before
+                     :space-after
+                     :image-height
+                     :image-width
+                     :font-size
+                     :font-tracking
+                     :font-baseline-shift
+                     :line-height)) #true))

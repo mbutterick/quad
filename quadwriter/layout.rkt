@@ -24,8 +24,8 @@
     (fill-color doc (quad-ref q :font-color default-font-color))
     (define str (unsafe-car (quad-elems q)))
     (match-define (list x y) (quad-origin q))
-    (text doc str x (- y (parse-dimension (quad-ref q :font-baseline-shift 0)))
-          #:tracking (parse-dimension (quad-ref q :font-tracking 0))
+    (text doc str x (- y  (quad-ref q :font-baseline-shift 0))
+          #:tracking (quad-ref q :font-tracking 0)
           #:bg (quad-ref q :bg)
           #:features (quad-ref q :font-features default-font-features)
           #:link (quad-ref q :link))))
@@ -86,14 +86,14 @@
         [str
          (font-size pdf (quad-ref q :font-size default-font-size))
          (font pdf (path->string (quad-ref q font-path-key default-font-face)))
-         (define ft-value (parse-dimension (quad-ref q :font-tracking 0)))
+         (define ft-value  (quad-ref q :font-tracking 0))
          (if (equal? str "\u00AD")
              ft-value
              (+ (string-width pdf str
                               #:tracking ft-value
                               #:features (quad-ref q :font-features default-font-features))))]
         [else 0]))
-    (list string-size (parse-dimension (quad-ref q :line-height (current-line-height pdf))))))
+    (list string-size  (quad-ref q :line-height (current-line-height pdf)))))
 
 (define (generic->typed-quad q)
   (cond
@@ -105,8 +105,8 @@
         (define img-width ($img-width img-obj))
         (define img-height ($img-height img-obj))
         (match-define (list layout-width layout-height)
-          (match (list (parse-dimension (quad-ref q :image-width))
-                       (parse-dimension (quad-ref q :image-height))) 
+          (match (list  (quad-ref q :image-width)
+                        (quad-ref q :image-height)) 
             [(list (? number? w) (? number? h)) (list w h)]
             [(list #false (? number? h)) (define ratio (/ h img-height))
                                          (list (* ratio img-width) h)]
@@ -181,7 +181,7 @@
   (define arbitrary-width 20)
   (q #:type line-spacer-quad
      #:size (pt arbitrary-width (cond
-                                  [(and maybe-first-line-q (parse-dimension (quad-ref maybe-first-line-q key)))]
+                                  [(and maybe-first-line-q  (quad-ref maybe-first-line-q key))]
                                   [else default-val]))
      #:from 'sw
      #:to 'nw
@@ -347,7 +347,7 @@
           (match-define (list line-width line-height) (quad-size line-q))
           (define new-size (let ()
                              (define line-heights
-                               (filter-map (λ (q) (or (parse-dimension (quad-ref q :line-height)) (pt-y (size q)))) pcs))
+                               (filter-map (λ (q) (or (quad-ref q :line-height) (pt-y (size q)))) pcs))
                              (pt line-width (if (empty? line-heights) line-height (apply max line-heights)))))
           (list
            (struct-copy
@@ -525,7 +525,7 @@
   ;; adjust drawing coordinates for border inset
   (match-define (list bil bit bir bib)
     (for/list ([k (in-list (list :border-inset-left :border-inset-top :border-inset-right :border-inset-bottom))])
-              (parse-dimension (quad-ref first-line k 0))))
+               (quad-ref first-line k 0)))
   (match-define (list left top) (pt+ (quad-origin q) (list bil bit)))
   (match-define (list width height) (pt- (size q) (list (+ bil bir) (+ bit bib))))
   ;; fill rect
@@ -536,7 +536,7 @@
           (fill doc bgcolor))])
   ;; draw border
   (match-define (list bw-left bw-top bw-right bw-bottom)
-    (map (λ (k) (max 0 (parse-dimension (quad-ref first-line k 0))))
+    (map (λ (k) (max 0  (quad-ref first-line k 0)))
          (list
           :border-width-left
           :border-width-top
@@ -593,9 +593,9 @@
       #:size (delay (pt (pt-x (size ln0)) ; 
                         (+ (for/sum ([line (in-list lines)])
                                     (pt-y (size line)))
-                           (parse-dimension (quad-ref ln0 :inset-top 0))
-                           (parse-dimension (quad-ref ln0 :inset-bottom 0)))))
-      #:shift-elems (pt 0 (+ (parse-dimension (quad-ref ln0 :inset-top 0))))
+                           (quad-ref ln0 :inset-top 0)
+                           (quad-ref ln0 :inset-bottom 0))))
+      #:shift-elems (pt 0 (quad-ref ln0 :inset-top 0))
       #:draw-start (block-draw-start ln0)
       #:draw-end (block-draw-end ln0))])
 
@@ -681,7 +681,7 @@
              #:result (reverse qs-out))
             ([q (in-list qs)]
              [next-q (in-list (cdr qs))])
-    (match (and (para-break-quad? q) (parse-dimension (quad-ref next-q :first-line-indent 0)))
+    (match (and (para-break-quad? q)  (quad-ref next-q :first-line-indent 0))
       [(or #false 0) (cons next-q qs-out)]
       [indent-val (list* next-q (make-quad #:from 'bo
                                            #:to 'bi

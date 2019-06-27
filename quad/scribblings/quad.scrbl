@@ -575,7 +575,7 @@ Specify a quad with an image (either @racket{.png} or @racket{.jpeg}). @racket[i
 
 @deftogether[(@defthing[#:kind "attribute" font-size symbol?]
               @defthing[#:kind "attribute" font-size-adjust symbol?])]{
-Two ways of setting the point size for text. @racket[font-size] takes a size string. @racket[font-size-adjust] takes a string representing a percentage (like @racket["120%"] or @racket["1.2"]) and sets the font size to the size of the parent, multiplied by the percentage.
+Two ways of setting the point size for text. @racket[font-size] takes a @tech{dimension string}. @racket[font-size-adjust] takes a string representing a percentage (like @racket["120%"] or @racket["1.2"]) and sets the font size to the size of the parent, multiplied by the percentage.
 }
 
 @defthing[#:kind "attribute" font-family symbol?]{
