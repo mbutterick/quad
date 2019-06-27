@@ -16,6 +16,7 @@
 (define (parse-dimension x [round? #f])
   (define val
     (match x
+      [#false #false]
       [(? number?) x]
       [(? string? x)
        (match (cdr (regexp-match #rx"^(-?[0-9\\.]+)([a-z]+)$"  (string-downcase x)))
@@ -72,6 +73,7 @@ Naming guidelines
                font-italic
                font-bold
                font-tracking
+               font-baseline-shift
                bg
                link
                href

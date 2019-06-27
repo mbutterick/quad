@@ -603,7 +603,11 @@ Two ways of setting OpenType layout features. @racket[font-features] takes a @de
  
 
 @defthing[#:kind "attribute" font-tracking symbol?]{
-Spacing between characters. Value is given as a @tech{dimension string}.
+Space between characters. Value is given as a @tech{dimension string}.
+}
+
+@defthing[#:kind "attribute" font-baseline-shift symbol?]{
+Vertical offset of font baseline (positive values move the baseline up, negative down). Value is given as a @tech{dimension string}.
 }
 
 @defthing[#:kind "attribute" line-height symbol?]{

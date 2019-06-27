@@ -126,20 +126,20 @@
   (define left
     (or (debug-x-margin)
         (quad-ref (car qs) :page-margin-left
-                  (λ () (quad-ref (car qs) :page-margin-right default-side-margin)))))
+                  (λ () (parse-dimension (quad-ref (car qs) :page-margin-right default-side-margin))))))
   (define right
     (or (debug-x-margin)
         (quad-ref (car qs) :page-margin-right
-                  (λ () (quad-ref (car qs) :page-margin-left default-side-margin)))))
+                  (λ () (parse-dimension (quad-ref (car qs) :page-margin-left default-side-margin))))))
   (define top
     (or (debug-y-margin)
         (quad-ref (car qs) :page-margin-top
-                  (λ () (quad-ref (car qs) :page-margin-bottom default-top-margin)))))
+                  (λ () (parse-dimension (quad-ref (car qs) :page-margin-bottom default-top-margin))))))
   (define vert-optical-adjustment 10)
   (define bottom
     (or (debug-y-margin)
-        (quad-ref (car qs) :page-margin-bottom
-                  (λ () (+ vert-optical-adjustment (quad-ref (car qs) :page-margin-top (* default-top-margin 1.4)))))))
+        (parse-dimension (quad-ref (car qs) :page-margin-bottom
+                  (λ () (+ vert-optical-adjustment (quad-ref (car qs) :page-margin-top (* default-top-margin 1.4))))))))
   (list left top right bottom))
 
 (define default-column-count 1)
@@ -151,7 +151,7 @@
 
 (define default-column-gap 36)
 (define (setup-column-gap qs)
-  (or (debug-column-gap) (quad-ref (car qs) :column-gap default-column-gap)))
+  (or (debug-column-gap) (parse-dimension (quad-ref (car qs) :column-gap default-column-gap))))
 
 (define (set-page-size! the-pdf qs)
     ;; page size can be specified by name, or measurements.

@@ -24,8 +24,8 @@
     (fill-color doc (quad-ref q :font-color default-font-color))
     (define str (unsafe-car (quad-elems q)))
     (match-define (list x y) (quad-origin q))
-    (text doc str x y
-          #:tracking (quad-ref q :font-tracking 0)
+    (text doc str x (- y (parse-dimension (quad-ref q :font-baseline-shift 0)))
+          #:tracking (parse-dimension (quad-ref q :font-tracking 0))
           #:bg (quad-ref q :bg)
           #:features (quad-ref q :font-features default-font-features)
           #:link (quad-ref q :link))))
@@ -86,13 +86,14 @@
         [str
          (font-size pdf (quad-ref q :font-size default-font-size))
          (font pdf (path->string (quad-ref q font-path-key default-font-face)))
+         (define ft-value (parse-dimension (quad-ref q :font-tracking 0)))
          (if (equal? str "\u00AD")
-             (quad-ref q :font-tracking 0)
+             ft-value
              (+ (string-width pdf str
-                              #:tracking (quad-ref q :font-tracking 0)
+                              #:tracking ft-value
                               #:features (quad-ref q :font-features default-font-features))))]
         [else 0]))
-    (list string-size (quad-ref q :line-height (current-line-height pdf)))))
+    (list string-size (parse-dimension (quad-ref q :line-height (current-line-height pdf))))))
 
 (define (generic->typed-quad q)
   (cond
@@ -104,7 +105,8 @@
         (define img-width ($img-width img-obj))
         (define img-height ($img-height img-obj))
         (match-define (list layout-width layout-height)
-          (match (list (quad-ref q :image-width) (quad-ref q :image-height)) 
+          (match (list (parse-dimension (quad-ref q :image-width))
+                       (parse-dimension (quad-ref q :image-height))) 
             [(list (? number? w) (? number? h)) (list w h)]
             [(list #false (? number? h)) (define ratio (/ h img-height))
                                          (list (* ratio img-width) h)]
@@ -179,7 +181,7 @@
   (define arbitrary-width 20)
   (q #:type line-spacer-quad
      #:size (pt arbitrary-width (cond
-                                  [(and maybe-first-line-q (quad-ref maybe-first-line-q key))]
+                                  [(and maybe-first-line-q (parse-dimension (quad-ref maybe-first-line-q key)))]
                                   [else default-val]))
      #:from 'sw
      #:to 'nw
@@ -201,9 +203,9 @@
        (define new-run (quad-copy q:string
                                   [attrs (quad-attrs strq)]
                                   [elems (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
-                                                                                 (quad-elems pc))))]
+                                                                                         (quad-elems pc))))]
                                   [size (delay (pt (for/sum ([pc (in-list run-pcs)])
-                                                     (pt-x (size pc)))
+                                                            (pt-x (size pc)))
                                                    (pt-y (size strq))))]))
        (loop (cons new-run runs) rest)]
       [(cons first rest) (loop (cons first runs) rest)])))
@@ -236,7 +238,7 @@
 (define (sum-of-widths qss)
   (for*/sum ([qs (in-list qss)]
              [q (in-list qs)])
-    (pt-x (size q))))
+            (pt-x (size q))))
 
 (define (space-quad? q) (equal? (quad-elems q) (list " ")))
 
@@ -328,7 +330,7 @@
   ;; remove unused soft hyphens so they don't affect final shaping
   (define pcs-printing (for/list ([pc (in-list pcs-in)]
                                   #:unless (equal? (quad-elems pc) '("\u00AD")))
-                         pc))
+                                 pc))
   (define new-lines
     (cond
       [(empty? pcs-printing) null]
@@ -345,7 +347,7 @@
           (match-define (list line-width line-height) (quad-size line-q))
           (define new-size (let ()
                              (define line-heights
-                               (filter-map (λ (q) (or (quad-ref q :line-height) (pt-y (size q)))) pcs))
+                               (filter-map (λ (q) (or (parse-dimension (quad-ref q :line-height)) (pt-y (size q)))) pcs))
                              (pt line-width (if (empty? line-heights) line-height (apply max line-heights)))))
           (list
            (struct-copy
@@ -418,17 +420,17 @@
      (apply append
             ;; next line removes all para-break? quads as a consequence
             (for/list ([qs (in-list (filter-split qs para-break-quad?))])
-              (wrap qs
-                    (λ (q idx) (* (- wrap-size
-                                     (quad-ref (car qs) :inset-left 0)
-                                     (quad-ref (car qs) :inset-right 0))
-                                  permitted-justify-overfill))
-                    #:nicely (match (or (current-line-wrap) (quad-ref (car qs) :line-wrap))
-                               [(or "best" "kp") #true]
-                               [_ #false])
-                    #:hard-break line-break-quad?
-                    #:soft-break soft-break-for-line?
-                    #:finish-wrap (finish-line-wrap line-q))))]))
+                      (wrap qs
+                            (λ (q idx) (* (- wrap-size
+                                             (quad-ref (car qs) :inset-left 0)
+                                             (quad-ref (car qs) :inset-right 0))
+                                          permitted-justify-overfill))
+                            #:nicely (match (or (current-line-wrap) (quad-ref (car qs) :line-wrap))
+                                       [(or "best" "kp") #true]
+                                       [_ #false])
+                            #:hard-break line-break-quad?
+                            #:soft-break soft-break-for-line?
+                            #:finish-wrap (finish-line-wrap line-q))))]))
 
 (define (make-nobreak! q) (quad-set! q :no-colbr #true)) ; cooperates with col-wrap
 
@@ -441,8 +443,8 @@
              [prev-ln (in-list (cdr reversed-lines))]
              #:when (and (line-spacer-quad? this-ln)
                          (quad-ref prev-ln :keep-with-next)))
-         (make-nobreak! this-ln)
-         (make-nobreak! prev-ln))]))
+            (make-nobreak! this-ln)
+            (make-nobreak! prev-ln))]))
 
 (define (apply-keeps lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x :display)) lines))
@@ -523,7 +525,7 @@
   ;; adjust drawing coordinates for border inset
   (match-define (list bil bit bir bib)
     (for/list ([k (in-list (list :border-inset-left :border-inset-top :border-inset-right :border-inset-bottom))])
-      (quad-ref first-line k 0)))
+              (parse-dimension (quad-ref first-line k 0))))
   (match-define (list left top) (pt+ (quad-origin q) (list bil bit)))
   (match-define (list width height) (pt- (size q) (list (+ bil bir) (+ bit bib))))
   ;; fill rect
@@ -534,11 +536,12 @@
           (fill doc bgcolor))])
   ;; draw border
   (match-define (list bw-left bw-top bw-right bw-bottom)
-    (map (λ (k) (max 0 (quad-ref first-line k 0))) (list
-                                                    :border-width-left
-                                                    :border-width-top
-                                                    :border-width-right
-                                                    :border-width-bottom)))
+    (map (λ (k) (max 0 (parse-dimension (quad-ref first-line k 0))))
+         (list
+          :border-width-left
+          :border-width-top
+          :border-width-right
+          :border-width-bottom)))
   ;; adjust start and end points based on adjacent border width
   ;; so all borders overlap rectangularly
   (define (half x) (/ x 2.0))
@@ -561,15 +564,15 @@
     [(#true)
      (when (eq? (log-clipping?) 'warn)
        (for ([line (in-list (quad-elems q))])
-         (define line-width (pt-x (size line)))
-         (define line-elem-width (for/sum ([q (in-list (quad-elems line))])
-                                   (pt-x (size q))))
-         (when (< line-width line-elem-width)
-           (define error-str (apply string-append (for/list ([q (in-list (quad-elems line))])
-                                                    (match (quad-elems q)
-                                                      [(list (? string? str)) str]
-                                                      [_ ""]))))
-           (log-quadwriter-warning (format "clipping overfull line: ~v" error-str)))))
+            (define line-width (pt-x (size line)))
+            (define line-elem-width (for/sum ([q (in-list (quad-elems line))])
+                                             (pt-x (size q))))
+            (when (< line-width line-elem-width)
+              (define error-str (apply string-append (for/list ([q (in-list (quad-elems line))])
+                                                               (match (quad-elems q)
+                                                                 [(list (? string? str)) str]
+                                                                 [_ ""]))))
+              (log-quadwriter-warning (format "clipping overfull line: ~v" error-str)))))
      (save doc)
      (rect doc left top width height)
      (clip doc)]))
@@ -589,10 +592,10 @@
       #:attrs (quad-attrs ln0)
       #:size (delay (pt (pt-x (size ln0)) ; 
                         (+ (for/sum ([line (in-list lines)])
-                             (pt-y (size line)))
-                           (quad-ref ln0 :inset-top 0)
-                           (quad-ref ln0 :inset-bottom 0))))
-      #:shift-elems (pt 0 (+ (quad-ref ln0 :inset-top 0)))
+                                    (pt-y (size line)))
+                           (parse-dimension (quad-ref ln0 :inset-top 0))
+                           (parse-dimension (quad-ref ln0 :inset-bottom 0)))))
+      #:shift-elems (pt 0 (+ (parse-dimension (quad-ref ln0 :inset-top 0))))
       #:draw-start (block-draw-start ln0)
       #:draw-end (block-draw-end ln0))])
 
@@ -631,7 +634,7 @@
          #:distance (λ (q dist-so-far wrap-qs)
                       ;; do trial block insertions
                       (for/sum ([x (in-list (insert-blocks wrap-qs))])
-                        (pt-y (size x))))                     
+                               (pt-y (size x))))                     
          #:finish-wrap (col-finish-wrap column-quad))
    col-spacer))
 
@@ -651,15 +654,15 @@
         #:no-break (λ (q) (quad-ref q :no-pbr))
         #:distance (λ (q dist-so-far wrap-qs)
                      (for/sum ([x (in-list wrap-qs)])
-                       (pt-x (size x))))
+                              (pt-x (size x))))
         #:finish-wrap (page-finish-wrap page-quad (pdf-output-path (current-pdf)))))
 
 (define (insert-blocks lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x :display)) lines))
   (append* (for/list ([line-group (in-list groups-of-lines)])
-             (if (quad-ref (car line-group) :display)
-                 (list (lines->block line-group))
-                 line-group))))
+                     (if (quad-ref (car line-group) :display)
+                         (list (lines->block line-group))
+                         line-group))))
 
 (define-quad first-line-indent-quad quad ())
 
@@ -678,7 +681,7 @@
              #:result (reverse qs-out))
             ([q (in-list qs)]
              [next-q (in-list (cdr qs))])
-    (match (and (para-break-quad? q) (quad-ref next-q :first-line-indent 0))
+    (match (and (para-break-quad? q) (parse-dimension (quad-ref next-q :first-line-indent 0)))
       [(or #false 0) (cons next-q qs-out)]
       [indent-val (list* next-q (make-quad #:from 'bo
                                            #:to 'bi
