@@ -181,6 +181,8 @@ This is the first part of the @tech{Q-expression} that the source file produces 
 
 @margin-note{Yes, you can generate your own @tech{Q-expressions} by other means and pass them to @racketmodname[quadwriter] for layout & rendering. See @racket[render-pdf].}
 
+@margin-note{I have no connection to the @link["https://skim-app.sourceforge.io/"]{Skim PDF reader}, but it has an auto-refresh feature that monitors a PDF for changes. This cooperates nicely with Quadwriter during editing sessions: you can have a window on the PDF that updates automatically when you recompile the source file (say, in DrRacket).}
+
 @subsection{Quadwriter & markup}
 
 Suppose Markdown is just not your thing. You prefer to enter your markup the old-fashioned way — by hand. I hear you. So let's switch to the @racket[quadwriter/markup] dialect. First we try our simple test:
