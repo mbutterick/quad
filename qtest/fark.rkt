@@ -1,11 +1,11 @@
 #lang quadwriter/markdown
 
-#:page-size A3
-#:page-orientation wide
+#:page-size "A3"
+#:page-orientation "wide"
 #:column-count 3
 #:column-gap 24
-#:line-align justify
-#:line-wrap best
+#:line-align "justify"
+#:line-wrap "best"
 #:page-margin-left 200
 #:page-margin-right 100
 

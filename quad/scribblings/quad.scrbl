@@ -292,16 +292,16 @@ Even if you're using a @racketmodname[quadwriter] dialect, you can still set top
 @codeblock|{
 #lang quadwriter/markdown
 
-#:page-size tabloid
-#:page-orientation wide
+#:page-size "tabloid"
+#:page-orientation "wide"
 #:font-size 18
-#:font-color red
+#:font-color "red"
 
 Brennan and Dale like fancy sauce.
 }|
 ]
 
-Any of the @secref{Markup} attributes documented below can be used as keyword arguments. The syntax follows the pattern above: one attribute + value pair per line, with the attribute prefixed with @litchar{#:} to make it a keyword, and the value unquoted. 
+Any of the @secref{Markup} attributes documented below can be used as keyword arguments. The syntax follows the pattern above: one attribute + value pair per line, with the attribute prefixed with @litchar{#:} to make it a keyword, followed by the value.
 
 This keyword syntax works in the @racketmodname[quadwriter], @racketmodname[quadwriter/markdown], and @racketmodname[quadwriter/markup] languages. The idea is to make it easy to adjust the default layout behavior without going outside the source file.
 
