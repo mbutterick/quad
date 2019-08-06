@@ -8,6 +8,7 @@
          page-break
          column-break
          hr-break
+         section-break
          q:para-break
          q:line-break
          q:page-break

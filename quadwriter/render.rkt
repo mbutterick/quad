@@ -41,7 +41,7 @@
            (define TYPE-BREAK '(q ((break TYPE-STR)))) ...
            (define ALL-BREAKS-ID (list (cons TYPE-BREAK Q:TYPE-BREAK) ...))))]))
 
-(define-break-types all-breaks para line page column hr)
+(define-break-types all-breaks para line page column hr section)
 
 (define (replace-breaks x)
   (map-elements (λ (el)

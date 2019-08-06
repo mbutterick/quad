@@ -167,6 +167,10 @@
 (define q:page-break (make-page-break-quad #:printable #f
                                            #:id 'page-break))
 
+(define-quad section-break-quad page-break-quad ())
+(define q:section-break (make-section-break-quad #:printable #f
+                                           #:id 'section-break))
+
 (define q:line (q #:size (pt 0 default-line-height)
                   #:from 'sw
                   #:to 'nw
@@ -679,7 +683,8 @@
         #:finish-wrap (page-finish-wrap page-quad (pdf-output-path (current-pdf)))))
 
 (define (section-wrap qs)
-  (list qs))
+  (wrap qs +inf.0
+        #:hard-break section-break-quad?))
 
 (define (insert-blocks lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x :display)) lines))
