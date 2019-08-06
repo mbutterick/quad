@@ -21,8 +21,7 @@
          "log.rkt")
 (provide (all-defined-out))
 
-(define default-page-size "letter")
-(define default-page-orientation "tall")
+
 
 (define (setup-pdf-path pdf-path-arg)
   (define fallback-path (build-path (find-system-path 'temp-dir) "quadwriter-temp.pdf"))
@@ -161,20 +160,6 @@
 (define (setup-column-gap qs)
   (or (debug-column-gap)  (quad-ref (car qs) :column-gap default-column-gap)))
 
-(define (set-page-size! the-pdf qs)
-  ;; page size can be specified by name, or measurements.
-  ;; explicit measurements from page-height and page-width supersede those from page-size.
-  (match-define (list page-width page-height)
-    (for/list ([k (list :page-width :page-height)])
-      (and (pair? qs) (match (quad-ref (car qs) k)
-                        [#false #false]
-                        [val (inexact->exact (floor val))]))))
-  (resolve-page-size
-   (or (debug-page-width) page-width)
-   (or (debug-page-height) page-height)
-   (quad-ref (car qs) :page-size default-page-size)
-   (quad-ref (car qs) :page-orientation default-page-orientation)))
-
 (define/contract (render-pdf qx-arg pdf-path-arg
                              #:replace [replace-existing-file? #t]
                              #:compress [compress? #t])
@@ -195,7 +180,7 @@
 
     (define sections (time-log section-wrap (section-wrap qs)))
     (for ([qs (in-list sections)])
-      (match-define (list page-width page-height) (set-page-size! the-pdf qs))
+      (match-define (list page-width page-height) (parse-page-size (and (pair? qs) (car qs))))
       (match-define (list left-margin top-margin right-margin bottom-margin)
         (setup-margins qs page-width page-height))
       (define printable-width (- page-width left-margin right-margin))
