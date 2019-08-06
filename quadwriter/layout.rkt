@@ -543,6 +543,8 @@
 (define q:doc (q #:draw-start (λ (q doc) (start-doc doc))
                  #:draw-end (λ (q doc) (end-doc doc))))
 
+(define q:section (q #:id 'section))
+
 (define ((block-draw-start first-line) q doc)
   ;; adjust drawing coordinates for border inset
   (match-define (list bil bit bir bib)

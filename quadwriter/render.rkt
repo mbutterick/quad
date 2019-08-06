@@ -178,30 +178,32 @@
                  [verbose-quad-printing? #false])
     (define qs (time-log setup-qs (setup-qs qx-arg pdf-path)))
 
-    (define sections (time-log section-wrap (section-wrap qs)))
-    (for ([qs (in-list sections)])
-      (match-define (list page-width page-height) (parse-page-size (and (pair? qs) (car qs))))
-      (match-define (list left-margin top-margin right-margin bottom-margin)
-        (setup-margins qs page-width page-height))
-      (define printable-width (- page-width left-margin right-margin))
-      (define printable-height (- page-height top-margin bottom-margin))
-      (define column-count (setup-column-count qs))
-      (define column-gap (setup-column-gap qs))
+    (define sections
+      (for/list ([qs (in-list (time-log section-wrap (section-wrap qs)))])
+        (match-define (list page-width page-height) (parse-page-size (and (pair? qs) (car qs))))
+        (match-define (list left-margin top-margin right-margin bottom-margin)
+          (setup-margins qs page-width page-height))
+        (define printable-width (- page-width left-margin right-margin))
+        (define printable-height (- page-height top-margin bottom-margin))
+        (define column-count (setup-column-count qs))
+        (define column-gap (setup-column-gap qs))
     
-      (define line-wrap-size (/ (- printable-width (* (sub1 column-count) column-gap)) column-count))
-      (define line-qs (time-log line-wrap (apply-keeps (line-wrap qs line-wrap-size))))
+        (define line-wrap-size (/ (- printable-width (* (sub1 column-count) column-gap)) column-count))
+        (define line-qs (time-log line-wrap (apply-keeps (line-wrap qs line-wrap-size))))
     
-      (define col-quad-prototype (struct-copy quad q:column
-                                              [size (pt line-wrap-size printable-height)]))
-      (define column-qs (time-log column-wrap (column-wrap line-qs printable-height column-gap col-quad-prototype)))
+        (define col-quad-prototype (struct-copy quad q:column
+                                                [size (pt line-wrap-size printable-height)]))
+        (define column-qs (time-log column-wrap (column-wrap line-qs printable-height column-gap col-quad-prototype)))
     
-      (define page-quad-prototype (struct-copy quad q:page
-                                               [shift (pt left-margin top-margin)]
-                                               [size (pt line-wrap-size printable-height)]))
-      (define page-qs (time-log page-wrap (page-wrap column-qs printable-width page-quad-prototype)))
+        (define page-quad-prototype (struct-copy quad q:page
+                                                 [shift (pt left-margin top-margin)]
+                                                 [size (pt line-wrap-size printable-height)]))
+        (define page-qs (time-log page-wrap (page-wrap column-qs printable-width page-quad-prototype)))
     
-      (define positioned-qs (time-log position (position (struct-copy quad q:doc [elems page-qs]))))
-      (time-log draw (draw positioned-qs (current-pdf)))))
+        (struct-copy quad q:section [elems page-qs])))
+
+    (define doc (time-log position (position (struct-copy quad q:doc [elems sections]))))
+    (time-log draw (draw doc (current-pdf))))
 
   (if pdf-path-arg
       (log-quadwriter-info (format "wrote PDF to ~a" pdf-path))
