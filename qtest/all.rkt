@@ -36,5 +36,6 @@
            "test-fallback-super.rkt"
            "test-hello.rkt"
            "test-kafka.rkt"
+           "test-sections.rkt"
            "test-symbol.rkt"
            "test-image.rkt")
