@@ -14,6 +14,7 @@
          pollen/decode
          sugar/coerce
          sugar/debug
+         sugar/list
          "attrs.rkt"
          "param.rkt"
          "font.rkt"
@@ -177,9 +178,8 @@
   (parameterize ([current-pdf the-pdf]
                  [verbose-quad-printing? #false])
     (define qs (time-log setup-qs (setup-qs qx-arg pdf-path)))
-
     (define sections
-      (for/list ([qs (in-list (time-log section-wrap (section-wrap qs)))])
+      (for/list ([qs (in-list (filter-split qs section-break-quad?))])
         (match-define (list page-width page-height) (parse-page-size (and (pair? qs) (car qs))))
         (match-define (list left-margin top-margin right-margin bottom-margin)
           (setup-margins qs page-width page-height))
