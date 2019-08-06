@@ -657,6 +657,9 @@
                               (pt-x (size x))))
         #:finish-wrap (page-finish-wrap page-quad (pdf-output-path (current-pdf)))))
 
+(define (section-wrap qs)
+  qs)
+
 (define (insert-blocks lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x :display)) lines))
   (append* (for/list ([line-group (in-list groups-of-lines)])
