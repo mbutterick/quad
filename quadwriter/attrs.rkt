@@ -184,3 +184,6 @@ Naming guidelines
                      :font-tracking
                      :font-baseline-shift
                      :line-height)) #true))
+
+(define (takes-path? k)
+  (and (memq k (list :image-file)) #true))

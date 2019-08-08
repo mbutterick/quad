@@ -11,7 +11,7 @@
      (with-syntax ([PDF-NAME (test-pdf-name (syntax-e #'PATH))])
        #'(begin
            (parameterize ([quadwriter-test-mode #t])
-             (render-pdf (dynamic-require PATH 'doc) PDF-NAME))
+             (render-pdf (dynamic-require PATH 'doc) PDF-NAME PATH))
            (make-test-pdf . REST)))]))
 
 (define-syntax (test-each stx)
@@ -26,7 +26,7 @@
            (define-runtime-path path (path-replace-extension MOD-PATH #".pdf"))
            (check-pdfs-equal? (time (parameterize ([quadwriter-test-mode #t]
                                                    [current-output-port (open-output-nowhere)])
-                                      (render-pdf (dynamic-require path-to-test 'doc) path)
+                                      (render-pdf (dynamic-require path-to-test 'doc) path path-to-test)
                                       path)) test-base)
            (test-each . REST)))]))
 

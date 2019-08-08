@@ -70,7 +70,7 @@
                  (current-output-port)
                  (λ () (with-logging-to-port
                         (current-output-port)
-                        (λ () (render-pdf DOC pdf-path))
+                        (λ () (render-pdf DOC pdf-path PATH-STRING))
                         #:logger quadwriter-logger
                         'debug))
                  #:logger quad-logger
