@@ -93,14 +93,14 @@
 (define (parse-dimension-strings! attrs)
   (for ([k (in-hash-keys attrs)]
         #:when (takes-dimension-string? k))
-       (hash-set! attrs k (parse-dimension (hash-ref attrs k))))
+       (hash-update! attrs k parse-dimension))
   attrs)
 
 (define (complete-every-path! attrs)
   ;; relies on `current-directory` being parameterized to source file's dir
-  (for ([(k v) (in-hash attrs)]
+  (for ([k (in-hash-keys attrs)]
         #:when (takes-path? k))
-       (hash-set! attrs k (path->string (path->complete-path v))))
+       (hash-update! attrs k (compose1 path->string path->complete-path)))
   attrs)
 
 (define (handle-cascading-attrs attrs)

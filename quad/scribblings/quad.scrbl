@@ -625,11 +625,17 @@ TK: OT feature attributes, bullet attributes
 (render-pdf
 [qx qexpr?]
 [pdf-path (or/c path? path-string? #false)]
-[#:replace replace? any/c #true])
+[base-dir (or/c path? path-string? (current-directory))]
+[#:replace replace? any/c #true]
+[#:compress compress? any/c #true])
 (or/c void? bytes?)]{
-Compute the layout for @racket[qx] and render it as a PDF to @racket[pdf-path]. If @racket[pdf-path] is @racket[#false], then the rendered PDF is returned as a @tech[#:doc '(lib "scribblings/guide/guide.scrbl")]{byte string}. Otherwise it is written to @racket[pdf-path]. 
+Compute the layout for @racket[qx] and render it as a PDF to @racket[pdf-path]. If @racket[pdf-path] is @racket[#false], then the rendered PDF is returned as a @tech[#:doc '(lib "scribblings/guide/guide.scrbl")]{byte string}. Otherwise it is written to @racket[pdf-path].
+
+The optional @racket[base-dir] argument sets a base directory for resolution of any relative path names passed as attribute values. The default is @racket[(current-directory)]. 
 
 The optional @racket[replace?] argument controls whether an existing file is automatically overwritten. The default is @racket[#true].
+
+The optional @racket[compress?] argument controls whether data inside the resulting PDF is compressed. The default is @racket[#true].
 }
 
 
