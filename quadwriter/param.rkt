@@ -10,6 +10,8 @@
          (define current-doc (make-parameter #false))
          (define current-pdf (make-parameter #false))
          (define current-line-wrap (make-parameter #f)) ; because kp is slow and maybe we want to disable for "draft" mode
+         (define current-page-count (make-parameter 0))
+         
          (define quadwriter-test-mode (make-parameter #f)) ; used during rackunit to suppress nondeterministic elements, like timestamp in header
 
          (define draw-debug? (make-parameter #true))
@@ -32,6 +34,8 @@
          (define current-doc (make-parameter #false))
          (define current-pdf (make-parameter #false))
          (define current-line-wrap (make-parameter #f))
+         (define current-page-count (make-parameter 0))
+         
          (define quadwriter-test-mode (make-parameter #f))
 
          (define draw-debug? (make-parameter #false))

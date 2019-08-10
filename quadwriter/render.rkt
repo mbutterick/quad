@@ -34,10 +34,10 @@
     [(_ ALL-BREAKS-ID . TYPES)
      (with-syntax ([((TYPE-BREAK TYPE-STR Q:TYPE-BREAK) ...)
                     (for/list ([type (in-list (syntax->list #'TYPES))])
-                              (list
-                               (format-id #'TYPES "~a-break" type)
-                               (symbol->string (syntax->datum type))
-                               (format-id #'TYPES "q:~a-break" type)))])
+                      (list
+                       (format-id #'TYPES "~a-break" type)
+                       (symbol->string (syntax->datum type))
+                       (format-id #'TYPES "q:~a-break" type)))])
        #'(begin
            (define TYPE-BREAK '(q ((break TYPE-STR)))) ...
            (define ALL-BREAKS-ID (list (cons TYPE-BREAK Q:TYPE-BREAK) ...))))]))
@@ -56,22 +56,22 @@
   ;; do this before ->string-quad so that it can handle the sizing promises
   (apply append
          (for/list ([q (in-list qs)])
-                   (match (quad-ref q :hyphenate)
-                     [#true #:when (and (pair? (quad-elems q))
-                                        (andmap string? (quad-elems q)))
-                            (for*/list ([str (in-list (quad-elems q))]
-                                        [hyphen-char (in-value #\u00AD)]
-                                        [hstr (in-value (hyphenate str hyphen-char
-                                                                   #:min-left-length 3
-                                                                   #:min-right-length 3))]
-                                        [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
-                                       (struct-copy quad q [elems (list substr)]))]
-                     [_ (list q)]))))
+           (match (quad-ref q :hyphenate)
+             [#true #:when (and (pair? (quad-elems q))
+                                (andmap string? (quad-elems q)))
+                    (for*/list ([str (in-list (quad-elems q))]
+                                [hyphen-char (in-value #\u00AD)]
+                                [hstr (in-value (hyphenate str hyphen-char
+                                                           #:min-left-length 3
+                                                           #:min-right-length 3))]
+                                [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
+                      (struct-copy quad q [elems (list substr)]))]
+             [_ (list q)]))))
 
 
 (define (string->feature-list str)
   (for/list ([kv (in-slice 2 (string-split str))])
-            (cons (string->bytes/utf-8 (first kv)) (string->number (second kv)))))
+    (cons (string->bytes/utf-8 (first kv)) (string->number (second kv)))))
 
 (define (parse-font-features! attrs)
   (cond
@@ -93,14 +93,14 @@
 (define (parse-dimension-strings! attrs)
   (for ([k (in-hash-keys attrs)]
         #:when (takes-dimension-string? k))
-       (hash-update! attrs k parse-dimension))
+    (hash-update! attrs k parse-dimension))
   attrs)
 
 (define (complete-every-path! attrs)
   ;; relies on `current-directory` being parameterized to source file's dir
   (for ([k (in-hash-keys attrs)]
         #:when (takes-path? k))
-       (hash-update! attrs k (compose1 path->string path->complete-path)))
+    (hash-update! attrs k (compose1 path->string path->complete-path)))
   attrs)
 
 (define (handle-cascading-attrs attrs)
@@ -169,7 +169,8 @@
 (define (setup-column-gap qs)
   (or (debug-column-gap)  (quad-ref (car qs) :column-gap default-column-gap)))
 
-(define/contract (render-pdf qx-arg pdf-path-arg [base-dir-arg #f]
+(define/contract (render-pdf qx-arg pdf-path-arg
+                             [base-dir-arg #false]
                              #:replace [replace-existing-file? #t]
                              #:compress [compress? #t])
   ((qexpr? (or/c #false path? path-string?))
@@ -194,31 +195,47 @@
                  ;; set `current-directory` so that ops like `path->complete-path`
                  ;; will be handled relative to the original directory
                  [current-directory base-dir]
+                 [current-page-count 0]
                  [verbose-quad-printing? #false])
     (define qs (time-log setup-qs (setup-qs qx-arg pdf-path)))
     (define sections
       (for/list ([qs (in-list (filter-split qs section-break-quad?))])
-                (match-define (list page-width page-height) (parse-page-size (and (pair? qs) (car qs))))
-                (match-define (list left-margin top-margin right-margin bottom-margin)
-                  (setup-margins qs page-width page-height))
-                (define printable-width (- page-width left-margin right-margin))
-                (define printable-height (- page-height top-margin bottom-margin))
-                (define column-count (setup-column-count qs))
-                (define column-gap (setup-column-gap qs))
+        (match-define (list page-width page-height) (parse-page-size (and (pair? qs) (car qs))))
+        (match-define (list left-margin top-margin right-margin bottom-margin)
+          (setup-margins qs page-width page-height))
+        (define printable-width (- page-width left-margin right-margin))
+        (define printable-height (- page-height top-margin bottom-margin))
+        (define column-count (setup-column-count qs))
+        (define column-gap (setup-column-gap qs))
     
-                (define line-wrap-size (/ (- printable-width (* (sub1 column-count) column-gap)) column-count))
-                (define line-qs (time-log line-wrap (apply-keeps (line-wrap qs line-wrap-size))))
+        (define line-wrap-size (/ (- printable-width (* (sub1 column-count) column-gap)) column-count))
+        (define line-qs (time-log line-wrap (apply-keeps (line-wrap qs line-wrap-size))))
     
-                (define col-quad-prototype (struct-copy quad q:column
-                                                        [size (pt line-wrap-size printable-height)]))
-                (define column-qs (time-log column-wrap (column-wrap line-qs printable-height column-gap col-quad-prototype)))
+        (define col-quad-prototype (struct-copy quad q:column
+                                                [size (pt line-wrap-size printable-height)]))
+        (define column-qs (time-log column-wrap (column-wrap line-qs printable-height column-gap col-quad-prototype)))
     
-                (define page-quad-prototype (struct-copy quad q:page
-                                                         [shift (pt left-margin top-margin)]
-                                                         [size (pt line-wrap-size printable-height)]))
-                (define page-qs (time-log page-wrap (page-wrap column-qs printable-width page-quad-prototype)))
-    
-                (struct-copy quad q:section [elems page-qs])))
+        (define page-quad-prototype (struct-copy quad q:page
+                                                 [shift (pt left-margin top-margin)]
+                                                 [size (pt line-wrap-size printable-height)]))
+
+        (define next-page-side (if (even? (add1 (current-page-count))) 'left 'right))
+        (define insert-blank-page?
+          (and (pair? qs)
+               (let ([section-starting-side (string->symbol (quad-ref (car qs) :page-side-start "right"))])
+                 ;; if we need a 'left page and will get 'right (or vice versa) then insert page
+                 (not (eq? section-starting-side next-page-side)))))
+        
+        (define page-qs
+          (match (time-log page-wrap (page-wrap column-qs printable-width page-quad-prototype))
+            [ps #:when insert-blank-page?
+                (define blank-page (struct-copy quad (car ps) [elems null]))
+                (cons blank-page ps)]
+            [ps ps]))
+        
+        (begin0        
+          (struct-copy quad q:section [elems page-qs])
+          (current-page-count (+ (current-page-count) (length page-qs))))))
 
     (define doc (time-log position (position (struct-copy quad q:doc [elems sections]))))
     (time-log draw (draw doc (current-pdf))))

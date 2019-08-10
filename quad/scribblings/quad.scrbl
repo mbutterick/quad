@@ -444,6 +444,13 @@ The @tech{Q-expression} @racketresult['#,para-break]. Used to denote the start o
 }
 
 
+@defthing[section-break qexpr?]{
+The @tech{Q-expression} @racketresult['#,section-break]. Used to denote the start of a new section.
+
+A section is a contiguous series of pages. Each section has its own @secref{Page-level_attributes}. A document without any explicit section breaks still has one section (that includes all the pages).
+}
+
+
 @subsection{Attributes}
 
 These are the attributes that can be used inside a @tech{Q-expression} passed to @racketmodname[quadwriter]. Inside a Q-expression, every attribute is a @tech[#:doc '(lib "scribblings/guide/guide.scrbl")]{symbol}, and every attribute value is a @tech[#:doc '(lib "scribblings/guide/guide.scrbl")]{string}.
@@ -481,7 +488,11 @@ Inset values from the page edges. Value is given as a @tech{dimension string}. D
 }
 
 @defthing[#:kind "attribute" page-number-start symbol?]{
-First page number used in document.
+First page number used. Default is @racket[1].
+}
+
+@defthing[#:kind "attribute" page-side-start symbol?]{
+Side that first page appears on. Can be @racket['left] or @racket['right]. A blank page will be inserted if necessary. Default is @racket['right].
 }
 
 @deftogether[(@defthing[#:kind "attribute" column-count symbol?]
