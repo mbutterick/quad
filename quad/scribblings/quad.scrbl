@@ -284,9 +284,9 @@ And they love to code
 
 And again, use the resulting @tech{Q-expression} in @racket[doc] as the source for a new @racket[quadwriter] program, which will result in the same PDF.
 
-@subsection{Setting top-level attributes}
+@subsection{Setting section-level attributes}
 
-Even if you're using a @racketmodname[quadwriter] dialect, you can still set top-level formatting attributes for the document. For instance, suppose we wanted to make our original @racketmodname[quadwriter/markdown] example 24 points and red, and put the PDF on wide tabloid (17in × 11in) paper. We can add these top-level attributes to the beginning of our source file as keyword arguments:
+Even if you're using a @racketmodname[quadwriter] dialect, you can still set section-level formatting attributes for the document. For instance, suppose we wanted to make our original @racketmodname[quadwriter/markdown] example 24 points and red, and put the PDF on wide tabloid (17in × 11in) paper. We can add these section-level attributes to the beginning of our source file as keyword arguments:
 
 @fileblock["test.rkt"
 @codeblock|{
