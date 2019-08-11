@@ -10,8 +10,10 @@
     [(_ PATH . REST)
      (with-syntax ([PDF-NAME (test-pdf-name (syntax-e #'PATH))])
        #'(begin
-           (parameterize ([quadwriter-test-mode #t])
-             (render-pdf (dynamic-require PATH 'doc) PDF-NAME PATH))
+           (define-runtime-path rp PATH)
+           (time
+            (parameterize ([quadwriter-test-mode #t])
+              (render-pdf (dynamic-require PATH 'doc) PDF-NAME rp)))
            (make-test-pdf . REST)))]))
 
 (define-syntax (test-each stx)

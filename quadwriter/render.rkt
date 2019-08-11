@@ -34,10 +34,10 @@
     [(_ ALL-BREAKS-ID . TYPES)
      (with-syntax ([((TYPE-BREAK TYPE-STR Q:TYPE-BREAK) ...)
                     (for/list ([type (in-list (syntax->list #'TYPES))])
-                      (list
-                       (format-id #'TYPES "~a-break" type)
-                       (symbol->string (syntax->datum type))
-                       (format-id #'TYPES "q:~a-break" type)))])
+                              (list
+                               (format-id #'TYPES "~a-break" type)
+                               (symbol->string (syntax->datum type))
+                               (format-id #'TYPES "q:~a-break" type)))])
        #'(begin
            (define TYPE-BREAK '(q ((break TYPE-STR)))) ...
            (define ALL-BREAKS-ID (list (cons TYPE-BREAK Q:TYPE-BREAK) ...))))]))
@@ -56,22 +56,22 @@
   ;; do this before ->string-quad so that it can handle the sizing promises
   (apply append
          (for/list ([q (in-list qs)])
-           (match (quad-ref q :hyphenate)
-             [#true #:when (and (pair? (quad-elems q))
-                                (andmap string? (quad-elems q)))
-                    (for*/list ([str (in-list (quad-elems q))]
-                                [hyphen-char (in-value #\u00AD)]
-                                [hstr (in-value (hyphenate str hyphen-char
-                                                           #:min-left-length 3
-                                                           #:min-right-length 3))]
-                                [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
-                      (struct-copy quad q [elems (list substr)]))]
-             [_ (list q)]))))
+                   (match (quad-ref q :hyphenate)
+                     [#true #:when (and (pair? (quad-elems q))
+                                        (andmap string? (quad-elems q)))
+                            (for*/list ([str (in-list (quad-elems q))]
+                                        [hyphen-char (in-value #\u00AD)]
+                                        [hstr (in-value (hyphenate str hyphen-char
+                                                                   #:min-left-length 3
+                                                                   #:min-right-length 3))]
+                                        [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
+                                       (struct-copy quad q [elems (list substr)]))]
+                     [_ (list q)]))))
 
 
 (define (string->feature-list str)
   (for/list ([kv (in-slice 2 (string-split str))])
-    (cons (string->bytes/utf-8 (first kv)) (string->number (second kv)))))
+            (cons (string->bytes/utf-8 (first kv)) (string->number (second kv)))))
 
 (define (parse-font-features! attrs)
   (cond
@@ -93,14 +93,14 @@
 (define (parse-dimension-strings! attrs)
   (for ([k (in-hash-keys attrs)]
         #:when (takes-dimension-string? k))
-    (hash-update! attrs k parse-dimension))
+       (hash-update! attrs k parse-dimension))
   attrs)
 
 (define (complete-every-path! attrs)
   ;; relies on `current-directory` being parameterized to source file's dir
   (for ([k (in-hash-keys attrs)]
         #:when (takes-path? k))
-    (hash-update! attrs k (compose1 path->string path->complete-path)))
+       (hash-update! attrs k (compose1 path->string path->complete-path)))
   attrs)
 
 (define (handle-cascading-attrs attrs)
@@ -199,7 +199,9 @@
                  [verbose-quad-printing? #false])
     (define qs (time-log setup-qs (setup-qs qx-arg pdf-path)))
     (define sections
-      (for/list ([qs (in-list (filter-split qs section-break-quad?))])
+      (for/fold ([sections-acc null]
+                 #:result (reverse sections-acc))
+                ([qs (in-list (filter-split qs section-break-quad?))])
         (match-define (list page-width page-height) (parse-page-size (and (pair? qs) (car qs))))
         (match-define (list left-margin top-margin right-margin bottom-margin)
           (setup-margins qs page-width page-height))
@@ -219,23 +221,44 @@
                                                  [shift (pt left-margin top-margin)]
                                                  [size (pt line-wrap-size printable-height)]))
 
-        (define next-page-side (if (even? (add1 (current-page-count))) 'left 'right))
+        (define section-starting-side (string->symbol (quad-ref (car qs) :page-side-start "right")))
         (define insert-blank-page?
           (and (pair? qs)
-               (let ([section-starting-side (string->symbol (quad-ref (car qs) :page-side-start "right"))])
-                 ;; if we need a 'left page and will get 'right (or vice versa) then insert page
+               ;; if we need a 'left page and will get 'right (or vice versa) then insert page
+               (let ([next-page-side (if (even? (add1 (current-page-count))) 'left 'right)])
                  (not (eq? section-starting-side next-page-side)))))
+        ;; update page count before starting page wrap
+        (when insert-blank-page?
+          (current-page-count (add1 (current-page-count))))
         
-        (define page-qs
-          (match (time-log page-wrap (page-wrap column-qs printable-width page-quad-prototype))
-            [ps #:when insert-blank-page?
-                (define blank-page (struct-copy quad (car ps) [elems null]))
-                (cons blank-page ps)]
-            [ps ps]))
+        (define section-pages (time-log page-wrap (page-wrap column-qs printable-width page-quad-prototype)))
         
-        (begin0        
-          (struct-copy quad q:section [elems page-qs])
-          (current-page-count (+ (current-page-count) (length page-qs))))))
+        (begin0
+          (cond
+            [insert-blank-page?
+             (match section-starting-side
+               ['left
+                ;; blank page goes at beginning of current section
+                (define page-from-current-section (car section-pages))
+                (define blank-page (struct-copy quad page-from-current-section [elems null]))
+                (define new-section (struct-copy quad q:section [elems (cons blank-page section-pages)]))
+                (cons new-section sections-acc)]
+               [_ ;; must be 'right
+                ;; blank page goes at end of previous section (if it exists)
+                (define new-section (struct-copy quad q:section [elems section-pages]))
+                (match sections-acc
+                  [(cons previous-section other-sections)
+                   (define previous-section-pages (quad-elems previous-section))
+                   (define page-from-previous-section (car previous-section-pages))
+                   (define blank-page (struct-copy quad page-from-previous-section [elems null]))
+                   (define revised-previous-section
+                     (struct-copy quad previous-section
+                                  [elems (append previous-section-pages (list blank-page))]))
+                   (list* new-section revised-previous-section other-sections)]
+                  [_ (list new-section)])])]
+            [else (define new-section (struct-copy quad q:section [elems section-pages]) )
+                  (cons new-section sections-acc)])
+          (current-page-count (+ (current-page-count) (length section-pages))))))
 
     (define doc (time-log position (position (struct-copy quad q:doc [elems sections]))))
     (time-log draw (draw doc (current-pdf))))
