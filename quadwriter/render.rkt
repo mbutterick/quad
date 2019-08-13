@@ -217,8 +217,8 @@
         (match-define (list page-width page-height) (parse-page-size (and (pair? qs) (car qs))))
         (match-define (list left-margin top-margin right-margin bottom-margin)
           (setup-margins qs page-width page-height))
-        (define maybe-gutter-margin (and (pair? qs) (quad-ref (car qs) :page-margin-gutter)))
-        (define printable-width (- page-width left-margin right-margin (or maybe-gutter-margin 0)))
+        (define gutter-margin (and (pair? qs) (quad-ref (car qs) :page-margin-gutter 0)))
+        (define printable-width (- page-width left-margin right-margin gutter-margin))
         (define printable-height (- page-height top-margin bottom-margin))
         (define column-count (setup-column-count qs))
         (define column-gap (setup-column-gap qs))
@@ -232,10 +232,7 @@
 
         (define page-quad-prototype
           (λ (page-count)
-            (define left-shift (+ left-margin
-                                  (cond
-                                    [(and (odd? page-count) maybe-gutter-margin)]
-                                    [else 0])))
+            (define left-shift (+ left-margin (if (odd? page-count) gutter-margin 0)))
             (struct-copy quad q:page
                          [shift (pt left-shift top-margin)]
                          [size (pt line-wrap-size printable-height)])))
