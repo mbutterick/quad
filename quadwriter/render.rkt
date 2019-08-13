@@ -248,9 +248,13 @@
           (section-pages-used (add1 (section-pages-used))))
         
         (define section-pages (time-log page-wrap (page-wrap column-qs printable-width page-quad-prototype)))
+
+        (define (section-empty? section-pages) (zero? (length section-pages)))
         
         (begin0
           (cond
+            ;; ignore empty section
+            [(section-empty? section-pages) sections-acc]
             [insert-blank-page?
              (match section-starting-side
                ['left
@@ -265,6 +269,7 @@
                 (match sections-acc
                   [(cons previous-section other-sections)
                    (define previous-section-pages (quad-elems previous-section))
+                   ;; we know previous section has pages because we ignore empty sections
                    (define page-from-previous-section (car previous-section-pages))
                    (define blank-page (struct-copy quad page-from-previous-section [elems null]))
                    (define revised-previous-section
