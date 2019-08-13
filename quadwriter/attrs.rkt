@@ -155,6 +155,7 @@ Naming guidelines
                            page-margin-bottom
                            page-margin-left
                            page-margin-right
+                           page-margin-gutter
 
                            footer-display))
 
@@ -165,6 +166,7 @@ Naming guidelines
                      :page-margin-bottom
                      :page-margin-left
                      :page-margin-right
+                     :page-margin-gutter
                      :column-gap
                      :inset-top
                      :inset-bottom

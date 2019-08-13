@@ -512,7 +512,8 @@
 (define (make-footer-quad col-q page-idx path)
   (define-values (dir name _) (split-path (path-replace-extension path #"")))
   (q #:size (pt 50 default-line-height)
-     #:attrs (hasheq :page-number (+ (quad-ref col-q :page-number-start (add1 (current-page-count))) (sub1 page-idx))
+     #:attrs (hasheq :page-number (+ (quad-ref col-q :page-number-start (add1 (section-pages-used)))
+                                     (sub1 page-idx))
                      :doc-title (string-titlecase (path->string name)))
      #:from-parent 'sw
      #:to 'nw
@@ -661,7 +662,8 @@
          #:finish-wrap (col-finish-wrap column-quad))
    col-spacer))
 
-(define ((page-finish-wrap page-quad path) cols q0 q page-idx)
+(define ((page-finish-wrap make-page-quad path) cols q0 q page-idx)
+  (define page-quad (make-page-quad (+ (section-pages-used) page-idx)))
   (define elems
     (match (quad-ref (car cols) :footer-display #true)
       [(or #false "none") (from-parent cols 'nw)]
@@ -671,7 +673,7 @@
                    [attrs (copy-block-attrs (quad-attrs (car cols))
                                             (hash-copy (quad-attrs page-quad)))])))
 
-(define (page-wrap qs width [page-quad q:page])
+(define (page-wrap qs width [make-page-quad (λ _ q:page)])
   (unless (positive? width)
     (raise-argument-error 'page-wrap "positive number" width))
   (wrap qs width
@@ -681,7 +683,7 @@
         #:distance (λ (q dist-so-far wrap-qs)
                      (for/sum ([x (in-list wrap-qs)])
                               (pt-x (size x))))
-        #:finish-wrap (page-finish-wrap page-quad (pdf-output-path (current-pdf)))))
+        #:finish-wrap (page-finish-wrap make-page-quad (pdf-output-path (current-pdf)))))
 
 (define (insert-blocks lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x :display)) lines))

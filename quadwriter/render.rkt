@@ -34,10 +34,10 @@
     [(_ ALL-BREAKS-ID . TYPES)
      (with-syntax ([((TYPE-BREAK TYPE-STR Q:TYPE-BREAK) ...)
                     (for/list ([type (in-list (syntax->list #'TYPES))])
-                              (list
-                               (format-id #'TYPES "~a-break" type)
-                               (symbol->string (syntax->datum type))
-                               (format-id #'TYPES "q:~a-break" type)))])
+                      (list
+                       (format-id #'TYPES "~a-break" type)
+                       (symbol->string (syntax->datum type))
+                       (format-id #'TYPES "q:~a-break" type)))])
        #'(begin
            (define TYPE-BREAK '(q ((break TYPE-STR)))) ...
            (define ALL-BREAKS-ID (list (cons TYPE-BREAK Q:TYPE-BREAK) ...))))]))
@@ -56,22 +56,22 @@
   ;; do this before ->string-quad so that it can handle the sizing promises
   (apply append
          (for/list ([q (in-list qs)])
-                   (match (quad-ref q :hyphenate)
-                     [#true #:when (and (pair? (quad-elems q))
-                                        (andmap string? (quad-elems q)))
-                            (for*/list ([str (in-list (quad-elems q))]
-                                        [hyphen-char (in-value #\u00AD)]
-                                        [hstr (in-value (hyphenate str hyphen-char
-                                                                   #:min-left-length 3
-                                                                   #:min-right-length 3))]
-                                        [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
-                                       (struct-copy quad q [elems (list substr)]))]
-                     [_ (list q)]))))
+           (match (quad-ref q :hyphenate)
+             [#true #:when (and (pair? (quad-elems q))
+                                (andmap string? (quad-elems q)))
+                    (for*/list ([str (in-list (quad-elems q))]
+                                [hyphen-char (in-value #\u00AD)]
+                                [hstr (in-value (hyphenate str hyphen-char
+                                                           #:min-left-length 3
+                                                           #:min-right-length 3))]
+                                [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
+                      (struct-copy quad q [elems (list substr)]))]
+             [_ (list q)]))))
 
 
 (define (string->feature-list str)
   (for/list ([kv (in-slice 2 (string-split str))])
-            (cons (string->bytes/utf-8 (first kv)) (string->number (second kv)))))
+    (cons (string->bytes/utf-8 (first kv)) (string->number (second kv)))))
 
 (define (parse-font-features! attrs)
   (cond
@@ -93,14 +93,14 @@
 (define (parse-dimension-strings! attrs)
   (for ([k (in-hash-keys attrs)]
         #:when (takes-dimension-string? k))
-       (hash-update! attrs k parse-dimension))
+    (hash-update! attrs k parse-dimension))
   attrs)
 
 (define (complete-every-path! attrs)
   ;; relies on `current-directory` being parameterized to source file's dir
   (for ([k (in-hash-keys attrs)]
         #:when (takes-path? k))
-       (hash-update! attrs k (compose1 path->string path->complete-path)))
+    (hash-update! attrs k (compose1 path->string path->complete-path)))
   attrs)
 
 (define (handle-cascading-attrs attrs)
@@ -135,27 +135,39 @@
   indented-qs)
 
 (define (setup-margins qs page-width page-height)
+  ;; if only left or right margin is provided, copy other value in preference to default margin
+  (define q (car qs))
   (define default-side-margin (min (* 72 1.5) (floor (* .20 page-width))))
   (define default-top-margin (min 72 (floor (* .10 page-height))))
-
-  ;; if only left or right margin is provided, copy other value in preference to default margin
-  (define left
-    (or (debug-x-margin)
-        (quad-ref (car qs) :page-margin-left
-                  (λ ()  (quad-ref (car qs) :page-margin-right default-side-margin)))))
-  (define right
-    (or (debug-x-margin)
-        (quad-ref (car qs) :page-margin-right
-                  (λ ()  (quad-ref (car qs) :page-margin-left default-side-margin)))))
-  (define top
-    (or (debug-y-margin)
-        (quad-ref (car qs) :page-margin-top
-                  (λ ()  (quad-ref (car qs) :page-margin-bottom default-top-margin)))))
-  (define vert-optical-adjustment 10)
-  (define bottom
-    (or (debug-y-margin)
-        (quad-ref (car qs) :page-margin-bottom
-                  (λ () (+ vert-optical-adjustment (quad-ref (car qs) :page-margin-top (* default-top-margin 1.4)))))))
+  
+  (define left (cond
+                 [(debug-x-margin)]
+                 [(quad-ref q :page-margin-left)]
+                 [(quad-ref q :page-margin-right)]
+                 [else default-side-margin]))
+  
+  (define right (cond
+                  [(debug-x-margin)]
+                  [(quad-ref q :page-margin-right)]
+                  [(quad-ref q :page-margin-left)]
+                  [else default-side-margin]))
+  
+  (define top (cond
+                [(debug-y-margin)]
+                [(quad-ref q :page-margin-top)]
+                [(quad-ref q :page-margin-bottom)]
+                [else default-top-margin]))
+  
+  (define bottom (cond
+                   [(debug-y-margin)]
+                   [(quad-ref q :page-margin-bottom)]
+                   [else
+                    (define vert-optical-adjustment 10)
+                    (+ vert-optical-adjustment
+                       (cond
+                         [(quad-ref q :page-margin-top)]
+                         [else (* default-top-margin 1.4)]))]))
+  
   (list left top right bottom))
 
 (define default-column-count 1)
@@ -195,7 +207,7 @@
                  ;; set `current-directory` so that ops like `path->complete-path`
                  ;; will be handled relative to the original directory
                  [current-directory base-dir]
-                 [current-page-count 0]
+                 [section-pages-used 0]
                  [verbose-quad-printing? #false])
     (define qs (time-log setup-qs (setup-qs qx-arg pdf-path)))
     (define sections
@@ -205,7 +217,8 @@
         (match-define (list page-width page-height) (parse-page-size (and (pair? qs) (car qs))))
         (match-define (list left-margin top-margin right-margin bottom-margin)
           (setup-margins qs page-width page-height))
-        (define printable-width (- page-width left-margin right-margin))
+        (define maybe-gutter-margin (and (pair? qs) (quad-ref (car qs) :page-margin-gutter)))
+        (define printable-width (- page-width left-margin right-margin (or maybe-gutter-margin 0)))
         (define printable-height (- page-height top-margin bottom-margin))
         (define column-count (setup-column-count qs))
         (define column-gap (setup-column-gap qs))
@@ -216,20 +229,26 @@
         (define col-quad-prototype (struct-copy quad q:column
                                                 [size (pt line-wrap-size printable-height)]))
         (define column-qs (time-log column-wrap (column-wrap line-qs printable-height column-gap col-quad-prototype)))
-    
-        (define page-quad-prototype (struct-copy quad q:page
-                                                 [shift (pt left-margin top-margin)]
-                                                 [size (pt line-wrap-size printable-height)]))
+
+        (define page-quad-prototype
+          (λ (page-count)
+            (define left-shift (+ left-margin
+                                  (cond
+                                    [(and (odd? page-count) maybe-gutter-margin)]
+                                    [else 0])))
+            (struct-copy quad q:page
+                         [shift (pt left-shift top-margin)]
+                         [size (pt line-wrap-size printable-height)])))
 
         (define section-starting-side (string->symbol (quad-ref (car qs) :page-side-start "right")))
         (define insert-blank-page?
           (and (pair? qs)
                ;; if we need a 'left page and will get 'right (or vice versa) then insert page
-               (let ([next-page-side (if (even? (add1 (current-page-count))) 'left 'right)])
+               (let ([next-page-side (if (even? (add1 (section-pages-used))) 'left 'right)])
                  (not (eq? section-starting-side next-page-side)))))
         ;; update page count before starting page wrap
         (when insert-blank-page?
-          (current-page-count (add1 (current-page-count))))
+          (section-pages-used (add1 (section-pages-used))))
         
         (define section-pages (time-log page-wrap (page-wrap column-qs printable-width page-quad-prototype)))
         
@@ -258,7 +277,7 @@
                   [_ (list new-section)])])]
             [else (define new-section (struct-copy quad q:section [elems section-pages]) )
                   (cons new-section sections-acc)])
-          (current-page-count (+ (current-page-count) (length section-pages))))))
+          (section-pages-used (+ (section-pages-used) (length section-pages))))))
 
     (define doc (time-log position (position (struct-copy quad q:doc [elems sections]))))
     (time-log draw (draw doc (current-pdf))))

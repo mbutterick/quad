@@ -484,15 +484,19 @@ The unusual way of setting the overall page dimensions of the rendered PDF. Both
               @defthing[#:kind "attribute" page-margin-bottom symbol?]
               @defthing[#:kind "attribute" page-margin-left symbol?]
               @defthing[#:kind "attribute" page-margin-right symbol?])]{
-Inset values from the page edges. Value is given as a @tech{dimension string}. Default values depend on size of the page: they are chosen to be not completely bananas.
+Inset values from the page edges. Value is a @tech{dimension string}. Default values depend on size of the page: they are chosen to be not completely bananas.
+}
+
+@defthing[#:kind "attribute" page-margin-gutter symbol?]{
+Extra space added to the inner margin of page. Value is a @tech{dimension string}. On right-hand pages, the gutter will be added to the left margin. On left-hand pages, it will be added to the right margin.  Default is @racket[0].
 }
 
 @defthing[#:kind "attribute" page-number-start symbol?]{
-First page number used. Default is @racket[1].
+First page number used. Value is an integer. Default is @racket[1].
 }
 
 @defthing[#:kind "attribute" page-side-start symbol?]{
-Side that first page appears on. Can be @racket['left] or @racket['right]. A blank page will be inserted if necessary. Default is @racket['right].
+Side that first page appears on. Value is @racket['left] or @racket['right]. A blank page will be inserted if necessary. Default is @racket['right].
 }
 
 @deftogether[(@defthing[#:kind "attribute" column-count symbol?]
@@ -508,21 +512,21 @@ A block is a paragraph or other rectangular item (say, a blockquote or code bloc
               @defthing[#:kind "attribute" inset-bottom symbol?]
               @defthing[#:kind "attribute" inset-left symbol?]
               @defthing[#:kind "attribute" inset-right symbol?])]{
-Inset values increase the layout boundary of the quad. Value is given as a @tech{dimension string}. @racket["0"] by default.
+Inset values increase the layout boundary of the quad. Value is a @tech{dimension string}. @racket["0"] by default.
 }
 
 @deftogether[(@defthing[#:kind "attribute" border-inset-top symbol?]
               @defthing[#:kind "attribute" border-inset-bottom symbol?]
               @defthing[#:kind "attribute" border-inset-left symbol?]
               @defthing[#:kind "attribute" border-inset-right symbol?])]{
-Border-inset values do not change the layout boundary of the quad. Rather, they change the position of the border (if any) relative to the layout boundary. Value is given as a @tech{dimension string}. @racket["0"] by default (meaning, the border sits on the layout boundary).
+Border-inset values do not change the layout boundary of the quad. Rather, they change the position of the border (if any) relative to the layout boundary. Value is a @tech{dimension string}. @racket["0"] by default (meaning, the border sits on the layout boundary).
 }
 
 @deftogether[(@defthing[#:kind "attribute" border-width-top symbol?]
               @defthing[#:kind "attribute" border-width-bottom symbol?]
               @defthing[#:kind "attribute" border-width-left symbol?]
               @defthing[#:kind "attribute" border-width-right symbol?])]{
-Width of the border on each edge of the quad. Value is given as a @tech{dimension string}. @racket["0"] by default (meaning no border).
+Width of the border on each edge of the quad. Value is a @tech{dimension string}. @racket["0"] by default (meaning no border).
 }
 
 @deftogether[(@defthing[#:kind "attribute" border-color-top symbol?]
@@ -538,7 +542,7 @@ Color of the background of the quad. Value is a @tech{hex color} string or @tech
 
 @deftogether[(@defthing[#:kind "attribute" space-before symbol?]
               @defthing[#:kind "attribute" space-after symbol?])]{
-Vertical space added around a block. Value is given as a @tech{dimension string}.
+Vertical space added around a block. Value is a @tech{dimension string}.
 }
 
 @deftogether[(@defthing[#:kind "attribute" keep-first-lines symbol?]
@@ -559,7 +563,7 @@ How the lines are aligned horizontally in the quad. Possibilities are @racket["l
 }
 
 @defthing[#:kind "attribute" first-line-indent symbol?]{
-The indent of the first line in the quad. Value is given as a @tech{dimension string}.
+The indent of the first line in the quad. Value is a @tech{dimension string}.
 }
 
 
@@ -616,11 +620,11 @@ Two ways of setting OpenType layout features. @racket[font-features] takes a @de
  
 
 @defthing[#:kind "attribute" font-tracking symbol?]{
-Space between characters. Value is given as a @tech{dimension string}.
+Space between characters. Value is a @tech{dimension string}.
 }
 
 @defthing[#:kind "attribute" font-baseline-shift symbol?]{
-Vertical offset of font baseline (positive values move the baseline up, negative down). Value is given as a @tech{dimension string}.
+Vertical offset of font baseline (positive values move the baseline up, negative down). Value is a @tech{dimension string}.
 }
 
 @defthing[#:kind "attribute" line-height symbol?]{
