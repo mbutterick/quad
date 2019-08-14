@@ -280,9 +280,24 @@
             [else (define new-section (struct-copy quad q:section [elems section-pages]) )
                   (cons new-section sections-acc)])
           (section-pages-used (+ (section-pages-used) (length section-pages))))))
-
-    (define doc (time-log position (position (struct-copy quad q:doc [elems sections]))))
-    (time-log draw (draw doc (current-pdf))))
+    
+    (define doc (struct-copy quad q:doc [elems sections]))
+    #;(for* ([(page page-idx) (in-indexed (for*/list ([section (in-list (quad-elems doc))]
+                                                    [page (in-list (quad-elems section))])
+                                          page))]
+           [col (in-list (quad-elems page))]
+           [line (in-list (quad-elems col))])
+      (define side (if (odd? (add1 page-idx)) 'right 'left))
+      (when (eq? side 'left)
+        (match (quad-elems line)
+          [(cons (? filler-quad? fq) _)
+           (match (quad-ref line :line-align)
+             ["inner" (set-quad-size! fq (pt (quad-ref fq 'end-hspace) 0))] ;; change filler to right-align
+             ["outer" (set-quad-size! fq (pt 0 0))] ;; change filler to 0
+             [_ (void)])]
+          [_ (void)])))
+    (define positioned-doc (time-log position (position doc)))
+    (time-log draw (draw positioned-doc (current-pdf))))
 
   (if pdf-path-arg
       (log-quadwriter-info (format "wrote PDF to ~a" pdf-path))

@@ -71,6 +71,7 @@
               draw-end ; func called at the end of every draw event (for teardown ops)
               id
               )
+  #:mutable
   #:transparent
   #:property prop:custom-write
   (λ (q p w?) (display
