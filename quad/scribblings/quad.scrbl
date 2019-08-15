@@ -559,7 +559,9 @@ Whether a quad appears on the same page with the following quad. Activated only 
 
 @deftogether[(@defthing[#:kind "attribute" line-align symbol?]
               @defthing[#:kind "attribute" line-align-last symbol?])]{
-How the lines are aligned horizontally in the quad. Possibilities are @racket["left"], @racket["center"], @racket["left"], and @racket["justify"]. @racket[line-align-last] controls the alignment of the last line; @racket[line-align] controls the others.
+How the lines are aligned horizontally in the quad. Possibilities are @racket["left"], @racket["center"], @racket["left"], @racket["justify"], @racket["inner"], and @racket["outer"]. @racket[line-align-last] controls the alignment of the last line; @racket[line-align] controls the others. 
+
+@racket["inner"] and @racket["outer"] align the line toward (or away from) the gutter. So on right-hand pages, @racket["inner"] alignment is the same as @racket["left"], and @racket["outer"] is the same as @racket["right"]. On left-hand pages, vice versa. 
 }
 
 @defthing[#:kind "attribute" first-line-indent symbol?]{
