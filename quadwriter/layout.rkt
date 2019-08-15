@@ -639,9 +639,9 @@
   ;; can be repeated without damage.
   [((? null?) _) null]
   [((cons q rest) where)
-   #;(set-quad-from-parent! q (or where (quad-from q)))
-   #;(cons q rest)
-   (cons (quad-copy q [from-parent (or where (quad-from q))]) rest)])
+   (set-quad-from-parent! q (or where (quad-from q)))
+   (cons q rest)
+   #;(cons (quad-copy q [from-parent (or where (quad-from q))]) rest)])
 
 (define ((col-finish-wrap col-quad) lns . _)
   (match lns
@@ -670,7 +670,7 @@
          #:no-break (λ (q) (quad-ref q :no-colbr)) ; cooperates with make-nobreak
          #:distance (λ (q dist-so-far wrap-qs)
                       ;; do trial block insertions
-                      (for/sum ([x (in-list (insert-blocks wrap-qs))])
+                      (for/sum ([x (in-list (insert-blocks (reverse wrap-qs)))])
                         (pt-y (size x))))                     
          #:finish-wrap (col-finish-wrap column-quad))
    col-spacer))

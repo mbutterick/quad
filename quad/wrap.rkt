@@ -41,7 +41,8 @@
               #:no-break [no-break-func-arg #false]
               ;; size of potential wrap.
               ;; simple: measure q and add it to last-dist
-              ;; sophisticated: process all wrap-qs and measure resulting 
+              ;; sophisticated: process all wrap-qs and measure resulting
+              ;; wrap-qs are reversed from typographic order
               #:distance [distance-func (λ (q last-dist wrap-qs)
                                           (+ last-dist (if (printable? q) (distance q) 0)))]
               ;; called when wrap counter increments.
