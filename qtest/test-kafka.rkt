@@ -1,9 +1,11 @@
 #lang quadwriter/markdown
 
 #:page-size A2
-#:column-count 4
+#:column-count 3
+#:page-margin-gutter "1in"
 #:line-wrap worst
-#:line-align left
+#:line-align inner
+#:line-align-last inner
 
 # Metamorphosis
 

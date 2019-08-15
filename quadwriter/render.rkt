@@ -282,20 +282,21 @@
           (section-pages-used (+ (section-pages-used) (length section-pages))))))
     
     (define doc (struct-copy quad q:doc [elems sections]))
-    #;(for* ([(page page-idx) (in-indexed (for*/list ([section (in-list (quad-elems doc))]
+
+    ;; correct lines with inner / outer alignment
+    (for* ([(page page-idx) (in-indexed (for*/list ([section (in-list (quad-elems doc))]
                                                     [page (in-list (quad-elems section))])
                                           page))]
            [col (in-list (quad-elems page))]
-           [line (in-list (quad-elems col))])
-      (define side (if (odd? (add1 page-idx)) 'right 'left))
-      (when (eq? side 'left)
+           [block (in-list (quad-elems col))]
+           [line (in-list (quad-elems block))])
+      ;; all inner / outer lines are initially filled as if they were right-aligned
+      (define zero-filler-side (if (odd? (add1 page-idx)) "inner" "outer"))
+      (when (equal? zero-filler-side (quad-ref line :line-align))
         (match (quad-elems line)
-          [(cons (? filler-quad? fq) _)
-           (match (quad-ref line :line-align)
-             ["inner" (set-quad-size! fq (pt (quad-ref fq 'end-hspace) 0))] ;; change filler to right-align
-             ["outer" (set-quad-size! fq (pt 0 0))] ;; change filler to 0
-             [_ (void)])]
+          [(cons (? filler-quad? fq) _) (set-quad-size! fq (pt 0 0))]
           [_ (void)])))
+    
     (define positioned-doc (time-log position (position doc)))
     (time-log draw (draw positioned-doc (current-pdf))))
 
