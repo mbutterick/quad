@@ -8,7 +8,8 @@
   (λ ()
     (match (with-handlers ([exn:fail? (λ (exn) #f)])
              (vector-ref (current-command-line-arguments) 0))
-      ["test" (dynamic-require 'qtest/all #f)]
+      ["test" (dynamic-require 'qtest/all-tests #f)]
+      ["update" (dynamic-require 'qtest/update-tests #f)]
       [_ (displayln "no cmd given")]))
   #:logger qtest-logger
   'info
