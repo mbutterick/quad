@@ -91,7 +91,7 @@
   (define this-origin (pt- ref-pt (to-point q)))
   (define shifted-origin (pt+ this-origin (quad-shift q)))
   ;; need to position before recurring, so subquads have accurate reference point
-  (define positioned-q (quad-copy q
+  (define positioned-q (struct-copy quad q
                                     [origin shifted-origin]
                                     ;; set shift to zero because it's baked into new origin value
                                     [shift (pt 0 0)]))
@@ -99,7 +99,7 @@
     ;; for purposes of positioning the elements, we want to also bake in the `shift-elements` value
     ;; but we don't want this origin to be permanent on the parent.
     ;; akin to `push` a graphics state and then `pop` afterwards.
-    (let ([parent-q (quad-copy positioned-q
+    (let ([parent-q (struct-copy quad positioned-q
                                  [origin (pt+ (quad-origin positioned-q) (quad-shift-elems positioned-q))]
                                  [shift-elems (pt 0 0)])])
       ;; can't use for/list here because previous quads provide context for later ones
@@ -112,7 +112,7 @@
                              (car prev-elems)))
            (loop (cons (position-one this-q ref-q) prev-elems) rest)]
           [(cons x rest) (loop (cons x prev-elems) rest)]))))
-  (quad-copy positioned-q [elems positioned-elems]))
+  (struct-copy quad positioned-q [elems positioned-elems]))
 
 (define (distance q)
   (match (pt- (from-point q) (to-point q))
@@ -120,7 +120,7 @@
     [(list ∆x ∆y) (sqrt (+ (expt ∆x 2) (expt ∆y 2)))]))
 
 (define (flatten-quad q)
-  (cons (quad-copy q [elems null])
+  (cons (struct-copy quad q [elems null])
         (apply append (map flatten-quad (quad-elems q)))))
 
 (define (bounding-box . qs-in)
@@ -133,8 +133,8 @@
   (append min-origin max-outer-pt))
 
 (define (attach-to from-q from-pt to-q to-pt)
-  (quad-copy from-q
-    [elems (cons (quad-copy to-q
+  (struct-copy quad from-q
+    [elems (cons (struct-copy quad to-q
                               [from-parent from-pt]
                               [to to-pt])
                  (quad-elems from-q))]))

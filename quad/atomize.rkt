@@ -98,7 +98,7 @@
            (cons maybe-fallback-attrs str))]))))
 
 
-(define (atomize q-arg #:attrs-proc [attrs-proc values]
+(define (atomize qx #:attrs-proc [attrs-proc values]
                  #:missing-glyph-action [missing-glyph-action (current-missing-glyph-action)]
                  #:fallback [fallback-font-family #f]
                  #:emoji [emoji-font-family #f]
@@ -107,22 +107,29 @@
   ;; atomize a quad by reducing it to the smallest indivisible formatting units.
   ;; which are multi-character quads with the same formatting.
   
-  (let loop ([q0 (make-quad q-arg)]
+  (let loop ([x (make-quad qx)]
              [attrs (hash-copy (current-default-attrs))]
              [key (eq-hash-code (current-default-attrs))])
     (match-define-values (next-key next-attrs)
       ;; make a new run when we encounter non-empty attrs
-      (match q0
+      (match (quad-attrs x)
         [(? hash-empty?) (values key attrs)]
         [this-attrs (define next-key (eq-hash-code this-attrs))
                     (define next-attrs (attrs . update-with . this-attrs))
                     (hash-set! next-attrs run-key next-key)
                     (attrs-proc next-attrs)
                     (values next-key next-attrs)]))
-    (match (quad-elems q0)
-      [(? null?) ((quad-attrs q0) . update-with! . next-attrs) (list q0)]
+    (match (quad-elems x)
+      [(? null?) ((quad-attrs x) . update-with! . next-attrs) (list x)]
       [_
-       (match (merge-adjacent-strings (quad-elems q0) 'isolate-white)
+       ;; we don't use `struct-copy` here because it needs to have the structure id at compile time.
+       ;; whereas with this technique, we can extract a constructor for any structure type.
+       ;; notice that the technique depends on
+       ;; 1) we only need to update attrs and elems
+       ;; 2) we make them the first two fields, so we know to drop the first two fields of x-tail
+       (define x-constructor (derive-quad-constructor x))
+       (define x-tail (drop (struct->list x) 2))
+       (match (merge-adjacent-strings (quad-elems x) 'isolate-white)
          [(? pair? merged-elems)
           (append* 
            (for/list ([elem (in-list merged-elems)])
@@ -131,31 +138,27 @@
                 (for/list ([attrstr (in-list
                                      (handle-fallback missing-glyph-action str next-attrs fallback-font-family emoji-font-family math-font-family font-path-resolver))])
                   (match-define (cons attrs str) attrstr)
-                  (define h (hash-copy attrs))
-                  (hash-set! h 'elems (list str))
-                  h)]
+                  (apply x-constructor attrs (list str) x-tail))]
                [_ (loop elem next-attrs next-key)])))]
          ;; if merged elements are empty (for instance, series of empty strings)
-         ;; then zero out the elements inr the quad.
-         [_ #;(list (apply x-constructor next-attrs null x-tail))
-            (define h (hash-copy next-attrs))
-                  (hash-set! h 'elems null)
-                  h])])))
+         ;; then zero out the elements in the quad.
+         [_ (list (apply x-constructor next-attrs null x-tail))])])))
 
 (module+ test
   (define (filter-private-keys qs)
     (for-each (λ (q) (when (hash-has-key? (quad-attrs q) 'run)
                        (hash-remove! (quad-attrs q) 'run))) qs)
     qs)
-  (define br (q #:type '$br))
+  (struct $br quad ())
+  (define br (q #:type $br (make-hasheq '((br . "time")))))
   (check-equal? (filter-private-keys (atomize (q (q "a b") br (q "x y"))))
                 (list (q "a") (q " ") (q "b") br (q "x") (q " ") (q "y")))  
   (check-equal?
-   (filter-private-keys (atomize (q (q "Hi" "    idiot" (q "There") "Eve" "ry" "one"))))
-   (list (q "Hi")
-         (q " ")
-         (q "idiot")
-         (q "There")
-         (q "Everyone")))
+   (filter-private-keys (atomize (q (hasheq 'foo 42) (q "Hi" "    idiot" (q (hasheq 'bar 84) "There") "Eve" "ry" "one"))))
+   (list (q (hasheq 'foo 42) "Hi")
+         (q (hasheq 'foo 42) " ")
+         (q (hasheq 'foo 42) "idiot")
+         (q (hasheq 'foo 42 'bar 84) "There")
+         (q (hasheq 'foo 42) "Everyone")))
 
-  #;(check-true (andmap quad=?  (atomize (qexpr->quad '(q))) (atomize (qexpr->quad '(q ""))))))
+  (check-true (andmap quad=?  (atomize (qexpr->quad '(q))) (atomize (qexpr->quad '(q ""))))))

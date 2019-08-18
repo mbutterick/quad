@@ -12,22 +12,6 @@
 (provide (all-defined-out))
 (module+ test (require rackunit))
 
-(define (quad-origin q) (hash-ref q 'origin))
-(define (quad-from q) (hash-ref q 'from))
-(define (quad-shift q) (hash-ref q 'shift))
-(define (quad-shift-elems q) (hash-ref q 'shift-elems))
-(define (quad-from-parent q) (hash-ref q 'from-parent))
-(define (set-quad-from-parent! q val) (hash-set! q 'from-parent val))
-(define (quad-to q) (hash-ref q 'to))
-(define (quad-size q) (hash-ref q 'size))
-(define (set-quad-size! q val) (hash-set! q 'size val))
-(define (quad-elems q) (hash-ref q 'elems))
-(define quad-attrs values)
-(define (quad-draw-start q) (hash-ref q 'draw-start))
-(define (quad-draw q) (hash-ref q 'draw))
-(define (quad-draw-end q) (hash-ref q 'draw-end))
-(define (quad-printable q) (hash-ref q 'printable))
-
 (define (size q)
   (match (quad-size q)
     [(? procedure? proc) proc (proc q)]
@@ -38,7 +22,6 @@
   (match (quad-printable q)
     [(? procedure? proc) (proc q signal)]
     [val val]))
-
 
 (define (draw q [surface (current-output-port)])
   ((quad-draw-start q) q surface)
@@ -51,12 +34,19 @@
          (and (hash-has-key? h2 k) (equal? (hash-ref h2 k) v)))))
 
 (define (quad=? q1 q2 [recur? #t])
-  (hashes-equal? (quad-attrs q1) (quad-attrs q2)))
+  (and
+   ;; exclude attrs from initial comparison
+   (for/and ([getter (in-list (list quad-elems quad-size quad-from-parent quad-from quad-to 
+                                    quad-shift quad-shift-elems quad-from-parent quad-origin quad-printable
+                                    quad-draw-start quad-draw-end quad-draw))])
+     (equal? (getter q1) (getter q2)))
+   ;; and compare them key-by-key
+   (hashes-equal? (quad-attrs q1) (quad-attrs q2))))
 
 ;; keep this param here so you don't have to import quad/param to get it
 (define verbose-quad-printing? (make-parameter #f))
 
-#;(struct quad (attrs ; key-value pairs, arbitrary
+(struct quad (attrs ; key-value pairs, arbitrary
               elems ; subquads or text
               ;; size is a two-dim pt
               size ; outer size of quad for layout (though not necessarily the bounding box for drawing)
@@ -101,12 +91,10 @@
    (define (hash2-proc h recur) (equal-secondary-hash-code h))])
 
 (define-syntax-rule (quad-copy QID [K V] ...)
-  (let ()
-    (define h (hash-copy QID))
-    (for ([k (in-list (list 'K ...))]
-          [v (in-list (list V ...))])
-      (hash-set! h k v))
-    h))
+  (struct-copy quad QID [K V] ...))
+
+(define-syntax-rule (quad-clone QID [K V] ...)
+  (struct-copy quad QID [K V] ... [attrs (hash-copy (quad-attrs QID))]))
 
 (define (quad-ref q key [default-val #f])
   (hash-ref (quad-attrs q) key (match default-val
@@ -137,7 +125,7 @@
 
 ;; todo: convert immutable hashes to mutable on input?
 (define (make-quad
-         #:type [type 'base]
+         #:type [type quad]
          #:attrs [attrs (make-hasheq)]
          #:elems [elems null]
          #:id [id #f]
@@ -156,13 +144,13 @@
   (unless (andmap (λ (x) (not (pair? x))) elems)
     (raise-argument-error 'make-quad "elements that are not lists" elems))
   (match args
-    #;[(list (== #false) elems ...) (make-quad #:elems elems)]
-    #;[(list (? hash? attrs) elems ...) (make-quad #:attrs attrs #:elems elems)]
-    #;[(list (? dict? assocs) elems ...) assocs (make-quad #:attrs (make-hasheq assocs) #:elems elems)]
+    [(list (== #false) elems ...) (make-quad #:elems elems)]
+    [(list (? hash? attrs) elems ...) (make-quad #:attrs attrs #:elems elems)]
+    [(list (? dict? assocs) elems ...) assocs (make-quad #:attrs (make-hasheq assocs) #:elems elems)]
     [(list elems ..1) (make-quad #:elems elems)]
     ;; all cases end up below
     [null (define args (list
-                        type
+                        attrs
                         elems
                         size
                         from-parent
@@ -175,25 +163,8 @@
                         draw-start
                         draw
                         draw-end))
-          (define keys '(type
-                         elems
-                         size
-                         from-parent
-                         from
-                         to
-                         shift-elems
-                         shift
-                         origin
-                         printable
-                         draw-start
-                         draw
-                         draw-end))
           (define id-syn (string->symbol (if id (~a id) (~r (eq-hash-code args) #:base 36))))
-          (define h (make-hasheq))
-          (for ([k (in-list keys)]
-                       [arg (in-list args)])
-            (hash-set! h k arg))
-          h]))
+          (apply type (append args (list id-syn)))]))
 
 (define-syntax (define-quad stx)
   (syntax-case stx ()
@@ -205,7 +176,6 @@
                                                      (keyword-apply make-quad #:type ID kws kw-args rest))))))]))
   
 (define q make-quad)
-(define quad? hash?)
 
 (module+ test
   (require racket/port)
@@ -215,6 +185,6 @@
   (check-true (equal? q1 q1))
   (check-true (equal? q1 q2))
   (check-false (equal? q1 q3))
-  (define q4 (quad-copy q1
-                        [draw (λ (q surface) (display "foo" surface))]))
+  (define q4 (struct-copy quad q1
+                          [draw (λ (q surface) (display "foo" surface))]))
   (check-equal? (with-output-to-string (λ () (draw q4))) "foo"))
