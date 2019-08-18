@@ -360,8 +360,7 @@
                                (filter-map (λ (q) (or (quad-ref q :line-height) (pt-y (size q)))) pcs))
                              (pt line-width (if (empty? line-heights) line-height (apply max line-heights)))))
           (list
-           (struct-copy
-            quad line-q
+           (quad-copy line-q
             ;; move block attrs up, so they are visible in col wrap
             [attrs (copy-block-attrs (quad-attrs elem)
                                      (hash-copy (quad-attrs line-q)))]
@@ -380,8 +379,7 @@
               (match (and (eq? idx 1) (quad-ref elem :list-index))
                 [#false null]
                 [bullet
-                 (define bq (struct-copy
-                             quad q:string ;; copy q:string to get draw routine
+                 (define bq (quad-copy q:string ;; copy q:string to get draw routine
                              ;; borrow attrs from elem
                              [attrs (quad-attrs elem)]
                              ;; use bullet as elems
