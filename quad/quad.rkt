@@ -8,7 +8,8 @@
          racket/dict
          racket/match
          "param.rkt"
-         "rebase.rkt")
+         "rebase.rkt"
+         "proto.rkt")
 (provide (all-defined-out))
 (module+ test (require rackunit))
 
@@ -45,6 +46,8 @@
 
 ;; keep this param here so you don't have to import quad/param to get it
 (define verbose-quad-printing? (make-parameter #f))
+
+
 
 (struct quad (attrs ; key-value pairs, arbitrary
               elems ; subquads or text
@@ -168,10 +171,10 @@
 
 (define-syntax (define-quad stx)
   (syntax-case stx ()
-    [(_ ID SUPER ARGS . REST)
+    [(_ ID SUPER)
      (with-syntax ([MAKE-ID (format-id #'ID "make-~a" (syntax-e #'ID))])
        #'(begin
-           (struct ID SUPER ARGS . REST)
+           (struct ID SUPER () #:transparent)
            (define MAKE-ID (make-keyword-procedure (λ (kws kw-args . rest)
                                                      (keyword-apply make-quad #:type ID kws kw-args rest))))))]))
   
