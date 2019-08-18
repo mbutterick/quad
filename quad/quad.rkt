@@ -93,8 +93,6 @@
 (define-syntax-rule (quad-copy QID [K V] ...)
   (struct-copy quad QID [K V] ...))
 
-(define-syntax-rule (quad-clone QID [K V] ...)
-  (struct-copy quad QID [K V] ... [attrs (hash-copy (quad-attrs QID))]))
 
 (define (quad-ref q key [default-val #f])
   (hash-ref (quad-attrs q) key (match default-val
@@ -104,6 +102,15 @@
 (define (quad-set! q key val)
   (hash-set! (quad-attrs q) key val)
   q)
+
+(define-syntax (quad-update! stx)
+  (syntax-case stx ()
+    [(_ ID [K V] ...)
+     (with-syntax ([(K-SETTER ...) (for/list ([kstx (in-list (syntax->list #'(K ...)))])
+                                     (format-id kstx "set-quad-~a!" kstx))])
+       #'(let ([q ID])
+           (K-SETTER q V) ...
+           q))]))
 
 (define (default-printable q [sig #f]) #t)
 

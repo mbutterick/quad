@@ -227,15 +227,15 @@
         (define line-qs (time-log line-wrap (apply-keeps (line-wrap qs line-wrap-size))))
     
         (define col-quad-prototype (quad-copy q:column
-                                                [size (pt line-wrap-size printable-height)]))
+                                              [size (pt line-wrap-size printable-height)]))
         (define column-qs (time-log column-wrap (column-wrap line-qs printable-height column-gap col-quad-prototype)))
 
         (define page-quad-prototype
           (λ (page-count)
             (define left-shift (+ left-margin (if (odd? page-count) gutter-margin 0)))
             (quad-copy q:page
-                         [shift (pt left-shift top-margin)]
-                         [size (pt line-wrap-size printable-height)])))
+                       [shift (pt left-shift top-margin)]
+                       [size (pt line-wrap-size printable-height)])))
 
         (define section-starting-side (string->symbol (quad-ref (car qs) :page-side-start "right")))
         (define insert-blank-page?
@@ -272,10 +272,10 @@
                    ;; we know previous section has pages because we ignore empty sections
                    (define page-from-previous-section (car previous-section-pages))
                    (define blank-page (quad-copy page-from-previous-section [elems null]))
-                   (define revised-previous-section
-                     (quad-copy previous-section
-                                  [elems (append previous-section-pages (list blank-page))]))
-                   (list* new-section revised-previous-section other-sections)]
+                   (define updated-previous-section
+                     (quad-update! previous-section
+                                   [elems (append previous-section-pages (list blank-page))]))
+                   (list* new-section updated-previous-section other-sections)]
                   [_ (list new-section)])])]
             [else (define new-section (quad-copy q:section [elems section-pages]) )
                   (cons new-section sections-acc)])

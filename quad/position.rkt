@@ -84,17 +84,19 @@
 
 (define (position-one q ref-src)
   ;; recursively calculates coordinates for quad & subquads
-  (define ref-pt (cond
-                   [(quad? ref-src) (anchor->global-point ref-src (or (quad-from-parent q) (quad-from q)))]
-                   [ref-src] ; for passing explicit points in testing
-                   [else (pt 0 0)]))
-  (define this-origin (pt- ref-pt (to-point q)))
-  (define shifted-origin (pt+ this-origin (quad-shift q)))
   ;; need to position before recurring, so subquads have accurate reference point
-  (define positioned-q (quad-copy q
-                                  [origin shifted-origin]
-                                  ;; set shift to zero because it's baked into new origin value
-                                  [shift (pt 0 0)]))
+  (define positioned-q
+    (quad-copy q
+               [origin (let* ([ref-pt (cond
+                                        [(quad? ref-src)
+                                         (anchor->global-point ref-src (or (quad-from-parent q) (quad-from q)))]
+                                        [ref-src] ; for passing explicit points in testing
+                                        [else (pt 0 0)])]
+                              [this-origin (pt- ref-pt (to-point q))]
+                              [shifted-origin (pt+ this-origin (quad-shift q))])
+                         shifted-origin)]
+               ;; set shift to zero because it's baked into new origin value
+               [shift (pt 0 0)]))
   (define positioned-elems
     ;; for purposes of positioning the elements, we want to also bake in the `shift-elements` value
     ;; but we don't want this origin to be permanent on the parent.
@@ -112,7 +114,7 @@
                              (car prev-elems)))
            (loop (cons (position-one this-q ref-q) prev-elems) rest)]
           [(cons x rest) (loop (cons x prev-elems) rest)]))))
-  (quad-copy positioned-q [elems positioned-elems]))
+  (quad-update! positioned-q [elems positioned-elems]))
 
 (define (distance q)
   (match (pt- (from-point q) (to-point q))
@@ -133,11 +135,9 @@
   (append min-origin max-outer-pt))
 
 (define (attach-to from-q from-pt to-q to-pt)
-  (quad-copy from-q
-             [elems (cons (quad-copy to-q
-                                     [from-parent from-pt]
-                                     [to to-pt])
-                          (quad-elems from-q))]))
+  (quad-update! to-q
+                [from-parent from-pt]
+                [to to-pt]))
 
 (module+ test
   (require rackunit)

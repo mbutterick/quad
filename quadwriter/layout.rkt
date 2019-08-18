@@ -226,9 +226,9 @@
      (define str (car (quad-elems last-q)))
      (define str+hyphen (string-append str "-"))
      (append head
-             (list (quad-copy last-q
-                              [elems (list str+hyphen)]
-                              [size (make-size-promise last-q str+hyphen)])))]
+             (list (quad-update! last-q
+                                 [elems (list str+hyphen)]
+                                 [size (make-size-promise last-q str+hyphen)])))]
     [_ qs]))
 
 
@@ -314,9 +314,7 @@
                                  #:size (pt (* end-hspace space-multiplier) 0)
                                  #:attrs (quad-attrs (car qs))))
            (list* fq
-                  (let ([q (car qs)])
-                    (set-quad-from-parent! q #f)
-                    q)
+                  (quad-update! (car qs) [from-parent #f])
                   (cdr qs))])])]))
 
 (define-quad offsetter-quad quad ())
@@ -361,43 +359,43 @@
                              (pt line-width (if (empty? line-heights) line-height (apply max line-heights)))))
           (list
            (quad-copy line-q
-            ;; move block attrs up, so they are visible in col wrap
-            [attrs (copy-block-attrs (quad-attrs elem)
-                                     (hash-copy (quad-attrs line-q)))]
-            ;; line width is static
-            ;; line height is the max 'line-height value or the natural height of q:line
-            [size new-size]
-            ;; handle list indexes. drop new quad into line to hold list index
-            ;; could also use this for line numbers
-            [elems
-             ;; we assume here that a list item has already had extra inset-left
-             ;; with room for a bullet
-             ;; which we just insert at the front.
-             ;; this is safe because line has already been filled.
-             (append
-              ;; only put bullet into line if we're at the first line of the list item
-              (match (and (eq? idx 1) (quad-ref elem :list-index))
-                [#false null]
-                [bullet
-                 (define bq (quad-copy q:string ;; copy q:string to get draw routine
-                             ;; borrow attrs from elem
-                             [attrs (quad-attrs elem)]
-                             ;; use bullet as elems
-                             [elems (list (if (number? bullet) (format "~a." bullet) bullet))]
-                             ;; size doesn't matter because nothing refers to this quad
-                             ;; just for debugging box
-                             [size (pt 15 (pt-y (size line-q)))]))
-                 (from-parent (list bq) 'sw)])
-              (from-parent
-               (match (quad-ref elem :inset-left 0)
-                 [0 elems]
-                 [inset-val
-                  (cons (make-quad
-                         #:draw-end q:string-draw-end
-                         #:to 'sw
-                         #:size (pt inset-val 5)
-                         #:type offsetter-quad)
-                        elems)]) 'sw))]))]
+                      ;; move block attrs up, so they are visible in col wrap
+                      [attrs (copy-block-attrs (quad-attrs elem)
+                                               (hash-copy (quad-attrs line-q)))]
+                      ;; line width is static
+                      ;; line height is the max 'line-height value or the natural height of q:line
+                      [size new-size]
+                      ;; handle list indexes. drop new quad into line to hold list index
+                      ;; could also use this for line numbers
+                      [elems
+                       ;; we assume here that a list item has already had extra inset-left
+                       ;; with room for a bullet
+                       ;; which we just insert at the front.
+                       ;; this is safe because line has already been filled.
+                       (append
+                        ;; only put bullet into line if we're at the first line of the list item
+                        (match (and (eq? idx 1) (quad-ref elem :list-index))
+                          [#false null]
+                          [bullet
+                           (define bq (quad-copy q:string ;; copy q:string to get draw routine
+                                                 ;; borrow attrs from elem
+                                                 [attrs (quad-attrs elem)]
+                                                 ;; use bullet as elems
+                                                 [elems (list (if (number? bullet) (format "~a." bullet) bullet))]
+                                                 ;; size doesn't matter because nothing refers to this quad
+                                                 ;; just for debugging box
+                                                 [size (pt 15 (pt-y (size line-q)))]))
+                           (from-parent (list bq) 'sw)])
+                        (from-parent
+                         (match (quad-ref elem :inset-left 0)
+                           [0 elems]
+                           [inset-val
+                            (cons (make-quad
+                                   #:draw-end q:string-draw-end
+                                   #:to 'sw
+                                   #:size (pt inset-val 5)
+                                   #:type offsetter-quad)
+                                  elems)]) 'sw))]))]
          [_ null])]))
   (define maybe-first-line (match new-lines [(cons line0 _) line0][_ #false]))
   (append (match opening-q
@@ -632,9 +630,8 @@
   ;; can be repeated without damage.
   [((? null?) _) null]
   [((cons q rest) where)
-   (set-quad-from-parent! q (or where (quad-from q)))
-   (cons q rest)
-   #;(cons (quad-copy q [from-parent (or where (quad-from q))]) rest)])
+   (quad-update! q [from-parent (or where (quad-from q))])
+   (cons q rest)])
 
 (define ((col-finish-wrap col-quad) lns . _)
   (match lns
