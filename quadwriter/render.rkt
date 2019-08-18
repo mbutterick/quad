@@ -65,7 +65,7 @@
                                                            #:min-left-length 3
                                                            #:min-right-length 3))]
                                 [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
-                      (struct-copy quad q [elems (list substr)]))]
+                      (quad-copy q [elems (list substr)]))]
              [_ (list q)]))))
 
 
@@ -226,14 +226,14 @@
         (define line-wrap-size (/ (- printable-width (* (sub1 column-count) column-gap)) column-count))
         (define line-qs (time-log line-wrap (apply-keeps (line-wrap qs line-wrap-size))))
     
-        (define col-quad-prototype (struct-copy quad q:column
+        (define col-quad-prototype (quad-copy q:column
                                                 [size (pt line-wrap-size printable-height)]))
         (define column-qs (time-log column-wrap (column-wrap line-qs printable-height column-gap col-quad-prototype)))
 
         (define page-quad-prototype
           (λ (page-count)
             (define left-shift (+ left-margin (if (odd? page-count) gutter-margin 0)))
-            (struct-copy quad q:page
+            (quad-copy q:page
                          [shift (pt left-shift top-margin)]
                          [size (pt line-wrap-size printable-height)])))
 
@@ -260,28 +260,28 @@
                ['left
                 ;; blank page goes at beginning of current section
                 (define page-from-current-section (car section-pages))
-                (define blank-page (struct-copy quad page-from-current-section [elems null]))
-                (define new-section (struct-copy quad q:section [elems (cons blank-page section-pages)]))
+                (define blank-page (quad-copy page-from-current-section [elems null]))
+                (define new-section (quad-copy q:section [elems (cons blank-page section-pages)]))
                 (cons new-section sections-acc)]
                [_ ;; must be 'right
                 ;; blank page goes at end of previous section (if it exists)
-                (define new-section (struct-copy quad q:section [elems section-pages]))
+                (define new-section (quad-copy q:section [elems section-pages]))
                 (match sections-acc
                   [(cons previous-section other-sections)
                    (define previous-section-pages (quad-elems previous-section))
                    ;; we know previous section has pages because we ignore empty sections
                    (define page-from-previous-section (car previous-section-pages))
-                   (define blank-page (struct-copy quad page-from-previous-section [elems null]))
+                   (define blank-page (quad-copy page-from-previous-section [elems null]))
                    (define revised-previous-section
-                     (struct-copy quad previous-section
+                     (quad-copy previous-section
                                   [elems (append previous-section-pages (list blank-page))]))
                    (list* new-section revised-previous-section other-sections)]
                   [_ (list new-section)])])]
-            [else (define new-section (struct-copy quad q:section [elems section-pages]) )
+            [else (define new-section (quad-copy q:section [elems section-pages]) )
                   (cons new-section sections-acc)])
           (section-pages-used (+ (section-pages-used) (length section-pages))))))
     
-    (define doc (struct-copy quad q:doc [elems sections]))
+    (define doc (quad-copy q:doc [elems sections]))
 
     ;; correct lines with inner / outer alignment
     (for* ([(page page-idx) (in-indexed (for*/list ([section (in-list (quad-elems doc))]

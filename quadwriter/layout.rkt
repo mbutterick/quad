@@ -15,7 +15,6 @@
 (provide (all-defined-out))
 
 
-(define-quad string-quad quad ())
  
 (define (q:string-draw q doc)
   (when (pair? (quad-elems q))
@@ -43,7 +42,7 @@
        [else #true])]
     [_ #true]))
 
-(define q:string (q #:type string-quad
+(define q:string (q #:type 'string-quad
                     #:from 'bo
                     #:to 'bi
                     #:id 'str
@@ -51,7 +50,6 @@
                     #:draw q:string-draw
                     #:draw-end q:string-draw-end))
 
-(define-quad image-quad quad ())
 
 (define (q:image-draw q doc)
   (define img (quad-ref q :image-object))
@@ -65,7 +63,7 @@
   (when (draw-debug-image?)
     (draw-debug q doc "orange" "orange")))
 
-(define q:image (q #:type image-quad
+(define q:image (q #:type 'image-quad
                    #:from 'bo
                    #:to 'bi
                    #:id 'image
@@ -95,6 +93,10 @@
         [else 0]))
     (list string-size  (quad-ref q :line-height (current-line-height pdf)))))
 
+(define (line-break-quad? q) (hash-has-key? q 'line-break-quad))
+(define (section-break-quad? q) (hash-has-key? q 'section-break-quad))
+(define (filler-quad? q) (hash-has-key? q 'filler-quad))
+
 (define (generic->typed-quad q)
   (cond
     [(line-break-quad? q) q]
@@ -113,24 +115,22 @@
             [(list (? number? w) #false) (define ratio (/ w img-width))
                                          (list w (* ratio img-height))]
             [(list #false #false) (list img-width img-height)]))
-        (struct-copy
-         image-quad q:image
-         [attrs #:parent quad (let ([h (hash-copy (quad-attrs q))])
+        (quad-copy q:image
+         [attrs (let ([h (hash-copy (quad-attrs q))])
                                 ;; defeat 'bi 'bo positioning by removing font reference
                                 (hash-set! h font-path-key #false)
                                 ;; save the img-obj for later
                                 (hash-set! h :image-object img-obj)
                                 h)]
-         [size #:parent quad (pt layout-width layout-height)])]
+         [size (pt layout-width layout-height)])]
        [bad-path (raise-argument-error 'quadwriter "image path that exists" bad-path)])]
     [else
-     (struct-copy
-      string-quad q:string
-      [attrs #:parent quad (let ([attrs (quad-attrs q)])
+     (quad-copy q:string
+      [attrs (let ([attrs (quad-attrs q)])
                              (hash-ref! attrs :font-size default-font-size)
                              attrs)]
-      [elems #:parent quad (quad-elems q)]
-      [size #:parent quad (make-size-promise q)])]))
+      [elems (quad-elems q)]
+      [size (make-size-promise q)])]))
 
 
 (define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"] [stroke-width 0.5])
@@ -151,24 +151,22 @@
     (restore doc)))
 
 
-(define-quad line-break-quad quad ())
-(define q:line-break (make-line-break-quad #:printable #f
+(define q:line-break (make-quad #:printable #f
                                            #:id 'line-break))
-(define-quad para-break-quad line-break-quad ())
-(define q:para-break (make-para-break-quad #:printable #f
+
+(define q:para-break (make-quad #:printable #f
                                            #:id 'para-break))
-(define-quad hr-break-quad line-break-quad ())
-(define q:hr-break (make-hr-break-quad #:printable #t
+
+(define q:hr-break (make-quad #:printable #t
                                        #:id 'hr-break))
-(define-quad column-break-quad line-break-quad ())
-(define q:column-break (make-column-break-quad #:printable #f
+
+(define q:column-break (make-quad #:printable #f
                                                #:id 'column-break))
-(define-quad page-break-quad column-break-quad ())
-(define q:page-break (make-page-break-quad #:printable #f
+
+(define q:page-break (make-quad #:printable #f
                                            #:id 'page-break))
 
-(define-quad section-break-quad page-break-quad ())
-(define q:section-break (make-section-break-quad #:printable #f
+(define q:section-break (make-quad #:printable #f
                                                  #:id 'section-break))
 
 (define q:line (q #:size (pt 0 default-line-height)
@@ -178,12 +176,12 @@
                   #:id 'line
                   #:draw-start (if draw-debug-line? draw-debug void)))
 
-(define-quad line-spacer-quad line-break-quad ())
+
 
 (define only-prints-in-middle (λ (q sig) (not (memq sig '(start end)))))
 (define (make-paragraph-spacer maybe-first-line-q key default-val)
   (define arbitrary-width 20)
-  (q #:type line-spacer-quad
+  (q #:type 'line-spacer-quad
      #:size (pt arbitrary-width (cond
                                   [(and maybe-first-line-q  (quad-ref maybe-first-line-q key))]
                                   [else default-val]))
@@ -197,6 +195,8 @@
 (define (soft-break-for-line? q)
   (and (pair? (quad-elems q))
        (member (unsafe-car (quad-elems q)) softies)))
+
+(define (string-quad? q) (hash-has-key? q 'string-quad))
 
 (define (consolidate-runs pcs ending-q)
   (let loop ([runs empty][pcs pcs])
@@ -237,7 +237,7 @@
   (check-true (line-break-quad? (second (quad-elems (q "foo" q:page-break "bar")))))
   (check-true (line-break-quad? (second (atomize (q "foo" q:page-break "bar"))))))
 
-(define-quad filler-quad quad ())
+
 
 (define (sum-of-widths qss)
   (for*/sum ([qs (in-list qss)]
@@ -306,7 +306,7 @@
            (define end-hspace (- empty-hspace word-space-width))
            ;; make filler a leading quad, not a parent / grouping quad,
            ;; so that elements can still be reached by consolidate-runs
-           (define fq (make-quad #:type filler-quad
+           (define fq (make-quad #:type 'filler-quad
                                  #:id 'line-filler
                                  #:from-parent (quad-from-parent (car qs))
                                  #:from 'bo
@@ -319,7 +319,7 @@
                     q)
                   (cdr qs))])])]))
 
-(define-quad offsetter-quad quad ())
+
 
 (define (hr-draw dq doc)
   (match-define (list left top) (quad-origin dq))
@@ -334,6 +334,12 @@
 
 (define (make-hr-quad line-q)
   (quad-copy line-q [draw-start hr-draw]))
+
+(define (hr-break-quad? q) (hash-has-key? q 'hr-break-quad))
+(define (page-break-quad? q) (hash-has-key? q 'page-break-quad))
+(define (para-break-quad? q) (hash-has-key? q 'para-break-quad))
+(define (line-spacer-quad? q) (hash-has-key? q 'line-spacer-quad))
+(define (column-break-quad? q) (hash-has-key? q 'column-break-quad))
 
 (define ((finish-line-wrap line-q) pcs-in opening-q ending-q idx)
   ;; we curry line-q so that the wrap size can be communicated to this operation
@@ -360,8 +366,7 @@
                                (filter-map (λ (q) (or (quad-ref q :line-height) (pt-y (size q)))) pcs))
                              (pt line-width (if (empty? line-heights) line-height (apply max line-heights)))))
           (list
-           (struct-copy
-            quad line-q
+           (quad-copy line-q
             ;; move block attrs up, so they are visible in col wrap
             [attrs (copy-block-attrs (quad-attrs elem)
                                      (hash-copy (quad-attrs line-q)))]
@@ -380,8 +385,7 @@
               (match (and (eq? idx 1) (quad-ref elem :list-index))
                 [#false null]
                 [bullet
-                 (define bq (struct-copy
-                             quad q:string ;; copy q:string to get draw routine
+                 (define bq (quad-copy q:string ;; copy q:string to get draw routine
                              ;; borrow attrs from elem
                              [attrs (quad-attrs elem)]
                              ;; use bullet as elems
@@ -398,7 +402,7 @@
                          #:draw-end q:string-draw-end
                          #:to 'sw
                          #:size (pt inset-val 5)
-                         #:type offsetter-quad)
+                         #:type 'offsetter-quad)
                         elems)]) 'sw))]))]
          [_ null])]))
   (define maybe-first-line (match new-lines [(cons line0 _) line0][_ #false]))
@@ -535,8 +539,8 @@
                   #:from 'ne
                   #:to 'nw))
 
-(struct column-spacer-quad quad () #:transparent)
-(define q:column-spacer (q #:type column-spacer-quad
+
+(define q:column-spacer (q #:type 'column-spacer-quad
                            #:from 'ne
                            #:to 'nw
                            #:printable only-prints-in-middle))
@@ -700,7 +704,7 @@
                  (list (lines->block line-group))
                  line-group))))
 
-(define-quad first-line-indent-quad quad ())
+
 
 (define (insert-first-line-indents qs-in)
   ;; first line indents are quads inserted at the beginning of a paragraph
@@ -722,6 +726,6 @@
       [indent-val (list* next-q (make-quad #:from 'bo
                                            #:to 'bi
                                            #:draw-end q:string-draw-end
-                                           #:type first-line-indent-quad
+                                           #:type 'first-line-indent-quad
                                            #:attrs (quad-attrs next-q)
                                            #:size (pt indent-val 10)) qs-out)])))
