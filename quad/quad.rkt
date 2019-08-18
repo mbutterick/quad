@@ -13,6 +13,8 @@
 (provide (all-defined-out))
 (module+ test (require rackunit))
 
+(define quad-attrs values)
+
 (define (size q)
   (match (quad-size q)
     [(? procedure? proc) proc (proc q)]
@@ -49,56 +51,6 @@
 
 
 
-(struct quad (attrs ; key-value pairs, arbitrary
-              elems ; subquads or text
-              ;; size is a two-dim pt
-              size ; outer size of quad for layout (though not necessarily the bounding box for drawing)
-              ;; from-parent, from, to are phrased in terms of cardinal position
-              from-parent ; alignment point on parent. if not #f, supersedes `from`
-              ;; (this way, `from` doens't change, so a quad can "remember" its default `from` attachment point)
-              from ; alignment point on ref quad
-              to ; alignment point on this quad that is matched to `from` on previous quad
-              ;; shift-elements, shift are two-dim pts
-              ;; shift-elements = Similar to `relative` CSS positioning
-              ;; moves origin for elements . Does NOT change layout position of parent.
-              shift-elems
-              ;; shift = shift between previous out point and current in point.
-              ;; DOES change the layout position.
-              shift
-              ;; reference point (in absolute coordinates)
-              ;; for all subsequent drawing ops in the quad. Calculated, not set directly
-              origin 
-              printable ; whether the quad will print
-              draw-start ; func called at the beginning of every draw event (for setup ops)
-              draw ; func called in the middle of every daw event
-              draw-end ; func called at the end of every draw event (for teardown ops)
-              id
-              )
-  #:mutable
-  #:transparent
-  #:property prop:custom-write
-  (λ (q p w?) (display
-               (format "<~a-~a~a~a>"
-                       (object-name q)
-                       (quad-id q)
-                       (if (verbose-quad-printing?)
-                           (string-join (map ~v (flatten (hash->list (quad-attrs q))))
-                                        " " #:before-first "(" #:after-last ")")
-                           "")
-                       (match (quad-elems q)
-                         [(? pair?) (string-join (map ~v (quad-elems q)) " " #:before-first " ")]
-                         [_ ""])) p))
-  #:methods gen:equal+hash
-  [(define equal-proc quad=?)
-   (define (hash-proc h recur) (equal-hash-code h))
-   (define (hash2-proc h recur) (equal-secondary-hash-code h))])
-
-(define-syntax-rule (quad-copy QID [K V] ...)
-  (struct-copy quad QID [K V] ...))
-
-(define-syntax-rule (quad-clone QID [K V] ...)
-  (struct-copy quad QID [K V] ... [attrs (hash-copy (quad-attrs QID))]))
-
 (define (quad-ref q key [default-val #f])
   (hash-ref (quad-attrs q) key (match default-val
                                  [(? procedure? proc) (proc)]
@@ -126,48 +78,24 @@
   (define-values (x-structure-type _) (struct-info q))
   (struct-type-make-constructor x-structure-type))
 
+(define-prototype quad
+  [elems null]
+  [id #f]
+  [size '(0 0)]
+  [from-parent #false]
+  [from 'ne]
+  [to 'nw]
+  [shift '(0 0)]
+  [shift-elems '(0 0)]
+  [origin '(0 0)]
+  [printable default-printable]
+  [draw-start void]
+  [draw default-draw]
+  [draw-end void])
+
+
 ;; todo: convert immutable hashes to mutable on input?
-(define (make-quad
-         #:type [type quad]
-         #:attrs [attrs (make-hasheq)]
-         #:elems [elems null]
-         #:id [id #f]
-         #:size [size '(0 0)]
-         #:from-parent [from-parent #false]
-         #:from [from 'ne]
-         #:to [to 'nw]
-         #:shift [shift '(0 0)]
-         #:shift-elems [shift-elems '(0 0)]
-         #:origin [origin '(0 0)]
-         #:printable [printable default-printable]
-         #:draw-start [draw-start void]
-         #:draw [draw default-draw]
-         #:draw-end [draw-end void]
-         . args)
-  (unless (andmap (λ (x) (not (pair? x))) elems)
-    (raise-argument-error 'make-quad "elements that are not lists" elems))
-  (match args
-    [(list (== #false) elems ...) (make-quad #:elems elems)]
-    [(list (? hash? attrs) elems ...) (make-quad #:attrs attrs #:elems elems)]
-    [(list (? dict? assocs) elems ...) assocs (make-quad #:attrs (make-hasheq assocs) #:elems elems)]
-    [(list elems ..1) (make-quad #:elems elems)]
-    ;; all cases end up below
-    [null (define args (list
-                        attrs
-                        elems
-                        size
-                        from-parent
-                        from
-                        to
-                        shift-elems
-                        shift
-                        origin
-                        printable
-                        draw-start
-                        draw
-                        draw-end))
-          (define id-syn (string->symbol (if id (~a id) (~r (eq-hash-code args) #:base 36))))
-          (apply type (append args (list id-syn)))]))
+
 
 (define-syntax (define-quad stx)
   (syntax-case stx ()
@@ -178,7 +106,14 @@
            (define MAKE-ID (make-keyword-procedure (λ (kws kw-args . rest)
                                                      (keyword-apply make-quad #:type ID kws kw-args rest))))))]))
   
-(define q make-quad)
+(define (q . args)
+  (match args
+    [(list (== #false) elems ...) (make-quad #:elems elems)]
+    #;[(list (? hash? attrs) elems ...) (make-quad #:attrs attrs #:elems elems)]
+    #;[(list (? dict? assocs) elems ...) assocs (make-quad #:attrs (make-hasheq assocs) #:elems elems)]
+    [(list elems ..1) (make-quad #:elems elems)]
+    ;; all cases end up below
+    [null (apply make-quad args)]))
 
 (module+ test
   (require racket/port)
@@ -188,6 +123,6 @@
   (check-true (equal? q1 q1))
   (check-true (equal? q1 q2))
   (check-false (equal? q1 q3))
-  (define q4 (struct-copy quad q1
+  (define q4 (quad-copy q1
                           [draw (λ (q surface) (display "foo" surface))]))
   (check-equal? (with-output-to-string (λ () (draw q4))) "foo"))

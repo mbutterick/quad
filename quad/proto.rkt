@@ -1,4 +1,4 @@
-#lang racket
+#lang debug racket
 (require racket/dict
          (for-syntax racket/syntax))
 (provide (all-defined-out))
@@ -14,6 +14,7 @@
     [(_ TYPE [K V] ...) #'(define-prototype TYPE proto [K V] ...)]
     [(_ TYPE BASE-TYPE [K V] ...)
      (with-syntax ([MAKE-TYPE (format-id #'TYPE "make-~a" #'TYPE)]
+                   [TYPE-COPY (format-id #'TYPE "~a-copy" #'TYPE)]
                    [TYPE? (format-id #'TYPE "~a?" #'TYPE)]
                    [((K-GET K-SET) ...) (for/list ([kstx (in-list (syntax->list #'(K ...)))])
                                           (list
@@ -23,11 +24,18 @@
            (when BASE-TYPE
              (unless (proto? BASE-TYPE)
                (raise-argument-error 'define-prototype "base type must derive from proto" BASE-TYPE)))
+           (...
+            (define-syntax-rule (TYPE-COPY PID [K2 V2] ...)
+             (let ([d (dict-copy PID)])
+               (for ([k (in-list (list 'K2 ...))]
+                     [v (in-list (list V2 ...))])
+                 (proto-set! d k v))
+               d)))
            (define MAKE-TYPE
              (make-keyword-procedure 
               (λ (kws kwargs . rest)
                 (define allowed-ks (list 'K ...))
-                (define d (proto-copy BASE-TYPE [K V] ...))
+                (define d (TYPE-COPY BASE-TYPE [K V] ...))
                 (for ([kw (in-list kws)]
                       [kwarg (in-list kwargs)])
                   (define k (string->symbol (keyword->string kw)))
@@ -41,6 +49,7 @@
            (define TYPE (MAKE-TYPE))
            (define (TYPE? x) (and (dict? x) (memq 'TYPE (dict-ref x type-key null)) #true))))]))
 
+(define-prototype x) 
 (define-prototype foo [xs null])
 (define-prototype bar foo [b 42])
 (module+ test
@@ -56,12 +65,6 @@
   (make-bar)
   (proto-set! foo 'z 12)
   (make-bar))
-
-(define-syntax-rule (proto-copy PID [K V] ...)
-  (let ([d (dict-copy PID)])
-    (for/last ([k (in-list (list 'K ...))]
-               [v (in-list (list V ...))])
-      (proto-set! d k v))))
 
 (define (proto-equal? d1 d2)
   (and (= (length (dict-keys d1)) (length (dict-keys d2)))

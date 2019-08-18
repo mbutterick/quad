@@ -89,9 +89,12 @@
                                 [(equal? v "false") #false]
                                 [(string->number v)]
                                 [else (string-downcase v)])))
-          (q #:attrs mheq #:elems (map loop elems))]
+          (define q (make-quad #:elems (map loop elems)))
+          (for ([(k v) (in-hash mheq)])
+            (quad-set! q k v))
+          q]
          [(list (? qexpr? elems) ...)
-          (q #:elems (map loop elems))])]
+          (make-quad #:elems (map loop elems))])]
       [_ x])))
 
 (module+ test
