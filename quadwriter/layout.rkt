@@ -15,7 +15,7 @@
 (provide (all-defined-out))
 
 
-(define-quad string-quad quad ())
+(define-quad string-quad quad)
  
 (define (q:string-draw q doc)
   (when (pair? (quad-elems q))
@@ -51,7 +51,7 @@
                     #:draw q:string-draw
                     #:draw-end q:string-draw-end))
 
-(define-quad image-quad quad ())
+(define-quad image-quad quad)
 
 (define (q:image-draw q doc)
   (define img (quad-ref q :image-object))
@@ -151,23 +151,23 @@
     (restore doc)))
 
 
-(define-quad line-break-quad quad ())
+(define-quad line-break-quad quad)
 (define q:line-break (make-line-break-quad #:printable #f
                                            #:id 'line-break))
-(define-quad para-break-quad line-break-quad ())
+(define-quad para-break-quad line-break-quad)
 (define q:para-break (make-para-break-quad #:printable #f
                                            #:id 'para-break))
-(define-quad hr-break-quad line-break-quad ())
+(define-quad hr-break-quad line-break-quad)
 (define q:hr-break (make-hr-break-quad #:printable #t
                                        #:id 'hr-break))
-(define-quad column-break-quad line-break-quad ())
+(define-quad column-break-quad line-break-quad)
 (define q:column-break (make-column-break-quad #:printable #f
                                                #:id 'column-break))
-(define-quad page-break-quad column-break-quad ())
+(define-quad page-break-quad column-break-quad)
 (define q:page-break (make-page-break-quad #:printable #f
                                            #:id 'page-break))
 
-(define-quad section-break-quad page-break-quad ())
+(define-quad section-break-quad page-break-quad)
 (define q:section-break (make-section-break-quad #:printable #f
                                                  #:id 'section-break))
 
@@ -178,7 +178,7 @@
                   #:id 'line
                   #:draw-start (if draw-debug-line? draw-debug void)))
 
-(define-quad line-spacer-quad line-break-quad ())
+(define-quad line-spacer-quad line-break-quad)
 
 (define only-prints-in-middle (λ (q sig) (not (memq sig '(start end)))))
 (define (make-paragraph-spacer maybe-first-line-q key default-val)
@@ -237,7 +237,7 @@
   (check-true (line-break-quad? (second (quad-elems (q "foo" q:page-break "bar")))))
   (check-true (line-break-quad? (second (atomize (q "foo" q:page-break "bar"))))))
 
-(define-quad filler-quad quad ())
+(define-quad filler-quad quad)
 
 (define (sum-of-widths qss)
   (for*/sum ([qs (in-list qss)]
@@ -319,7 +319,7 @@
                     q)
                   (cdr qs))])])]))
 
-(define-quad offsetter-quad quad ())
+(define-quad offsetter-quad quad)
 
 (define (hr-draw dq doc)
   (match-define (list left top) (quad-origin dq))
@@ -360,8 +360,7 @@
                                (filter-map (λ (q) (or (quad-ref q :line-height) (pt-y (size q)))) pcs))
                              (pt line-width (if (empty? line-heights) line-height (apply max line-heights)))))
           (list
-           (struct-copy
-            quad line-q
+           (quad-copy line-q
             ;; move block attrs up, so they are visible in col wrap
             [attrs (copy-block-attrs (quad-attrs elem)
                                      (hash-copy (quad-attrs line-q)))]
@@ -380,8 +379,7 @@
               (match (and (eq? idx 1) (quad-ref elem :list-index))
                 [#false null]
                 [bullet
-                 (define bq (struct-copy
-                             quad q:string ;; copy q:string to get draw routine
+                 (define bq (quad-copy q:string ;; copy q:string to get draw routine
                              ;; borrow attrs from elem
                              [attrs (quad-attrs elem)]
                              ;; use bullet as elems
@@ -535,7 +533,7 @@
                   #:from 'ne
                   #:to 'nw))
 
-(struct column-spacer-quad quad () #:transparent)
+(define-quad column-spacer-quad quad)
 (define q:column-spacer (q #:type column-spacer-quad
                            #:from 'ne
                            #:to 'nw
@@ -700,7 +698,7 @@
                  (list (lines->block line-group))
                  line-group))))
 
-(define-quad first-line-indent-quad quad ())
+(define-quad first-line-indent-quad quad)
 
 (define (insert-first-line-indents qs-in)
   ;; first line indents are quads inserted at the beginning of a paragraph
