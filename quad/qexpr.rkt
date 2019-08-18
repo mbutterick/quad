@@ -91,7 +91,7 @@
                                 [else (string-downcase v)])))
           (define q (make-quad #:elems (map loop elems)))
           (for ([(k v) (in-hash mheq)])
-            (quad-set! q k v))
+            (dict-set! q k v))
           q]
          [(list (? qexpr? elems) ...)
           (make-quad #:elems (map loop elems))])]

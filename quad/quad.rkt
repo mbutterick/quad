@@ -80,6 +80,7 @@
 
 (define-prototype quad
   [elems null]
+  [type 'quad]
   [id #f]
   [size '(0 0)]
   [from-parent #false]
@@ -100,20 +101,18 @@
 (define-syntax (define-quad stx)
   (syntax-case stx ()
     [(_ ID SUPER)
-     (with-syntax ([MAKE-ID (format-id #'ID "make-~a" (syntax-e #'ID))])
-       #'(begin
-           (struct ID SUPER () #:transparent)
-           (define MAKE-ID (make-keyword-procedure (λ (kws kw-args . rest)
-                                                     (keyword-apply make-quad #:type ID kws kw-args rest))))))]))
+     #'(define-prototype ID SUPER)]))
   
-(define (q . args)
-  (match args
-    [(list (== #false) elems ...) (make-quad #:elems elems)]
-    #;[(list (? hash? attrs) elems ...) (make-quad #:attrs attrs #:elems elems)]
-    #;[(list (? dict? assocs) elems ...) assocs (make-quad #:attrs (make-hasheq assocs) #:elems elems)]
-    [(list elems ..1) (make-quad #:elems elems)]
-    ;; all cases end up below
-    [null (apply make-quad args)]))
+(define q
+  (make-keyword-procedure
+   (λ (kws kwargs . args)
+     (match args
+       [(list (== #false) elems ...) (make-quad #:elems elems)]
+       #;[(list (? hash? attrs) elems ...) (make-quad #:attrs attrs #:elems elems)]
+       #;[(list (? dict? assocs) elems ...) assocs (make-quad #:attrs (make-hasheq assocs) #:elems elems)]
+       [(list elems ..1) (make-quad #:elems elems)]
+       ;; all cases end up below
+       [null (keyword-apply make-quad kws kwargs args)]))))
 
 (module+ test
   (require racket/port)
@@ -124,5 +123,5 @@
   (check-true (equal? q1 q2))
   (check-false (equal? q1 q3))
   (define q4 (quad-copy q1
-                          [draw (λ (q surface) (display "foo" surface))]))
+                        [draw (λ (q surface) (display "foo" surface))]))
   (check-equal? (with-output-to-string (λ () (draw q4))) "foo"))

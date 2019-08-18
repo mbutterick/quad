@@ -7,7 +7,7 @@
 (define (proto-ref d k) (dict-ref d k #false))
 (define (proto-set! d k v) (dict-set! d k v) d)
 (define (proto? x) (dict? x))
-(define type-key 'type)
+(define type-key '$type)
 
 (define-syntax (define-prototype stx)
   (syntax-case stx ()
@@ -39,7 +39,7 @@
                 (for ([kw (in-list kws)]
                       [kwarg (in-list kwargs)])
                   (define k (string->symbol (keyword->string kw)))
-                  (unless (memq k allowed-ks)
+                  #;(unless (memq k allowed-ks)
                     (raise-argument-error 'MAKE-TYPE (format "valid keyword arg ~v" (map string->keyword (map symbol->string allowed-ks))) kw))
                   (proto-set! d k kwarg))
                 ;; set type last so it overrides anything else

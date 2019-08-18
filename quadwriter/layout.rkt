@@ -113,24 +113,22 @@
             [(list (? number? w) #false) (define ratio (/ w img-width))
                                          (list w (* ratio img-height))]
             [(list #false #false) (list img-width img-height)]))
-        (struct-copy
-         image-quad q:image
-         [attrs #:parent quad (let ([h (hash-copy (quad-attrs q))])
+        (image-quad-copy q:image
+         [attrs (let ([h (hash-copy (quad-attrs q))])
                                 ;; defeat 'bi 'bo positioning by removing font reference
                                 (hash-set! h font-path-key #false)
                                 ;; save the img-obj for later
                                 (hash-set! h :image-object img-obj)
                                 h)]
-         [size #:parent quad (pt layout-width layout-height)])]
+         [size (pt layout-width layout-height)])]
        [bad-path (raise-argument-error 'quadwriter "image path that exists" bad-path)])]
     [else
-     (struct-copy
-      string-quad q:string
-      [attrs #:parent quad (let ([attrs (quad-attrs q)])
+     (string-quad-copy q:string
+      [attrs (let ([attrs (quad-attrs q)])
                              (hash-ref! attrs :font-size default-font-size)
                              attrs)]
-      [elems #:parent quad (quad-elems q)]
-      [size #:parent quad (make-size-promise q)])]))
+      [elems (quad-elems q)]
+      [size (make-size-promise q)])]))
 
 
 (define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"] [stroke-width 0.5])
