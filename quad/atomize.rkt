@@ -50,10 +50,8 @@
                                           list) (apply string-append strs))) acc))]
       [(cons x others) (loop others (cons x acc))])))
 
-(define run-key 'run)
-
 (define (same-run? qa qb)
-  (eq? (quad-ref qa run-key) (quad-ref qb run-key)))
+  (eq? (quad-attrs qa) (quad-attrs qb)))
 
 (define handle-fallback
   (let ([font-cache (make-hash)]
@@ -89,10 +87,9 @@
                 (raise-argument-error 'quad (format "glyph that exists in font ~a" (path->string font-path)) str)]
                [else (define new-attrs (hash-copy attrs))
                      (hash-set! new-attrs 'font-family (match fallback-val
-                                                         ['emoji  emoji-font-family]
+                                                         ['emoji emoji-font-family]
                                                          ['math math-font-family]
                                                          [_ fallback-font-family]))
-                     (hash-set! new-attrs run-key (eq-hash-code new-attrs))
                      (font-path-resolver new-attrs)
                      new-attrs]))
            (cons maybe-fallback-attrs str))]))))
@@ -108,19 +105,13 @@
   ;; which are multi-character quads with the same formatting.
   
   (let loop ([x (make-quad qx)]
-             [attrs (hash-copy (current-default-attrs))]
-             [key (eq-hash-code (current-default-attrs))])
-    (match-define-values (next-key next-attrs)
-      ;; make a new run when we encounter non-empty attrs
-      (match (quad-attrs x)
-        [(? hash-empty?) (values key attrs)]
-        [this-attrs (define next-key (eq-hash-code this-attrs))
-                    (define next-attrs (attrs . update-with . this-attrs))
-                    (hash-set! next-attrs run-key next-key)
-                    (attrs-proc next-attrs)
-                    (values next-key next-attrs)]))
+             [attrs (hash-copy (current-default-attrs))])
+    (define next-attrs (let ([next-attrs (attrs . update-with . (quad-attrs x))])
+                         (attrs-proc next-attrs)
+                         next-attrs))
     (match (quad-elems x)
-      [(? null?) ((quad-attrs x) . update-with! . next-attrs) (list x)]
+      [(? null?) ((quad-attrs x) . update-with! . next-attrs)
+                 (list x)]
       [_
        ;; we don't use `struct-copy` here because it needs to have the structure id at compile time.
        ;; whereas with this technique, we can extract a constructor for any structure type.
@@ -139,22 +130,18 @@
                                      (handle-fallback missing-glyph-action str next-attrs fallback-font-family emoji-font-family math-font-family font-path-resolver))])
                   (match-define (cons attrs str) attrstr)
                   (apply x-constructor attrs (list str) x-tail))]
-               [_ (loop elem next-attrs next-key)])))]
+               [_ (loop elem next-attrs)])))]
          ;; if merged elements are empty (for instance, series of empty strings)
          ;; then zero out the elements in the quad.
          [_ (list (apply x-constructor next-attrs null x-tail))])])))
 
 (module+ test
-  (define (filter-private-keys qs)
-    (for-each (λ (q) (when (hash-has-key? (quad-attrs q) 'run)
-                       (hash-remove! (quad-attrs q) 'run))) qs)
-    qs)
   (struct $br quad ())
   (define br (q #:type $br (make-hasheq '((br . "time")))))
-  (check-equal? (filter-private-keys (atomize (q (q "a b") br (q "x y"))))
-                (list (q "a") (q " ") (q "b") br (q "x") (q " ") (q "y")))  
+  (check-equal?  (atomize (q (q "a b") br (q "x y")))
+                 (list (q "a") (q " ") (q "b") br (q "x") (q " ") (q "y")))  
   (check-equal?
-   (filter-private-keys (atomize (q (hasheq 'foo 42) (q "Hi" "    idiot" (q (hasheq 'bar 84) "There") "Eve" "ry" "one"))))
+   (atomize (q (hasheq 'foo 42) (q "Hi" "    idiot" (q (hasheq 'bar 84) "There") "Eve" "ry" "one")))
    (list (q (hasheq 'foo 42) "Hi")
          (q (hasheq 'foo 42) " ")
          (q (hasheq 'foo 42) "idiot")
