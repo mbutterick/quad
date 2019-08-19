@@ -22,18 +22,21 @@
 
 (define-quad string-quad quad)
  
-(define (q:string-draw q doc)
-  (when (pair? (quad-elems q))
-    (font doc (path->string (quad-ref q font-path-key default-font-face)))
-    (font-size doc (quad-ref q :font-size default-font-size))
-    (fill-color doc (quad-ref q :font-color default-font-color))
-    (define str (unsafe-car (quad-elems q)))
-    (match-define (list x y) (quad-origin q))
-    (text doc str x (- y  (quad-ref q :font-baseline-shift 0))
-          #:tracking (quad-ref q :font-tracking 0)
-          #:bg (quad-ref q :bg)
-          #:features (quad-ref q :font-features default-font-features)
-          #:link (quad-ref q :link))))
+(define (q:string-draw q doc
+                       #:origin [origin-in #f]
+                       #:text [str-in #f])
+  (match (or str-in (and (pair? (quad-elems q)) (unsafe-car (quad-elems q))))
+    [#false (void)]
+    [str 
+     (font doc (path->string (quad-ref q font-path-key default-font-face)))
+     (font-size doc (quad-ref q :font-size default-font-size))
+     (fill-color doc (quad-ref q :font-color default-font-color))
+     (match-define (list x y) (or origin-in (quad-origin q)))
+     (text doc str x (- y  (quad-ref q :font-baseline-shift 0))
+           #:tracking (quad-ref q :font-tracking 0)
+           #:bg (quad-ref q :bg)
+           #:features (quad-ref q :font-features default-font-features)
+           #:link (quad-ref q :link))]))
 
 (define (q:string-draw-end q doc)
   (when (draw-debug-string?)
@@ -99,7 +102,26 @@
         [else 0]))
     (list string-size (quad-ref q :line-height (current-line-height pdf)))))
 
-(define (maybe-do-image-quad? q)
+(define (maybe-convert-draw-quad q)
+  (define draw-type (quad-ref q :draw))
+  (and draw-type 
+       (quad-update! q
+                     [draw (λ (q doc)
+                             (save doc)
+                             (match draw-type
+                               ["line" 
+                                (move-to doc (quad-ref q :x1) (quad-ref q :y1))
+                                (line-to doc (quad-ref q :x2) (quad-ref q :y2))
+                                (stroke doc "black")]
+                               ["text" (move-to doc 0 0)
+                                       (q:string-draw q doc
+                                                      #:origin (pt (quad-ref q :x 0) (quad-ref q :y 0))
+                                                      #:text (quad-ref q :text))]
+                               [_ (void)])
+                             (restore doc))]
+                     [size (pt 0 0)])))
+
+(define (maybe-convert-image-quad q)
   (define path-string (quad-ref q :image-file))
   (and path-string
        (let ()
@@ -128,7 +150,7 @@
                                  h)]
           [size #:parent quad (pt layout-width layout-height)]))))
 
-(define (maybe-do-line-break-quad? q)
+(define (maybe-convert-line-break-quad q)
   (and (line-break-quad? q) q))
 
 (define (do-string-quad q)
@@ -142,8 +164,9 @@
 
 (define (generic->typed-quad q)
   (or
-   (maybe-do-line-break-quad? q)
-   (maybe-do-image-quad? q)
+   (maybe-convert-line-break-quad q)
+   (maybe-convert-draw-quad q)
+   (maybe-convert-image-quad q)
    (do-string-quad q)))
 
 

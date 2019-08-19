@@ -82,7 +82,17 @@ Naming guidelines
                no-colbr
                no-pbr
                page-number
-               doc-title))
+               doc-title
+
+               draw
+               position
+               text
+               x
+               y
+               x1
+               x2
+               y1
+               y2))
   
 
 (define-attrs block-attrs (display
@@ -187,7 +197,13 @@ Naming guidelines
                      :font-size
                      :font-tracking
                      :font-baseline-shift
-                     :line-height)) #true))
+                     :line-height
+                     :x
+                     :y
+                     :x1
+                     :x2
+                     :y1
+                     :y2)) #true))
 
 (define (takes-path? k)
   (and (memq k (list :image-file)) #true))
