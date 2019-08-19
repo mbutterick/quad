@@ -175,10 +175,10 @@
 
 (define-syntax (define-quad stx)
   (syntax-case stx ()
-    [(_ ID SUPER ARGS . REST)
+    [(_ ID SUPER)
      (with-syntax ([MAKE-ID (format-id #'ID "make-~a" (syntax-e #'ID))])
        #'(begin
-           (struct ID SUPER ARGS . REST)
+           (struct ID SUPER ())
            (define MAKE-ID (make-keyword-procedure (λ (kws kw-args . rest)
                                                      (keyword-apply make-quad #:type ID kws kw-args rest))))))]))
   

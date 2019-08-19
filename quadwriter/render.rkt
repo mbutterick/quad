@@ -10,10 +10,8 @@
          pitfall
          quad
          hyphenate
-         pollen/unstable/typography
          pollen/decode
          sugar/coerce
-         sugar/debug
          sugar/list
          "attrs.rkt"
          "param.rkt"

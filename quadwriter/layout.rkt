@@ -14,8 +14,13 @@
          "log.rkt")
 (provide (all-defined-out))
 
+(define (sum-base xs which)
+  (for/sum ([x (in-list xs)])
+    (which (size x))))
+(define (sum-y xs) (sum-base xs pt-y))
+(define (sum-x xs) (sum-base xs pt-x))
 
-(define-quad string-quad quad ())
+(define-quad string-quad quad)
  
 (define (q:string-draw q doc)
   (when (pair? (quad-elems q))
@@ -51,7 +56,7 @@
                     #:draw q:string-draw
                     #:draw-end q:string-draw-end))
 
-(define-quad image-quad quad ())
+(define-quad image-quad quad)
 
 (define (q:image-draw q doc)
   (define img (quad-ref q :image-object))
@@ -76,24 +81,23 @@
 (define (make-size-promise q [str-arg #f])
   (delay
     (define pdf (current-pdf))
-    (define str
-      (cond
-        [str-arg]
-        [(pair? (quad-elems q)) (unsafe-car (quad-elems q))]
-        [else #false]))
+    (define str (cond
+                  [str-arg]
+                  [(pair? (quad-elems q)) (unsafe-car (quad-elems q))]
+                  [else #false]))
     (define string-size
       (cond
         [str
          (font-size pdf (quad-ref q :font-size default-font-size))
          (font pdf (path->string (quad-ref q font-path-key default-font-face)))
-         (define ft-value  (quad-ref q :font-tracking 0))
-         (if (equal? str "\u00AD")
-             ft-value
-             (+ (string-width pdf str
-                              #:tracking ft-value
-                              #:features (quad-ref q :font-features default-font-features))))]
+         (define ft-value (quad-ref q :font-tracking 0))
+         (match str
+           ["\u00AD" ft-value]
+           [_ (+ (string-width pdf str
+                               #:tracking ft-value
+                               #:features (quad-ref q :font-features default-font-features)))])]
         [else 0]))
-    (list string-size  (quad-ref q :line-height (current-line-height pdf)))))
+    (list string-size (quad-ref q :line-height (current-line-height pdf)))))
 
 (define (generic->typed-quad q)
   (cond
@@ -105,13 +109,14 @@
         (define img-width ($img-width img-obj))
         (define img-height ($img-height img-obj))
         (match-define (list layout-width layout-height)
-          (match (list  (quad-ref q :image-width)
-                        (quad-ref q :image-height)) 
+          (match (list (quad-ref q :image-width) (quad-ref q :image-height)) 
             [(list (? number? w) (? number? h)) (list w h)]
-            [(list #false (? number? h)) (define ratio (/ h img-height))
-                                         (list (* ratio img-width) h)]
-            [(list (? number? w) #false) (define ratio (/ w img-width))
-                                         (list w (* ratio img-height))]
+            [(list #false (? number? h))
+             (define ratio (/ h img-height))
+             (list (* ratio img-width) h)]
+            [(list (? number? w) #false)
+             (define ratio (/ w img-width))
+             (list w (* ratio img-height))]
             [(list #false #false) (list img-width img-height)]))
         (struct-copy
          image-quad q:image
@@ -151,23 +156,23 @@
     (restore doc)))
 
 
-(define-quad line-break-quad quad ())
+(define-quad line-break-quad quad)
 (define q:line-break (make-line-break-quad #:printable #f
                                            #:id 'line-break))
-(define-quad para-break-quad line-break-quad ())
+(define-quad para-break-quad line-break-quad)
 (define q:para-break (make-para-break-quad #:printable #f
                                            #:id 'para-break))
-(define-quad hr-break-quad line-break-quad ())
+(define-quad hr-break-quad line-break-quad)
 (define q:hr-break (make-hr-break-quad #:printable #t
                                        #:id 'hr-break))
-(define-quad column-break-quad line-break-quad ())
+(define-quad column-break-quad line-break-quad)
 (define q:column-break (make-column-break-quad #:printable #f
                                                #:id 'column-break))
-(define-quad page-break-quad column-break-quad ())
+(define-quad page-break-quad column-break-quad)
 (define q:page-break (make-page-break-quad #:printable #f
                                            #:id 'page-break))
 
-(define-quad section-break-quad page-break-quad ())
+(define-quad section-break-quad page-break-quad)
 (define q:section-break (make-section-break-quad #:printable #f
                                                  #:id 'section-break))
 
@@ -178,14 +183,14 @@
                   #:id 'line
                   #:draw-start (if draw-debug-line? draw-debug void)))
 
-(define-quad line-spacer-quad line-break-quad ())
+(define-quad line-spacer-quad line-break-quad)
 
 (define only-prints-in-middle (λ (q sig) (not (memq sig '(start end)))))
 (define (make-paragraph-spacer maybe-first-line-q key default-val)
   (define arbitrary-width 20)
   (q #:type line-spacer-quad
      #:size (pt arbitrary-width (cond
-                                  [(and maybe-first-line-q  (quad-ref maybe-first-line-q key))]
+                                  [(and maybe-first-line-q (quad-ref maybe-first-line-q key))]
                                   [else default-val]))
      #:from 'sw
      #:to 'nw
@@ -206,11 +211,8 @@
        (define-values (run-pcs rest) (splitf-at pcs (λ (p) (same-run? strq p))))
        (define new-run (quad-copy q:string
                                   [attrs (quad-attrs strq)]
-                                  [elems (merge-adjacent-strings (apply append (for/list ([pc (in-list run-pcs)])
-                                                                                 (quad-elems pc))))]
-                                  [size (delay (pt (for/sum ([pc (in-list run-pcs)])
-                                                     (pt-x (size pc)))
-                                                   (pt-y (size strq))))]))
+                                  [elems (merge-adjacent-strings (apply append (map quad-elems run-pcs)))]
+                                  [size (delay (pt (sum-x run-pcs) (pt-y (size strq))))]))
        (loop (cons new-run runs) rest)]
       [(cons first rest) (loop (cons first runs) rest)])))
 
@@ -237,7 +239,7 @@
   (check-true (line-break-quad? (second (quad-elems (q "foo" q:page-break "bar")))))
   (check-true (line-break-quad? (second (atomize (q "foo" q:page-break "bar"))))))
 
-(define-quad filler-quad quad ())
+(define-quad filler-quad quad)
 
 (define (sum-of-widths qss)
   (for*/sum ([qs (in-list qss)]
@@ -317,7 +319,7 @@
                   (quad-update! (car qs) [from-parent #f])
                   (cdr qs))])])]))
 
-(define-quad offsetter-quad quad ())
+(define-quad offsetter-quad quad)
 
 (define (hr-draw dq doc)
   (match-define (list left top) (quad-origin dq))
@@ -531,7 +533,7 @@
                   #:from 'ne
                   #:to 'nw))
 
-(struct column-spacer-quad quad () #:transparent)
+(define-quad column-spacer-quad quad)
 (define q:column-spacer (q #:type column-spacer-quad
                            #:from 'ne
                            #:to 'nw
@@ -555,11 +557,10 @@
   (match-define (list left top) (pt+ (quad-origin q) (list bil bit)))
   (match-define (list width height) (pt- (size q) (list (+ bil bir) (+ bit bib))))
   ;; fill rect
-  (cond 
-    [(quad-ref first-line :background-color)
-     => (λ (bgcolor)
-          (rect doc left top width height)
-          (fill doc bgcolor))])
+  (let ([bgc (quad-ref first-line :background-color)])
+    (when bgc
+      (rect doc left top width height)
+      (fill doc bgc)))
   ;; draw border
   (match-define (list bw-left bw-top bw-right bw-bottom)
     (map (λ (k) (max 0  (quad-ref first-line k 0)))
@@ -591,8 +592,7 @@
      (when (eq? (log-clipping?) 'warn)
        (for ([line (in-list (quad-elems q))])
          (define line-width (pt-x (size line)))
-         (define line-elem-width (for/sum ([q (in-list (quad-elems line))])
-                                   (pt-x (size q))))
+         (define line-elem-width (sum-x (quad-elems line)))
          (when (< line-width line-elem-width)
            (define error-str (apply string-append (for/list ([q (in-list (quad-elems line))])
                                                     (match (quad-elems q)
@@ -610,20 +610,19 @@
     (draw-debug q doc "#6c6" "#9c9")))
 
 (define/match (lines->block lines)
-  [((cons ln0 _))
+  [((cons line _))
    (q #:from 'sw
       #:to 'nw
       #:elems (from-parent lines 'nw)
       #:id 'block
-      #:attrs (quad-attrs ln0)
-      #:size (delay (pt (pt-x (size ln0)) ; 
-                        (+ (for/sum ([line (in-list lines)])
-                             (pt-y (size line)))
-                           (quad-ref ln0 :inset-top 0)
-                           (quad-ref ln0 :inset-bottom 0))))
-      #:shift-elems (pt 0 (quad-ref ln0 :inset-top 0))
-      #:draw-start (block-draw-start ln0)
-      #:draw-end (block-draw-end ln0))])
+      #:attrs (quad-attrs line)
+      #:size (delay (pt (pt-x (size line)) ; 
+                        (+ (sum-y lines)
+                           (quad-ref line :inset-top 0)
+                           (quad-ref line :inset-bottom 0))))
+      #:shift-elems (pt 0 (quad-ref line :inset-top 0))
+      #:draw-start (block-draw-start line)
+      #:draw-end (block-draw-end line))])
 
 (define/match (from-parent qs [where #f])
   ;; doesn't change any positioning. doesn't depend on state. can happen anytime.
@@ -635,17 +634,17 @@
 
 (define ((col-finish-wrap col-quad) lns . _)
   (match lns
-    [(cons first-line _)
+    [(cons line _)
      (list (quad-copy col-quad
                       ;; move block attrs up, so they are visible in page wrap
-                      [attrs (copy-block-attrs (quad-attrs first-line)
+                      [attrs (copy-block-attrs (quad-attrs line)
                                                (hash-copy (quad-attrs col-quad)))]
                       [elems (from-parent (insert-blocks lns) 'nw)]))]
     [_ null]))
 
 (define (column-wrap qs vertical-height column-gap [column-quad q:column])
   (unless (positive? vertical-height)
-    (raise-argument-error 'col-wrap "positive number" vertical-height))
+    (raise-argument-error 'column-wrap "positive number" vertical-height))
   
   ;; on timing of `insert-blocks`:
   ;; can't do it before because it depends on where columns are broken.
@@ -660,8 +659,7 @@
          #:no-break (λ (q) (quad-ref q :no-colbr)) ; cooperates with make-nobreak
          #:distance (λ (q dist-so-far wrap-qs)
                       ;; do trial block insertions
-                      (for/sum ([x (in-list (insert-blocks (reverse wrap-qs)))])
-                        (pt-y (size x))))                     
+                      (sum-y (insert-blocks (reverse wrap-qs))))                     
          #:finish-wrap (col-finish-wrap column-quad))
    col-spacer))
 
@@ -683,9 +681,7 @@
         #:soft-break #true
         #:hard-break page-break-quad?
         #:no-break (λ (q) (quad-ref q :no-pbr))
-        #:distance (λ (q dist-so-far wrap-qs)
-                     (for/sum ([x (in-list wrap-qs)])
-                       (pt-x (size x))))
+        #:distance (λ (q dist-so-far wrap-qs) (sum-x wrap-qs))
         #:finish-wrap (page-finish-wrap make-page-quad (pdf-output-path (current-pdf)))))
 
 (define (insert-blocks lines)
@@ -695,7 +691,7 @@
                  (list (lines->block line-group))
                  line-group))))
 
-(define-quad first-line-indent-quad quad ())
+(define-quad first-line-indent-quad quad)
 
 (define (insert-first-line-indents qs-in)
   ;; first line indents are quads inserted at the beginning of a paragraph
@@ -706,7 +702,7 @@
   ;; stick a pbr on the front if there isn't one already
   ;; because of the "lookahead" style of iteration
   (define qs (match qs-in
-               [(list (? para-break-quad?) _ ...) qs-in]
+               [(cons (? para-break-quad?) _) qs-in]
                [_ (cons q:page-break qs-in)]))
   (for/fold ([qs-out null]
              #:result (reverse qs-out))
