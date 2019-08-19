@@ -700,15 +700,14 @@
   (define qs (match qs-in
                [(cons (? para-break-quad?) _) qs-in]
                [_ (cons q:page-break qs-in)]))
-  (for/fold ([qs-out null]
-             #:result (reverse qs-out))
-            ([q (in-list qs)]
-             [next-q (in-list (cdr qs))])
-    (match (and (para-break-quad? q)  (quad-ref next-q :first-line-indent 0))
-      [(or #false 0) (cons next-q qs-out)]
-      [indent-val (list* next-q (make-quad #:from 'bo
-                                           #:to 'bi
-                                           #:draw-end q:string-draw-end
-                                           #:type first-line-indent-quad
-                                           #:attrs (quad-attrs next-q)
-                                           #:size (pt indent-val 10)) qs-out)])))
+  (apply append
+         (for/list ([q (in-list qs)]
+                    [next-q (in-list (cdr qs))])
+           (match (and (para-break-quad? q)  (quad-ref next-q :first-line-indent 0))
+             [(or #false 0) (list next-q)]
+             [indent-val (list (make-quad #:from 'bo
+                                          #:to 'bi
+                                          #:draw-end q:string-draw-end
+                                          #:type first-line-indent-quad
+                                          #:attrs (quad-attrs next-q)
+                                          #:size (pt indent-val 10)) next-q)]))))

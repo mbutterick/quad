@@ -54,17 +54,16 @@
   ;; do this before ->string-quad so that it can handle the sizing promises
   (apply append
          (for/list ([q (in-list qs)])
-           (match (quad-ref q :hyphenate)
-             [#true #:when (and (pair? (quad-elems q))
-                                (andmap string? (quad-elems q)))
-                    (for*/list ([str (in-list (quad-elems q))]
-                                [hyphen-char (in-value #\u00AD)]
-                                [hstr (in-value (hyphenate str hyphen-char
-                                                           #:min-left-length 3
-                                                           #:min-right-length 3))]
-                                [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
-                      (quad-copy q [elems (list substr)]))]
-             [_ (list q)]))))
+           (cond 
+             [(and (quad-ref q :hyphenate) (pair? (quad-elems q)) (andmap string? (quad-elems q)))
+              (for*/list ([str (in-list (quad-elems q))]
+                          [hyphen-char (in-value #\u00AD)]
+                          [hstr (in-value (hyphenate str hyphen-char
+                                                     #:min-left-length 3
+                                                     #:min-right-length 3))]
+                          [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
+                (quad-copy q [elems (list substr)]))]
+             [else (list q)]))))
 
 
 (define (string->feature-list str)
@@ -72,20 +71,18 @@
     (cons (string->bytes/utf-8 (first kv)) (string->number (second kv)))))
 
 (define (parse-font-features! attrs)
-  (cond
-    [(match (hash-ref attrs :font-features-adjust #f)
-       [(? string? str)
-        ;; override any existing features
-        (define parsed-features (string->feature-list str))
-        (hash-update! attrs :font-features (λ (fs) (remove-duplicates (append parsed-features fs) equal? #:key car)))
-        ;; adjustment is incorporated, so delete it
-        (hash-set! attrs :font-features-adjust #false)]
-       [_ #false])]
-    [else (match (hash-ref attrs :font-features #f)
-            [(? string? str)
-             (define parsed-features (string->feature-list str))
-             (hash-set! attrs :font-features parsed-features)]
-            [_ #false])]))
+  (match (hash-ref attrs :font-features-adjust #f)
+    [(? string? str)
+     ;; override any existing features
+     (define parsed-features (string->feature-list str))
+     (hash-update! attrs :font-features (λ (fs) (remove-duplicates (append parsed-features fs) equal? #:key car)))
+     ;; adjustment is incorporated, so delete it
+     (hash-set! attrs :font-features-adjust #false)]
+    [_ (match (hash-ref attrs :font-features #f)
+         [(? string? str)
+          (define parsed-features (string->feature-list str))
+          (hash-set! attrs :font-features parsed-features)]
+         [_ (void)])]))
 
 
 (define (parse-dimension-strings! attrs)
@@ -102,11 +99,12 @@
   attrs)
 
 (define (handle-cascading-attrs attrs)
-  (parse-dimension-strings! attrs)
-  (complete-every-path! attrs)
-  (resolve-font-path! attrs)
-  (resolve-font-size! attrs)
-  (parse-font-features! attrs))
+  (for ([proc (in-list (list parse-dimension-strings!
+                             complete-every-path!
+                             resolve-font-path!
+                             resolve-font-size!
+                             parse-font-features!))])
+    (proc attrs)))
 
 (define default-line-height-multiplier 1.42)
 (define (setup-qs qx-arg pdf-path)
