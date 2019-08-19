@@ -99,43 +99,52 @@
         [else 0]))
     (list string-size (quad-ref q :line-height (current-line-height pdf)))))
 
+(define (maybe-do-image-quad? q)
+  (define path-string (quad-ref q :image-file))
+  (and path-string
+       (let ()
+         (unless (file-exists? path-string)
+           (raise-argument-error 'create-image-quad "image path that exists" path-string))
+         (define img-obj (open-image (current-pdf) path-string))
+         (define img-width ($img-width img-obj))
+         (define img-height ($img-height img-obj))
+         (match-define (list layout-width layout-height)
+           (match (list (quad-ref q :image-width) (quad-ref q :image-height)) 
+             [(list (? number? w) (? number? h)) (list w h)]
+             [(list #false (? number? h))
+              (define ratio (/ h img-height))
+              (list (* ratio img-width) h)]
+             [(list (? number? w) #false)
+              (define ratio (/ w img-width))
+              (list w (* ratio img-height))]
+             [(list #false #false) (list img-width img-height)]))
+         (struct-copy
+          image-quad q:image
+          [attrs #:parent quad (let ([h (hash-copy (quad-attrs q))])
+                                 ;; defeat 'bi 'bo positioning by removing font reference
+                                 (hash-set! h font-path-key #false)
+                                 ;; save the img-obj for later
+                                 (hash-set! h :image-object img-obj)
+                                 h)]
+          [size #:parent quad (pt layout-width layout-height)]))))
+
+(define (maybe-do-line-break-quad? q)
+  (and (line-break-quad? q) q))
+
+(define (do-string-quad q)
+  (struct-copy
+   string-quad q:string
+   [attrs #:parent quad (let ([attrs (quad-attrs q)])
+                          (hash-ref! attrs :font-size default-font-size)
+                          attrs)]
+   [elems #:parent quad (quad-elems q)]
+   [size #:parent quad (make-size-promise q)]))
+
 (define (generic->typed-quad q)
-  (cond
-    [(line-break-quad? q) q]
-    [(match (quad-ref q :image-file)
-       [#false #false]
-       [(? file-exists? path-string)
-        (define img-obj (open-image (current-pdf) path-string))
-        (define img-width ($img-width img-obj))
-        (define img-height ($img-height img-obj))
-        (match-define (list layout-width layout-height)
-          (match (list (quad-ref q :image-width) (quad-ref q :image-height)) 
-            [(list (? number? w) (? number? h)) (list w h)]
-            [(list #false (? number? h))
-             (define ratio (/ h img-height))
-             (list (* ratio img-width) h)]
-            [(list (? number? w) #false)
-             (define ratio (/ w img-width))
-             (list w (* ratio img-height))]
-            [(list #false #false) (list img-width img-height)]))
-        (struct-copy
-         image-quad q:image
-         [attrs #:parent quad (let ([h (hash-copy (quad-attrs q))])
-                                ;; defeat 'bi 'bo positioning by removing font reference
-                                (hash-set! h font-path-key #false)
-                                ;; save the img-obj for later
-                                (hash-set! h :image-object img-obj)
-                                h)]
-         [size #:parent quad (pt layout-width layout-height)])]
-       [bad-path (raise-argument-error 'quadwriter "image path that exists" bad-path)])]
-    [else
-     (struct-copy
-      string-quad q:string
-      [attrs #:parent quad (let ([attrs (quad-attrs q)])
-                             (hash-ref! attrs :font-size default-font-size)
-                             attrs)]
-      [elems #:parent quad (quad-elems q)]
-      [size #:parent quad (make-size-promise q)])]))
+  (or
+   (maybe-do-line-break-quad? q)
+   (maybe-do-image-quad? q)
+   (do-string-quad q)))
 
 
 (define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"] [stroke-width 0.5])
