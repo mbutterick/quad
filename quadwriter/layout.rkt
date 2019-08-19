@@ -241,11 +241,6 @@
 
 (define-quad filler-quad quad)
 
-(define (sum-of-widths qss)
-  (for*/sum ([qs (in-list qss)]
-             [q (in-list qs)])
-    (pt-x (size q))))
-
 (define (space-quad? q) (equal? (quad-elems q) (list " ")))
 
 (define (fill-line-wrap qs ending-q line-q)
@@ -278,8 +273,10 @@
                   (define last-sublist (append prev-qs (list last-q hanger-q)))
                   (append sublists (list last-sublist))])]
             [_ word-sublists]))
-        (define word-width (sum-of-widths hung-word-sublists))
-        (define word-space-width (sum-of-widths word-space-sublists))
+        (define word-width (for/sum ([qs (in-list hung-word-sublists)])
+                             (sum-x qs)))
+        (define word-space-width (for/sum ([qs (in-list word-space-sublists)])
+                                   (sum-x qs)))
         (define empty-hspace (- line-width
                                 (quad-ref (car qs) :inset-left 0)
                                 word-width
@@ -399,7 +396,7 @@
                                    #:type offsetter-quad)
                                   elems)]) 'sw))]))]
          [_ null])]))
-  (define maybe-first-line (match new-lines [(cons line0 _) line0][_ #false]))
+  (define maybe-first-line (and (pair? new-lines) (car new-lines)))
   (append (match opening-q
             [#false (list (make-paragraph-spacer maybe-first-line :space-before 0))] ; paragraph break
             [_ null])
@@ -467,17 +464,16 @@
     ;; always catch last line of block in this case
     ;; so later cases are guaranteed to have earlier lines.
     (unless (eq? idx group-len)
-      (cond
-        ;; if we have :keep-all we can skip :keep-first and :keep-last cases
-        [(quad-ref ln :keep-all-lines) (make-nobreak! ln)]
-        ;; to keep n lines, we only paint the first n - 1
-        ;; (because each nobr line sticks to the next)
-        [(let ([keep-first (quad-ref ln :keep-first-lines)])
-           (and (number? keep-first) (< idx keep-first)))
-         (make-nobreak! ln)]
-        [(let ([keep-last (quad-ref ln :keep-last-lines)])
-           (and (number? keep-last) (< (- group-len keep-last) idx)))
-         (make-nobreak! ln)]))
+      (when (or
+             ;; if we have :keep-all we can skip :keep-first and :keep-last cases
+             (quad-ref ln :keep-all-lines)
+             ;; to keep n lines, we only paint the first n - 1
+             ;; (because each nobr line sticks to the next)
+             (let ([keep-first (quad-ref ln :keep-first-lines)])
+               (and (number? keep-first) (< idx keep-first)))
+             (let ([keep-last (quad-ref ln :keep-last-lines)])
+               (and (number? keep-last) (< (- group-len keep-last) idx))))
+        (make-nobreak! ln)))
     (cons ln reversed-lines)))
 
 
