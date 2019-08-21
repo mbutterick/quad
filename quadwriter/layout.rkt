@@ -100,7 +100,7 @@
                                #:tracking ft-value
                                #:features (quad-ref q :font-features default-font-features)))])]
         [else 0]))
-    (list string-size (quad-ref q :line-height (current-line-height pdf)))))
+    (list string-size (quad-ref q :line-height default-line-height))))
 
 (define (maybe-convert-draw-quad q)
   (define draw-type (quad-ref q :draw))
@@ -445,7 +445,7 @@
     [_
      (unless (positive? wrap-size)
        (raise-argument-error 'line-wrap "positive number" wrap-size))
-     (define line-q (quad-copy q:line [size (pt wrap-size (pt-y (size q:line)))]))
+     (define line-q (quad-copy q:line [size (pt wrap-size (quad-ref (car qs) :line-height default-line-height))]))
      (define permitted-justify-overfill
        (match (quad-ref (car qs) :line-align)
          ;; allow justified lines to go wider,
