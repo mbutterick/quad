@@ -6,6 +6,8 @@
 #:line-wrap worst
 #:line-align inner
 #:line-align-last inner
+#:line-height "19pt"
+#:font-size "13pt"
 
 # Metamorphosis
 
