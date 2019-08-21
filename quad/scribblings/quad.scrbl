@@ -461,9 +461,15 @@ A @deftech{dimension string} represents a distance in the plane. If unitless, it
 
 Attributes that can only be set once for the whole document.
 
-
 @defthing[#:kind "attribute" output-path symbol?]{
 Output path for the rendered PDF. Default is the name of the source file with its extension changed to @racket[.pdf]. For instance, @racket["my-source.rkt"] would become @racket["my-source.pdf"]. Unsaved source files are rendered as @racket["untitled.pdf"].
+}
+
+@deftogether[(@defthing[#:kind "attribute" pdf-title symbol?]
+              @defthing[#:kind "attribute" pdf-author symbol?]
+              @defthing[#:kind "attribute" pdf-subject symbol?]
+              @defthing[#:kind "attribute" pdf-keywords symbol?])]{
+Strings that are used to fill in the corresponding @link["https://helpx.adobe.com/acrobat/using/pdf-properties-metadata.html"]{PDF metadata} fields. Default for each is the empty string.
 }
 
 

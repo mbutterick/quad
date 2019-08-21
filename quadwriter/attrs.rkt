@@ -7,7 +7,7 @@
 
 (define (list->attrs . kvs)
   (for/list ([kv (in-slice 2 kvs)])
-            kv))
+    kv))
 
 (define (cm->in x) (/ x 2.54))
 (define (in->pts x) (* 72 x))
@@ -29,18 +29,18 @@
 (define (copy-block-attrs source-hash dest-hash)
   (define new-hash (make-hasheq))
   (for ([(k v) (in-hash dest-hash)])
-       (hash-set! new-hash k v))
+    (hash-set! new-hash k v))
   (for* ([k (in-list block-attrs)]
          [v (in-value (hash-ref source-hash k #f))]
          #:when v)
-        (hash-set! new-hash k v))
+    (hash-set! new-hash k v))
   new-hash)
 
 (define-syntax (define-attrs stx)
   (syntax-case stx ()
     [(_ (ATTR-NAME ...))
      (with-syntax ([(ATTR-ID ...) (for/list ([attr-id (in-list (syntax->list #'(ATTR-NAME ...)))])
-                                            (format-id stx ":~a" (syntax-e attr-id)))])
+                                    (format-id stx ":~a" (syntax-e attr-id)))])
        #'(begin
            (define ATTR-ID 'ATTR-NAME) ...))]
     [(_ ID (ATTR-NAME ...))
@@ -83,6 +83,11 @@ Naming guidelines
                no-pbr
                page-number
                doc-title
+
+               pdf-title
+               pdf-subject
+               pdf-author
+               pdf-keywords
 
                draw
                position
@@ -204,6 +209,12 @@ Naming guidelines
                      :x2
                      :y1
                      :y2)) #true))
+
+(define (has-case-sensitive-value? k)
+  (and (memq k (list :pdf-title
+                     :pdf-subject
+                     :pdf-author
+                     :pdf-keywords)) #true))
 
 (define (takes-path? k)
   (and (memq k (list :image-file)) #true))

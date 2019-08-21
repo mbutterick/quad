@@ -91,6 +91,14 @@
     (hash-update! attrs k parse-dimension))
   attrs)
 
+(define (downcase-values! attrs)
+  (for ([k (in-hash-keys attrs)]
+        #:unless (has-case-sensitive-value? k))
+    (hash-update! attrs k (λ (val) (match val
+                                     [(? string? str) (string-downcase str)]
+                                     [_ val]))))
+  attrs)
+
 (define (complete-every-path! attrs)
   ;; relies on `current-directory` being parameterized to source file's dir
   (for ([k (in-hash-keys attrs)]
@@ -99,7 +107,8 @@
   attrs)
 
 (define (handle-cascading-attrs attrs)
-  (for ([proc (in-list (list parse-dimension-strings!
+  (for ([proc (in-list (list downcase-values!
+                             parse-dimension-strings!
                              complete-every-path!
                              resolve-font-path!
                              resolve-font-size!
@@ -177,6 +186,18 @@
 (define (setup-column-gap qs)
   (or (debug-column-gap)  (quad-ref (car qs) :column-gap default-column-gap)))
 
+(define (setup-pdf-metadata! qs pdf)
+  (for ([k (in-list (list :pdf-title
+                          :pdf-author
+                          :pdf-subject
+                          :pdf-keywords))]
+        [pdf-k (in-list (list 'Title
+                              'Author
+                              'Subject
+                              'Keywords))])
+    (hash-set! (pdf-info pdf) pdf-k (quad-ref (car qs) k "")))
+  (hash-set! (pdf-info pdf) 'Creator (format "Racket ~a (Quad library)" (version))))
+
 (define/contract (render-pdf qx-arg pdf-path-arg
                              [base-dir-arg #false]
                              #:replace [replace-existing-file? #t]
@@ -206,6 +227,8 @@
                  [section-pages-used 0]
                  [verbose-quad-printing? #false])
     (define qs (time-log setup-qs (setup-qs qx-arg pdf-path)))
+    (when (pair? qs)
+      (setup-pdf-metadata! qs the-pdf))
     (define sections
       (for/fold ([sections-acc null]
                  #:result (reverse sections-acc))

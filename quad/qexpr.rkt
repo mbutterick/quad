@@ -88,7 +88,7 @@
                                 [(equal? v "true") #true]
                                 [(equal? v "false") #false]
                                 [(string->number v)]
-                                [else (string-downcase v)])))
+                                [else v])))
           (q #:attrs mheq #:elems (map loop elems))]
          [(list (? qexpr? elems) ...)
           (q #:elems (map loop elems))])]
