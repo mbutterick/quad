@@ -32,8 +32,8 @@
              [_ (loop kw-val-pairs)]))]
         ;; reverse in case of multiple values with same keyword, latest takes precedence (by becoming first)
         [else (reverse (for/list ([(kw val) (in-dict kw-val-pairs)])
-                                 (list (string->symbol (string-trim (keyword->string kw) "#:"))
-                                       (format "~a" val))))])))
+                         (list (string->symbol (string-trim (keyword->string kw) "#:"))
+                               (format "~a" val))))])))
   (strip-context
    (with-syntax ([PATH-STRING path-string]
                  [((ATTR-NAME ATTR-VAL) ...) kw-attrs]
@@ -51,30 +51,36 @@
       (syntax-case stx ()
         [(_ PATH-STRING ATTRS . EXPRS)
          (with-syntax ([DOC (datum->syntax #'PATH-STRING 'doc)]
-                       [VIEW-RESULT (datum->syntax #'PATH-STRING 'view-result)])
+                       [VIEW-OUTPUT (datum->syntax #'PATH-STRING 'view-output)])
            #'(#%module-begin
-              (provide DOC VIEW-RESULT)
-              (define DOC `(q ATTRS ,(DOC-PROC (list . EXPRS))))
-              (define pdf-path (path-string->pdf-path 'PATH-STRING))
-              (define (VIEW-RESULT)
+              (provide DOC VIEW-OUTPUT)
+              (define attrs (let ([h (make-hasheq)])
+                              (for ([kvlist (in-list 'ATTRS)])
+                                (apply hash-set! h kvlist))
+                              h))
+              (define pdf-path (hash-ref! attrs 'output-path (λ () (path-string->pdf-path 'PATH-STRING))))
+              (define DOC `(q ,(for/list ([(k v) (in-hash attrs)])
+                                 (list k v))
+                              ,(DOC-PROC (list . EXPRS))))
+              (define (VIEW-OUTPUT)
                 (define open-string
                   (case (system-type 'os)
                     [(macosx) "open '~a'"]
                     [(windows) "start '~a'"]
                     [(unix) "xdg-open '~a' &> /dev/null"]
-                    [else (error "Don't know how to open PDF file.")]))
+                    [else (error "Unknown platform. Don't know how to view PDF.")]))
                 (when (file-exists? pdf-path)
                   (void (system (format open-string pdf-path)))))
               (module+ main
                 (with-logging-to-port
-                 (current-output-port)
-                 (λ () (with-logging-to-port
-                        (current-output-port)
-                        (λ () (render-pdf DOC pdf-path PATH-STRING))
-                        #:logger quadwriter-logger
-                        'debug))
-                 #:logger quad-logger
-                 'debug))))]))))
+                    (current-output-port)
+                  (λ () (with-logging-to-port
+                            (current-output-port)
+                          (λ () (render-pdf DOC pdf-path PATH-STRING))
+                          #:logger quadwriter-logger
+                          'debug))
+                  #:logger quad-logger
+                  'debug))))]))))
 
 (define (path-string->pdf-path path-string)
   (match (format "~a" path-string)
@@ -122,7 +128,7 @@
            (or
             (for/first ([pos (in-range line-start-pos line-end-pos)]
                         #:unless (char-blank? (send text get-character pos)))
-                       pos)
+              pos)
             line-start-pos))
          (- first-vis-pos line-start-pos))]      
       [else default])))

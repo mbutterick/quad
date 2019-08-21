@@ -106,7 +106,7 @@ quadwriter: wrote PDF to /Users/Desktop/test.pdf
 Congratulations — you just made your first PDF. If you want to have a look, either open the file manually, or enter this command on the REPL, which will open the PDF in your default viewer:
 
 @terminal{
-> (view-result)
+> (view-output)
 }
 
 Next, on the REPL enter this:
@@ -121,7 +121,7 @@ You will see the actual input to Quadwriter, which is called a @tech{Q-expressio
 '(q () (q ((page-margin-left "120") (page-margin-top "80") (page-margin-bottom "120") (font-family "text") (line-height "17")) (q ((keep-first-lines "2") (keep-last-lines "3") (font-size-adjust "100%") (character-tracking "0") (hyphenate "true") (display "g49598")) "Brennan and Dale like fancy sauce.")))
 }
 
-In the demos that follow, the input language will change slightly. But the PDF will be rendered the same way (by running the source file) and you can always look at @racket[doc] or use @racket[view-result].
+In the demos that follow, the input language will change slightly. But the PDF will be rendered the same way (by running the source file) and you can always look at @racket[doc] or use @racket[view-output].
 
 
 @subsection{Quadwriter & Markdown}
@@ -447,7 +447,7 @@ The @tech{Q-expression} @racketresult['#,para-break]. Used to denote the start o
 @defthing[section-break qexpr?]{
 The @tech{Q-expression} @racketresult['#,section-break]. Used to denote the start of a new section.
 
-A section is a contiguous series of pages. Each section has its own @secref{Page-level_attributes}. A document without any explicit section breaks still has one section (that includes all the pages).
+A section is a contiguous series of pages. Each section has its own @secref{Section-level_attributes}. A document without any explicit section breaks still has one section (that includes all the pages).
 }
 
 
@@ -457,8 +457,20 @@ These are the attributes that can be used inside a @tech{Q-expression} passed to
 
 A @deftech{dimension string} represents a distance in the plane. If unitless, it is treated as points (where 1 point = 1/72 of an inch). If the number has @racket[in], @racket[cm], or @racket[mm] as a suffix, it is treated as inches, centimeters, or millimeters respectively.
 
+@subsubsection{Document-level attributes}
 
-@subsubsection{Page-level attributes}
+Attributes that can only be set once for the whole document.
+
+
+@defthing[#:kind "attribute" output-path symbol?]{
+Output path for the rendered PDF. Default is the name of the source file with its extension changed to @racket[.pdf]. For instance, @racket["my-source.rkt"] would become @racket["my-source.pdf"]. Unsaved source files are rendered as @racket["untitled.pdf"].
+}
+
+
+@subsubsection{Section-level attributes}
+
+Attributes that can be set for each section.
+
 
 @deftogether[(@defthing[#:kind "attribute" page-size symbol?]
               @defthing[#:kind "attribute" page-orientation symbol?])]{
@@ -737,7 +749,7 @@ A @deftech{named color} is a hex color with a pre-existing name.
 @subsection{Utility}
 
 @defproc[
-(view-result)
+(view-output)
 void?]{
 On the REPL, after running a @racketmodname[quadwriter] dialect and generating a PDF, this function will open the PDF.
 }
