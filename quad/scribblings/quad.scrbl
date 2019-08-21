@@ -496,7 +496,7 @@ First page number used. Value is an integer. Default is @racket[1].
 }
 
 @defthing[#:kind "attribute" page-side-start symbol?]{
-Side that first page appears on. Value is @racket['left] or @racket['right]. A blank page will be inserted if necessary. Default is @racket['right].
+Side that first page appears on. Value is @racket["left"] or @racket["right"]. A blank page will be inserted if necessary. Default is @racket["right"].
 }
 
 @deftogether[(@defthing[#:kind "attribute" column-count symbol?]
