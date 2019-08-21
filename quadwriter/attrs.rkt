@@ -18,9 +18,10 @@
     [#false #false]
     [(? number?) x]
     [(? string? x)
-     (match (cdr (regexp-match #rx"^(-?[0-9\\.]+)([a-z]+)$"  (string-downcase x)))
+     (match (cdr (regexp-match #px"^(-?[0-9\\.]+)\\s*([a-z]+)$"  (string-downcase x)))
        [(list num-string unit)
         ((match unit
+           [(regexp #rx"(pt|point)(s)?$") values]
            [(regexp #rx"in(ch(es)?)?$") in->pts]
            [(regexp #rx"cm$") (compose1 in->pts cm->in)]
            [(regexp #rx"mm$") (compose1 in->pts cm->in mm->cm)]
