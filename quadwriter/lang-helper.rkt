@@ -58,7 +58,7 @@
                               (for ([kvlist (in-list 'ATTRS)])
                                 (apply hash-set! h kvlist))
                               h))
-              (define pdf-path (hash-ref! attrs 'output-path (λ () (path-string->pdf-path 'PATH-STRING))))
+              (define pdf-path (hash-ref! attrs 'output-path (λ () (path-string->pdf-path-string 'PATH-STRING))))
               (define DOC `(q ,(for/list ([(k v) (in-hash attrs)])
                                  (list k v))
                               ,(DOC-PROC (list . EXPRS))))
@@ -82,13 +82,14 @@
                   #:logger quad-logger
                   'debug))))]))))
 
-(define (path-string->pdf-path path-string)
+(define (path-string->pdf-path-string path-string)
+  (path->string
   (match (format "~a" path-string)
     ;; weird test but sometimes DrRacket calls the unsaved file
     ;; 'unsaved-editor and sometimes "unsaved editor"
     [(regexp #rx"unsaved.editor")
      (build-path (find-system-path 'desk-dir) "untitled.pdf")]
-    [_ (path-replace-extension path-string #".pdf")]))
+    [_ (path-replace-extension path-string #".pdf")])))
 
 (define quad-at-reader (make-at-reader
                         #:syntax? #t 
