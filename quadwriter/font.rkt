@@ -75,10 +75,16 @@
 (define (parse-percentage pstr)
   (/ (string->number (string-trim pstr "%")) 100.0))
 
-(define (resolve-font-size! attrs)
-  (define this-font-size (hash-ref! attrs :font-size default-font-size))
-  (define this-font-size-adjust (parse-percentage (hash-ref! attrs :font-size-adjust "100%")))
-  ;; we bake the adjustment into the font size...
-  (hash-set! attrs :font-size (* this-font-size this-font-size-adjust))
+(define (adjuster-base attrs key adjustment-key default-value)
+  (define this-val (hash-ref! attrs key default-value))
+  (define this-val-adjust (parse-percentage (hash-ref! attrs adjustment-key "100%")))
+  ;; we bake the adjustment into the val...
+  (hash-set! attrs key (and this-val (* this-val this-val-adjust)))
   ;; and then set the adjustment back to 100% (since it's now accounted for)
-  (hash-set! attrs :font-size-adjust "100%"))
+  (hash-set! attrs adjustment-key "100%"))
+
+(define (resolve-font-size! attrs)
+  (adjuster-base attrs :font-size :font-size-adjust default-font-size))
+
+(define (resolve-line-height! attrs)
+  (adjuster-base attrs :line-height :line-height-adjust default-line-height))

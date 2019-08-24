@@ -78,6 +78,7 @@ Naming guidelines
                link
                href
                line-height
+               line-height-adjust
                hyphenate
                list-index
                no-colbr

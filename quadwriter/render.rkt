@@ -112,6 +112,7 @@
                              complete-every-path!
                              resolve-font-path!
                              resolve-font-size!
+                             resolve-line-height!
                              parse-font-features!))])
     (proc attrs)))
 
@@ -198,6 +199,8 @@
     (hash-set! (pdf-info pdf) pdf-k (quad-ref (car qs) k "")))
   (hash-set! (pdf-info pdf) 'Creator (format "Racket ~a (Quad library)" (version))))
 
+(define (footnote-flow? q) (equal? (quad-ref q 'flow) "footnote"))
+
 (define/contract (render-pdf qx-arg pdf-path-arg
                              [base-dir-arg #false]
                              #:replace [replace-existing-file? #t]
@@ -241,13 +244,16 @@
         (define printable-height (- page-height top-margin bottom-margin))
         (define column-count (setup-column-count qs))
         (define column-gap (setup-column-gap qs))
+
+        (define-values (fn-qs main-qs) (partition footnote-flow? qs))
     
         (define line-wrap-size (/ (- printable-width (* (sub1 column-count) column-gap)) column-count))
-        (define line-qs (time-log line-wrap (apply-keeps (line-wrap qs line-wrap-size))))
+        (define line-qs (time-log line-wrap (apply-keeps (line-wrap main-qs line-wrap-size))))
+        (define fn-line-qs (time-log fn-line-wrap (apply-keeps (line-wrap fn-qs line-wrap-size))))
     
         (define col-quad-prototype (quad-copy q:column
                                               [size (pt line-wrap-size printable-height)]))
-        (define column-qs (time-log column-wrap (column-wrap line-qs printable-height column-gap col-quad-prototype)))
+        (define column-qs (time-log column-wrap (column-wrap line-qs fn-line-qs printable-height column-gap col-quad-prototype)))
 
         (define page-quad-prototype
           (λ (page-count)
