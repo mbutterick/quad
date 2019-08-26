@@ -19,9 +19,8 @@
 (define (finalize-reversed-wraps wraps)
   ; append* because `finish-wrap-proc` returns a spliceable list
   ; reverse because wraps accumulated in reverse
-  ; as a special case, '(()) is returned as just '()
   (match (append* (reverse wraps))
-    [(list (list)) (list)]
+    ['(()) '()] ; special case
     [wraps wraps]))
 
 (define (arg->proc arg [arity 1])
@@ -58,7 +57,9 @@
               ;; (q0 is not part of this wrap, but q is)
               ;; idx is current wrap-count value.
               #:finish-wrap [finish-wrap-func default-finish-wrap-func]
-              #:nicely [nicely? #f])
+              #:nicely [nicely? #f]
+              #:footnote-qs [footnote-qs null]
+              #:footnote-start-pred [footnote-start-pred (λ (q) #false)])
   (define wrap-proc (if nicely? wrap-best wrap-first))
   (define hard-break-func (arg->proc hard-break-func-arg))
   (define soft-break-func (arg->proc soft-break-func-arg))
@@ -75,16 +76,44 @@
     ;; note: we don't trim `soft-break?` or `hard-break?` because that's an orthogonal consideration
     ;; for instance, a hyphen is `soft-break?` but shouldn't be trimmed.
     (finish-wrap-func (reverse (dropf qs nonprinting-at-end?)) previous-wrap-ender wrap-triggering-q wrap-idx))
-  (wrap-proc qs max-distance-proc debug hard-break? soft-break? finish-wrap wrap-count distance-func initial-wrap-idx))
+  (wrap-proc qs
+             footnote-qs
+             footnote-start-pred
+             max-distance-proc
+             debug
+             hard-break?
+             soft-break?
+             finish-wrap
+             wrap-count
+             distance-func
+             initial-wrap-idx))
 
-(define (wrap-first qs max-distance-proc debug hard-break? soft-break? finish-wrap wrap-count distance-func initial-wrap-idx)
+(define (wrap-first qs
+                    footnote-qs-in
+                    footnote-start-pred
+                    max-distance-proc
+                    debug
+                    hard-break?
+                    soft-break?
+                    finish-wrap
+                    wrap-count
+                    distance-func
+                    initial-wrap-idx)
   (let loop ([wraps null] ; list of (list of quads)
              [wrap-idx initial-wrap-idx] ; wrap count (could be (length wraps) but we'd rather avoid `length`)
              [next-wrap-head null] ; list of quads ending in previous `soft-break?` or `hard-break?`
              [next-wrap-tail null] ; list of unbreakable quads
              [current-dist #false] ; #false (to indicate start) or integer
              [previous-wrap-ender #f]
-             [qs qs]) ; list of quads
+             [qs qs]
+             [footnote-qs footnote-qs-in]
+             [footnote-wraps null]) ; list of quads
+    #|
+1) If there are lines left over from a previous footnote, set as many of those lines on the current page as space allows. If the footnote zone is empty, this is a footnote continuation, so start with a continuation break. Loop without making a new column break.
+|#
+    (match footnote-qs
+      [(list* (? footnote-start-pred leftover-lns) ..1 _) #R leftover-lns]
+      [_ (void)])
     (match qs
       [(or (== empty) (list (? hard-break?))) ; ignore single trailing hard break
        (define last-wrap (finish-wrap (append next-wrap-tail next-wrap-head) previous-wrap-ender wrap-idx #f))
@@ -103,7 +132,9 @@
                 null
                 #false
                 q
-                other-qs)]
+                other-qs
+                footnote-qs
+                footnote-wraps)]
          [(let ([at-start? (not current-dist)]) at-start?)
           (match q
             [(and (? soft-break?) (? nonprinting-at-start?))
@@ -114,7 +145,9 @@
                    next-wrap-tail
                    current-dist
                    previous-wrap-ender
-                   other-qs)]
+                   other-qs
+                   footnote-qs
+                   footnote-wraps)]
             [_ (debug-report 'hard-quad-at-start)
                (loop wraps
                      wrap-idx
@@ -122,7 +155,9 @@
                      (list q)
                      (distance-func q 0 would-be-wrap-qs)
                      previous-wrap-ender
-                     other-qs)])]
+                     other-qs
+                     footnote-qs
+                     footnote-wraps)])]
          [else ; cases that require computing distance
           (define wrap-distance (distance-func q current-dist would-be-wrap-qs))
           (define max-distance (max-distance-proc q wrap-idx))
@@ -140,7 +175,9 @@
                       null
                       wrap-distance
                       previous-wrap-ender
-                      other-qs)]
+                      other-qs
+                      footnote-qs
+                      footnote-wraps)]
                [(empty? next-wrap-head)
                 (define-values (next-wrap-qs other-qs)
                   (cond
@@ -160,7 +197,9 @@
                       null
                       #false
                       (car next-wrap-qs)
-                      other-qs)]
+                      other-qs
+                      footnote-qs
+                      footnote-wraps)]
                [else ; finish the wrap & reset the line without consuming a quad
                 (loop (cons (finish-wrap next-wrap-head previous-wrap-ender wrap-idx) wraps)
                       (wrap-count wrap-idx q)
@@ -168,7 +207,9 @@
                       next-wrap-tail
                       (for/sum ([item (in-list next-wrap-tail)]) (distance item))
                       (car next-wrap-head)
-                      qs)])]         
+                      qs
+                      footnote-qs
+                      footnote-wraps)])]         
             [(soft-break? q)
              (debug-report 'would-not-overflow-soft)
              ;; a soft break that fits, so move it on top of the next-wrap-head with the next-wrap-tail
@@ -178,7 +219,9 @@
                    null
                    wrap-distance
                    previous-wrap-ender
-                   other-qs)]
+                   other-qs
+                   footnote-qs
+                   footnote-wraps)]
             [else
              (debug-report 'would-not-overflow)
              ;; add to partial
@@ -188,7 +231,9 @@
                    (cons q next-wrap-tail)
                    wrap-distance
                    previous-wrap-ender
-                   other-qs)])])])))
+                   other-qs
+                   footnote-qs
+                   footnote-wraps)])])])))
 
 (define last-line-can-be-short? #t)
 (define mega-penalty 1e8)
@@ -198,7 +243,17 @@
   (reverse (apply append (for/list ([n (in-range i j)])
                            (vector-ref pieces n)))))
 
-(define (wrap-best qs max-distance-proc debug hard-break? soft-break? finish-wrap wrap-count distance-func initial-wrap-idx)
+(define (wrap-best qs
+                   footnote-qs
+                   footnote-start-pred?
+                   max-distance-proc
+                   debug
+                   hard-break?
+                   soft-break?
+                   finish-wrap
+                   wrap-count
+                   distance-func
+                   initial-wrap-idx)
   (for*/fold ([wrapss null]
               [wrap-idx initial-wrap-idx]
               [previous-wrap-ender #f]
@@ -278,28 +333,28 @@
   (define q-one (q #:size (pt 1 1) #:printable #t))
   (define x (quad-copy q-one [elems '(#\x)]))
   (define zwx (quad-copy q-zero
-                           [printable (λ _ #t)]
-                           [elems '(#\z)]))
+                         [printable (λ _ #t)]
+                         [elems '(#\z)]))
   (define hyph (quad-copy q-one [elems '(#\-)]))
   (define shy (quad-copy q-one
-                           [printable (λ (q [sig #f])
-                                        (case sig
-                                          [(end) #t]
-                                          [else #f]))]
-                           [elems '(#\-)]))
+                         [printable (λ (q [sig #f])
+                                      (case sig
+                                        [(end) #t]
+                                        [else #f]))]
+                         [elems '(#\-)]))
   (define a (quad-copy q-one [elems '(#\a)]))
   (define b (quad-copy q-one [elems '(#\b)]))
   (define c (quad-copy q-one [elems '(#\c)]))
   (define d (quad-copy q-one [elems '(#\d)]))
   (define sp (quad-copy q-one
-                          [printable (λ (q [sig #f])
-                                       (case sig
-                                         [(start end) #f]
-                                         [else #t]))]
-                          [elems '(#\space)]))
+                        [printable (λ (q [sig #f])
+                                     (case sig
+                                       [(start end) #f]
+                                       [else #t]))]
+                        [elems '(#\space)]))
   (define lbr (quad-copy q-one
-                           [printable (λ _ #f)]
-                           [elems '(#\newline)]))
+                         [printable (λ _ #f)]
+                         [elems '(#\newline)]))
 
   (define (soft-break? q) (memv (car (quad-elems q)) '(#\space #\-)))
 
@@ -318,9 +373,9 @@
                                         (if (equal? (quad-elems atom) '(#\space))
                                             (quad-copy sp)
                                             (quad-copy q-one
-                                                         [attrs (quad-attrs atom)]
-                                                         [elems (quad-elems atom)]))) int debug
-                                                                                      #:nicely nicely?))]
+                                                       [attrs (quad-attrs atom)]
+                                                       [elems (quad-elems atom)]))) int debug
+                                                                                    #:nicely nicely?))]
                 #:when (and (list? x) (andmap quad? x)))
        (list->string (map car (map quad-elems x))))
      "|"))

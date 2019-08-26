@@ -174,7 +174,11 @@ Naming guidelines
                            page-margin-right
                            page-margin-gutter
 
-                           footer-display))
+                           footer-display
+
+                           fn-ref
+                           fn-text
+                           fn-text-start))
 
 (define (takes-dimension-string? k)
   (and (memq k (list :page-width

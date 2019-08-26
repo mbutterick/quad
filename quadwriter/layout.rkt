@@ -660,16 +660,27 @@
    (quad-update! q [from-parent (or where (quad-from q))])
    (cons q rest)])
 
-(define ((col-finish-wrap col-quad) lns . _)
+(define ((col-finish-wrap col-quad) lns q0 ending-q idx [fn-lines null])
+  (define reversed-fn-lines
+    (from-parent (for/list ([fn-line (in-list (reverse fn-lines))])
+                   ;; position bottom to top, in reverse
+                   (quad-update! fn-line
+                                 [from 'nw]
+                                 [to 'sw])) 'sw))
   (match lns
     [(cons line _)
      (list (quad-copy col-quad
                       ;; move block attrs up, so they are visible in page wrap
                       [attrs (copy-block-attrs (quad-attrs line)
                                                (hash-copy (quad-attrs col-quad)))]
-                      [elems (from-parent (insert-blocks lns) 'nw)]))]
+                      [elems (append (from-parent (insert-blocks lns) 'nw) reversed-fn-lines)]))]
     [_ null]))
 
+#|
+constraint wrapping example
+https://github.com/mbutterick/typesetter/blob/882ec681ad1fa6eaee6287e53bc4320d9656046b/pdf/directory-require.rkt#L51
+|#
+;; 
 (define (column-wrap lines fn-lines vertical-height column-gap [column-quad q:column])
   (unless (positive? vertical-height)
     (raise-argument-error 'column-wrap "positive number" vertical-height))
@@ -679,6 +690,7 @@
   ;; could do it after, but it would require going back inside each col quad
   ;; which seems overly interdependent, because `insert-blocks` is used to determine break locations.
   ;; `col-wrap` should emit quads that are complete.
+  (verbose-quad-printing? #true)
   (define cols (wrap lines vertical-height
                      #:soft-break #true
                      #:hard-break column-break-quad?
@@ -686,19 +698,19 @@
                      #:distance (λ (q dist-so-far wrap-qs)
                                   ;; do trial block insertions
                                   (sum-y (insert-blocks (reverse wrap-qs))))                     
-                     #:finish-wrap (col-finish-wrap column-quad)))
-  (define reversed-fn-lines (match (reverse fn-lines)
-                              [(? null?) null]
-                              [reversed-fn-lines
-                               (quad-update! (car reversed-fn-lines)
-                                             [from-parent 'sw])
-                               (for/list ([fn-line (in-list reversed-fn-lines)])
-                                 (quad-update! fn-line
-                                               [from 'nw]
-                                               [to 'sw]))]))
+                     #:finish-wrap (col-finish-wrap column-quad)
+                     #:footnote-qs fn-lines
+                     #:footnote-start-pred (λ (q) (and (quad-ref q :fn-text)
+                                                       (not (quad-ref q :fn-text-start))))))
+  (define reversed-fn-lines
+    (from-parent (for/list ([fn-line (in-list (reverse fn-lines))])
+                   ;; position bottom to top, in reverse
+                   (quad-update! fn-line
+                                 [from 'nw]
+                                 [to 'sw])) 'sw))
   (quad-update! (car cols)
                 [elems (append (quad-elems (car cols)) reversed-fn-lines)])
-  (define col-spacer (quad-copy q:column-spacer [size (pt column-gap 100)]))
+  (define col-spacer (quad-copy q:column-spacer [size (pt column-gap (and 'arbitrary-irrelevant-value 100))]))
   (add-between cols col-spacer))
 
 (define ((page-finish-wrap make-page-quad path) cols q0 q page-idx)
