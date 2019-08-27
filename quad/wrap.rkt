@@ -1,7 +1,7 @@
 #lang debug racket
 (require racket/list racket/match sugar/debug sugar/list
          "param.rkt" "quad.rkt" "atomize.rkt" "position.rkt" "ocm.rkt" "log.rkt")
-(provide wrap)
+(provide wrap sum-x sum-y)
 
 (define-syntax (debug-report stx)
   (syntax-case stx ()
@@ -22,6 +22,12 @@
   (match (append* (reverse wraps))
     ['(()) '()] ; special case
     [wraps wraps]))
+
+(define (sum-base xs which)
+  (for/sum ([x (in-list xs)])
+    (which (size x))))
+(define (sum-y xs) (sum-base xs pt-y))
+(define (sum-x xs) (sum-base xs pt-x))
 
 (define (arg->proc arg [arity 1])
   (match arg
@@ -105,14 +111,30 @@
              [next-wrap-tail null] ; list of unbreakable quads
              [current-dist #false] ; #false (to indicate start) or integer
              [previous-wrap-ender #f]
-             [qs qs]
-             [footnote-qs footnote-qs-in]
-             [footnote-wraps null]) ; list of quads
+             [qs qs]  ; list of quads
+             [footnote-qs footnote-qs-in] ; list of footnote quads
+             [footnote-wraps null] ; list of footnote lines wrapped into footnote area for this col
+             [footnote-dist 0] ; dist consumed by footnotes in current footnote wrap
+             ; this needs to be tracked separately from current-dist because #false is used to detect start
+             )
     #|
 1) If there are lines left over from a previous footnote, set as many of those lines on the current page as space allows. If the footnote zone is empty, this is a footnote continuation, so start with a continuation break. Loop without making a new column break.
 |#
     (match footnote-qs
-      [(list* (? footnote-start-pred leftover-lns) ..1 _) #R leftover-lns]
+      [(list* (and (not (? footnote-start-pred))  fn-leftovers) ..1 other-fn-lines)
+       (define fn-nonblank (dropf fn-leftovers (λ (q) (and (soft-break? q)) (nonprinting-at-start? q))))
+       (define fn-non-blank-height (sum-y fn-nonblank))
+       (loop
+        wraps
+        wrap-idx
+        next-wrap-head
+        next-wrap-tail
+        current-dist
+        previous-wrap-ender
+        qs
+        other-fn-lines
+        (cons fn-nonblank footnote-wraps)
+        fn-non-blank-height)]
       [_ (void)])
     (match qs
       [(or (== empty) (list (? hard-break?))) ; ignore single trailing hard break
@@ -134,7 +156,8 @@
                 q
                 other-qs
                 footnote-qs
-                footnote-wraps)]
+                footnote-wraps
+                footnote-dist)]
          [(let ([at-start? (not current-dist)]) at-start?)
           (match q
             [(and (? soft-break?) (? nonprinting-at-start?))
@@ -147,7 +170,8 @@
                    previous-wrap-ender
                    other-qs
                    footnote-qs
-                   footnote-wraps)]
+                   footnote-wraps
+                   footnote-dist)]
             [_ (debug-report 'hard-quad-at-start)
                (loop wraps
                      wrap-idx
@@ -157,7 +181,8 @@
                      previous-wrap-ender
                      other-qs
                      footnote-qs
-                     footnote-wraps)])]
+                     footnote-wraps
+                     footnote-dist)])]
          [else ; cases that require computing distance
           (define wrap-distance (distance-func q current-dist would-be-wrap-qs))
           (define max-distance (max-distance-proc q wrap-idx))
@@ -177,7 +202,8 @@
                       previous-wrap-ender
                       other-qs
                       footnote-qs
-                      footnote-wraps)]
+                      footnote-wraps
+                      footnote-dist)]
                [(empty? next-wrap-head)
                 (define-values (next-wrap-qs other-qs)
                   (cond
@@ -199,7 +225,8 @@
                       (car next-wrap-qs)
                       other-qs
                       footnote-qs
-                      footnote-wraps)]
+                      footnote-wraps
+                      footnote-dist)]
                [else ; finish the wrap & reset the line without consuming a quad
                 (loop (cons (finish-wrap next-wrap-head previous-wrap-ender wrap-idx) wraps)
                       (wrap-count wrap-idx q)
@@ -209,7 +236,8 @@
                       (car next-wrap-head)
                       qs
                       footnote-qs
-                      footnote-wraps)])]         
+                      footnote-wraps
+                      footnote-dist)])]         
             [(soft-break? q)
              (debug-report 'would-not-overflow-soft)
              ;; a soft break that fits, so move it on top of the next-wrap-head with the next-wrap-tail
@@ -221,7 +249,8 @@
                    previous-wrap-ender
                    other-qs
                    footnote-qs
-                   footnote-wraps)]
+                   footnote-wraps
+                   footnote-dist)]
             [else
              (debug-report 'would-not-overflow)
              ;; add to partial
@@ -233,7 +262,8 @@
                    previous-wrap-ender
                    other-qs
                    footnote-qs
-                   footnote-wraps)])])])))
+                   footnote-wraps
+                   footnote-dist)])])])))
 
 (define last-line-can-be-short? #t)
 (define mega-penalty 1e8)

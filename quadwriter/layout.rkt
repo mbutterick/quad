@@ -14,12 +14,6 @@
          "log.rkt")
 (provide (all-defined-out))
 
-(define (sum-base xs which)
-  (for/sum ([x (in-list xs)])
-    (which (size x))))
-(define (sum-y xs) (sum-base xs pt-y))
-(define (sum-x xs) (sum-base xs pt-x))
-
 (define-quad string-quad quad)
  
 (define (q:string-draw q doc
@@ -700,8 +694,7 @@ https://github.com/mbutterick/typesetter/blob/882ec681ad1fa6eaee6287e53bc4320d96
                                   (sum-y (insert-blocks (reverse wrap-qs))))                     
                      #:finish-wrap (col-finish-wrap column-quad)
                      #:footnote-qs fn-lines
-                     #:footnote-start-pred (λ (q) (and (quad-ref q :fn-text)
-                                                       (not (quad-ref q :fn-text-start))))))
+                     #:footnote-start-pred (λ (q) (quad-ref q :fn-text-start))))
   (define reversed-fn-lines
     (from-parent (for/list ([fn-line (in-list (reverse fn-lines))])
                    ;; position bottom to top, in reverse
