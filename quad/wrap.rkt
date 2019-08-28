@@ -1,7 +1,7 @@
 #lang debug racket
-(require racket/list racket/match sugar/debug sugar/list
+(require racket/list racket/match sugar/debug sugar/list racket/generator
          "param.rkt" "quad.rkt" "atomize.rkt" "position.rkt" "ocm.rkt" "log.rkt")
-(provide wrap sum-x sum-y)
+(provide wrap)
 
 (define-syntax (debug-report stx)
   (syntax-case stx ()
@@ -23,12 +23,6 @@
     ['(()) '()] ; special case
     [wraps wraps]))
 
-(define (sum-base xs which)
-  (for/sum ([x (in-list xs)])
-    (which (size x))))
-(define (sum-y xs) (sum-base xs pt-y))
-(define (sum-x xs) (sum-base xs pt-x))
-
 (define (arg->proc arg [arity 1])
   (match arg
     [(? procedure? proc) proc]
@@ -36,7 +30,7 @@
     [val (λ (q) val)]))
 
 (define (wrap qs
-              [max-distance-proc-arg (current-wrap-distance)]
+              [max-distance (current-wrap-distance)]
               [debug #f]
               ;; hard break: must wrap
               #:hard-break [hard-break-func-arg #false]
@@ -65,14 +59,14 @@
               #:finish-wrap [finish-wrap-func default-finish-wrap-func]
               #:nicely [nicely? #f]
               #:footnote-qs [footnote-qs null]
-              #:footnote-start-pred [footnote-start-pred (λ (q) #false)])
+              #:footnote-leftover-proc [footnote-leftover-proc (λ _ (error 'no-footnote-leftover-proc))]
+              #:footnote-new-proc [footnote-new-proc (λ _ (error 'no-footnote-new-proc))])
   (define wrap-proc (if nicely? wrap-best wrap-first))
   (define hard-break-func (arg->proc hard-break-func-arg))
   (define soft-break-func (arg->proc soft-break-func-arg))
   (define no-break-func (arg->proc no-break-func-arg))
   (define (hard-break? x) (and (hard-break-func x) (not (no-break-func x))))
   (define (soft-break? x) (and (soft-break-func x) (not (no-break-func x))))
-  (define max-distance-proc (arg->proc max-distance-proc-arg 2))
   ; takes quads in wrap, triggering quad, and wrap idx; returns list containing wrap (and maybe other things)
   (define (finish-wrap qs previous-wrap-ender wrap-idx [wrap-triggering-q (car qs)])
     ;; reverse because quads accumulated in reverse
@@ -83,28 +77,35 @@
     ;; for instance, a hyphen is `soft-break?` but shouldn't be trimmed.
     (finish-wrap-func (reverse (dropf qs nonprinting-at-end?)) previous-wrap-ender wrap-triggering-q wrap-idx))
   (wrap-proc qs
-             footnote-qs
-             footnote-start-pred
-             max-distance-proc
+             max-distance
              debug
              hard-break?
              soft-break?
              finish-wrap
              wrap-count
              distance-func
-             initial-wrap-idx))
+             initial-wrap-idx
+             
+             footnote-qs
+             footnote-leftover-proc
+             footnote-new-proc))
 
 (define (wrap-first qs
-                    footnote-qs-in
-                    footnote-start-pred
-                    max-distance-proc
+                    max-distance
                     debug
                     hard-break?
                     soft-break?
                     finish-wrap
                     wrap-count
                     distance-func
-                    initial-wrap-idx)
+                    initial-wrap-idx
+                    
+                    footnote-qs-in
+                    footnote-leftover-proc
+                    footnote-new-proc)
+
+  (define has-footnotes? (pair? footnote-qs-in))
+  
   (let loop ([wraps null] ; list of (list of quads)
              [wrap-idx initial-wrap-idx] ; wrap count (could be (length wraps) but we'd rather avoid `length`)
              [next-wrap-head null] ; list of quads ending in previous `soft-break?` or `hard-break?`
@@ -113,157 +114,171 @@
              [previous-wrap-ender #f]
              [qs qs]  ; list of quads
              [footnote-qs footnote-qs-in] ; list of footnote quads
+             [footnote-next-wrap null]
              [footnote-wraps null] ; list of footnote lines wrapped into footnote area for this col
              [footnote-dist 0] ; dist consumed by footnotes in current footnote wrap
              ; this needs to be tracked separately from current-dist because #false is used to detect start
+             [max-distance max-distance] ; might be reduced by footnotes
              )
     #|
 1) If there are lines left over from a previous footnote, set as many of those lines on the current page as space allows. If the footnote zone is empty, this is a footnote continuation, so start with a continuation break. Loop without making a new column break.
 |#
-    (match footnote-qs
-      [(list* (and (not (? footnote-start-pred))  fn-leftovers) ..1 other-fn-lines)
-       (define fn-nonblank (dropf fn-leftovers (λ (q) (and (soft-break? q)) (nonprinting-at-start? q))))
-       (define fn-non-blank-height (sum-y fn-nonblank))
-       (loop
-        wraps
-        wrap-idx
-        next-wrap-head
-        next-wrap-tail
-        current-dist
-        previous-wrap-ender
-        qs
-        other-fn-lines
-        (cons fn-nonblank footnote-wraps)
-        fn-non-blank-height)]
-      [_ (void)])
-    (match qs
-      [(or (== empty) (list (? hard-break?))) ; ignore single trailing hard break
-       (define last-wrap (finish-wrap (append next-wrap-tail next-wrap-head) previous-wrap-ender wrap-idx #f))
-       (finalize-reversed-wraps (cons last-wrap wraps))]
-      [(cons q other-qs)
-       (debug-report q 'next-q)
-       (debug-report (quad-elems q) 'next-q-elems)
-       (define would-be-wrap-qs (append (cons q next-wrap-tail) next-wrap-head))
-       (cond
-         [(hard-break? q)
-          (debug-report 'found-hard-break)
-          ;; must break. finish the wrap
-          (loop (cons (finish-wrap would-be-wrap-qs previous-wrap-ender wrap-idx) wraps)
-                (wrap-count wrap-idx q)
-                null
-                null
-                #false
-                q
-                other-qs
-                footnote-qs
-                footnote-wraps
-                footnote-dist)]
-         [(let ([at-start? (not current-dist)]) at-start?)
-          (match q
-            [(and (? soft-break?) (? nonprinting-at-start?))
-             (debug-report q 'skipping-soft-break-at-beginning)
-             (loop wraps
-                   wrap-idx
-                   next-wrap-head
-                   next-wrap-tail
-                   current-dist
-                   previous-wrap-ender
-                   other-qs
-                   footnote-qs
-                   footnote-wraps
-                   footnote-dist)]
-            [_ (debug-report 'hard-quad-at-start)
-               (loop wraps
-                     wrap-idx
-                     next-wrap-head
-                     (list q)
-                     (distance-func q 0 would-be-wrap-qs)
-                     previous-wrap-ender
-                     other-qs
-                     footnote-qs
-                     footnote-wraps
-                     footnote-dist)])]
-         [else ; cases that require computing distance
-          (define wrap-distance (distance-func q current-dist would-be-wrap-qs))
-          (define max-distance (max-distance-proc q wrap-idx))
-          (define would-overflow? (> wrap-distance max-distance))
-          (cond
-            [would-overflow?
+    (let-values ([(max-distance footnote-next-wrap footnote-qs)
+                  ((if has-footnotes?
+                       footnote-leftover-proc
+                       values) max-distance footnote-next-wrap footnote-qs)])
+      
+      (match qs
+        [(or (== empty) (list (? hard-break?))) ; ignore single trailing hard break
+         (define last-wrap (finish-wrap (append next-wrap-tail next-wrap-head) previous-wrap-ender wrap-idx #f))
+         (finalize-reversed-wraps (cons last-wrap wraps))]
+        [(cons q other-qs)
+         (debug-report q 'next-q)
+         (debug-report (quad-elems q) 'next-q-elems)
+         (define would-be-wrap-qs (append (cons q next-wrap-tail) next-wrap-head))
+         (define (handle-hard-overflow)
+           (cond
+             [(empty? next-wrap-head)
+                      (define-values (next-wrap-qs other-qs)
+                        (cond
+                          [(empty? next-wrap-tail)
+                           ;; degenerate case where q is big enough to trigger a wrap on its own,
+                           ;; but nothing left in next-wrap-head or next-wrap-tail.
+                           ;; so we put it in its own wrap and recur, because otherwise we can't proceed
+                           ;; though it will look screwy
+                           (debug-report 'making-the-best-of-a-bad-situation)
+                           (values (list q) (cdr qs))]
+                          [else
+                           (debug-report 'would-overflow-hard-without-captured-break)
+                           (values next-wrap-tail qs)]))
+                      (loop (cons (finish-wrap next-wrap-qs previous-wrap-ender wrap-idx) wraps)
+                            (wrap-count wrap-idx q)
+                            null
+                            null
+                            #false
+                            (car next-wrap-qs)
+                            other-qs
+                            footnote-qs
+                            footnote-next-wrap
+                            footnote-wraps
+                            footnote-dist
+                            max-distance)]
+                     [else ; finish the wrap & reset the line without consuming a quad
+                      (loop (cons (finish-wrap next-wrap-head previous-wrap-ender wrap-idx) wraps)
+                 (wrap-count wrap-idx q)
+                 null
+                 next-wrap-tail
+                 (for/sum ([item (in-list next-wrap-tail)]) (distance item))
+                 (car next-wrap-head)
+                 qs
+                 footnote-qs
+                 footnote-next-wrap
+                 footnote-wraps
+                 footnote-dist
+                 max-distance)]))
+         (with-handlers ([symbol? (λ (exn) (handle-hard-overflow))])
+           (let-values ([(max-distance footnote-next-wrap footnote-qs)
+                         (if has-footnotes?
+                             (footnote-new-proc max-distance footnote-next-wrap footnote-qs q)
+                             (values max-distance footnote-next-wrap footnote-qs))])
              (cond
-               [(and (soft-break? q) (nonprinting-at-end? q))
-                (debug-report 'would-overflow-soft-nonprinting)
-                ;; a break is inevitable but we want to wait to finish the wrap until we see a hard quad
-                ;; but we can move the current-partial into the current-wrap
-                (loop wraps
-                      wrap-idx
-                      (append (cons q next-wrap-tail) next-wrap-head)
-                      null
-                      wrap-distance
-                      previous-wrap-ender
-                      other-qs
-                      footnote-qs
-                      footnote-wraps
-                      footnote-dist)]
-               [(empty? next-wrap-head)
-                (define-values (next-wrap-qs other-qs)
-                  (cond
-                    [(empty? next-wrap-tail)
-                     ;; degenerate case where q is big enough to trigger a wrap on its own,
-                     ;; but nothing left in next-wrap-head or next-wrap-tail.
-                     ;; so we put it in its own wrap and recur, because otherwise we can't proceed
-                     ;; though it will look screwy
-                     (debug-report 'making-the-best-of-a-bad-situation)
-                     (values (list q) (cdr qs))]
-                    [else
-                     (debug-report 'would-overflow-hard-without-captured-break)
-                     (values next-wrap-tail qs)]))
-                (loop (cons (finish-wrap next-wrap-qs previous-wrap-ender wrap-idx) wraps)
+               [(hard-break? q)
+                (debug-report 'found-hard-break)
+                ;; must break. finish the wrap and consume the hard break
+                (loop (cons (finish-wrap would-be-wrap-qs previous-wrap-ender wrap-idx) wraps)
                       (wrap-count wrap-idx q)
                       null
                       null
                       #false
-                      (car next-wrap-qs)
+                      q
                       other-qs
                       footnote-qs
+                      footnote-next-wrap
                       footnote-wraps
-                      footnote-dist)]
-               [else ; finish the wrap & reset the line without consuming a quad
-                (loop (cons (finish-wrap next-wrap-head previous-wrap-ender wrap-idx) wraps)
-                      (wrap-count wrap-idx q)
-                      null
-                      next-wrap-tail
-                      (for/sum ([item (in-list next-wrap-tail)]) (distance item))
-                      (car next-wrap-head)
-                      qs
-                      footnote-qs
-                      footnote-wraps
-                      footnote-dist)])]         
-            [(soft-break? q)
-             (debug-report 'would-not-overflow-soft)
-             ;; a soft break that fits, so move it on top of the next-wrap-head with the next-wrap-tail
-             (loop wraps
-                   wrap-idx
-                   (append (cons q next-wrap-tail) next-wrap-head)
-                   null
-                   wrap-distance
-                   previous-wrap-ender
-                   other-qs
-                   footnote-qs
-                   footnote-wraps
-                   footnote-dist)]
-            [else
-             (debug-report 'would-not-overflow)
-             ;; add to partial
-             (loop wraps
-                   wrap-idx
-                   next-wrap-head
-                   (cons q next-wrap-tail)
-                   wrap-distance
-                   previous-wrap-ender
-                   other-qs
-                   footnote-qs
-                   footnote-wraps
-                   footnote-dist)])])])))
+                      footnote-dist
+                      max-distance)]
+               [(let ([at-start? (not current-dist)]) at-start?)
+                (match q
+                  [(and (? soft-break?) (? nonprinting-at-start?))
+                   (debug-report q 'skipping-soft-break-at-beginning)
+                   (loop wraps
+                         wrap-idx
+                         next-wrap-head
+                         next-wrap-tail
+                         current-dist
+                         previous-wrap-ender
+                         other-qs
+                         footnote-qs
+                         footnote-next-wrap
+                         footnote-wraps
+                         footnote-dist
+                         max-distance)]
+                  [_ (debug-report 'hard-quad-at-start)
+                     (loop wraps
+                           wrap-idx
+                           next-wrap-head
+                           (list q)
+                           (distance-func q 0 would-be-wrap-qs)
+                           previous-wrap-ender
+                           other-qs
+                           footnote-qs
+                           footnote-next-wrap
+                           footnote-wraps
+                           footnote-dist
+                           max-distance)])]
+               [else ; cases that require computing distance
+                (define wrap-distance (distance-func q current-dist would-be-wrap-qs))
+                (define would-overflow? (> wrap-distance max-distance))
+                (cond
+                  [would-overflow?
+                   (cond
+                     [(and (soft-break? q) (nonprinting-at-end? q))
+                      (debug-report 'would-overflow-soft-nonprinting)
+                      ;; a break is inevitable but we want to wait to finish the wrap until we see a hard quad
+                      ;; but we can move the current-partial into the current-wrap
+                      (loop wraps
+                            wrap-idx
+                            (append (cons q next-wrap-tail) next-wrap-head)
+                            null
+                            wrap-distance
+                            previous-wrap-ender
+                            other-qs
+                            footnote-qs
+                            footnote-next-wrap
+                            footnote-wraps
+                            footnote-dist
+                            max-distance)]
+                     [else (handle-hard-overflow)])]         
+                  [(soft-break? q)
+                   (debug-report 'would-not-overflow-soft)
+                   ;; a soft break that fits, so move it on top of the next-wrap-head with the next-wrap-tail
+                   (loop wraps
+                         wrap-idx
+                         (append (cons q next-wrap-tail) next-wrap-head)
+                         null
+                         wrap-distance
+                         previous-wrap-ender
+                         other-qs
+                         footnote-qs
+                         footnote-next-wrap
+                         footnote-wraps
+                         footnote-dist
+                         max-distance)]
+                  [else
+                   (debug-report 'would-not-overflow)
+                   ;; add to partial
+                   (loop wraps
+                         wrap-idx
+                         next-wrap-head
+                         (cons q next-wrap-tail)
+                         wrap-distance
+                         previous-wrap-ender
+                         other-qs
+                         footnote-qs
+                         footnote-next-wrap
+                         footnote-wraps
+                         footnote-dist
+                         max-distance)])])))]))))
 
 (define last-line-can-be-short? #t)
 (define mega-penalty 1e8)
@@ -274,16 +289,14 @@
                            (vector-ref pieces n)))))
 
 (define (wrap-best qs
-                   footnote-qs
-                   footnote-start-pred?
-                   max-distance-proc
+                   max-distance
                    debug
                    hard-break?
                    soft-break?
                    finish-wrap
                    wrap-count
                    distance-func
-                   initial-wrap-idx)
+                   initial-wrap-idx . _)
   (for*/fold ([wrapss null]
               [wrap-idx initial-wrap-idx]
               [previous-wrap-ender #f]
@@ -295,11 +308,11 @@
         [pieces (values pieces #f)]))
     (define pieces-vec (list->vector (slicef-after pieces soft-break?)))
     (define-values (wraps idx ender)
-      (wrap-pieces-best pieces-vec wrap-idx previous-wrap-ender last-ender wrap-count distance-func max-distance-proc finish-wrap))
+      (wrap-pieces-best pieces-vec wrap-idx previous-wrap-ender last-ender wrap-count distance-func max-distance finish-wrap))
     (values (cons wraps wrapss) idx last-ender)))
 
 (struct penalty-rec (val idx hyphen-count) #:transparent)
-(define (wrap-pieces-best pieces-vec starting-wrap-idx previous-last-q last-ender wrap-count distance-func max-distance-proc finish-wrap)
+(define (wrap-pieces-best pieces-vec starting-wrap-idx previous-last-q last-ender wrap-count distance-func max-distance finish-wrap)
   (define (penalty i j)
     (cond
       [(or (eq? i j) (> j (vector-length pieces-vec)))
@@ -311,7 +324,7 @@
        (define wrap-distance (for/fold ([last-dist 0])
                                        ([q (in-list would-be-wrap-qs)])
                                (distance-func q last-dist would-be-wrap-qs)))
-       (define underflow (- (max-distance-proc (car would-be-wrap-qs) starting-idx) wrap-distance))
+       (define underflow (- max-distance wrap-distance))
        (define new-consecutive-hyphen-count
          (if (equal? (quad-elems (car would-be-wrap-qs)) '("\u00AD")) (add1 hyphen-count) 0))
        (penalty-rec

@@ -8,6 +8,12 @@
 (define (pt+ . pts) (apply map + pts))
 (define (pt- . pts) (apply map - pts))
 
+(define (sum-base qs which)
+  (for/sum ([q (in-list qs)])
+    (which (size q))))
+(define (sum-y qs) (sum-base qs pt-y))
+(define (sum-x qs) (sum-base qs pt-x))
+
 (define valid-anchors '(nw n ne w c e sw s se bi bo))
 
 (define (coerce-int x) (if (integer? x) (inexact->exact x) x))

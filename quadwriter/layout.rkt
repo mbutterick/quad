@@ -452,10 +452,10 @@
             ;; next line removes all para-break? quads as a consequence
             (for/list ([qs (in-list (filter-split qs para-break-quad?))])
               (wrap qs
-                    (λ (q idx) (* (- wrap-size
-                                     (quad-ref (car qs) :inset-left 0)
-                                     (quad-ref (car qs) :inset-right 0))
-                                  permitted-justify-overfill))
+                    (* (- wrap-size
+                          (quad-ref (car qs) :inset-left 0)
+                          (quad-ref (car qs) :inset-right 0))
+                       permitted-justify-overfill)
                     #:nicely (match (or (current-line-wrap) (quad-ref (car qs) :line-wrap))
                                [(or "best" "kp") #true]
                                [_ #false])
@@ -684,7 +684,7 @@ https://github.com/mbutterick/typesetter/blob/882ec681ad1fa6eaee6287e53bc4320d96
   ;; could do it after, but it would require going back inside each col quad
   ;; which seems overly interdependent, because `insert-blocks` is used to determine break locations.
   ;; `col-wrap` should emit quads that are complete.
-  (verbose-quad-printing? #true)
+  (define (footnote-start? fnq) (quad-ref fnq :fn-text-start))
   (define cols (wrap lines vertical-height
                      #:soft-break #true
                      #:hard-break column-break-quad?
@@ -694,7 +694,24 @@ https://github.com/mbutterick/typesetter/blob/882ec681ad1fa6eaee6287e53bc4320d96
                                   (sum-y (insert-blocks (reverse wrap-qs))))                     
                      #:finish-wrap (col-finish-wrap column-quad)
                      #:footnote-qs fn-lines
-                     #:footnote-start-pred (λ (q) (quad-ref q :fn-text-start))))
+                     #:footnote-leftover-proc (λ (ymax leftover-qs fn-qs)
+                                                (let loop ([ymax ymax][leftover-qs leftover-qs][fn-qs fn-qs])
+                                                  (define ydist (and (pair? fn-qs) (pt-y (size (car fn-qs)))))
+                                                  ;; take all fn lines that are not footnote-start?
+                                                  ;; and that fit within ymax remaining
+                                                  (if (and ydist (not (footnote-start? (car fn-qs))) (<= ydist ymax))
+                                                      (loop (- ymax ydist) (cons (car fn-qs) leftover-qs) (cdr fn-qs))
+                                                      (values ymax leftover-qs fn-qs))))
+                     #:footnote-new-proc (λ (ymax leftover-qs fn-qs fn-ref-q)
+                                           (define ydist-fn (and (pair? fn-qs)
+                                                              (footnote-start? (car fn-qs))
+                                                              (pt-y (size (car fn-qs)))))
+                                           (define ydist-ref (pt-y (size fn-ref-q)))
+                                           ;; only accept the footnote if both the first line of footnote
+                                           ;; and the line containing the ref will fit.
+                                           (if (and ydist-fn (<= (+ ydist-fn ydist-ref) ymax))
+                                               (values (- ymax ydist-fn) (cons (car fn-qs) leftover-qs) (cdr fn-qs))
+                                               (raise 'boom)))))
   (define reversed-fn-lines
     (from-parent (for/list ([fn-line (in-list (reverse fn-lines))])
                    ;; position bottom to top, in reverse
