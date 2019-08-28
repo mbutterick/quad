@@ -654,9 +654,9 @@
    (quad-update! q [from-parent (or where (quad-from q))])
    (cons q rest)])
 
-(define ((col-finish-wrap col-quad) lns q0 ending-q idx [fn-lines null])
-  (define reversed-fn-lines
-    (from-parent (for/list ([fn-line (in-list (reverse fn-lines))])
+(define ((col-finish-wrap col-quad) lns q0 ending-q idx [reversed-fn-lines null])
+  (define fn-lines
+    (from-parent (for/list ([fn-line (in-list reversed-fn-lines)])
                    ;; position bottom to top, in reverse
                    (quad-update! fn-line
                                  [from 'nw]
@@ -667,7 +667,7 @@
                       ;; move block attrs up, so they are visible in page wrap
                       [attrs (copy-block-attrs (quad-attrs line)
                                                (hash-copy (quad-attrs col-quad)))]
-                      [elems (append (from-parent (insert-blocks lns) 'nw) reversed-fn-lines)]))]
+                      [elems (append (from-parent (insert-blocks lns) 'nw) fn-lines)]))]
     [_ null]))
 
 #|
