@@ -1,5 +1,7 @@
 #lang quadwriter/markdown
 
+#:line-wrap "best"
+
 # Hyphenate
 
 A simple _hyphenation engine_ that uses the Knuth–Liang hyphenation algorithm originally developed for TeX.
