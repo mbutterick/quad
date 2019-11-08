@@ -659,8 +659,8 @@ TK: OT feature attributes, bullet attributes
 @defproc[
 (render-pdf
 [qx qexpr?]
-[pdf-path (or/c path? path-string? #false)]
-[base-dir (or/c path? path-string? (current-directory))]
+[pdf-path (or/c path? path-string? #false) #false]
+[base-dir (or/c path? path-string?) (current-directory)]
 [#:replace replace? any/c #true]
 [#:compress compress? any/c #true])
 (or/c void? bytes?)]{
