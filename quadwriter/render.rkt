@@ -32,10 +32,10 @@
     [(_ ALL-BREAKS-ID . TYPES)
      (with-syntax ([((TYPE-BREAK TYPE-STR Q:TYPE-BREAK) ...)
                     (for/list ([type (in-list (syntax->list #'TYPES))])
-                      (list
-                       (format-id #'TYPES "~a-break" type)
-                       (symbol->string (syntax->datum type))
-                       (format-id #'TYPES "q:~a-break" type)))])
+                              (list
+                               (format-id #'TYPES "~a-break" type)
+                               (symbol->string (syntax->datum type))
+                               (format-id #'TYPES "q:~a-break" type)))])
        #'(begin
            (define TYPE-BREAK '(q ((break TYPE-STR)))) ...
            (define ALL-BREAKS-ID (list (cons TYPE-BREAK Q:TYPE-BREAK) ...))))]))
@@ -54,21 +54,21 @@
   ;; do this before ->string-quad so that it can handle the sizing promises
   (apply append
          (for/list ([q (in-list qs)])
-           (cond 
-             [(and (quad-ref q :hyphenate) (pair? (quad-elems q)) (andmap string? (quad-elems q)))
-              (for*/list ([str (in-list (quad-elems q))]
-                          [hyphen-char (in-value #\u00AD)]
-                          [hstr (in-value (hyphenate str hyphen-char
-                                                     #:min-left-length 3
-                                                     #:min-right-length 3))]
-                          [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
-                (quad-copy q [elems (list substr)]))]
-             [else (list q)]))))
+                   (cond 
+                     [(and (quad-ref q :hyphenate) (pair? (quad-elems q)) (andmap string? (quad-elems q)))
+                      (for*/list ([str (in-list (quad-elems q))]
+                                  [hyphen-char (in-value #\u00AD)]
+                                  [hstr (in-value (hyphenate str hyphen-char
+                                                             #:min-left-length 3
+                                                             #:min-right-length 3))]
+                                  [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
+                                 (quad-copy q [elems (list substr)]))]
+                     [else (list q)]))))
 
 
 (define (string->feature-list str)
   (for/list ([kv (in-slice 2 (string-split str))])
-    (cons (string->bytes/utf-8 (first kv)) (string->number (second kv)))))
+            (cons (string->bytes/utf-8 (first kv)) (string->number (second kv)))))
 
 (define (parse-font-features! attrs)
   (match (hash-ref attrs :font-features-adjust #f)
@@ -88,22 +88,22 @@
 (define (parse-dimension-strings! attrs)
   (for ([k (in-hash-keys attrs)]
         #:when (takes-dimension-string? k))
-    (hash-update! attrs k parse-dimension))
+       (hash-update! attrs k parse-dimension))
   attrs)
 
 (define (downcase-values! attrs)
   (for ([k (in-hash-keys attrs)]
         #:unless (has-case-sensitive-value? k))
-    (hash-update! attrs k (λ (val) (match val
-                                     [(? string? str) (string-downcase str)]
-                                     [_ val]))))
+       (hash-update! attrs k (λ (val) (match val
+                                        [(? string? str) (string-downcase str)]
+                                        [_ val]))))
   attrs)
 
 (define (complete-every-path! attrs)
   ;; relies on `current-directory` being parameterized to source file's dir
   (for ([k (in-hash-keys attrs)]
         #:when (takes-path? k))
-    (hash-update! attrs k (compose1 path->string path->complete-path)))
+       (hash-update! attrs k (compose1 path->string path->complete-path)))
   attrs)
 
 (define (handle-cascading-attrs attrs)
@@ -114,7 +114,7 @@
                              resolve-font-size!
                              resolve-line-height!
                              parse-font-features!))])
-    (proc attrs)))
+       (proc attrs)))
 
 (define default-line-height-multiplier 1.42)
 (define (setup-qs qx-arg pdf-path)
@@ -196,17 +196,19 @@
                               'Author
                               'Subject
                               'Keywords))])
-    (hash-set! (pdf-info pdf) pdf-k (quad-ref (car qs) k "")))
+       (hash-set! (pdf-info pdf) pdf-k (quad-ref (car qs) k "")))
   (hash-set! (pdf-info pdf) 'Creator (format "Racket ~a (Quad library)" (version))))
 
 (define (footnote-flow? q) (equal? (quad-ref q 'flow) "footnote"))
 
-(define/contract (render-pdf qx-arg pdf-path-arg
+(define/contract (render-pdf qx-arg
+                             [pdf-path-arg #false]
                              [base-dir-arg #false]
                              #:replace [replace-existing-file? #t]
                              #:compress [compress? #t])
-  ((qexpr? (or/c #false path? path-string?))
+  ((qexpr?)
    ((or/c #false path? path-string?)
+    (or/c #false path? path-string?)
     #:replace any/c
     #:compress any/c) . ->* . (or/c void? bytes?))
 
@@ -311,16 +313,16 @@
     ;; correct lines with inner / outer alignment
     (for* ([(page page-idx) (in-indexed (for*/list ([section (in-list (quad-elems doc))]
                                                     [page (in-list (quad-elems section))])
-                                          page))]
+                                                   page))]
            [col (in-list (quad-elems page))]
            [block (in-list (quad-elems col))]
            [line (in-list (quad-elems block))])
-      ;; all inner / outer lines are initially filled as if they were right-aligned
-      (define zero-filler-side (if (odd? (add1 page-idx)) "inner" "outer"))
-      (when (equal? zero-filler-side (quad-ref line :line-align))
-        (match (quad-elems line)
-          [(cons (? filler-quad? fq) _) (set-quad-size! fq (pt 0 0))]
-          [_ (void)])))
+          ;; all inner / outer lines are initially filled as if they were right-aligned
+          (define zero-filler-side (if (odd? (add1 page-idx)) "inner" "outer"))
+          (when (equal? zero-filler-side (quad-ref line :line-align))
+            (match (quad-elems line)
+              [(cons (? filler-quad? fq) _) (set-quad-size! fq (pt 0 0))]
+              [_ (void)])))
     
     (define positioned-doc (time-log position (position doc)))
     (time-log draw (draw positioned-doc (current-pdf))))

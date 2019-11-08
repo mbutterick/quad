@@ -664,7 +664,7 @@ TK: OT feature attributes, bullet attributes
 [#:replace replace? any/c #true]
 [#:compress compress? any/c #true])
 (or/c void? bytes?)]{
-Compute the layout for @racket[qx] and render it as a PDF to @racket[pdf-path]. If @racket[pdf-path] is @racket[#false], then the rendered PDF is returned as a @tech[#:doc '(lib "scribblings/guide/guide.scrbl")]{byte string}. Otherwise it is written to @racket[pdf-path].
+Compute the layout for @racket[qx] and render it as a PDF to @racket[pdf-path]. If @racket[pdf-path] is @racket[#false], then the rendered PDF is returned as a @tech[#:doc '(lib "scribblings/guide/guide.scrbl")]{byte string}. Otherwise it is written to @racket[pdf-path]. The default is @racket[#false].
 
 The optional @racket[base-dir] argument sets a base directory for resolution of any relative path names passed as attribute values. The default is @racket[(current-directory)]. 
 
