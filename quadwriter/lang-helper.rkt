@@ -32,8 +32,8 @@
              [_ (loop kw-val-pairs)]))]
         ;; reverse in case of multiple values with same keyword, latest takes precedence (by becoming first)
         [else (reverse (for/list ([(kw val) (in-dict kw-val-pairs)])
-                         (list (string->symbol (string-trim (keyword->string kw) "#:"))
-                               (format "~a" val))))])))
+                                 (list (string->symbol (string-trim (keyword->string kw) "#:"))
+                                       (format "~a" val))))])))
   (strip-context
    (with-syntax ([PATH-STRING path-string]
                  [((ATTR-NAME ATTR-VAL) ...) kw-attrs]
@@ -56,40 +56,49 @@
               (provide DOC VIEW-OUTPUT)
               (define attrs (let ([h (make-hasheq)])
                               (for ([kvlist (in-list 'ATTRS)])
-                                (apply hash-set! h kvlist))
+                                   (apply hash-set! h kvlist))
                               h))
               (define pdf-path (hash-ref! attrs 'output-path (λ () (path-string->pdf-path-string 'PATH-STRING))))
               (define DOC `(q ,(for/list ([(k v) (in-hash attrs)])
-                                 (list k v))
+                                         (list k v))
                               ,(DOC-PROC (list . EXPRS))))
+
               (define (VIEW-OUTPUT)
-                (define open-string
-                  (case (system-type 'os)
-                    [(macosx) "open '~a'"]
-                    [(windows) "start '~a'"]
-                    [(unix) "xdg-open '~a' &> /dev/null"]
-                    [else (error "Unknown platform. Don't know how to view PDF.")]))
                 (when (file-exists? pdf-path)
+                  (define open-string
+                    (case (system-type 'os)
+                      [(macosx) "open '~a'"]
+                      [(windows) "start '~a'"]
+                      [(unix) "xdg-open '~a' &> /dev/null"]
+                      [else (error "Unknown platform. Don't know how to view PDF.")]))
                   (void (system (format open-string pdf-path)))))
-              (module+ main
+
+              (define (make-pdf [pdf-path #false])
                 (with-logging-to-port
-                    (current-output-port)
-                  (λ () (with-logging-to-port
-                            (current-output-port)
-                          (λ () (render-pdf DOC pdf-path PATH-STRING))
-                          #:logger quadwriter-logger
-                          'debug))
-                  #:logger quad-logger
-                  'debug))))]))))
+                 (current-output-port)
+                 (λ () (with-logging-to-port
+                        (current-output-port)
+                        (λ () (render-pdf DOC pdf-path PATH-STRING))
+                        #:logger quadwriter-logger
+                        'debug))
+                 #:logger quad-logger
+                 'debug))
+
+              (module+ pdf
+                (define pdf (make-pdf))
+                (provide pdf))
+              
+              (module+ main
+                (make-pdf pdf-path))))]))))
 
 (define (path-string->pdf-path-string path-string)
   (path->string
-  (match (format "~a" path-string)
-    ;; weird test but sometimes DrRacket calls the unsaved file
-    ;; 'unsaved-editor and sometimes "unsaved editor"
-    [(regexp #rx"unsaved.editor")
-     (build-path (find-system-path 'desk-dir) "untitled.pdf")]
-    [_ (path-replace-extension path-string #".pdf")])))
+   (match (format "~a" path-string)
+     ;; weird test but sometimes DrRacket calls the unsaved file
+     ;; 'unsaved-editor and sometimes "unsaved editor"
+     [(regexp #rx"unsaved.editor")
+      (build-path (find-system-path 'desk-dir) "untitled.pdf")]
+     [_ (path-replace-extension path-string #".pdf")])))
 
 (define quad-at-reader (make-at-reader
                         #:syntax? #t 
@@ -129,7 +138,7 @@
            (or
             (for/first ([pos (in-range line-start-pos line-end-pos)]
                         #:unless (char-blank? (send text get-character pos)))
-              pos)
+                       pos)
             line-start-pos))
          (- first-vis-pos line-start-pos))]      
       [else default])))
