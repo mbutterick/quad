@@ -26,8 +26,9 @@
   ;; this makes it possible to give font families generic names (e.g., "body-text")
   ;; and change the font files without disturbing anything else.
   (hash-clear! font-paths)
-  (define-values (dir path _) (split-path base-path))
-  (define doc-fonts-dir (build-path dir top-font-directory))
+  (define doc-fonts-dir (build-path (match/values (split-path base-path)
+                                                  [(base name #true) (build-path base name)]
+                                                  [(dir _ _) dir]) top-font-directory))
   ;; run doc-fonts-dir first because earlier fonts take precedence (using hash-ref! below)
   (for* ([fonts-dir (in-list (list doc-fonts-dir quadwriter-fonts-dir))]
          #:when (directory-exists? fonts-dir)
@@ -35,21 +36,21 @@
          #:when (directory-exists? font-family-subdir)
          [font-path (in-directory font-family-subdir)]
          #:when (member (path-get-extension font-path) font-file-extensions))
-    (match-define (list font-path-string family-name)
-      (for/list ([x (list font-path font-family-subdir)])
-        (path->string (find-relative-path fonts-dir x))))
-    (define path-parts (for/list ([part (in-list (explode-path (string->path (string-downcase font-path-string))))])
-                         (path->string part)))
-    (define key
-      (cons (string-downcase family-name)
-            (cond
-              [(member "bold-italic" path-parts) 'bi]
-              [(member "bold" path-parts) 'b]
-              [(member "italic" path-parts) 'i]
-              [else 'r])))
-    ;; only set value if there's not one there already.
-    ;; this means that we only use the first eligible font we find.
-    (hash-ref! font-paths key font-path)))
+        (match-define (list font-path-string family-name)
+          (for/list ([x (list font-path font-family-subdir)])
+                    (path->string (find-relative-path fonts-dir x))))
+        (define path-parts (for/list ([part (in-list (explode-path (string->path (string-downcase font-path-string))))])
+                                     (path->string part)))
+        (define key
+          (cons (string-downcase family-name)
+                (cond
+                  [(member "bold-italic" path-parts) 'bi]
+                  [(member "bold" path-parts) 'b]
+                  [(member "italic" path-parts) 'i]
+                  [else 'r])))
+        ;; only set value if there's not one there already.
+        ;; this means that we only use the first eligible font we find.
+        (hash-ref! font-paths key font-path)))
 
 (define (font-attrs->path font-family bold italic)
   ;; find the font-path corresponding to a certain family name and style.
