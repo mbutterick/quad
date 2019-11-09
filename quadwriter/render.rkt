@@ -117,7 +117,7 @@
        (proc attrs)))
 
 (define default-line-height-multiplier 1.42)
-(define (setup-qs qx-arg pdf-path)
+(define (setup-qs qx-arg base-dir)
   (define qexpr (decode qx-arg
                         #:string-proc (λ (str) (smart-ellipses (smart-dashes str)))
                         #:txexpr-proc smart-quotes))
@@ -127,7 +127,7 @@
                            :font-family default-font-family
                            :font-size (number->string default-font-size)
                            :line-height (number->string (floor (* default-line-height-multiplier default-font-size)))) super-qexpr)))
-  (setup-font-path-table! pdf-path)
+  (setup-font-path-table! base-dir)
   (define atomized-qs (atomize the-quad
                                #:attrs-proc handle-cascading-attrs
                                #:missing-glyph-action 'fallback
@@ -231,7 +231,7 @@
                  [current-directory base-dir]
                  [section-pages-used 0]
                  [verbose-quad-printing? #false])
-    (define qs (time-log setup-qs (setup-qs qx-arg pdf-path)))
+    (define qs (time-log setup-qs (setup-qs qx-arg base-dir)))
     (when (pair? qs)
       (setup-pdf-metadata! qs the-pdf))
     (define sections
