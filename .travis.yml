@@ -41,3 +41,5 @@ script:
  - travis_retry raco pkg install --deps search-auto https://github.com/mbutterick/pitfall.git
  - travis_retry raco pkg install --deps search-auto https://github.com/mbutterick/quad.git
  - raco test -p quad
+ - raco test -l ptest/all
+ - raco test -l qtest/all
