@@ -26,9 +26,11 @@
   ;; this makes it possible to give font families generic names (e.g., "body-text")
   ;; and change the font files without disturbing anything else.
   (hash-clear! font-paths)
-  (define doc-fonts-dir (build-path (match/values (split-path base-path)
-                                                  [(base name #true) (build-path base name)]
-                                                  [(dir _ _) dir]) top-font-directory))
+  (define doc-fonts-dir
+    (simple-form-path
+     (build-path (match/values (split-path base-path)
+                               [(base name #true) (build-path base name)]
+                               [(dir _ _) dir]) top-font-directory)))
   ;; run doc-fonts-dir first because earlier fonts take precedence (using hash-ref! below)
   (for* ([fonts-dir (in-list (list doc-fonts-dir quadwriter-fonts-dir))]
          #:when (directory-exists? fonts-dir)
