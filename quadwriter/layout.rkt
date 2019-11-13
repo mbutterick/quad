@@ -466,16 +466,17 @@
 (define (make-nobreak! q) (quad-set! q :no-colbr #true)) ; cooperates with col-wrap
 
 (define (do-keep-with-next! reversed-lines)
-  ;; paints nobreak onto spacers that follow keep-with-next lines
+  ;; paints nobreak onto the kwn line itself,
+  ;; and any line spacers that follow (could be one or more)
   ;; (we are iterating backward, so the geometrically previous ln follows the spacer)
-  (match reversed-lines
-    [(? null?) null]
-    [_ (for ([this-ln (in-list reversed-lines)]
-             [prev-ln (in-list (cdr reversed-lines))]
-             #:when (and (line-spacer-quad? this-ln)
-                         (quad-ref prev-ln :keep-with-next)))
-            (make-nobreak! this-ln)
-            (make-nobreak! prev-ln))]))
+  (define (is-kwn-line? ln) (quad-ref ln :keep-with-next))
+  (let loop ([lines (reverse reversed-lines)])
+    (unless (null? lines)
+      (match lines
+        [(list* (? is-kwn-line? kwn) (? line-spacer-quad? lsqs) ..1 rest)
+         (for-each make-nobreak! (cons kwn lsqs))
+         (loop rest)]
+        [(cons ln rest) (loop rest)]))))
 
 (define (apply-keeps lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x :display)) lines))
