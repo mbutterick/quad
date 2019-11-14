@@ -3,7 +3,7 @@ Quad [![Build Status](https://travis-ci.org/mbutterick/quad.svg?branch=master)](
 
 A work-in-progress document processor written in [Racket](http://racket-lang.org). 
 
-Create PDFs from a simple text-based source format. Use any TTF or OTF fonts you like.
+Create PDFs from a simple text-based source format. Use any TTF or OTF or WOFF fonts you like.
 
 Quad lets you avoid:
 
