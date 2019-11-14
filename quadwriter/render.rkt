@@ -197,7 +197,7 @@
                               'Subject
                               'Keywords))])
        (hash-set! (pdf-info pdf) pdf-k (quad-ref (car qs) k "")))
-  (hash-set! (pdf-info pdf) 'Creator (format "Racket ~a (Quad library)" (version))))
+  (hash-set! (pdf-info pdf) 'Creator (format "Racket ~a [Quad library]" (version))))
 
 (define (footnote-flow? q) (equal? (quad-ref q 'flow) "footnote"))
 
