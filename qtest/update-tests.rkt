@@ -6,4 +6,4 @@
   (define-values (dir name _) (split-path test-path))
   (displayln (path->string name))
   (time (parameterize ([quadwriter-test-mode #t])
-          (render-pdf (dynamic-require test-path 'doc) (test-pdf-name test-path) test-path #:compress #false))))
+          (render-pdf (dynamic-require test-path 'doc) (test-pdf-name test-path) test-path))))

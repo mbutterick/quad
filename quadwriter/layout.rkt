@@ -533,7 +533,7 @@
   (fill-color doc default-font-color)
   (text doc (format "~a · ~a at ~a" (quad-ref q :page-number 0)
                     (if (quadwriter-test-mode) "test" (quad-ref q :doc-title "untitled"))
-                    (date->string (if (quadwriter-test-mode) (seconds->date 0) (current-date)) #t))
+                    (date->string (if (quadwriter-test-mode) (seconds->date 0 #f) (current-date)) #t))
         x y))
 
 (define (make-footer-quad col-q page-idx path)
