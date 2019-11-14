@@ -10,6 +10,6 @@
   (displayln (path->string name))
   (check-pdfs-equal? (time (parameterize ([quadwriter-test-mode #t]
                                           [current-output-port (open-output-nowhere)])
-                             (render-pdf (dynamic-require test-path 'doc) pdf-path test-path)
+                             (render-pdf (dynamic-require test-path 'doc) pdf-path test-path #:compress #false)
                              pdf-path))
                      (test-pdf-name test-path)))
