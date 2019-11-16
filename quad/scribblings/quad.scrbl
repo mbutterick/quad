@@ -526,6 +526,8 @@ Columns per page. @racket[column-count] is a positive integer; @racket[column-ga
 
 A block is a paragraph or other rectangular item (say, a blockquote or code block) with paragraph breaks around it.
 
+@margin-note{Block-level attributes are ignored unless the quad is a block-level element. To explicitly promote a quad to a block-level element, use the @racket[display] attribute with value @racket["block"].}
+
 @deftogether[(@defthing[#:kind "attribute" inset-top symbol?]
               @defthing[#:kind "attribute" inset-bottom symbol?]
               @defthing[#:kind "attribute" inset-left symbol?]
@@ -609,6 +611,10 @@ Specify a quad with an image (either @racket{.png} or @racket{.jpeg}). @racket[i
 }
 
 @subsubsection{Other attributes}
+
+@defthing[#:kind "attribute" display symbol?]{
+Sets the display type. Value is a string. Supply @racket["block"] as a value of this attribute to make the quad behave as a block-level element.
+}
 
 @deftogether[(@defthing[#:kind "attribute" font-size symbol?]
               @defthing[#:kind "attribute" font-size-adjust symbol?])]{
