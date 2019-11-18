@@ -522,6 +522,11 @@ Side that first page appears on. Value is @racket["left"] or @racket["right"]. A
 Columns per page. @racket[column-count] is a positive integer; @racket[column-gap] (the space between columns) is a @tech{dimension string}.
 }
 
+@defthing[#:kind "attribute" footer-display symbol?]{
+Whether footer is displayed. Default is @racket["true"]. Footer is suppressed if this value is @racket["none"] or @racket["false"].
+}
+
+
 @subsubsection{Block-level attributes}
 
 A block is a paragraph or other rectangular item (say, a blockquote or code block) with paragraph breaks around it.
