@@ -31,9 +31,8 @@
   (define new-hash (make-hasheq))
   (for ([(k v) (in-hash dest-hash)])
     (hash-set! new-hash k v))
-  (for* ([k (in-list block-attrs)]
-         [v (in-value (hash-ref source-hash k #f))]
-         #:when v)
+  (for ([(k v) (in-hash source-hash)]
+        #:when (memq k block-attrs))
     (hash-set! new-hash k v))
   new-hash)
 
