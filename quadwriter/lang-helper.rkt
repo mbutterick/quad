@@ -1,6 +1,7 @@
 #lang debug racket/base
 (require (for-syntax racket/base)
          racket/match
+         racket/path
          racket/dict
          pollen/tag
          racket/system
@@ -98,7 +99,11 @@
      ;; 'unsaved-editor and sometimes "unsaved editor"
      [(regexp #rx"unsaved.editor")
       (build-path (find-system-path 'desk-dir) "untitled.pdf")]
-     [_ (path-replace-extension path-string #".pdf")])))
+     [_ (define path-without-ext (path-replace-extension path-string #""))
+        ;; do the right thing with pollen-style double extension like "foo.pdf.pm"
+        (if (path-has-extension? path-without-ext #".pdf")
+            path-without-ext
+            (path-add-extension path-without-ext #".pdf"))])))
 
 (define quad-at-reader (make-at-reader
                         #:syntax? #t 
