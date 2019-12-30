@@ -1,4 +1,4 @@
-f#lang scribble/manual
+#lang scribble/manual
 
 @(require racket/runtime-path scribble/example quadwriter pitfall/page pitfall/color racket/format (for-label txexpr (except-in pollen #%module-begin) xml racket/base racket/draw quadwriter)
 pollen/scribblings/mb-tools quad/pict)
