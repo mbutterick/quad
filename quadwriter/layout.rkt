@@ -733,9 +733,8 @@ https://github.com/mbutterick/typesetter/blob/882ec681ad1fa6eaee6287e53bc4320d96
 
 (define ((page-finish-wrap make-page-quad path) cols q0 q page-idx)
   (define page-quad (make-page-quad (+ (section-pages-used) page-idx)))
-  #R (quad-ref (car cols) :footer-text #true)
   (define elems
-    (match #R (quad-ref (car cols) :footer-display #true)
+    (match (quad-ref (car cols) :footer-display #true)
       [(or #false "none") (from-parent cols 'nw)]
       [_ (cons (make-footer-quad (car cols) page-idx path) (from-parent cols 'nw))]))
   (list (quad-copy page-quad
