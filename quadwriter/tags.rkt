@@ -97,7 +97,7 @@
 
 (define-syntax-rule (attr-list . attrs) 'attrs)
 
-(define (heading-base font-size attrs exprs)
+(define (heading-base font-size inset-top attrs exprs)
   (qexpr (append (list->attrs
                   :font-family "heading"
                   :first-line-indent "0"
@@ -107,14 +107,14 @@
                   :border-width-top "0.5"
                   :border-inset-top "9"
                   :inset-bottom "-3"
-                  :inset-top "6"
+                  :inset-top (number->string inset-top)
                   :keep-with-next "true") attrs) exprs))
 
 (define-tag-function (h1 attrs exprs)
-  (qexpr null (list page-break (heading-base 20 attrs exprs))))
+  (qexpr null (list page-break (heading-base 20 6 attrs exprs))))
 
-(define-tag-function (h2 attrs exprs) (heading-base 16 attrs exprs))
-(define-tag-function (h3 attrs exprs) (heading-base 14 attrs exprs))
+(define-tag-function (h2 attrs exprs) (heading-base 16 7 attrs exprs))
+(define-tag-function (h3 attrs exprs) (heading-base 14 8 attrs exprs))
 
 (define h4 h3)
 (define h5 h3)
