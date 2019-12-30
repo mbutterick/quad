@@ -531,15 +531,17 @@
   (font-size doc (* .8 default-font-size))
   (font doc (path->string (quad-ref q font-path-key default-font-face)))
   (fill-color doc default-font-color)
-  (text doc (format "~a · ~a at ~a" (quad-ref q :page-number 0)
+  (text doc (or (quad-ref q :footer-text)
+                (format "~a · ~a at ~a" (quad-ref q :page-number 0)
                     (if (quadwriter-test-mode) "test" (quad-ref q :doc-title "untitled"))
-                    (date->string (if (quadwriter-test-mode) (seconds->date 0 #f) (current-date)) #t))
+                    (date->string (if (quadwriter-test-mode) (seconds->date 0 #f) (current-date)) #t)))
         x y))
 
 (define (make-footer-quad col-q page-idx path)
   (define-values (dir name _) (split-path (path-replace-extension path #"")))
   (define attrs (let ([attrs (make-hasheq)])
                   (hash-set*! attrs
+                              :footer-text (quad-ref col-q :footer-text)
                               :page-number (+ (quad-ref col-q :page-number-start (add1 (section-pages-used))) (sub1 page-idx))
                               :doc-title (string-titlecase (path->string name))
                               :font-family "text")
@@ -731,8 +733,9 @@ https://github.com/mbutterick/typesetter/blob/882ec681ad1fa6eaee6287e53bc4320d96
 
 (define ((page-finish-wrap make-page-quad path) cols q0 q page-idx)
   (define page-quad (make-page-quad (+ (section-pages-used) page-idx)))
+  #R (quad-ref (car cols) :footer-text #true)
   (define elems
-    (match (quad-ref (car cols) :footer-display #true)
+    (match #R (quad-ref (car cols) :footer-display #true)
       [(or #false "none") (from-parent cols 'nw)]
       [_ (cons (make-footer-quad (car cols) page-idx path) (from-parent cols 'nw))]))
   (list (quad-copy page-quad

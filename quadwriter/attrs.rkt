@@ -174,6 +174,7 @@ Naming guidelines
                            page-margin-gutter
 
                            footer-display
+                           footer-text
 
                            fn-ref
                            fn-text

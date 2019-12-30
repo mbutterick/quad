@@ -1,4 +1,4 @@
-#lang scribble/manual
+f#lang scribble/manual
 
 @(require racket/runtime-path scribble/example quadwriter pitfall/page pitfall/color racket/format (for-label txexpr (except-in pollen #%module-begin) xml racket/base racket/draw quadwriter)
 pollen/scribblings/mb-tools quad/pict)
@@ -524,6 +524,10 @@ Columns per page. @racket[column-count] is a positive integer; @racket[column-ga
 
 @defthing[#:kind "attribute" footer-display symbol?]{
 Whether footer is displayed. Default is @racket["true"]. Footer is suppressed if this value is @racket["none"] or @racket["false"].
+}
+
+@defthing[#:kind "attribute" footer-text symbol?]{
+Text displayed in footer. Default is @racket["false"], which will lead to default text being used for the footer (= a combination of page number, document name, and time / date).
 }
 
 
