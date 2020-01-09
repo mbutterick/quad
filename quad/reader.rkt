@@ -1,4 +1,4 @@
-#lang racket/base
+#lang debug racket/base
 (provide (rename-out
           [quad-lang-read read]
           [quad-lang-read-syntax read-syntax]
@@ -9,11 +9,15 @@
   #:info qgi:get-info
   #:read my-read
   #:read-syntax my-read-syntax
+  #:whole-body-readers? #true
   (require (prefix-in qgi: quad/get-info) (prefix-in at: scribble/reader))
   (define (my-read ip) (syntax->datum (my-read-syntax ip)))
   (define (my-read-syntax src ip)
-    (parameterize ([current-readtable (at:make-at-readtable #:command-char #\◊)])
-      (read-syntax src ip))))
+    (define reader (at:make-at-reader 
+                    #:command-char #\◊
+                    #:syntax? #t 
+                    #:inside? #t))
+    (reader src ip)))
 
 (require debug/reader (prefix-in qr-mod: 'quad-reader))
 
