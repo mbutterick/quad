@@ -74,6 +74,7 @@ Naming guidelines
                font-bold
                font-tracking
                font-baseline-shift
+               font-case
                bg
                link
                href

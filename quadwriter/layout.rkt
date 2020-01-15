@@ -87,11 +87,11 @@
         [str
          (font-size pdf (quad-ref q :font-size default-font-size))
          (font pdf (path->string (quad-ref q font-path-key default-font-face)))
-         (define ft-value (quad-ref q :font-tracking 0))
+         (define tracking-val (quad-ref q :font-tracking 0))
          (match str
-           ["\u00AD" ft-value]
+           ["\u00AD" tracking-val]
            [_ (+ (string-width pdf str
-                               #:tracking ft-value
+                               #:tracking tracking-val
                                #:features (quad-ref q :font-features default-font-features)))])]
         [else 0]))
     (list string-size (quad-ref q :line-height default-line-height))))
@@ -148,13 +148,19 @@
   (and (line-break-quad? q) q))
 
 (define (do-string-quad q)
+  ;; need to handle casing here so that it's reflected in sizing ops
+  (define cased-str ((match (quad-ref q :font-case)
+                       [(or "upper" "uppercase") string-upcase]
+                       [(or "lower" "lowercase" "down" "downcase") string-downcase]
+                       [(or "title" "titlecase") string-titlecase]
+                       [_ values]) (unsafe-car (quad-elems q))))
   (struct-copy
    string-quad q:string
    [attrs #:parent quad (let ([attrs (quad-attrs q)])
                           (hash-ref! attrs :font-size default-font-size)
                           attrs)]
-   [elems #:parent quad (quad-elems q)]
-   [size #:parent quad (make-size-promise q)]))
+   [elems #:parent quad (list cased-str)]
+   [size #:parent quad (make-size-promise q cased-str)]))
 
 (define (generic->typed-quad q)
   (or
@@ -533,8 +539,8 @@
   (fill-color doc default-font-color)
   (text doc (or (quad-ref q :footer-text)
                 (format "~a · ~a at ~a" (quad-ref q :page-number 0)
-                    (if (quadwriter-test-mode) "test" (quad-ref q :doc-title "untitled"))
-                    (date->string (if (quadwriter-test-mode) (seconds->date 0 #f) (current-date)) #t)))
+                        (if (quadwriter-test-mode) "test" (quad-ref q :doc-title "untitled"))
+                        (date->string (if (quadwriter-test-mode) (seconds->date 0 #f) (current-date)) #t)))
         x y))
 
 (define (make-footer-quad col-q page-idx path)
