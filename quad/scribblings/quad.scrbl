@@ -662,8 +662,9 @@ Space between characters. Value is a @tech{dimension string}.
 Vertical offset of font baseline (positive values move the baseline up, negative down). Value is a @tech{dimension string}.
 }
 
-@defthing[#:kind "attribute" line-height symbol?]{
-Distance between baselines. Value is a @tech{dimension string}.
+@deftogether[(@defthing[#:kind "attribute" line-height symbol?]
+              @defthing[#:kind "attribute" line-height-adjust symbol?])]{
+Two ways of setting the distance between baselines. @racket[line-height] takes a @tech{dimension string}. @racket[line-height-adjust] takes a string representing a percentage (like @racket["120%"] or @racket["1.2"]) and sets the line height to the line height of the parent, multiplied by the percentage.
 }
 
 TK: OT feature attributes, bullet attributes
