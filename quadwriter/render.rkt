@@ -112,6 +112,7 @@
                              complete-every-path!
                              resolve-font-path!
                              resolve-font-size!
+                             resolve-font-tracking!
                              resolve-line-height!
                              parse-font-features!))])
        (proc attrs)))

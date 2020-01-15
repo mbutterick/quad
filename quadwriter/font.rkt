@@ -76,7 +76,10 @@
     (hash-set! attrs :font-path (font-attrs->path this-font-family this-bold this-italic))))
 
 (define (parse-percentage pstr)
-  (/ (string->number (string-trim pstr "%")) 100.0))
+  (and
+   (string? pstr)
+   (string-suffix? pstr "%")
+   (/ (string->number (string-trim pstr "%")) 100.0)))
 
 (define (adjuster-base attrs key adjustment-key default-value)
   (define this-val (hash-ref! attrs key default-value))
@@ -91,3 +94,10 @@
 
 (define (resolve-line-height! attrs)
   (adjuster-base attrs :line-height :line-height-adjust default-line-height))
+
+(define (resolve-font-tracking! attrs)
+  ;; if it's a percentage, we need to look at the font size.
+  ;; if it's anything else, we're done.
+  (match (parse-percentage (hash-ref attrs :font-tracking #false))
+    [#false (void)]
+    [pct (hash-set! attrs :font-tracking (* pct (hash-ref attrs :font-size)))]))

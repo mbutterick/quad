@@ -16,16 +16,17 @@
 (define (parse-dimension x)
   (match x
     [#false #false]
-    [(? number?) x]
-    [(? string? x)
-     (match (cdr (regexp-match #px"^(-?[0-9\\.]+)\\s*([a-z]+)$"  (string-downcase x)))
-       [(list num-string unit)
+    [(? number? num) num]
+    [(? string? str)
+     (match (regexp-match #px"^(-?[0-9\\.]+)\\s*([a-z]+)$"  (string-downcase str))
+       [#false str] ; a string other than a dimension string, so leave it
+       [(list _ num-string unit)
         ((match unit
            [(regexp #rx"(pt|point)(s)?$") values]
            [(regexp #rx"in(ch(es)?)?$") in->pts]
            [(regexp #rx"cm$") (compose1 in->pts cm->in)]
            [(regexp #rx"mm$") (compose1 in->pts cm->in mm->cm)]
-           [_ (raise-argument-error 'parse-dimension "dimension string" x)]) (string->number num-string))])]))
+           [_ (raise-argument-error 'parse-dimension "dimension string" str)]) (string->number num-string))])]))
 
 (define (copy-block-attrs source-hash dest-hash)
   (define new-hash (make-hasheq))
