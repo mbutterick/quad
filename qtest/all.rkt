@@ -4,6 +4,8 @@
          racket/runtime-path
          "paths-to-test.rkt")
 
+;; `racket -l qtest/all`
+
 (for ([test-path (in-list (test-paths))])
   (define pdf-path (path-replace-extension test-path #".pdf"))
   (define-values (dir name _) (split-path test-path))
