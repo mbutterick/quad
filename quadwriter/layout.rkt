@@ -152,7 +152,7 @@
   (define cased-str ((match (quad-ref q :font-case)
                        [(or "upper" "uppercase") string-upcase]
                        [(or "lower" "lowercase" "down" "downcase") string-downcase]
-                       [(or "title" "titlecase") string-titlecase]
+                       [(or "capitalize" "capitalized") string-titlecase]
                        [_ values]) (unsafe-car (quad-elems q))))
   (struct-copy
    string-quad q:string

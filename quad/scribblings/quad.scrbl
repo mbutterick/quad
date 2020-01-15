@@ -663,7 +663,7 @@ Vertical offset of font baseline (positive values move the baseline up, negative
 }
 
 @defthing[#:kind "attribute" font-case symbol?]{
-Case transformation of string. Possibilities are @racket["upper"], @racket["lower"], or @racket["title"].
+Case transformation of string. Possibilities are @racket["uppercase"], @racket["lowercase"], or @racket["capitalize"] (= first letter of each word is uppercase, the rest is lowercase).
 }
 
 @deftogether[(@defthing[#:kind "attribute" line-height symbol?]
