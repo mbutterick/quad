@@ -655,7 +655,7 @@ Two ways of setting OpenType layout features. @racket[font-features] takes a @de
  
 
 @defthing[#:kind "attribute" font-tracking symbol?]{
-Space between characters. Value is a @tech{dimension string}.
+Space between characters. Value is a @tech{dimension string} or a percentage (like @racket["12%"]), which is interpreted as a percentage of the font size.
 }
 
 @defthing[#:kind "attribute" font-baseline-shift symbol?]{
