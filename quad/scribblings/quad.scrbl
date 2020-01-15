@@ -627,7 +627,7 @@ Sets the display type. Value is a string. Supply @racket["block"] as a value of 
 
 @deftogether[(@defthing[#:kind "attribute" font-size symbol?]
               @defthing[#:kind "attribute" font-size-adjust symbol?])]{
-Two ways of setting the point size for text. @racket[font-size] takes a @tech{dimension string}. @racket[font-size-adjust] takes a string representing a percentage (like @racket["120%"] or @racket["1.2"]) and sets the font size to the size of the parent, multiplied by the percentage.
+Two ways of setting the point size for text. @racket[font-size] takes a @tech{dimension string}. @racket[font-size-adjust] takes a string representing a percentage (like @racket["120%"]) and sets the font size to the size of the parent, multiplied by the percentage.
 }
 
 @defthing[#:kind "attribute" font-family symbol?]{
@@ -664,7 +664,7 @@ Vertical offset of font baseline (positive values move the baseline up, negative
 
 @deftogether[(@defthing[#:kind "attribute" line-height symbol?]
               @defthing[#:kind "attribute" line-height-adjust symbol?])]{
-Two ways of setting the distance between baselines. @racket[line-height] takes a @tech{dimension string}. @racket[line-height-adjust] takes a string representing a percentage (like @racket["120%"] or @racket["1.2"]) and sets the line height to the line height of the parent, multiplied by the percentage.
+Two ways of setting the distance between baselines. @racket[line-height] takes a @tech{dimension string}. @racket[line-height-adjust] takes a string representing a percentage (like @racket["120%"]) and sets the line height to the line height of the parent, multiplied by the percentage.
 }
 
 TK: OT feature attributes, bullet attributes
