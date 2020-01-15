@@ -148,7 +148,7 @@
   (and (line-break-quad? q) q))
 
 (define (do-string-quad q)
-  ;; need to handle casing here so that it's reflected in sizing ops
+  ;; need to handle casing here so that it's reflected in subsequent sizing ops
   (define cased-str ((match (quad-ref q :font-case)
                        [(or "upper" "uppercase") string-upcase]
                        [(or "lower" "lowercase" "down" "downcase") string-downcase]
