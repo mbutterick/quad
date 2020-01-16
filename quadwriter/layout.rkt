@@ -149,17 +149,19 @@
 
 (define (do-string-quad q)
   ;; need to handle casing here so that it's reflected in subsequent sizing ops
-  (define cased-str ((match (quad-ref q :font-case)
-                       [(or "upper" "uppercase") string-upcase]
-                       [(or "lower" "lowercase" "down" "downcase") string-downcase]
-                       [(or "capitalize" "capitalized") string-titlecase]
-                       [_ values]) (unsafe-car (quad-elems q))))
+  (define cased-str (and
+                     (pair? (quad-elems q))
+                     ((match (quad-ref q :font-case)
+                        [(or "upper" "uppercase") string-upcase]
+                        [(or "lower" "lowercase" "down" "downcase") string-downcase]
+                        [(or "title" "titlecase") string-titlecase]
+                        [_ values]) (unsafe-car (quad-elems q)))))
   (struct-copy
    string-quad q:string
    [attrs #:parent quad (let ([attrs (quad-attrs q)])
                           (hash-ref! attrs :font-size default-font-size)
                           attrs)]
-   [elems #:parent quad (list cased-str)]
+   [elems #:parent quad (if cased-str (list cased-str) null)]
    [size #:parent quad (make-size-promise q cased-str)]))
 
 (define (generic->typed-quad q)
