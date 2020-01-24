@@ -223,7 +223,6 @@
                [size (pt line-wrap-size printable-height)]))
   (time-log page-wrap (page-wrap column-qs printable-width page-quad-prototype)))
 
-
 (define (make-sections qs)
   (for/fold ([sections-acc null]
              #:result (reverse sections-acc))
