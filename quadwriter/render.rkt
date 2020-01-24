@@ -117,6 +117,8 @@
                              parse-font-features!))])
        (proc attrs)))
 
+(define (drop-leading-breaks qs) (dropf qs line-break-quad?))
+
 (define default-line-height-multiplier 1.42)
 (define (setup-qs qx-arg base-dir)
   (define qexpr (decode qx-arg
@@ -136,7 +138,8 @@
                                #:emoji "fallback-emoji"
                                #:math "fallback-math"
                                #:font-path-resolver resolve-font-path!))
-  (define hyphenated-qs (time-log hyphenate (handle-hyphenate atomized-qs)))
+  (define trimmed-qs (drop-leading-breaks atomized-qs))
+  (define hyphenated-qs (time-log hyphenate (handle-hyphenate trimmed-qs)))
   (define typed-quads (map generic->typed-quad hyphenated-qs))
   (define indented-qs (insert-first-line-indents typed-quads))
   indented-qs)
