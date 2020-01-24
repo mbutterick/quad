@@ -746,9 +746,6 @@ https://github.com/mbutterick/typesetter/blob/882ec681ad1fa6eaee6287e53bc4320d96
 
 (define ((page-wrap-finish make-page-quad path) cols q0 q page-idx)
   (define page-quad (make-page-quad (+ (section-pages-used) page-idx)))
-  #R page-idx
-  #R q0
-  #R q
   (define elems
     (append
      (match (and (pair? cols) (quad-ref (car cols) :footer-display #true))
@@ -757,9 +754,11 @@ https://github.com/mbutterick/typesetter/blob/882ec681ad1fa6eaee6287e53bc4320d96
      (from-parent cols 'nw)))
   (list (quad-copy page-quad
                    [elems elems]
-                   [attrs (copy-block-attrs (if (pair? cols)
-                                                (quad-attrs (car cols))
-                                                (hash))
+                   [attrs (copy-block-attrs (cond
+                                              ;; get attrs from cols if we can,
+                                              ;; otherwise try q or q0
+                                              [(or (and (pair? cols) (car cols)) q q0) => quad-attrs]
+                                              [else (hash)])
                                             (hash-copy (quad-attrs page-quad)))])))
 
 (define (page-wrap qs width [make-page-quad (λ (x) q:page)])
