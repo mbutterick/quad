@@ -366,7 +366,7 @@
 (define (make-hr-quad line-q)
   (quad-copy line-q [draw-start hr-draw]))
 
-(define ((finish-line-wrap line-q) pcs-in opening-q ending-q idx)
+(define ((line-wrap-finish line-q) pcs-in opening-q ending-q idx)
   ;; we curry line-q so that the wrap size can be communicated to this operation
   ;; remove unused soft hyphens so they don't affect final shaping
   (define pcs-printing (for/list ([pc (in-list pcs-in)]
@@ -436,7 +436,7 @@
             [_ null])
           new-lines
           (match ending-q
-            [(? page-break-quad? page-break) (list page-break)] ; hard page break
+            [(? column-break-quad? column-break) (list column-break)] ; hard column (or section or page) break
             [#false (list (make-paragraph-spacer maybe-first-line :space-after (* default-line-height 0.6)))] ; paragraph break
             [_ null]))) ; hard line break
                        
@@ -469,7 +469,7 @@
                                        [_ #false])
                             #:hard-break line-break-quad?
                             #:soft-break soft-break-for-line?
-                            #:finish-wrap (finish-line-wrap line-q))))]))
+                            #:finish-wrap (line-wrap-finish line-q))))]))
 
 (define (make-nobreak! q) (quad-set! q :no-colbr #true)) ; cooperates with col-wrap
 
@@ -670,21 +670,26 @@
    (quad-update! q [from-parent (or where (quad-from q))])
    (cons q rest)])
 
-(define ((col-finish-wrap col-quad) lns q0 ending-q idx [reversed-fn-lines null])
+(define ((column-wrap-finish col-quad) lns q0 ending-q idx [reversed-fn-lines null])
   (define fn-lines
     (from-parent (for/list ([fn-line (in-list reversed-fn-lines)])
                            ;; position bottom to top, in reverse
                            (quad-update! fn-line
                                          [from 'nw]
                                          [to 'sw])) 'sw))
-  (match lns
-    [(cons line _)
-     (list (quad-copy col-quad
-                      ;; move block attrs up, so they are visible in page wrap
-                      [attrs (copy-block-attrs (quad-attrs line)
-                                               (hash-copy (quad-attrs col-quad)))]
-                      [elems (append (from-parent (insert-blocks lns) 'nw) fn-lines)]))]
-    [_ null]))
+
+  (append
+   (match lns
+     [(cons line _)
+      (list (quad-copy col-quad
+                       ;; move block attrs up, so they are visible in page wrap
+                       [attrs (copy-block-attrs (quad-attrs line)
+                                                (hash-copy (quad-attrs col-quad)))]
+                       [elems (append (from-parent (insert-blocks lns) 'nw) fn-lines)]))]
+     [_ null])
+   (match ending-q
+     [(? page-break-quad? page-break) (list page-break)] ; hard page (or section) break
+     [_ null])))
 
 #|
 constraint wrapping example
@@ -708,7 +713,7 @@ https://github.com/mbutterick/typesetter/blob/882ec681ad1fa6eaee6287e53bc4320d96
                      #:distance (λ (q dist-so-far wrap-qs)
                                   ;; do trial block insertions
                                   (sum-y (insert-blocks (reverse wrap-qs))))                     
-                     #:finish-wrap (col-finish-wrap column-quad)
+                     #:finish-wrap (column-wrap-finish column-quad)
                      #:footnote-qs fn-lines
                      #:footnote-leftover-proc (λ (ymax leftover-qs fn-qs)
                                                 (let loop ([ymax ymax][leftover-qs leftover-qs][fn-qs fn-qs])
@@ -739,18 +744,25 @@ https://github.com/mbutterick/typesetter/blob/882ec681ad1fa6eaee6287e53bc4320d96
   (define col-spacer (quad-copy q:column-spacer [size (pt column-gap (and 'arbitrary-irrelevant-value 100))]))
   (add-between cols col-spacer))
 
-(define ((page-finish-wrap make-page-quad path) cols q0 q page-idx)
+(define ((page-wrap-finish make-page-quad path) cols q0 q page-idx)
   (define page-quad (make-page-quad (+ (section-pages-used) page-idx)))
+  #R page-idx
+  #R q0
+  #R q
   (define elems
-    (match (quad-ref (car cols) :footer-display #true)
-      [(or #false "none") (from-parent cols 'nw)]
-      [_ (cons (make-footer-quad (car cols) page-idx path) (from-parent cols 'nw))]))
+    (append
+     (match (and (pair? cols) (quad-ref (car cols) :footer-display #true))
+       [(or #false "none") null]
+       [_ (list (make-footer-quad (car cols) page-idx path))])
+     (from-parent cols 'nw)))
   (list (quad-copy page-quad
                    [elems elems]
-                   [attrs (copy-block-attrs (quad-attrs (car cols))
+                   [attrs (copy-block-attrs (if (pair? cols)
+                                                (quad-attrs (car cols))
+                                                (hash))
                                             (hash-copy (quad-attrs page-quad)))])))
 
-(define (page-wrap qs width [make-page-quad (λ _ q:page)])
+(define (page-wrap qs width [make-page-quad (λ (x) q:page)])
   (unless (positive? width)
     (raise-argument-error 'page-wrap "positive number" width))
   (wrap qs width
@@ -758,7 +770,7 @@ https://github.com/mbutterick/typesetter/blob/882ec681ad1fa6eaee6287e53bc4320d96
         #:hard-break page-break-quad?
         #:no-break (λ (q) (quad-ref q :no-pbr))
         #:distance (λ (q dist-so-far wrap-qs) (sum-x wrap-qs))
-        #:finish-wrap (page-finish-wrap make-page-quad (pdf-output-path (current-pdf)))))
+        #:finish-wrap (page-wrap-finish make-page-quad (pdf-output-path (current-pdf)))))
 
 (define (insert-blocks lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x :display)) lines))
