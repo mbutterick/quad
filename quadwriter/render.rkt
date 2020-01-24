@@ -213,10 +213,14 @@
     #:replace any/c
     #:compress any/c) . ->* . (or/c void? bytes?))
 
-  (define base-dir (match base-dir-arg
-                     [#false (current-directory)]
-                     [path (define-values (dir name _) (split-path path))
-                           dir]))
+  (match-define-values (base-dir _ _) (split-path
+                                       (match base-dir-arg
+                                         [#false (current-directory)]
+                                         ;; for reasons unclear, DrRacket sometimes sneaks
+                                         ;; an "unsaved editor" into this arg, despite efforts to prevent
+                                         ;; probably 
+                                         ["unsaved editor" pdf-path-arg]
+                                         [path path])))
 
   (define pdf-path (setup-pdf-path pdf-path-arg))
   (unless replace-existing-file?

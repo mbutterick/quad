@@ -74,19 +74,19 @@
                       [else (error "Unknown platform. Don't know how to view PDF.")]))
                   (void (system (format open-string pdf-path)))))
 
-              (define (make-pdf [pdf-path #false])
+              (define (make-pdf [the-pdf-path #false])
                 (with-logging-to-port
                  (current-output-port)
                  (λ () (with-logging-to-port
                         (current-output-port)
-                        (λ () (render-pdf DOC pdf-path))
+                        (λ () (render-pdf DOC the-pdf-path))
                         #:logger quadwriter-logger
                         'debug))
                  #:logger quad-logger
                  'debug))
 
               (module+ pdf
-                (define pdf (make-pdf))
+                (define pdf (make-pdf pdf-path))
                 (provide pdf))
               
               (module+ main
