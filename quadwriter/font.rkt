@@ -20,6 +20,8 @@
 (define font-file-extensions '(#".otf" #".ttf" #".woff"))
 
 (define (setup-font-path-table! base-path)
+  ;; create a table of font paths that we can use to resolve references to font names.
+  
   ;; rules for font naming
   ;; "fonts" subdirectory on top
   ;; family directories inside: each named with font family name
@@ -69,6 +71,9 @@
     [else default-font-face]))
 
 (define (resolve-font-path! attrs)
+  ;; convert references to a font family and style to an font path on disk
+  ;; we trust it exists because we used `setup-font-path-table!` earlier,
+  ;; but if not, fallback fonts will kick in, on the idea that a missing font shouldn't stop the show
   (define this-font-family (hash-ref! attrs :font-family default-font-family))
   (unless (complete-path? this-font-family)
     (define this-bold (hash-ref! attrs :font-bold #false))
@@ -82,6 +87,10 @@
    (/ (string->number (string-trim pstr "%")) 100.0)))
 
 (define (adjuster-base attrs key adjustment-key default-value)
+  ;; font size and line height use this helper.
+  ;; because they both can be specified directly,
+  ;; or as an "adjustment" to the parent value, in which case
+  ;; we get the parent value and perform the adjustment.
   (define this-val (hash-ref! attrs key default-value))
   (define this-val-adjust (parse-percentage (hash-ref! attrs adjustment-key "100%")))
   ;; we bake the adjustment into the val...
@@ -90,9 +99,11 @@
   (hash-set! attrs adjustment-key "100%"))
 
 (define (resolve-font-size! attrs)
+  ;; convert font-size attributes into a simple font size
   (adjuster-base attrs :font-size :font-size-adjust default-font-size))
 
 (define (resolve-line-height! attrs)
+  ;; convert line-height attributes into a simple line height
   (adjuster-base attrs :line-height :line-height-adjust default-line-height))
 
 (define (resolve-font-tracking! attrs)

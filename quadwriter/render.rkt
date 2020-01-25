@@ -23,8 +23,16 @@
 
 
 (define (setup-pdf-path pdf-path-arg)
-  (define fallback-path (build-path (find-system-path 'temp-dir) "quadwriter-temp.pdf"))
-  (path->complete-path (simplify-path (expand-user-path (->path (or pdf-path-arg fallback-path))))))
+  ;; convert pathlike arg into nice complete path.
+  (path->complete-path
+   (simplify-path
+    (expand-user-path
+     (->path
+      (match pdf-path-arg
+        ;; a #false arg signals that we're going to return the bytes directly,
+        ;; so we use a temp path to write the file, and we'll delete it later.
+        [#false (build-path (find-system-path 'temp-dir) "quadwriter-temp.pdf")]
+        [path path]))))))
 
 
 (define-syntax (define-break-types stx)
@@ -43,6 +51,11 @@
 (define-break-types all-breaks para line page column hr section)
 
 (define (replace-breaks x)
+  ;; replaces Q-expressions representing breaks
+  ;; with special typed quads representing breaks.
+  ;; Because typed quads have their own predicates,
+  ;; it's faster to find them in wrapping operations
+  ;; (instead of, say, using `equal?`)
   (map-elements (λ (el)
                   (cond
                     [(assoc el all-breaks) => cdr]
@@ -71,14 +84,16 @@
             (cons (string->bytes/utf-8 (first kv)) (string->number (second kv)))))
 
 (define (parse-font-features! attrs)
-  (match (hash-ref attrs :font-features-adjust #f)
+  ;; `font-features` are OpenType font feature specifiers.
+  (match (hash-ref attrs :font-features-adjust #false)
     [(? string? str)
-     ;; override any existing features
+     ;; adjustment: parse the feature string and append to the current feature set
      (define parsed-features (string->feature-list str))
      (hash-update! attrs :font-features (λ (fs) (remove-duplicates (append parsed-features fs) equal? #:key car)))
-     ;; adjustment is incorporated, so delete it
+     ;; once adjustment is incorporated, delete it
      (hash-set! attrs :font-features-adjust #false)]
-    [_ (match (hash-ref attrs :font-features #f)
+    [_ (match (hash-ref attrs :font-features #false)
+         ;; override: parse features & replace current set
          [(? string? str)
           (define parsed-features (string->feature-list str))
           (hash-set! attrs :font-features parsed-features)]
@@ -86,12 +101,16 @@
 
 
 (define (parse-dimension-strings! attrs)
+  ;; certain attributes can be "dimension strings", which are strings like "3in" or "4.2cm"
+  ;; we parse them into the equivalent measurement in points.
   (for ([k (in-hash-keys attrs)]
         #:when (takes-dimension-string? k))
        (hash-update! attrs k parse-dimension))
   attrs)
 
 (define (downcase-values! attrs)
+  ;; make attribute values lowercase, unless they're case-sensitive
+  ;; so we can check them more easily later.
   (for ([k (in-hash-keys attrs)]
         #:unless (has-case-sensitive-value? k))
        (hash-update! attrs k (λ (val) (match val
@@ -100,6 +119,8 @@
   attrs)
 
 (define (complete-every-path! attrs)
+  ;; convert every pathlike thing to a complete path,
+  ;; so we don't get tripped up later by relative paths
   ;; relies on `current-directory` being parameterized to source file's dir
   (for ([k (in-hash-keys attrs)]
         #:when (takes-path? k))
@@ -107,6 +128,7 @@
   attrs)
 
 (define (handle-cascading-attrs attrs)
+  ;; various housekeeping on attributes as they are propagated downward during atomization.
   (for ([proc (in-list (list downcase-values!
                              parse-dimension-strings!
                              complete-every-path!
@@ -117,14 +139,26 @@
                              parse-font-features!))])
        (proc attrs)))
 
-(define (drop-leading-breaks qs) (dropf qs line-break-quad?))
+(define (drop-leading-breaks qs)
+  ;; any leading breaks are pointless at the start of the doc, so drop them.
+  ;; How would we get these?
+  ;; we might, for instance, have a first-level heading style that is specified with page break before.
+  ;; so if we invoke that style first, we will get a page break.
+  (dropf qs break-quad?))
 
 (define default-line-height-multiplier 1.42)
 (define (setup-qs qx-arg base-dir)
+  ;; convert our input Q-expression into a useful form.
+
+  ;; some typographic niceties
   (define qexpr (decode qx-arg
-                        #:string-proc (λ (str) (smart-ellipses (smart-dashes str)))
+                        #:string-proc (compose1 smart-ellipses smart-dashes)
                         #:txexpr-proc smart-quotes))
   (define super-qexpr (replace-breaks qexpr))
+
+  ;; apply some default styling attributes.
+  ;; These will only be used if the underlying q-expression hasn't specified its own values,
+  ;; which will naturally override these.
   (define the-quad
     (qexpr->quad (list 'q (list->attrs
                            :font-family default-font-family
@@ -317,6 +351,13 @@
   ((qexpr?) ((or/c #false path? path-string?)
              (or/c #false path? path-string?)
              #:replace any/c #:compress any/c) . ->* . (or/c void? bytes?))
+  
+  ;; The principal public interface to rendering.
+  ;; `qx-arg` is the Q-expression to be rendered.
+  ;; `pdf-path-arg` is the destination of the generated PDF.
+  ;; #false signals that we should return the PDF bytes rather than saving.
+  ;; `base-dir-arg` is the starting point for resolving any relative pathnames,
+  ;; and looking for fonts and other assets.
 
   (match-define-values (base-dir _ _) (split-path
                                        (match base-dir-arg
@@ -327,17 +368,25 @@
                                          ["unsaved editor" pdf-path-arg]
                                          [path path])))
 
+  (unless (directory-exists? base-dir)
+    (raise-argument-error 'render-pdf "existing directory" base-dir))
+  
   (define pdf-path (setup-pdf-path pdf-path-arg))
   (unless replace-existing-file?
     (when (file-exists? pdf-path)
       (raise-argument-error 'render-pdf "path that doesn't exist" pdf-path)))
-  
+
+  ;; `make-pdf` creates a PDF data structure using the pitfall library.
+  ;; this structure provides some services as we lay out the document,
+  ;; and then when we render, we'll rely on pitfall's PDF-drawing routines.
   (parameterize ([current-pdf (make-pdf #:compress compress?
                                         #:auto-first-page #false
                                         #:output-path pdf-path)]
                  ;; set `current-directory` so that ops like `path->complete-path`
                  ;; will be handled relative to the original directory
                  [current-directory base-dir]
+                 ;; a lot of operations need to look at pages used so it's easier to
+                 ;; make it a parameter than endlessly pass it around as an argument.
                  [section-pages-used 0]
                  [verbose-quad-printing? #false])
     (define qs (time-log setup-qs (setup-qs qx-arg base-dir)))
