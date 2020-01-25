@@ -144,8 +144,8 @@
                                  h)]
           [size #:parent quad (pt layout-width layout-height)]))))
 
-(define (maybe-convert-line-break-quad q)
-  (and (line-break-quad? q) q))
+(define (maybe-convert-break-quad q)
+  (and (break-quad? q) q))
 
 (define (do-string-quad q)
   ;; need to handle casing here so that it's reflected in subsequent sizing ops
@@ -166,7 +166,7 @@
 
 (define (generic->typed-quad q)
   (or
-   (maybe-convert-line-break-quad q)
+   (maybe-convert-break-quad q)
    (maybe-convert-draw-quad q)
    (maybe-convert-image-quad q)
    (do-string-quad q)))
@@ -190,7 +190,9 @@
     (restore doc)))
 
 
-(define-quad line-break-quad quad)
+(define-quad break-quad quad)
+
+(define-quad line-break-quad break-quad)
 (define q:line-break (make-line-break-quad #:printable #f
                                            #:id 'line-break))
 (define-quad para-break-quad line-break-quad)
