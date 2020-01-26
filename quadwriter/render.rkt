@@ -195,17 +195,18 @@
   (or (debug-column-gap)  (quad-ref (car qs) :column-gap default-column-gap)))
 
 (define (setup-pdf-metadata! qs pdf)
-  (define kvs
-    (apply append
-           (for/list ([(k pdf-k) (in-dict (list (cons :pdf-title 'Title)
-                                                (cons :pdf-author 'Author)
-                                                (cons :pdf-subject 'Subject)
-                                                (cons :pdf-keywords 'Keywords)))])
-             (define str (or (match qs
-                               [(cons q _) (quad-ref q k)]
-                               [_ #false]) "")) ; default val is empty string
-             (list pdf-k str)))) 
-  (apply hash-set*! (pdf-info pdf) 'Creator (format "Racket ~a [Quad library]" (version)) kvs))
+  (define kv-dict
+    (cons
+     (cons 'Creator (format "Racket ~a [Quad library]" (version)))
+     (for*/list ([(k pdf-k) (in-dict (list (cons :pdf-title 'Title)
+                                           (cons :pdf-author 'Author)
+                                           (cons :pdf-subject 'Subject)
+                                           (cons :pdf-keywords 'Keywords)))]
+                 [str (in-value (and (pair? qs) (quad-ref (car qs) k)))]
+                 #:when str)
+       (cons pdf-k str))))
+  (for ([(k v) (in-dict kv-dict)])
+    (hash-set! (pdf-info pdf) k v)))
 
 (define (footnote-flow? q) (equal? (quad-ref q 'flow) "footnote"))
 
