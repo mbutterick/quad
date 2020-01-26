@@ -1,5 +1,6 @@
 #lang debug racket/base
-(require racket/promise
+(require (for-syntax racket/base racket/syntax)
+         racket/promise
          racket/match
          racket/list
          sugar/list
@@ -13,6 +14,29 @@
          "font.rkt"
          "log.rkt")
 (provide (all-defined-out))
+
+
+(define-quad break-quad quad)
+
+(define-quad line-break-quad break-quad)
+(define q:line-break (make-line-break-quad #:printable #f
+                                           #:id 'line-break))
+(define-quad para-break-quad line-break-quad)
+(define q:para-break (make-para-break-quad #:printable #f
+                                           #:id 'para-break))
+(define-quad hr-break-quad line-break-quad)
+(define q:hr-break (make-hr-break-quad #:printable #t
+                                       #:id 'hr-break))
+(define-quad column-break-quad line-break-quad)
+(define q:column-break (make-column-break-quad #:printable #f
+                                               #:id 'column-break))
+(define-quad page-break-quad column-break-quad)
+(define q:page-break (make-page-break-quad #:printable #f
+                                           #:id 'page-break))
+
+(define-quad section-break-quad page-break-quad)
+(define q:section-break (make-section-break-quad #:printable #f
+                                                 #:id 'section-break))
 
 (define-quad string-quad quad)
  
@@ -96,6 +120,31 @@
         [else 0]))
     (list string-size (quad-ref q :line-height default-line-height))))
 
+(define-syntax (define-break-types stx)
+  (syntax-case stx ()
+    [(_ ALL-BREAKS-ID . TYPES)
+     (with-syntax ([((TYPE-BREAK TYPE-STR Q:TYPE-BREAK) ...)
+                    (for/list ([type (in-list (syntax->list #'TYPES))])
+                              (list
+                               (format-id #'TYPES "~a-break" type)
+                               (symbol->string (syntax->datum type))
+                               (format-id #'TYPES "q:~a-break" type)))])
+       #'(begin
+           (define TYPE-BREAK '(q ((break TYPE-STR)))) ...
+           (define ALL-BREAKS-ID (list (cons TYPE-BREAK Q:TYPE-BREAK) ...))))]))
+
+(define-break-types all-breaks para line page column hr section)
+
+(define (convert-break-quad x)
+  ;; replaces Q-expressions representing breaks
+  ;; with special typed quads representing breaks.
+  ;; Because typed quads have their own predicates,
+  ;; it's faster to find them in wrapping operations
+  ;; (instead of, say, using `equal?`)
+  (cond
+    [(assoc x all-breaks) => cdr]
+    [else x]))
+
 (define (convert-draw-quad q)
   (quad-update! q
                 [draw (λ (q doc)
@@ -160,6 +209,7 @@
 (define (generic->typed-quad q)
   (cond
     [(break-quad? q) q]
+    [(quad-ref q :break) (convert-break-quad q)]
     [(quad-ref q :draw) (convert-draw-quad q)]
     [(quad-ref q :image-file) (convert-image-quad q)]
     [else (do-string-quad q)]))
@@ -182,27 +232,6 @@
     (restore doc)))
 
 
-(define-quad break-quad quad)
-
-(define-quad line-break-quad break-quad)
-(define q:line-break (make-line-break-quad #:printable #f
-                                           #:id 'line-break))
-(define-quad para-break-quad line-break-quad)
-(define q:para-break (make-para-break-quad #:printable #f
-                                           #:id 'para-break))
-(define-quad hr-break-quad line-break-quad)
-(define q:hr-break (make-hr-break-quad #:printable #t
-                                       #:id 'hr-break))
-(define-quad column-break-quad line-break-quad)
-(define q:column-break (make-column-break-quad #:printable #f
-                                               #:id 'column-break))
-(define-quad page-break-quad column-break-quad)
-(define q:page-break (make-page-break-quad #:printable #f
-                                           #:id 'page-break))
-
-(define-quad section-break-quad page-break-quad)
-(define q:section-break (make-section-break-quad #:printable #f
-                                                 #:id 'section-break))
 
 (define q:line (q #:size (pt 0 default-line-height)
                   #:from 'sw

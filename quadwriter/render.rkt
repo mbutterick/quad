@@ -35,21 +35,6 @@
         [path path]))))))
 
 
-(define-syntax (define-break-types stx)
-  (syntax-case stx ()
-    [(_ ALL-BREAKS-ID . TYPES)
-     (with-syntax ([((TYPE-BREAK TYPE-STR Q:TYPE-BREAK) ...)
-                    (for/list ([type (in-list (syntax->list #'TYPES))])
-                              (list
-                               (format-id #'TYPES "~a-break" type)
-                               (symbol->string (syntax->datum type))
-                               (format-id #'TYPES "q:~a-break" type)))])
-       #'(begin
-           (define TYPE-BREAK '(q ((break TYPE-STR)))) ...
-           (define ALL-BREAKS-ID (list (cons TYPE-BREAK Q:TYPE-BREAK) ...))))]))
-
-(define-break-types all-breaks para line page column hr section)
-
 (define (replace-breaks x)
   ;; replaces Q-expressions representing breaks
   ;; with special typed quads representing breaks.
