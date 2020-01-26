@@ -149,18 +149,18 @@
                            :font-size (number->string default-font-size)
                            :line-height (number->string (floor (* default-line-height-multiplier default-font-size)))) qexpr)))
   (setup-font-path-table! base-dir)
-  (define atomized-qs (atomize the-quad
-                               #:attrs-proc handle-cascading-attrs
-                               #:missing-glyph-action 'fallback
-                               #:fallback "fallback"
-                               #:emoji "fallback-emoji"
-                               #:math "fallback-math"
-                               #:font-path-resolver resolve-font-path!))
-  (define hyphenated-qs (time-log hyphenate (handle-hyphenate atomized-qs)))
-  (define typed-quads (map generic->typed-quad hyphenated-qs))
-  (define trimmed-qs (drop-leading-breaks typed-quads))
-  (define indented-qs (insert-first-line-indents trimmed-qs))
-  indented-qs)
+  (let* ([qs (atomize the-quad
+                      #:attrs-proc handle-cascading-attrs
+                      #:missing-glyph-action 'fallback
+                      #:fallback "fallback"
+                      #:emoji "fallback-emoji"
+                      #:math "fallback-math"
+                      #:font-path-resolver resolve-font-path!)]
+         [qs (time-log hyphenate (handle-hyphenate qs))]
+         [qs (map generic->typed-quad qs)]
+         [qs (drop-leading-breaks qs)]
+         [qs (insert-first-line-indents qs)])
+    qs))
 
 (define (setup-margins qs page-width page-height)
   ;; if only left or right margin is provided, copy other value in preference to default margin

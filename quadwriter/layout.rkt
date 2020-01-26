@@ -123,15 +123,16 @@
 (define-syntax (define-break-types stx)
   (syntax-case stx ()
     [(_ ALL-BREAKS-ID . TYPES)
-     (with-syntax ([((TYPE-BREAK TYPE-STR Q:TYPE-BREAK) ...)
+     (with-syntax ([((TYPE-BREAK TYPE-STR Q:TYPE-BREAK BREAK-TYPE) ...)
                     (for/list ([type (in-list (syntax->list #'TYPES))])
                               (list
                                (format-id #'TYPES "~a-break" type)
                                (symbol->string (syntax->datum type))
-                               (format-id #'TYPES "q:~a-break" type)))])
+                               (format-id #'TYPES "q:~a-break" type)
+                               (format-id #'TYPES "~a-break-quad" type)))])
        #'(begin
            (define TYPE-BREAK '(q ((break TYPE-STR)))) ...
-           (define ALL-BREAKS-ID (list (cons TYPE-STR Q:TYPE-BREAK) ...))))]))
+           (define ALL-BREAKS-ID (list (cons TYPE-STR BREAK-TYPE) ...))))]))
 
 (define-break-types all-breaks para line page column hr section)
 
@@ -141,9 +142,13 @@
   ;; Because typed quads have their own predicates,
   ;; it's faster to find them in wrapping operations
   ;; (instead of, say, using `equal?`)
-  (cond
-    [(assoc (quad-ref q :break) all-breaks) => cdr]
-    [else q]))
+  (match (assoc (quad-ref q :break) all-breaks)
+    [#false q]
+    [(cons _ break-quad-type) (make-quad #:type break-quad-type
+                                         #:attrs (quad-attrs q))]))
+
+(module+ test
+  (check-equal? (quad-ref (convert-break-quad (qexpr->quad '(q ((break "page") (foo "bar"))))) 'foo) "bar"))
 
 (define (convert-draw-quad q)
   (quad-update! q
@@ -189,7 +194,7 @@
                           h)]
    [size #:parent quad (pt layout-width layout-height)]))
 
-(define (do-string-quad q)
+(define (convert-string-quad q)
   ;; need to handle casing here so that it's reflected in subsequent sizing ops
   (define cased-str (and
                      (pair? (quad-elems q))
@@ -208,11 +213,10 @@
 
 (define (generic->typed-quad q)
   (cond
-    [(break-quad? q) q]
     [(quad-ref q :break) (convert-break-quad q)]
     [(quad-ref q :draw) (convert-draw-quad q)]
     [(quad-ref q :image-file) (convert-image-quad q)]
-    [else (do-string-quad q)]))
+    [else (convert-string-quad q)]))
 
 (define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"] [stroke-width 0.5])
   (when (draw-debug?)
@@ -767,6 +771,7 @@ https://github.com/mbutterick/typesetter/blob/882ec681ad1fa6eaee6287e53bc4320d96
   (define col-spacer (quad-copy q:column-spacer [size (pt column-gap (and 'arbitrary-irrelevant-value 100))]))
   (add-between cols col-spacer))
 
+(verbose-quad-printing? #t)
 (define ((page-wrap-finish make-page-quad path) cols q0 q page-idx)
   (define page-quad (make-page-quad (+ (section-pages-used) page-idx)))
   (define elems
