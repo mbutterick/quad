@@ -120,32 +120,19 @@
         [else 0]))
     (list string-size (quad-ref q :line-height default-line-height))))
 
-(define-syntax (define-break-types stx)
-  (syntax-case stx ()
-    [(_ ALL-BREAKS-ID . TYPES)
-     (with-syntax ([((TYPE-BREAK TYPE-STR Q:TYPE-BREAK BREAK-TYPE) ...)
-                    (for/list ([type (in-list (syntax->list #'TYPES))])
-                              (list
-                               (format-id #'TYPES "~a-break" type)
-                               (symbol->string (syntax->datum type))
-                               (format-id #'TYPES "q:~a-break" type)
-                               (format-id #'TYPES "~a-break-quad" type)))])
-       #'(begin
-           (define TYPE-BREAK '(q ((break TYPE-STR)))) ...
-           (define ALL-BREAKS-ID (list (cons TYPE-STR BREAK-TYPE) ...))))]))
-
-(define-break-types all-breaks para line page column hr section)
-
 (define (convert-break-quad q)
-  ;; replaces Q-expressions representing breaks
-  ;; with special typed quads representing breaks.
-  ;; Because typed quads have their own predicates,
-  ;; it's faster to find them in wrapping operations
-  ;; (instead of, say, using `equal?`)
-  (match (assoc (quad-ref q :break) all-breaks)
-    [#false q]
-    [(cons _ break-quad-type) (make-quad #:type break-quad-type
-                                         #:attrs (quad-attrs q))]))
+  (define break-quad-type (match (quad-ref q :break)
+                            ["para" para-break-quad]
+                            ["line" line-break-quad]
+                            ["page" page-break-quad]
+                            ["column" column-break-quad]
+                            ["hr" hr-break-quad]
+                            ["section" section-break-quad]
+                            [_ #false]))
+  (if break-quad-type
+      (make-quad #:type break-quad-type
+                 #:attrs (quad-attrs q))
+      q))
 
 (module+ test
   (check-equal? (quad-ref (convert-break-quad (qexpr->quad '(q ((break "page") (foo "bar"))))) 'foo) "bar"))
@@ -212,11 +199,16 @@
    [size #:parent quad (make-size-promise q cased-str)]))
 
 (define (generic->typed-quad q)
-  (cond
-    [(quad-ref q :break) (convert-break-quad q)]
-    [(quad-ref q :draw) (convert-draw-quad q)]
-    [(quad-ref q :image-file) (convert-image-quad q)]
-    [else (convert-string-quad q)]))
+  ;; replaces quads representing certain things
+  ;; with special typed quads representing those things.
+  ;; Because typed quads have their own predicates,
+  ;; it's faster to find them in wrapping operations
+  (define converter (cond
+                      [(quad-ref q :break) convert-break-quad]
+                      [(quad-ref q :draw) convert-draw-quad]
+                      [(quad-ref q :image-file) convert-image-quad]
+                      [else convert-string-quad]))
+  (converter q))
 
 (define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"] [stroke-width 0.5])
   (when (draw-debug?)

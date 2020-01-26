@@ -35,33 +35,19 @@
         [path path]))))))
 
 
-(define (replace-breaks x)
-  ;; replaces Q-expressions representing breaks
-  ;; with special typed quads representing breaks.
-  ;; Because typed quads have their own predicates,
-  ;; it's faster to find them in wrapping operations
-  ;; (instead of, say, using `equal?`)
-  (map-elements (λ (el)
-                  (cond
-                    [(assoc el all-breaks) => cdr]
-                    [else el])) x))
-
-
-(define (handle-hyphenate qs)
+(define (handle-hyphenate q)
   ;; find quads that want hyphenation and split them into smaller pieces
   ;; do this before ->string-quad so that it can handle the sizing promises
-  (apply append
-         (for/list ([q (in-list qs)])
-                   (cond 
-                     [(and (quad-ref q :hyphenate) (pair? (quad-elems q)) (andmap string? (quad-elems q)))
-                      (for*/list ([str (in-list (quad-elems q))]
-                                  [hyphen-char (in-value #\u00AD)]
-                                  [hstr (in-value (hyphenate str hyphen-char
-                                                             #:min-left-length 3
-                                                             #:min-right-length 3))]
-                                  [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
-                                 (quad-copy q [elems (list substr)]))]
-                     [else (list q)]))))
+  (cond
+    [(and (quad-ref q :hyphenate) (pair? (quad-elems q)) (andmap string? (quad-elems q)))
+     (for*/list ([str (in-list (quad-elems q))]
+                 [hyphen-char (in-value #\u00AD)]
+                 [hstr (in-value (hyphenate str hyphen-char
+                                            #:min-left-length 3
+                                            #:min-right-length 3))]
+                 [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
+                (quad-copy q [elems (list substr)]))]
+    [else (list q)]))
 
 
 (define (string->feature-list str)
@@ -143,20 +129,20 @@
   ;; apply some default styling attributes.
   ;; These will only be used if the underlying q-expression hasn't specified its own values,
   ;; which will naturally override these.
-  (define the-quad
+  (define q
     (qexpr->quad (list 'q (list->attrs
                            :font-family default-font-family
                            :font-size (number->string default-font-size)
                            :line-height (number->string (floor (* default-line-height-multiplier default-font-size)))) qexpr)))
   (setup-font-path-table! base-dir)
-  (let* ([qs (atomize the-quad
+  (let* ([qs (atomize q
                       #:attrs-proc handle-cascading-attrs
                       #:missing-glyph-action 'fallback
                       #:fallback "fallback"
                       #:emoji "fallback-emoji"
                       #:math "fallback-math"
                       #:font-path-resolver resolve-font-path!)]
-         [qs (time-log hyphenate (handle-hyphenate qs))]
+         [qs (time-log hyphenate (apply append (map handle-hyphenate qs)))]
          [qs (map generic->typed-quad qs)]
          [qs (drop-leading-breaks qs)]
          [qs (insert-first-line-indents qs)])
