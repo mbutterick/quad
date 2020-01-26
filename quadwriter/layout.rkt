@@ -96,56 +96,49 @@
         [else 0]))
     (list string-size (quad-ref q :line-height default-line-height))))
 
-(define (maybe-convert-draw-quad q)
-  (define draw-type (quad-ref q :draw))
-  (and draw-type 
-       (quad-update! q
-                     [draw (λ (q doc)
-                             (save doc)
-                             (match draw-type
-                               ["line" 
-                                (move-to doc (quad-ref q :x1) (quad-ref q :y1))
-                                (line-to doc (quad-ref q :x2) (quad-ref q :y2))
-                                (stroke doc "black")]
-                               ["text" (move-to doc 0 0)
-                                       (q:string-draw q doc
-                                                      #:origin (pt (quad-ref q :x 0) (quad-ref q :y 0))
-                                                      #:text (quad-ref q :text))]
-                               [_ (void)])
-                             (restore doc))]
-                     [size (pt 0 0)])))
+(define (convert-draw-quad q)
+  (quad-update! q
+                [draw (λ (q doc)
+                        (save doc)
+                        (match (quad-ref q :draw)
+                          ["line" 
+                           (move-to doc (quad-ref q :x1) (quad-ref q :y1))
+                           (line-to doc (quad-ref q :x2) (quad-ref q :y2))
+                           (stroke doc "black")]
+                          ["text" (move-to doc 0 0)
+                                  (q:string-draw q doc
+                                                 #:origin (pt (quad-ref q :x 0) (quad-ref q :y 0))
+                                                 #:text (quad-ref q :text))]
+                          [_ (void)])
+                        (restore doc))]
+                [size (pt 0 0)]))
 
-(define (maybe-convert-image-quad q)
+(define (convert-image-quad q)
   (define path-string (quad-ref q :image-file))
-  (and path-string
-       (let ()
-         (unless (file-exists? path-string)
-           (raise-argument-error 'create-image-quad "image path that exists" path-string))
-         (define img-obj (open-image (current-pdf) path-string))
-         (define img-width ($img-width img-obj))
-         (define img-height ($img-height img-obj))
-         (match-define (list layout-width layout-height)
-           (match (list (quad-ref q :image-width) (quad-ref q :image-height)) 
-             [(list (? number? w) (? number? h)) (list w h)]
-             [(list #false (? number? h))
-              (define ratio (/ h img-height))
-              (list (* ratio img-width) h)]
-             [(list (? number? w) #false)
-              (define ratio (/ w img-width))
-              (list w (* ratio img-height))]
-             [(list #false #false) (list img-width img-height)]))
-         (struct-copy
-          image-quad q:image
-          [attrs #:parent quad (let ([h (hash-copy (quad-attrs q))])
-                                 ;; defeat 'bi 'bo positioning by removing font reference
-                                 (hash-set! h font-path-key #false)
-                                 ;; save the img-obj for later
-                                 (hash-set! h :image-object img-obj)
-                                 h)]
-          [size #:parent quad (pt layout-width layout-height)]))))
-
-(define (maybe-convert-break-quad q)
-  (and (break-quad? q) q))
+  (unless (file-exists? path-string)
+    (raise-argument-error 'create-image-quad "image path that exists" path-string))
+  (define img-obj (open-image (current-pdf) path-string))
+  (define img-width ($img-width img-obj))
+  (define img-height ($img-height img-obj))
+  (match-define (list layout-width layout-height)
+    (match (list (quad-ref q :image-width) (quad-ref q :image-height)) 
+      [(list (? number? w) (? number? h)) (list w h)]
+      [(list #false (? number? h))
+       (define ratio (/ h img-height))
+       (list (* ratio img-width) h)]
+      [(list (? number? w) #false)
+       (define ratio (/ w img-width))
+       (list w (* ratio img-height))]
+      [(list #false #false) (list img-width img-height)]))
+  (struct-copy
+   image-quad q:image
+   [attrs #:parent quad (let ([h (hash-copy (quad-attrs q))])
+                          ;; defeat 'bi 'bo positioning by removing font reference
+                          (hash-set! h font-path-key #false)
+                          ;; save the img-obj for later
+                          (hash-set! h :image-object img-obj)
+                          h)]
+   [size #:parent quad (pt layout-width layout-height)]))
 
 (define (do-string-quad q)
   ;; need to handle casing here so that it's reflected in subsequent sizing ops
@@ -165,12 +158,11 @@
    [size #:parent quad (make-size-promise q cased-str)]))
 
 (define (generic->typed-quad q)
-  (or
-   (maybe-convert-break-quad q)
-   (maybe-convert-draw-quad q)
-   (maybe-convert-image-quad q)
-   (do-string-quad q)))
-
+  (cond
+    [(break-quad? q) q]
+    [(quad-ref q :draw) (convert-draw-quad q)]
+    [(quad-ref q :image-file) (convert-image-quad q)]
+    [else (do-string-quad q)]))
 
 (define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"] [stroke-width 0.5])
   (when (draw-debug?)
