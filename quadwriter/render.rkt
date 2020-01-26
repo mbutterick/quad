@@ -5,6 +5,7 @@
          racket/string
          racket/sequence
          racket/list
+         racket/dict
          pitfall
          quad
          hyphenate
@@ -196,8 +197,10 @@
 (define (setup-pdf-metadata! qs pdf)
   (define kvs
     (apply append
-           (for/list ([k (in-list (list :pdf-title :pdf-author :pdf-subject :pdf-keywords))] 
-                      [pdf-k (in-list '(Title Author Subject Keywords))])
+           (for/list ([(k pdf-k) (in-dict (list (cons :pdf-title 'Title)
+                                                (cons :pdf-author 'Author)
+                                                (cons :pdf-subject 'Subject)
+                                                (cons :pdf-keywords 'Keywords)))])
              (define str (or (match qs
                                [(cons q _) (quad-ref q k)]
                                [_ #false]) "")) ; default val is empty string
