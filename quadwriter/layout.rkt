@@ -131,19 +131,19 @@
                                (format-id #'TYPES "q:~a-break" type)))])
        #'(begin
            (define TYPE-BREAK '(q ((break TYPE-STR)))) ...
-           (define ALL-BREAKS-ID (list (cons TYPE-BREAK Q:TYPE-BREAK) ...))))]))
+           (define ALL-BREAKS-ID (list (cons TYPE-STR Q:TYPE-BREAK) ...))))]))
 
 (define-break-types all-breaks para line page column hr section)
 
-(define (convert-break-quad x)
+(define (convert-break-quad q)
   ;; replaces Q-expressions representing breaks
   ;; with special typed quads representing breaks.
   ;; Because typed quads have their own predicates,
   ;; it's faster to find them in wrapping operations
   ;; (instead of, say, using `equal?`)
   (cond
-    [(assoc x all-breaks) => cdr]
-    [else x]))
+    [(assoc (quad-ref q :break) all-breaks) => cdr]
+    [else q]))
 
 (define (convert-draw-quad q)
   (quad-update! q

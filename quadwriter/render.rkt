@@ -139,7 +139,6 @@
   (define qexpr (decode qx-arg
                         #:string-proc (compose1 smart-ellipses smart-dashes)
                         #:txexpr-proc smart-quotes))
-  (define super-qexpr (replace-breaks qexpr))
 
   ;; apply some default styling attributes.
   ;; These will only be used if the underlying q-expression hasn't specified its own values,
@@ -148,7 +147,7 @@
     (qexpr->quad (list 'q (list->attrs
                            :font-family default-font-family
                            :font-size (number->string default-font-size)
-                           :line-height (number->string (floor (* default-line-height-multiplier default-font-size)))) super-qexpr)))
+                           :line-height (number->string (floor (* default-line-height-multiplier default-font-size)))) qexpr)))
   (setup-font-path-table! base-dir)
   (define atomized-qs (atomize the-quad
                                #:attrs-proc handle-cascading-attrs
@@ -157,10 +156,10 @@
                                #:emoji "fallback-emoji"
                                #:math "fallback-math"
                                #:font-path-resolver resolve-font-path!))
-  (define trimmed-qs (drop-leading-breaks atomized-qs))
-  (define hyphenated-qs (time-log hyphenate (handle-hyphenate trimmed-qs)))
+  (define hyphenated-qs (time-log hyphenate (handle-hyphenate atomized-qs)))
   (define typed-quads (map generic->typed-quad hyphenated-qs))
-  (define indented-qs (insert-first-line-indents typed-quads))
+  (define trimmed-qs (drop-leading-breaks typed-quads))
+  (define indented-qs (insert-first-line-indents trimmed-qs))
   indented-qs)
 
 (define (setup-margins qs page-width page-height)
