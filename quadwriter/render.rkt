@@ -1,7 +1,5 @@
 #lang debug racket/base
-(require (for-syntax racket/base racket/syntax)
-         racket/match
-         txexpr/base
+(require racket/match
          racket/contract
          racket/file
          racket/string
@@ -46,13 +44,13 @@
                                             #:min-left-length 3
                                             #:min-right-length 3))]
                  [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
-                (quad-copy q [elems (list substr)]))]
+       (quad-copy q [elems (list substr)]))]
     [else (list q)]))
 
 
 (define (string->feature-list str)
   (for/list ([kv (in-slice 2 (string-split str))])
-            (cons (string->bytes/utf-8 (first kv)) (string->number (second kv)))))
+    (cons (string->bytes/utf-8 (first kv)) (string->number (second kv)))))
 
 (define (parse-font-features! attrs)
   ;; `font-features` are OpenType font feature specifiers.
@@ -76,7 +74,7 @@
   ;; we parse them into the equivalent measurement in points.
   (for ([k (in-hash-keys attrs)]
         #:when (takes-dimension-string? k))
-       (hash-update! attrs k parse-dimension))
+    (hash-update! attrs k parse-dimension))
   attrs)
 
 (define (downcase-values! attrs)
@@ -84,18 +82,18 @@
   ;; so we can check them more easily later.
   (for ([k (in-hash-keys attrs)]
         #:unless (has-case-sensitive-value? k))
-       (hash-update! attrs k (λ (val) (match val
-                                        [(? string? str) (string-downcase str)]
-                                        [_ val]))))
+    (hash-update! attrs k (λ (val) (match val
+                                     [(? string? str) (string-downcase str)]
+                                     [_ val]))))
   attrs)
 
 (define (complete-every-path! attrs)
-  ;; convert every pathlike thing to a complete path,
+  ;; convert every pathlike thing to a complete path (string, because it's inside an attr)
   ;; so we don't get tripped up later by relative paths
   ;; relies on `current-directory` being parameterized to source file's dir
   (for ([k (in-hash-keys attrs)]
         #:when (takes-path? k))
-       (hash-update! attrs k (compose1 path->string path->complete-path)))
+    (hash-update! attrs k (compose1 path->string path->complete-path)))
   attrs)
 
 (define (handle-cascading-attrs attrs)
@@ -108,7 +106,7 @@
                              resolve-font-tracking!
                              resolve-line-height!
                              parse-font-features!))])
-       (proc attrs)))
+    (proc attrs)))
 
 (define (drop-leading-breaks qs)
   ;; any leading breaks are pointless at the start of the doc, so drop them.
@@ -196,11 +194,16 @@
   (or (debug-column-gap)  (quad-ref (car qs) :column-gap default-column-gap)))
 
 (define (setup-pdf-metadata! qs pdf)
-  (for ([k (in-list (list :pdf-title :pdf-author :pdf-subject :pdf-keywords))]
+  (for ([str (match qs
+               [(cons q _)
+                (in-list (for/list ([k (in-list (list :pdf-title
+                                                      :pdf-author
+                                                      :pdf-subject
+                                                      :pdf-keywords))])
+                           (quad-ref q k)))]
+               [_ (in-value #f)])] 
         [pdf-k (in-list '(Title Author Subject Keywords))])
-       (hash-set! (pdf-info pdf) pdf-k (match (and (pair? qs) (quad-ref (car qs) k #false))
-                                         [#false ""] ; default val is empty string
-                                         [val val])))
+    (hash-set! (pdf-info pdf) pdf-k (or str ""))) ; default val is empty string
   (hash-set! (pdf-info pdf) 'Creator (format "Racket ~a [Quad library]" (version))))
 
 (define (footnote-flow? q) (equal? (quad-ref q 'flow) "footnote"))
@@ -301,16 +304,16 @@
   ;; correct lines with inner / outer alignment
   (for* ([(page page-idx) (in-indexed (for*/list ([section (in-list (quad-elems doc))]
                                                   [page (in-list (quad-elems section))])
-                                                 page))]
+                                        page))]
          [col (in-list (quad-elems page))]
          [block (in-list (quad-elems col))]
          [line (in-list (quad-elems block))])
-        ;; all inner / outer lines are initially filled as if they were right-aligned
-        (define zero-filler-side (if (odd? (add1 page-idx)) "inner" "outer"))
-        (when (equal? zero-filler-side (quad-ref line :line-align))
-          (match (quad-elems line)
-            [(cons (? filler-quad? fq) _) (set-quad-size! fq (pt 0 0))]
-            [_ (void)])))
+    ;; all inner / outer lines are initially filled as if they were right-aligned
+    (define zero-filler-side (if (odd? (add1 page-idx)) "inner" "outer"))
+    (when (equal? zero-filler-side (quad-ref line :line-align))
+      (match (quad-elems line)
+        [(cons (? filler-quad? fq) _) (set-quad-size! fq (pt 0 0))]
+        [_ (void)])))
   doc)
 
 (define/contract (render-pdf qx-arg
@@ -320,7 +323,7 @@
                              #:compress [compress? #t])
   ((qexpr?) ((or/c #false path? path-string?)
              (or/c #false path? path-string?)
-             #:replace any/c #:compress any/c) . ->* . (or/c void? bytes?))
+             #:replace boolean? #:compress boolean?) . ->* . (or/c void? bytes?))
   
   ;; The principal public interface to rendering.
   ;; `qx-arg` is the Q-expression to be rendered.
@@ -334,7 +337,7 @@
                                          [#false (current-directory)]
                                          ;; for reasons unclear, DrRacket sometimes sneaks
                                          ;; an "unsaved editor" into this arg, despite efforts to prevent
-                                         ;; probably 
+                                         ;; probably my fault
                                          ["unsaved editor" pdf-path-arg]
                                          [path path])))
 
@@ -358,11 +361,15 @@
                  ;; a lot of operations need to look at pages used so it's easier to
                  ;; make it a parameter than endlessly pass it around as an argument.
                  [section-pages-used 0]
-                 [verbose-quad-printing? #false])
+                 [verbose-quad-printing? #false]) ; for ease of debugging; not mandatory
     (define qs (time-log setup-qs (setup-qs qx-arg base-dir)))
     (setup-pdf-metadata! qs (current-pdf))
+    ;; all the heavy lifting happens inside `make-sections`
+    ;; which calls out to `make-pages`, `make-columns`, and so on.
     (define doc (correct-line-alignment (quad-copy q:doc [elems (make-sections qs)])))
+    ;; call `position` and `draw` separately so we can print a timer for each
     (define positioned-doc (time-log position (position doc)))
+    ;; drawing implies that a PDF is written to disk
     (time-log draw (draw positioned-doc (current-pdf))))
 
   (if pdf-path-arg
