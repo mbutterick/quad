@@ -12,10 +12,10 @@
                "txexpr"
                "markdown"
                "pict-lib"
-               "csp"))
+               "csp"
+                     "debug"))
 (define build-deps '("draw-lib"
                      "draw-doc"
                      "racket-doc"
-                     "scribble-lib"
-                     "debug"))
+                     "scribble-lib"))
 (define update-implies '("fontland" "pitfall"))
