@@ -6,7 +6,7 @@
 
 ;; `racket -l qtest/all`
 
-(for ([test-path (in-list (test-paths))])
+(for ([test-path (in-list (find-test-paths))])
   (define pdf-path (path-replace-extension test-path #".pdf"))
   (define-values (dir name _) (split-path test-path))
   (displayln (path->string name))
