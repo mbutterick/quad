@@ -10,6 +10,8 @@
 
 (q ((break "column")))
 
+(q ((break "para")))
+
 "Page 1 Column 2 Line 1"
 
 (q ((break "line")))
