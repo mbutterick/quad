@@ -11,7 +11,7 @@
 
 (define (cm->in x) (/ x 2.54))
 (define (in->pts x) (* 72 x))
-(define (mm->cm x) (/ x 10))
+(define (mm->cm x) (/ x 10.0))
 
 (define (parse-dimension x)
   (match x
