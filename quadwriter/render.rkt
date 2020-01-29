@@ -334,17 +334,17 @@
   ;; `base-dir-arg` is the starting point for resolving any relative pathnames,
   ;; and looking for fonts and other assets.
 
-  (match-define-values (base-dir _ _) (split-path
-                                       (cond
-                                         ;; for reasons unclear, DrRacket sometimes sneaks
-                                         ;; an "unsaved editor" into this arg, despite efforts to prevent
-                                         ;; probably my fault
-                                         [(equal? base-dir-arg "unsaved editor") pdf-path-arg]
-                                         [base-dir-arg]
-                                         [pdf-path-arg]
-                                         ;; pdf-path-arg is #false when we're returning bytes,
-                                         ;; but we still need some directory, so current-directory is last resort.
-                                         [else (current-directory)])))
+  (define base-dir (cond
+                     [base-dir-arg
+                      (define-values (dir name _)
+                        (split-path (match base-dir-arg
+                                      ;; for reasons unclear, DrRacket sometimes sneaks
+                                      ;; an "unsaved editor" into this arg, despite efforts to prevent
+                                      ;; probably my fault 
+                                      ["unsaved editor" pdf-path-arg]
+                                      [_ base-dir-arg])))
+                      dir]
+                     [else (current-directory)]))
   
   (unless (directory-exists? base-dir)
     (raise-argument-error 'render-pdf "existing directory" base-dir))
