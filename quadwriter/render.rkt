@@ -45,13 +45,13 @@
                                             #:min-left-length 3
                                             #:min-right-length 3))]
                  [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
-                (quad-copy q [elems (list substr)]))]
+       (quad-copy q [elems (list substr)]))]
     [else (list q)]))
 
 
 (define (string->feature-list str)
   (for/list ([kv (in-slice 2 (string-split str))])
-            (cons (string->bytes/utf-8 (first kv)) (string->number (second kv)))))
+    (cons (string->bytes/utf-8 (first kv)) (string->number (second kv)))))
 
 (define (parse-font-features! attrs)
   ;; `font-features` are OpenType font feature specifiers.
@@ -75,7 +75,7 @@
   ;; we parse them into the equivalent measurement in points.
   (for ([k (in-hash-keys attrs)]
         #:when (takes-dimension-string? k))
-       (hash-update! attrs k parse-dimension))
+    (hash-update! attrs k parse-dimension))
   attrs)
 
 (define (downcase-values! attrs)
@@ -83,9 +83,9 @@
   ;; so we can check them more easily later.
   (for ([k (in-hash-keys attrs)]
         #:unless (has-case-sensitive-value? k))
-       (hash-update! attrs k (λ (val) (match val
-                                        [(? string? str) (string-downcase str)]
-                                        [_ val]))))
+    (hash-update! attrs k (λ (val) (match val
+                                     [(? string? str) (string-downcase str)]
+                                     [_ val]))))
   attrs)
 
 (define (complete-every-path! attrs)
@@ -94,7 +94,7 @@
   ;; relies on `current-directory` being parameterized to source file's dir
   (for ([k (in-hash-keys attrs)]
         #:when (takes-path? k))
-       (hash-update! attrs k (compose1 path->string path->complete-path)))
+    (hash-update! attrs k (compose1 path->string path->complete-path)))
   attrs)
 
 (define (handle-cascading-attrs attrs)
@@ -107,7 +107,7 @@
                              resolve-font-tracking!
                              resolve-line-height!
                              parse-font-features!))])
-       (proc attrs)))
+    (proc attrs)))
 
 (define (drop-leading-breaks qs)
   ;; any leading breaks are pointless at the start of the doc, so drop them.
@@ -204,9 +204,9 @@
                                            (cons :pdf-keywords 'Keywords)))]
                  [str (in-value (and (pair? qs) (quad-ref (car qs) k)))]
                  #:when str)
-                (cons pdf-k str))))
+       (cons pdf-k str))))
   (for ([(k v) (in-dict kv-dict)])
-       (hash-set! (pdf-info pdf) k v)))
+    (hash-set! (pdf-info pdf) k v)))
 
 (define (footnote-flow? q) (equal? (quad-ref q 'flow) "footnote"))
 
@@ -306,16 +306,16 @@
   ;; correct lines with inner / outer alignment
   (for* ([(page page-idx) (in-indexed (for*/list ([section (in-list (quad-elems doc))]
                                                   [page (in-list (quad-elems section))])
-                                                 page))]
+                                        page))]
          [col (in-list (quad-elems page))]
          [block (in-list (quad-elems col))]
          [line (in-list (quad-elems block))])
-        ;; all inner / outer lines are initially filled as if they were right-aligned
-        (define zero-filler-side (if (odd? (add1 page-idx)) "inner" "outer"))
-        (when (equal? zero-filler-side (quad-ref line :line-align))
-          (match (quad-elems line)
-            [(cons (? filler-quad? fq) _) (set-quad-size! fq (pt 0 0))]
-            [_ (void)])))
+    ;; all inner / outer lines are initially filled as if they were right-aligned
+    (define zero-filler-side (if (odd? (add1 page-idx)) "inner" "outer"))
+    (when (equal? zero-filler-side (quad-ref line :line-align))
+      (match (quad-elems line)
+        [(cons (? filler-quad? fq) _) (set-quad-size! fq (pt 0 0))]
+        [_ (void)])))
   doc)
 
 (define/contract (render-pdf qx-arg
@@ -334,17 +334,18 @@
   ;; `base-dir-arg` is the starting point for resolving any relative pathnames,
   ;; and looking for fonts and other assets.
 
-  (define base-dir (cond
-                     [base-dir-arg
-                      (define-values (dir name _)
-                        (split-path (match base-dir-arg
+  (define base-dir (let ([maybe-dir (cond
                                       ;; for reasons unclear, DrRacket sometimes sneaks
-                                      ;; an "unsaved editor" into this arg, despite efforts to prevent
+                                      ;; an "unsaved editor" into base-dir-arg, despite efforts
                                       ;; probably my fault 
-                                      ["unsaved editor" pdf-path-arg]
-                                      [_ base-dir-arg])))
-                      dir]
-                     [else (current-directory)]))
+                                      [(equal? base-dir-arg "unsaved editor") pdf-path-arg]
+                                      [base-dir-arg]
+                                      [pdf-path-arg]
+                                      [else (current-directory)])])
+                     (match maybe-dir
+                       [(? directory-exists? dir) dir]
+                       [_ (define-values (dir name _) (split-path maybe-dir))
+                             dir])))
   
   (unless (directory-exists? base-dir)
     (raise-argument-error 'render-pdf "existing directory" base-dir))
