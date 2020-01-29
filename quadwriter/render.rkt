@@ -105,7 +105,9 @@
                              resolve-font-path!
                              resolve-font-size!
                              resolve-font-tracking!
-                             resolve-line-height!
+                             ;; we resolve line height after font size
+                             ;; because line height might be dependent
+                             resolve-line-height! 
                              parse-font-features!))])
     (proc attrs)))
 

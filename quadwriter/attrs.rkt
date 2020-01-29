@@ -22,10 +22,11 @@
        [#false str] ; a string other than a dimension string, so leave it
        [(list _ num-string unit)
         ((match unit
-           [(regexp #rx"(pt|point)(s)?$") values]
-           [(regexp #rx"in(ch(es)?)?$") in->pts]
-           [(regexp #rx"cm$") (compose1 in->pts cm->in)]
-           [(regexp #rx"mm$") (compose1 in->pts cm->in mm->cm)]
+           [(regexp #rx"(pt|point)(s)?$") values] ; points
+           [(regexp #rx"in(ch(es)?)?$") in->pts] ; inches
+           [(regexp #rx"cms?$") (compose1 in->pts cm->in)] ; cm
+           [(regexp #rx"mms?$") (compose1 in->pts cm->in mm->cm)] ; mm
+           [(regexp #rx"ems?$") (λ (num) (format "~aem" num))] ; em
            [_ (raise-argument-error 'parse-dimension "dimension string" str)]) (string->number num-string))])]))
 
 (define (copy-block-attrs source-hash dest-hash)
@@ -66,7 +67,6 @@ Naming guidelines
 (define-attrs (font-family
                font-path
                font-size
-               font-size-adjust
                font-color
                font-features
                font-features-adjust
@@ -79,7 +79,6 @@ Naming guidelines
                link
                href
                line-height
-               line-height-adjust
                hyphenate
                list-index
                no-colbr

@@ -118,7 +118,7 @@ Next, on the REPL enter this:
 You will see the actual input to Quadwriter, which is called a @tech{Q-expression}:
 
 @repl-output{
-'(q () (q ((page-margin-left "120") (page-margin-top "80") (page-margin-bottom "120") (font-family "text") (line-height "17")) (q ((keep-first-lines "2") (keep-last-lines "3") (font-size-adjust "100%") (character-tracking "0") (hyphenate "true") (display "g49598")) "Brennan and Dale like fancy sauce.")))
+'(q () (q ((page-margin-left "120") (page-margin-top "80") (page-margin-bottom "120") (font-family "text") (line-height "17")) (q ((keep-first-lines "2") (keep-last-lines "3") (font-size "100%") (character-tracking "0") (hyphenate "true") (display "g49598")) "Brennan and Dale like fancy sauce.")))
 }
 
 In the demos that follow, the input language will change slightly. But the PDF will be rendered the same way (by running the source file) and you can always look at @racket[doc] or use @racket[view-output].
@@ -625,9 +625,8 @@ Specify a quad with an image (either @racket{.png} or @racket{.jpeg}). @racket[i
 Sets the display type. Value is a string. Supply @racket["block"] as a value of this attribute to make the quad behave as a block-level element.
 }
 
-@deftogether[(@defthing[#:kind "attribute" font-size symbol?]
-              @defthing[#:kind "attribute" font-size-adjust symbol?])]{
-Two ways of setting the point size for text. @racket[font-size] takes a @tech{dimension string}. @racket[font-size-adjust] takes a string representing a percentage (like @racket["120%"]) and sets the font size to the size of the parent, multiplied by the percentage.
+@defthing[#:kind "attribute" font-size symbol?]{
+Sets the point size for text. Value is a @tech{dimension string}, a string representing a percentage (like @racket["120%"]), or an em size (like @racket["1.2em"]). If a percentage or em size is provided, the font size is the size of the parent multiplied by the percentage (or em).
 }
 
 @defthing[#:kind "attribute" font-family symbol?]{
@@ -666,9 +665,9 @@ Vertical offset of font baseline (positive values move the baseline up, negative
 Case transformation of string. Possibilities are @racket["uppercase"], @racket["lowercase"], or @racket["capitalize"] (= first letter of each word is uppercase, the rest is lowercase).
 }
 
-@deftogether[(@defthing[#:kind "attribute" line-height symbol?]
-              @defthing[#:kind "attribute" line-height-adjust symbol?])]{
-Two ways of setting the distance between baselines. @racket[line-height] takes a @tech{dimension string}. @racket[line-height-adjust] takes a string representing a percentage (like @racket["120%"]) and sets the line height to the line height of the parent, multiplied by the percentage.
+
+@defthing[#:kind "attribute" line-height symbol?]{
+Sets the distance between baselines. Value is a @tech{dimension string}, a string representing a percentage (like @racket["120%"]), or an em size (like @racket["1.2em"]). If a percentage or em size is provided, the line height is the current font size multiplied by the percentage (or em).
 }
 
 TK: OT feature attributes, bullet attributes

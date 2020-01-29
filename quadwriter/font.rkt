@@ -80,31 +80,42 @@
     (define this-italic (hash-ref! attrs :font-italic #false))
     (hash-set! attrs :font-path (font-attrs->path this-font-family this-bold this-italic))))
 
-(define (parse-percentage pstr)
+(define (parse-adjustment pstr suffix)
   (and
+   pstr
    (string? pstr)
-   (string-suffix? pstr "%")
-   (/ (string->number (string-trim pstr "%")) 100.0)))
+   (string-suffix? pstr suffix)
+   (string->number (string-trim pstr suffix))))
 
-(define (adjuster-base attrs key adjustment-key default-value)
-  ;; font size and line height use this helper.
-  ;; because they both can be specified directly,
-  ;; or as an "adjustment" to the parent value, in which case
-  ;; we get the parent value and perform the adjustment.
-  (define this-val (hash-ref! attrs key default-value))
-  (define this-val-adjust (parse-percentage (hash-ref! attrs adjustment-key "100%")))
-  ;; we bake the adjustment into the val...
-  (hash-set! attrs key (and this-val (* this-val this-val-adjust)))
-  ;; and then set the adjustment back to 100% (since it's now accounted for)
-  (hash-set! attrs adjustment-key "100%"))
+(define (parse-percentage pstr)
+  (match (parse-adjustment pstr "%")
+    [#false #false]
+    [res (/ res 100.0)]))
 
 (define (resolve-font-size! attrs)
   ;; convert font-size attributes into a simple font size
-  (adjuster-base attrs :font-size :font-size-adjust default-font-size))
+  ;; we stashed the previous size in private key 'font-size-previous
+  (define prev-font-size-key 'font-size-previous)
+  (define val (hash-ref attrs :font-size default-font-size))
+  (define adjustment (or (parse-percentage val) (parse-adjustment val "em")))
+  ;; if our value represents an adjustment, we apply the adjustment to the previous value
+  ;; otherwise we use our value directly
+  (define base-size (if adjustment (hash-ref attrs prev-font-size-key default-font-size) val))
+  (define base-size-adjusted (and base-size (* base-size (or adjustment 1))))
+  ;; we write our new value into both font-size and font-size-previous
+  ;; because as we cascade down, we're likely to come across superseding values
+  ;; of font-size (but font-size-previous will persist)
+  (hash-set! attrs :font-size base-size-adjusted)
+  (hash-set! attrs prev-font-size-key base-size-adjusted))
 
 (define (resolve-line-height! attrs)
   ;; convert line-height attributes into a simple line height
-  (adjuster-base attrs :line-height :line-height-adjust default-line-height))
+  (hash-update! attrs :line-height
+                (λ (val)
+                  (define adjustment (or (parse-percentage val) (parse-adjustment val "em")))
+                  (define base-height (if adjustment (hash-ref attrs :font-size) val))
+                  (and base-height (* base-height (or adjustment 1))))
+                default-line-height))
 
 (define (resolve-font-tracking! attrs)
   ;; if it's a percentage, we need to look at the font size.
