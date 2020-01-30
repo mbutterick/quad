@@ -121,18 +121,22 @@
     (list string-size (quad-ref q :line-height default-line-height))))
 
 (define (convert-break-quad q)
-  (define break-quad-type (match (quad-ref q :break)
-                            ["para" para-break-quad]
-                            ["line" line-break-quad]
-                            ["page" page-break-quad]
-                            ["column" column-break-quad]
-                            ["hr" hr-break-quad]
-                            ["section" section-break-quad]
-                            [_ #false]))
-  (if break-quad-type
-      (make-quad #:type break-quad-type
-                 #:attrs (quad-attrs q))
-      q))
+  ;; this is verbose & ugly because `struct-copy` is a macro
+  ;; we want to use break prototypes but also preserve their type
+  (match (quad-ref q :break)
+    ["para" (struct-copy para-break-quad q:para-break
+                         [attrs #:parent quad (quad-attrs q)])]
+    ["line" (struct-copy line-break-quad q:line-break
+                         [attrs #:parent quad (quad-attrs q)])]
+    ["page" (struct-copy page-break-quad q:page-break
+                         [attrs #:parent quad (quad-attrs q)])]
+    ["column" (struct-copy column-break-quad q:column-break
+                           [attrs #:parent quad (quad-attrs q)])]
+    ["hr" (struct-copy hr-break-quad q:hr-break
+                       [attrs #:parent quad (quad-attrs q)])]
+    ["section" (struct-copy section-break-quad q:section-break
+                            [attrs #:parent quad (quad-attrs q)])]
+    [_ q]))
 
 (module+ test
   (check-equal? (quad-ref (convert-break-quad (qexpr->quad '(q ((break "page") (foo "bar"))))) 'foo) "bar"))
@@ -259,15 +263,16 @@
 (define (consolidate-runs pcs ending-q)
   (let loop ([runs empty][pcs pcs])
     (match pcs
-      [(? empty?) (reverse runs)]
       [(cons (? string-quad? strq) rest)
        (define-values (run-pcs rest) (splitf-at pcs (λ (p) (same-run? strq p))))
-       (define new-run (quad-copy q:string
-                                  [attrs (quad-attrs strq)]
-                                  [elems (merge-adjacent-strings (apply append (map quad-elems run-pcs)))]
-                                  [size (delay (pt (sum-x run-pcs) (pt-y (size strq))))]))
+       (define new-run
+         (quad-copy q:string
+                    [attrs (quad-attrs strq)]
+                    [elems (merge-adjacent-strings (apply append (map quad-elems run-pcs)))]
+                    [size (delay (pt (sum-x run-pcs) (pt-y (size strq))))]))
        (loop (cons new-run runs) rest)]
-      [(cons first rest) (loop (cons first runs) rest)])))
+      [(cons first rest) (loop (cons first runs) rest)]
+      [_ (reverse runs)])))
 
 (define (render-hyphen qs ending-q)
   ;; naive handling of soft hyphen:
@@ -327,9 +332,9 @@
                   (append sublists (list last-sublist))])]
             [_ word-sublists]))
         (define word-width (for/sum ([qs (in-list hung-word-sublists)])
-                             (sum-x qs)))
+                                    (sum-x qs)))
         (define word-space-width (for/sum ([qs (in-list word-space-sublists)])
-                                   (sum-x qs)))
+                                          (sum-x qs)))
         (define empty-hspace (- line-width
                                 (quad-ref (car qs) :inset-left 0)
                                 word-width
@@ -390,7 +395,7 @@
   ;; remove unused soft hyphens so they don't affect final shaping
   (define pcs-printing (for/list ([pc (in-list pcs-in)]
                                   #:unless (equal? (quad-elems pc) '("\u00AD")))
-                         pc))
+                                 pc))
   (define new-lines
     (cond
       [(empty? pcs-printing) null]
@@ -405,49 +410,54 @@
          [(? pair? elems)
           (define elem (unsafe-car elems))
           (match-define (list line-width line-height) (quad-size line-q))
-          (define new-size (let ()
-                             (define line-heights
-                               (filter-map (λ (q) (or (quad-ref q :line-height) (pt-y (size q)))) pcs))
-                             (pt line-width (if (empty? line-heights) line-height (apply max line-heights)))))
+          (define new-size
+            (let ([line-heights
+                   (filter-map
+                    (λ (q) (or (quad-ref q :line-height) (pt-y (size q))))
+                    pcs)])
+              (pt line-width (if (empty? line-heights)
+                                 line-height
+                                 (apply max line-heights)))))
           (list
-           (quad-copy line-q
-                      ;; move block attrs up, so they are visible in col wrap
-                      [attrs (copy-block-attrs (quad-attrs elem)
-                                               (hash-copy (quad-attrs line-q)))]
-                      ;; line width is static
-                      ;; line height is the max 'line-height value or the natural height of q:line
-                      [size new-size]
-                      ;; handle list indexes. drop new quad into line to hold list index
-                      ;; could also use this for line numbers
-                      [elems
-                       ;; we assume here that a list item has already had extra inset-left
-                       ;; with room for a bullet
-                       ;; which we just insert at the front.
-                       ;; this is safe because line has already been filled.
-                       (append
-                        ;; only put bullet into line if we're at the first line of the list item
-                        (match (and (eq? idx 1) (quad-ref elem :list-index))
-                          [#false null]
-                          [bullet
-                           (define bq (quad-copy q:string ;; copy q:string to get draw routine
-                                                 ;; borrow attrs from elem
-                                                 [attrs (quad-attrs elem)]
-                                                 ;; use bullet as elems
-                                                 [elems (list (if (number? bullet) (format "~a." bullet) bullet))]
-                                                 ;; size doesn't matter because nothing refers to this quad
-                                                 ;; just for debugging box
-                                                 [size (pt 15 (pt-y (size line-q)))]))
-                           (from-parent (list bq) 'sw)])
-                        (from-parent
-                         (match (quad-ref elem :inset-left 0)
-                           [0 elems]
-                           [inset-val
-                            (cons (make-quad
-                                   #:draw-end q:string-draw-end
-                                   #:to 'sw
-                                   #:size (pt inset-val 5)
-                                   #:type offsetter-quad)
-                                  elems)]) 'sw))]))]
+           (quad-copy
+            line-q
+            ;; move block attrs up, so they are visible in col wrap
+            [attrs (copy-block-attrs (quad-attrs elem)
+                                     (hash-copy (quad-attrs line-q)))]
+            ;; line width is static
+            ;; line height is the max 'line-height value or the natural height of q:line
+            [size new-size]
+            ;; handle list indexes. drop new quad into line to hold list index
+            ;; could also use this for line numbers
+            [elems
+             ;; we assume here that a list item has already had extra inset-left
+             ;; with room for a bullet
+             ;; which we just insert at the front.
+             ;; this is safe because line has already been filled.
+             (append
+              ;; only put bullet into line if we're at the first line of the list item
+              (match (and (eq? idx 1) (quad-ref elem :list-index))
+                [#false null]
+                [bullet
+                 (define bq (quad-copy q:string ;; copy q:string to get draw routine
+                                       ;; borrow attrs from elem
+                                       [attrs (quad-attrs elem)]
+                                       ;; use bullet as elems
+                                       [elems (list (if (number? bullet) (format "~a." bullet) bullet))]
+                                       ;; size doesn't matter because nothing refers to this quad
+                                       ;; just for debugging box
+                                       [size (pt 15 (pt-y (size line-q)))]))
+                 (from-parent (list bq) 'sw)])
+              (from-parent
+               (match (quad-ref elem :inset-left 0)
+                 [0 elems]
+                 [inset-val
+                  (cons (make-quad
+                         #:draw-end q:string-draw-end
+                         #:to 'sw
+                         #:size (pt inset-val 5)
+                         #:type offsetter-quad)
+                        elems)]) 'sw))]))]
          [_ null])]))
   (define maybe-first-line (and (pair? new-lines) (car new-lines)))
   (append (match opening-q
@@ -486,32 +496,34 @@
                            (loop rest (cons bq acc))]
                           [(list* (and (not (? para-break-quad?)) nbqs) ... rest)
                            (loop rest (cons nbqs acc))])))
-     (apply append
+     (define res
+       (apply append
               (for/list ([para-qs (in-list para-qss)])
-                (match para-qs
-                  [(? break-quad? bq) (list bq)]
-                  [(cons pq _)
-                   (wrap para-qs
-                         (* (- wrap-size
-                               (quad-ref pq :inset-left 0)
-                               (quad-ref pq :inset-right 0))
-                            permitted-justify-overfill)
-                         debug
-                         #:nicely (match (or (current-line-wrap) (quad-ref pq :line-wrap))
-                                    [(or "best" "kp") #true]
-                                    [_ #false])
-                         #:hard-break line-break-quad?
-                         #:soft-break soft-break-for-line?
-                         #:finish-wrap (line-wrap-finish line-q))])))]
+                        (match para-qs
+                          [(? break-quad? bq) (list bq)]
+                          [(cons pq _)
+                           (wrap para-qs
+                                 (* (- wrap-size
+                                       (quad-ref pq :inset-left 0)
+                                       (quad-ref pq :inset-right 0))
+                                    permitted-justify-overfill)
+                                 debug
+                                 #:nicely (match (or (current-line-wrap) (quad-ref pq :line-wrap))
+                                            [(or "best" "kp") #true]
+                                            [_ #false])
+                                 #:hard-break line-break-quad?
+                                 #:soft-break soft-break-for-line?
+                                 #:finish-wrap (line-wrap-finish line-q))]))))
+     res]
     [_ null]))
 
 (module+ test
-(line-wrap (list (make-quad "foo" #:type string-quad)
-                 (make-quad #:type column-break-quad)
-                 (make-quad "foo2" #:type string-quad) ) 10 #t)
+  (line-wrap (list (make-quad "foo" #:type string-quad)
+                   (make-quad #:type column-break-quad)
+                   (make-quad "foo2" #:type string-quad) ) 10 #t)
 
-(line-wrap (list (make-quad "foo" #:type string-quad)
-                 (make-quad #:type column-break-quad)) 10 #t))
+  (line-wrap (list (make-quad "foo" #:type string-quad)
+                   (make-quad #:type column-break-quad)) 10 #t))
 
 (define (make-nobreak! q) (quad-set! q :no-colbr #true)) ; scooperates with col-wrap
 
@@ -561,9 +573,9 @@
   ;; explicit measurements from page-height and page-width supersede those from page-size.
   (match-define (list page-width page-height)
     (for/list ([k (list :page-width :page-height)])
-      (and (quad? q) (match (quad-ref q k)
-                       [#false #false]
-                       [val (inexact->exact (floor val))]))))
+              (and (quad? q) (match (quad-ref q k)
+                               [#false #false]
+                               [val (inexact->exact (floor val))]))))
   (resolve-page-size
    (or (debug-page-width) page-width)
    (or (debug-page-height) page-height)
@@ -633,7 +645,7 @@
   ;; adjust drawing coordinates for border inset
   (match-define (list bil bit bir bib)
     (for/list ([k (in-list (list :border-inset-left :border-inset-top :border-inset-right :border-inset-bottom))])
-      (quad-ref first-line k 0)))
+              (quad-ref first-line k 0)))
   (match-define (list left top) (pt+ (quad-origin q) (list bil bit)))
   (match-define (list width height) (pt- (size q) (list (+ bil bir) (+ bit bib))))
   ;; fill rect
@@ -671,14 +683,14 @@
     [(#true)
      (when (eq? (log-clipping?) 'warn)
        (for ([line (in-list (quad-elems q))])
-         (define line-width (pt-x (size line)))
-         (define line-elem-width (sum-x (quad-elems line)))
-         (when (< line-width line-elem-width)
-           (define error-str (apply string-append (for/list ([q (in-list (quad-elems line))])
-                                                    (match (quad-elems q)
-                                                      [(list (? string? str)) str]
-                                                      [_ ""]))))
-           (log-quadwriter-warning (format "clipping overfull line: ~v" error-str)))))
+            (define line-width (pt-x (size line)))
+            (define line-elem-width (sum-x (quad-elems line)))
+            (when (< line-width line-elem-width)
+              (define error-str (apply string-append (for/list ([q (in-list (quad-elems line))])
+                                                               (match (quad-elems q)
+                                                                 [(list (? string? str)) str]
+                                                                 [_ ""]))))
+              (log-quadwriter-warning (format "clipping overfull line: ~v" error-str)))))
      (save doc)
      (rect doc left top width height)
      (clip doc)]))
@@ -715,10 +727,10 @@
 (define ((column-wrap-finish col-quad) lns q0 ending-q idx [reversed-fn-lines null])
   (define fn-lines
     (from-parent (for/list ([fn-line (in-list reversed-fn-lines)])
-                   ;; position bottom to top, in reverse
-                   (quad-update! fn-line
-                                 [from 'nw]
-                                 [to 'sw])) 'sw))
+                           ;; position bottom to top, in reverse
+                           (quad-update! fn-line
+                                         [from 'nw]
+                                         [to 'sw])) 'sw))
 
   (append
    (match lns
@@ -777,10 +789,10 @@ https://github.com/mbutterick/typesetter/blob/882ec681ad1fa6eaee6287e53bc4320d96
                                                (raise 'boom)))))
   (define reversed-fn-lines
     (from-parent (for/list ([fn-line (in-list (reverse fn-lines))])
-                   ;; position bottom to top, in reverse
-                   (quad-update! fn-line
-                                 [from 'nw]
-                                 [to 'sw])) 'sw))
+                           ;; position bottom to top, in reverse
+                           (quad-update! fn-line
+                                         [from 'nw]
+                                         [to 'sw])) 'sw))
   (quad-update! (car cols)
                 [elems (append (quad-elems (car cols)) reversed-fn-lines)])
   (define col-spacer (quad-copy q:column-spacer [size (pt column-gap (and 'arbitrary-irrelevant-value 100))]))
@@ -789,18 +801,21 @@ https://github.com/mbutterick/typesetter/blob/882ec681ad1fa6eaee6287e53bc4320d96
 (verbose-quad-printing? #t)
 (define ((page-wrap-finish make-page-quad path) cols q0 q page-idx)
   (define page-quad (make-page-quad (+ (section-pages-used) page-idx)))
+  ;; get attrs from cols if we can, otherwise try q or q0
+  (define q-for-attrs (cond
+                        [(pair? cols) (car cols)]
+                        [q]
+                        [q0]))
   (define elems
     (append
-     (match (and (pair? cols) (quad-ref (car cols) :footer-display #true))
+     (match (quad-ref q-for-attrs :footer-display #true)
        [(or #false "none") null]
-       [_ (list (make-footer-quad (car cols) page-idx path))])
+       [_ (list (make-footer-quad q-for-attrs page-idx path))])
      (from-parent cols 'nw)))
   (list (quad-copy page-quad
                    [elems elems]
                    [attrs (copy-block-attrs (cond
-                                              ;; get attrs from cols if we can,
-                                              ;; otherwise try q or q0
-                                              [(or (and (pair? cols) (car cols)) q q0) => quad-attrs]
+                                              [q-for-attrs => quad-attrs]
                                               [else (hash)])
                                             (hash-copy (quad-attrs page-quad)))])))
 
@@ -817,9 +832,9 @@ https://github.com/mbutterick/typesetter/blob/882ec681ad1fa6eaee6287e53bc4320d96
 (define (insert-blocks lines)
   (define groups-of-lines (contiguous-group-by (λ (x) (quad-ref x :display)) lines))
   (append* (for/list ([line-group (in-list groups-of-lines)])
-             (if (quad-ref (car line-group) :display)
-                 (list (lines->block line-group))
-                 line-group))))
+                     (if (quad-ref (car line-group) :display)
+                         (list (lines->block line-group))
+                         line-group))))
 
 (define-quad first-line-indent-quad quad)
 
@@ -837,11 +852,11 @@ https://github.com/mbutterick/typesetter/blob/882ec681ad1fa6eaee6287e53bc4320d96
   (apply append
          (for/list ([q (in-list qs)]
                     [next-q (in-list (cdr qs))])
-           (match (and (para-break-quad? q)  (quad-ref next-q :first-line-indent 0))
-             [(or #false 0) (list next-q)]
-             [indent-val (list (make-quad #:from 'bo
-                                          #:to 'bi
-                                          #:draw-end q:string-draw-end
-                                          #:type first-line-indent-quad
-                                          #:attrs (quad-attrs next-q)
-                                          #:size (pt indent-val 10)) next-q)]))))
+                   (match (and (para-break-quad? q)  (quad-ref next-q :first-line-indent 0))
+                     [(or #false 0) (list next-q)]
+                     [indent-val (list (make-quad #:from 'bo
+                                                  #:to 'bi
+                                                  #:draw-end q:string-draw-end
+                                                  #:type first-line-indent-quad
+                                                  #:attrs (quad-attrs next-q)
+                                                  #:size (pt indent-val 10)) next-q)]))))
