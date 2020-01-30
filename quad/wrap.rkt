@@ -4,13 +4,13 @@
 (provide wrap)
 
 (define-syntax (debug-report stx)
-  (syntax-case stx ()
-    [(_ SYM)
-     (with-syntax ([DEBUG (datum->syntax stx 'debug)])
-       #'(when DEBUG (displayln (format "~a" SYM))))]
-    [(_ VAL SYM)
-     (with-syntax ([DEBUG (datum->syntax stx 'debug)])
-       #'(when DEBUG (displayln (format "~a: ~a" SYM VAL))))]))
+  (with-syntax ([DEBUG (datum->syntax stx 'debug)]
+                [STRING-EXPR (syntax-case stx ()
+                          [(_ SYM)
+                           #'(format "~a" SYM)]
+                          [(_ VAL SYM)
+                           #'(format "~a: ~a" SYM VAL)])])
+    #'(when DEBUG (log-quad-debug STRING-EXPR))))
 
 (define (nonprinting-at-start? x) (not (printable? x 'start)))
 (define (nonprinting-at-end? x) (not (printable? x 'end)))
@@ -290,7 +290,7 @@
 (define max-consecutive-hyphens 1)
 (define (pieces-sublist pieces i j)
   (reverse (apply append (for/list ([n (in-range i j)])
-                           (vector-ref pieces n)))))
+                                   (vector-ref pieces n)))))
 
 (define (wrap-best qs
                    max-distance
@@ -416,15 +416,15 @@
   (define (visual-wrap str int [debug #f] #:nicely [nicely? #f])
     (string-join
      (for/list ([x (in-list (linewrap (for/list ([c (in-string str)])
-                                        (define atom (q c))
-                                        (if (equal? (quad-elems atom) '(#\space))
-                                            (quad-copy sp)
-                                            (quad-copy q-one
-                                                       [attrs (quad-attrs atom)]
-                                                       [elems (quad-elems atom)]))) int debug
-                                                                                    #:nicely nicely?))]
+                                                (define atom (q c))
+                                                (if (equal? (quad-elems atom) '(#\space))
+                                                    (quad-copy sp)
+                                                    (quad-copy q-one
+                                                               [attrs (quad-attrs atom)]
+                                                               [elems (quad-elems atom)]))) int debug
+                                                                                            #:nicely nicely?))]
                 #:when (and (list? x) (andmap quad? x)))
-       (list->string (map car (map quad-elems x))))
+               (list->string (map car (map quad-elems x))))
      "|"))
 
   (define (pagewrap xs size [debug #f])
