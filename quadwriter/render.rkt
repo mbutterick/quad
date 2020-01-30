@@ -45,37 +45,56 @@
                                             #:min-left-length 3
                                             #:min-right-length 3))]
                  [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
-       (quad-copy q [elems (list substr)]))]
+                (quad-copy q [elems (list substr)]))]
     [else (list q)]))
 
 
 (define (string->feature-list str)
-  (for/list ([kv (in-slice 2 (string-split str))])
-    (cons (string->bytes/utf-8 (first kv)) (string->number (second kv)))))
+  (define pcs (string-split str))
+  (unless (even? (length pcs))
+    (raise-argument-error 'string->feature-list "even number of tags and values" pcs))
+  (for/list ([kv (in-slice 2 pcs)])
+            (cons (match (first kv)
+                    [(? string? k) (string->bytes/utf-8 k)]
+                    [k (raise-argument-error 'string->feature-list "string" k)])
+                  (match (string->number (second kv))
+                    [(? number? num) num]
+                    [v (raise-argument-error 'string->feature-list "number string" v)]))))
 
 (define (parse-font-features! attrs)
   ;; `font-features` are OpenType font feature specifiers.
-  (match (hash-ref attrs :font-features-adjust #false)
-    [(? string? str)
-     ;; adjustment: parse the feature string and append to the current feature set
-     (define parsed-features (string->feature-list str))
-     (hash-update! attrs :font-features (λ (fs) (remove-duplicates (append parsed-features fs) equal? #:key car)))
-     ;; once adjustment is incorporated, delete it
-     (hash-set! attrs :font-features-adjust #false)]
-    [_ (match (hash-ref attrs :font-features #false)
-         ;; override: parse features & replace current set
-         [(? string? str)
-          (define parsed-features (string->feature-list str))
-          (hash-set! attrs :font-features parsed-features)]
-         [_ (void)])]))
+  (define font-features-previous-key 'font-features-previous)
+  (define features-previous (hash-ref attrs font-features-previous-key empty))
+  (define val (hash-ref attrs :font-features #false))
+  (when (string? val)
+    (hash-set! attrs :font-features
+               (cond
+                 [(regexp-match #px"^\\s*\\+ " val)
+                  ;; adjustment: parse the feature string and append to the previous feature set
+                  (define parsed-features (string->feature-list (string-trim (string-trim val) "+")))
+                  (remove-duplicates (append parsed-features features-previous) bytes=? #:key car)]
+                 ;; replacement of previous feature string
+                 [else (string->feature-list val)]))
+    (hash-set! attrs font-features-previous-key (hash-ref attrs :font-features))))
 
+(module+ test
+  (require rackunit)
+  ;; feature replacement
+  (define attrs (make-hash '((font-features-previous '((#"smcp" . 1))))))
+  (hash-set! attrs :font-features " liga 0 ")
+  (parse-font-features! attrs)
+  (check-equal? (hash-ref attrs :font-features) '((#"liga" . 0)))
+  ;; feature append
+  (hash-set! attrs :font-features "  + calt 1 ")
+  (parse-font-features! attrs)
+  (check-equal? (sort (hash-ref attrs :font-features) bytes<? #:key car) '((#"calt" . 1)(#"liga" . 0))))
 
 (define (parse-dimension-strings! attrs)
   ;; certain attributes can be "dimension strings", which are strings like "3in" or "4.2cm"
   ;; we parse them into the equivalent measurement in points.
   (for ([k (in-hash-keys attrs)]
         #:when (takes-dimension-string? k))
-    (hash-update! attrs k parse-dimension))
+       (hash-update! attrs k parse-dimension))
   attrs)
 
 (define (downcase-values! attrs)
@@ -83,9 +102,9 @@
   ;; so we can check them more easily later.
   (for ([k (in-hash-keys attrs)]
         #:unless (has-case-sensitive-value? k))
-    (hash-update! attrs k (λ (val) (match val
-                                     [(? string? str) (string-downcase str)]
-                                     [_ val]))))
+       (hash-update! attrs k (λ (val) (match val
+                                        [(? string? str) (string-downcase str)]
+                                        [_ val]))))
   attrs)
 
 (define (complete-every-path! attrs)
@@ -94,7 +113,7 @@
   ;; relies on `current-directory` being parameterized to source file's dir
   (for ([k (in-hash-keys attrs)]
         #:when (takes-path? k))
-    (hash-update! attrs k (compose1 path->string path->complete-path)))
+       (hash-update! attrs k (compose1 path->string path->complete-path)))
   attrs)
 
 (define (handle-cascading-attrs attrs)
@@ -109,7 +128,7 @@
                              ;; because line height might be dependent
                              resolve-line-height! 
                              parse-font-features!))])
-    (proc attrs)))
+       (proc attrs)))
 
 (define (drop-leading-breaks qs)
   ;; any leading breaks are pointless at the start of the doc, so drop them.
@@ -206,9 +225,9 @@
                                            (cons :pdf-keywords 'Keywords)))]
                  [str (in-value (and (pair? qs) (quad-ref (car qs) k)))]
                  #:when str)
-       (cons pdf-k str))))
+                (cons pdf-k str))))
   (for ([(k v) (in-dict kv-dict)])
-    (hash-set! (pdf-info pdf) k v)))
+       (hash-set! (pdf-info pdf) k v)))
 
 (define (footnote-flow? q) (equal? (quad-ref q 'flow) "footnote"))
 
@@ -308,16 +327,16 @@
   ;; correct lines with inner / outer alignment
   (for* ([(page page-idx) (in-indexed (for*/list ([section (in-list (quad-elems doc))]
                                                   [page (in-list (quad-elems section))])
-                                        page))]
+                                                 page))]
          [col (in-list (quad-elems page))]
          [block (in-list (quad-elems col))]
          [line (in-list (quad-elems block))])
-    ;; all inner / outer lines are initially filled as if they were right-aligned
-    (define zero-filler-side (if (odd? (add1 page-idx)) "inner" "outer"))
-    (when (equal? zero-filler-side (quad-ref line :line-align))
-      (match (quad-elems line)
-        [(cons (? filler-quad? fq) _) (set-quad-size! fq (pt 0 0))]
-        [_ (void)])))
+        ;; all inner / outer lines are initially filled as if they were right-aligned
+        (define zero-filler-side (if (odd? (add1 page-idx)) "inner" "outer"))
+        (when (equal? zero-filler-side (quad-ref line :line-align))
+          (match (quad-elems line)
+            [(cons (? filler-quad? fq) _) (set-quad-size! fq (pt 0 0))]
+            [_ (void)])))
   doc)
 
 (define/contract (render-pdf qx-arg
@@ -347,7 +366,7 @@
                      (match maybe-dir
                        [(? directory-exists? dir) dir]
                        [_ (define-values (dir name _) (split-path maybe-dir))
-                             dir])))
+                          dir])))
   
   (unless (directory-exists? base-dir)
     (raise-argument-error 'render-pdf "existing directory" base-dir))

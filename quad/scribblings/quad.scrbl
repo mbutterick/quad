@@ -645,9 +645,8 @@ Whether the quad has bold styling applied. Activated only when value is @racket[
 Whether the quad has italic styling applied. Activated only when value is @racket["true"]. 
 }
 
-@deftogether[(@defthing[#:kind "attribute" font-features symbol?]
-              @defthing[#:kind "attribute" font-features-adjust symbol?])]{
-Two ways of setting OpenType layout features. @racket[font-features] takes a @deftech{feature string}, which is an alternating list of OT feature tags and values, separated by white space. For instance, @racket{liga 0 smcp 1} would deactivate the ligature feature and activate the small-cap feature. @racket[font-features-adjust] works the same way, but rather than replacing the current feature settings, it amends them.
+@defthing[#:kind "attribute" font-features symbol?]{
+Sets OpenType layout features. @racket[font-features] takes a @deftech{feature string}, which is an alternating list of OT feature tags and values, separated by white space. For instance, @racket{liga 0 smcp 1} would deactivate the ligature feature and activate the small-cap feature. If the feature string is prefixed with @racket["+"], rather than replacing the current feature settings, it amends the features that would otherwise apply.
 
 @margin-note{Fonts with OpenType layout features may be configured so that certain features, like ligatures, are activated by default. Your font will display these layout features even though there is no @racket[font-features] attribute in your Q-expression. You can, however, still turn them off with @racket[font-features].}
 }
