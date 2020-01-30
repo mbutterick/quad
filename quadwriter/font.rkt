@@ -40,21 +40,21 @@
          #:when (directory-exists? font-family-subdir)
          [font-path (in-directory font-family-subdir)]
          #:when (member (path-get-extension font-path) font-file-extensions))
-    (match-define (list font-path-string family-name)
-      (for/list ([x (list font-path font-family-subdir)])
-        (path->string (find-relative-path fonts-dir x))))
-    (define path-parts (for/list ([part (in-list (explode-path (string->path (string-downcase font-path-string))))])
-                         (path->string part)))
-    (define key
-      (cons (string-downcase family-name)
-            (cond
-              [(member "bold-italic" path-parts) 'bi]
-              [(member "bold" path-parts) 'b]
-              [(member "italic" path-parts) 'i]
-              [else 'r])))
-    ;; only set value if there's not one there already.
-    ;; this means that we only use the first eligible font we find.
-    (hash-ref! font-paths key font-path)))
+        (match-define (list font-path-string family-name)
+          (for/list ([x (list font-path font-family-subdir)])
+                    (path->string (find-relative-path fonts-dir x))))
+        (define path-parts (for/list ([part (in-list (explode-path (string->path (string-downcase font-path-string))))])
+                                     (path->string part)))
+        (define key
+          (cons (string-downcase family-name)
+                (cond
+                  [(member "bold-italic" path-parts) 'bi]
+                  [(member "bold" path-parts) 'b]
+                  [(member "italic" path-parts) 'i]
+                  [else 'r])))
+        ;; only set value if there's not one there already.
+        ;; this means that we only use the first eligible font we find.
+        (hash-ref! font-paths key font-path)))
 
 (define (font-attrs->path font-family bold italic)
   ;; find the font-path corresponding to a certain family name and style.
@@ -111,19 +111,14 @@
   (hash-set! attrs :font-size base-size-adjusted)
   (hash-set! attrs prev-font-size-key base-size-adjusted))
 
+(define ((make-updater-based-on-font-size attrs) val)
+  (define adjustment (parse-percentage-or-em val))
+  (define base-height (if adjustment (hash-ref attrs :font-size) val))
+  (and base-height (* base-height (or adjustment 1))))
+
 (define (resolve-line-height! attrs)
   ;; convert line-height attributes into a simple line height
-  (hash-update! attrs :line-height
-                (λ (val)
-                  (define adjustment (parse-percentage-or-em val))
-                  (define base-height (if adjustment (hash-ref attrs :font-size) val))
-                  (and base-height (* base-height (or adjustment 1))))
-                default-line-height))
+  (hash-update! attrs :line-height (make-updater-based-on-font-size attrs) default-line-height))
 
 (define (resolve-font-tracking! attrs)
-  (hash-update! attrs :font-tracking
-                (λ (val)
-                  (define adjustment (parse-percentage-or-em val))
-                  (define base-tracking (if adjustment (hash-ref attrs :font-size) val))
-                  (and base-tracking (* base-tracking (or adjustment 1))))
-                0))
+  (hash-update! attrs :font-tracking (make-updater-based-on-font-size attrs) 0))
