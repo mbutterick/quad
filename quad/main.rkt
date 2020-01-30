@@ -11,7 +11,8 @@
 "wrap.rkt"
 "position.rkt"
 "param.rkt"
-"util.rkt")
+"util.rkt"
+"checksum.rkt")
 
 (provide (all-from-out "atomize.rkt"
 "quad.rkt"
@@ -19,4 +20,5 @@
 "wrap.rkt"
 "position.rkt"
 "param.rkt"
-"util.rkt"))
+"util.rkt"
+"checksum.rkt"))

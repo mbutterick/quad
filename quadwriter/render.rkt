@@ -218,7 +218,7 @@
 (define (setup-pdf-metadata! qs pdf)
   (define kv-dict
     (cons
-     (cons 'Creator (format "Racket ~a [Quad library]" (version)))
+     (cons 'Creator (format "Racket ~a [Quad ~a]" (version) (pkg-checksum "quad" #:short #true)))
      (for*/list ([(k pdf-k) (in-dict (list (cons :pdf-title 'Title)
                                            (cons :pdf-author 'Author)
                                            (cons :pdf-subject 'Subject)
