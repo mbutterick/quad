@@ -187,19 +187,21 @@
 
 (define (convert-string-quad q)
   ;; need to handle casing here so that it's reflected in subsequent sizing ops
-  (define cased-str (and
-                     (pair? (quad-elems q))
-                     ((match (quad-ref q :font-case)
-                        [(or "upper" "uppercase") string-upcase]
-                        [(or "lower" "lowercase" "down" "downcase") string-downcase]
-                        [(or "title" "titlecase") string-titlecase]
-                        [_ values]) (unsafe-car (quad-elems q)))))
+  (define cased-str (match (quad-elems q)
+                      [(cons str _)
+                       (define proc (match (quad-ref q :font-case)
+                                      [(or "upper" "uppercase") string-upcase]
+                                      [(or "lower" "lowercase" "down" "downcase") string-downcase]
+                                      [(or "title" "titlecase") string-titlecase]
+                                      [_ values]))
+                       (proc str)]
+                      [_ ""])) ; a string quad should always contain a string
   (struct-copy
    string-quad q:string
    [attrs #:parent quad (let ([attrs (quad-attrs q)])
                           (hash-ref! attrs :font-size default-font-size)
                           attrs)]
-   [elems #:parent quad (if cased-str (list cased-str) null)]
+   [elems #:parent quad (list cased-str)]
    [size #:parent quad (make-size-promise q cased-str)]))
 
 (define (generic->typed-quad q)
@@ -265,11 +267,20 @@
     (match pcs
       [(cons (? string-quad? strq) rest)
        (define-values (run-pcs rest) (splitf-at pcs (λ (p) (same-run? strq p))))
+       ;; run-pcs has at least one element (strq)
+       ;; and the other members are part of the same run.
+       ;; meaning, they share the same formatting, including character tracking.
+       
+       ;; we add a tracking adjustment because it only "appears"
+       ;; once characters are consolidated
+       (define tracking-adjustment
+         (* (sub1 (length run-pcs)) (quad-ref (car run-pcs) :font-tracking 0)))
        (define new-run
          (quad-copy q:string
                     [attrs (quad-attrs strq)]
                     [elems (merge-adjacent-strings (apply append (map quad-elems run-pcs)))]
-                    [size (delay (pt (sum-x run-pcs) (pt-y (size strq))))]))
+                    [size (delay (pt (+ (sum-x run-pcs) tracking-adjustment)
+                                     (pt-y (size strq))))]))
        (loop (cons new-run runs) rest)]
       [(cons first rest) (loop (cons first runs) rest)]
       [_ (reverse runs)])))
@@ -302,77 +313,84 @@
 (define (space-quad? q) (equal? (quad-elems q) (list " ")))
 
 (define (fill-line-wrap qs ending-q line-q)
-  (match (and (pair? qs)
-              (quad-ref (car qs) (if ending-q
-                                     :line-align
-                                     :line-align-last) "left"))
-    [align-value
-     ;; words may still be in hyphenated fragments
-     ;; (though soft hyphens would have been removed)
-     ;; so group them (but no need to consolidate — that happens elsewhere)
-     (define-values (word-space-sublists word-sublists) (partition* space-quad? qs))
-     (match (length word-sublists)
-       [1 #:when (equal? align-value "justify") qs] ; can't justify single word
-       [word-count
-        (match-define (list line-width line-height) (quad-size line-q))
-        (define hung-word-sublists
-          (match word-sublists
-            [(list sublists ... (list prev-qs ... last-q))
-             #:when (pair? (quad-elems last-q))
-             (define last-char-str (regexp-match #rx"[.,:;’-]$" (car (quad-elems last-q))))
-             (match last-char-str
-               [#false word-sublists]
-               [_ (define hanger-q (quad-copy last-q
-                                              [elems null]
-                                              [size (let ([p (make-size-promise last-q (car last-char-str))])
-                                                      (delay
-                                                        (match-define (list x y) (force p))
-                                                        (pt (- x) y)))]))
-                  (define last-sublist (append prev-qs (list last-q hanger-q)))
-                  (append sublists (list last-sublist))])]
-            [_ word-sublists]))
-        (define word-width (for/sum ([qs (in-list hung-word-sublists)])
-                                    (sum-x qs)))
-        (define word-space-width (for/sum ([qs (in-list word-space-sublists)])
-                                          (sum-x qs)))
-        (define empty-hspace (- line-width
-                                (quad-ref (car qs) :inset-left 0)
-                                word-width
-                                (quad-ref (car qs) :inset-right 0)))
-        (define line-overfull? (negative? (- empty-hspace word-space-width)))
+  (unless (pair? qs)
+    (raise-argument-error 'fill-line-wrap "nonempty list of quads" qs))
+  ;; happens before consolidation of runs
+  (define align-value (quad-ref (car qs) (if ending-q :line-align :line-align-last) "left"))
+  
+  ;; words may still be in hyphenated fragments
+  ;; (though soft hyphens would have been removed)
+  ;; so group them (but no need to consolidate — that happens elsewhere)
+  (define-values (word-space-sublists word-sublists) (partition* space-quad? qs))
+  (match (length word-sublists)
+    [1 #:when (equal? align-value "justify") qs] ; can't justify single word
+    [word-count
+     (match-define (list line-width line-height) (quad-size line-q))
+     (define hung-word-sublists
+       (match word-sublists
+         [(list sublists ... (list prev-qs ... last-q))
+          #:when (pair? (quad-elems last-q))
+          (define last-char-str (regexp-match #rx"[.,:;’-]$" (car (quad-elems last-q))))
+          (match last-char-str
+            [#false word-sublists]
+            [_ (define hanger-q (quad-copy last-q
+                                           [elems null]
+                                           [size (let ([p (make-size-promise last-q (car last-char-str))])
+                                                   (delay
+                                                     (match-define (list x y) (force p))
+                                                     (pt (- x) y)))]))
+               (define last-sublist (append prev-qs (list last-q hanger-q)))
+               (append sublists (list last-sublist))])]
+         [_ word-sublists]))
+     (define word-width (for/sum ([qs (in-list hung-word-sublists)])
+                                 (+  (sum-x qs)
+                                     (match qs
+                                       [(list (? string-quad? sq))
+                                        ;; strings need tracking adjustment
+                                        (define tracking-val (quad-ref sq :font-tracking 0))
+                                        (define word-str (car (quad-elems sq)))
+                                        (* (sub1 (string-length word-str)) tracking-val)]
+                                       [_ 0]))))
+     (define word-space-width (for/sum ([qs (in-list word-space-sublists)])
+                                       (sum-x qs)))
+     (define empty-hspace (- line-width
+                             (quad-ref (car qs) :inset-left 0)
+                             word-width
+                             (quad-ref (car qs) :inset-right 0)))
+     (define line-overfull? (negative? (- empty-hspace word-space-width)))
 
-        (cond
-          [(or (equal? align-value "justify")
-               ;; force justification upon overfull lines
-               (and line-overfull? (> word-count 1)))
-           (define justified-space-width (/ empty-hspace (sub1 word-count)))
-           (apply append (add-between hung-word-sublists (list (make-quad
-                                                                #:from 'bo
-                                                                #:to 'bi
-                                                                #:draw-end q:string-draw-end
-                                                                #:size (pt justified-space-width line-height)))))]
-          [else
-           (define space-multiplier (match align-value
-                                      ["left" 0]
-                                      ["center" 0.5]
-                                      ;; fill inner & outer as if they were right,
-                                      ;; they will be corrected later, when pagination is known.
-                                      [(or "right" "inner" "outer") 1]))
-           ;; subtact space-width because that appears between words
-           ;; we only care about redistributing the space on the ends
-           (define end-hspace (- empty-hspace word-space-width))
-           ;; make filler a leading quad, not a parent / grouping quad,
-           ;; so that elements can still be reached by consolidate-runs
-           (define fq (make-quad #:type filler-quad
-                                 #:id 'line-filler
-                                 #:from-parent (quad-from-parent (car qs))
-                                 #:from 'bo
-                                 #:to 'bi
-                                 #:size (pt (* end-hspace space-multiplier) 0)
-                                 #:attrs (quad-attrs (car qs))))
-           (list* fq
-                  (quad-update! (car qs) [from-parent #f])
-                  (cdr qs))])])]))
+     (cond
+       [(or (equal? align-value "justify")
+            ;; force justification upon overfull lines
+            (and line-overfull? (> word-count 1)))
+        (define justified-space-width (/ empty-hspace (sub1 word-count)))
+        (apply append (add-between hung-word-sublists (list (make-quad
+                                                             #:from 'bo
+                                                             #:to 'bi
+                                                             #:draw-end q:string-draw-end
+                                                             #:size (pt justified-space-width line-height)))))]
+       [else
+        (define space-multiplier (match align-value
+                                   ["left" 0]
+                                   ["center" 0.5]
+                                   ;; fill inner & outer as if they were right,
+                                   ;; they will be corrected later, when pagination is known.
+                                   [(or "right" "inner" "outer") 1]))
+        ;; subtact space-width because that appears between words
+        ;; we only care about redistributing the space on the ends
+        (define end-hspace (- empty-hspace word-space-width))
+        ;; make filler a leading quad, not a parent / grouping quad,
+        ;; so that elements can still be reached by consolidate-runs
+        (define fq (make-quad #:type filler-quad
+                              #:id 'line-filler
+                              #:from-parent (quad-from-parent (car qs))
+                              #:from 'bo
+                              #:to 'bi
+                              #:size (pt (* end-hspace space-multiplier) 0)
+                              #:attrs (quad-attrs (car qs))))
+        (list* fq
+               (quad-update! (car qs) [from-parent #f])
+               (cdr qs))])]))
 
 (define-quad offsetter-quad quad)
 
