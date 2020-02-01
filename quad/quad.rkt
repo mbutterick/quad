@@ -32,7 +32,7 @@
 (define (hashes-equal? h1 h2)
   (and (= (length (hash-keys h1)) (length (hash-keys h2)))
        (for/and ([(k v) (in-hash h1)])
-         (and (hash-has-key? h2 k) (equal? (hash-ref h2 k) v)))))
+                (and (hash-has-key? h2 k) (equal? (hash-ref h2 k) v)))))
 
 (define (quad=? q1 q2 [recur? #t])
   (and
@@ -40,7 +40,7 @@
    (for/and ([getter (in-list (list quad-elems quad-size quad-from-parent quad-from quad-to 
                                     quad-shift quad-shift-elems quad-from-parent quad-origin quad-printable
                                     quad-draw-start quad-draw-end quad-draw))])
-     (equal? (getter q1) (getter q2)))
+            (equal? (getter q1) (getter q2)))
    ;; and compare them key-by-key
    (hashes-equal? (quad-attrs q1) (quad-attrs q2))))
 
@@ -94,11 +94,20 @@
 (define-syntax-rule (quad-copy QID [K V] ...)
   (struct-copy quad QID [K V] ...))
 
+(struct quad-attr (key default-val) #:transparent)
 
-(define (quad-ref q key [default-val #f])
-  (hash-ref (quad-attrs q) key (match default-val
-                                 [(? procedure? proc) (proc)]
-                                 [val val])))
+(define (make-quad-attr key [default-val #f])
+  (quad-attr key default-val))
+
+(define (quad-ref q key-arg [default-val-arg #f])
+  (define key (match key-arg
+                #;[(quad-attr key _) key]
+                [_ key-arg]))
+  (define default-val #;(cond
+                        [default-val-arg]
+                        [(quad-attr? key-arg) (quad-attr-default-val key-arg)]
+                        [else #false]) default-val-arg)
+  (hash-ref (quad-attrs q) key default-val))
 
 (define (quad-set! q key val)
   (hash-set! (quad-attrs q) key val)
@@ -108,7 +117,7 @@
   (syntax-case stx ()
     [(_ ID [K V] ...)
      (with-syntax ([(K-SETTER ...) (for/list ([kstx (in-list (syntax->list #'(K ...)))])
-                                     (format-id kstx "set-quad-~a!" kstx))])
+                                             (format-id kstx "set-quad-~a!" kstx))])
        #'(let ([q ID])
            (K-SETTER q V) ...
            q))]))

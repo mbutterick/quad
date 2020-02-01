@@ -50,8 +50,11 @@
      (font-size doc (quad-ref q :font-size default-font-size))
      (fill-color doc (quad-ref q :font-color default-font-color))
      (match-define (list x y) (or origin-in (quad-origin q)))
-     (text doc str x (- y  (quad-ref q :font-baseline-shift 0))
-           #:tracking (quad-ref q :font-tracking 0)
+     (define tracking (quad-ref q :font-tracking 0))
+     ;; we adjust x by half tracking because by convention, string quads have half tracking at beginning & end
+     ;; whereas PDF drawing only puts tracking between the glyphs.
+     (text doc str (+ x (/ tracking 2.0)) (- y (quad-ref q :font-baseline-shift 0))
+           #:tracking tracking
            #:bg (quad-ref q :bg)
            #:features (quad-ref q :font-features default-font-features)
            #:link (quad-ref q :link))]))
@@ -99,26 +102,35 @@
                    #:draw q:image-draw
                    #:draw-end q:image-draw-end))
 
-(define (make-size-promise q [str-arg #f])
+(define soft-hyphen-string "\u00AD")
+
+(define (make-size-promise-for-string q [str-arg #f])
+  ;; we know sensible defaults for all text properties have been set up during atomization.
   (delay
-    (define pdf (current-pdf))
-    (define str (cond
-                  [str-arg]
-                  [(pair? (quad-elems q)) (unsafe-car (quad-elems q))]
-                  [else #false]))
-    (define string-size
-      (cond
-        [str
-         (font-size pdf (quad-ref q :font-size default-font-size))
-         (font pdf (path->string (quad-ref q font-path-key default-font-face)))
-         (define tracking-val (quad-ref q :font-tracking 0))
-         (match str
-           ["\u00AD" tracking-val]
-           [_ (+ (string-width pdf str
+    (define q-string-width
+      (let ([str (cond
+                   [str-arg]
+                   [else (match (quad-elems q)
+                           [(cons q _) q]
+                           [_ #false])])])
+        (cond
+          [(positive? (string-length str))
+           (define pdf (current-pdf))
+           (font-size pdf (quad-ref q :font-size))
+           (font pdf (path->string (quad-ref q font-path-key)))
+           (define tracking-val (quad-ref q :font-tracking 0))
+           (cond
+             [(equal? str soft-hyphen-string) tracking-val]
+             [else ;; `string-width` only applies tracking between glyphs.
+              ;; we add an extra tracking-val because we want to count tracking on every glyph.
+              ;; because at this stage, we don't know whether the quad will be freestanding or adjacent to another
+              ;; probably adjacent. And if so, it should have half tracking on the ends, full tracking in between
+              (+ (string-width pdf str
                                #:tracking tracking-val
-                               #:features (quad-ref q :font-features default-font-features)))])]
-        [else 0]))
-    (list string-size (quad-ref q :line-height default-line-height))))
+                               #:features (quad-ref q :font-features))
+                 tracking-val)])]
+          [else 0])))
+    (list q-string-width (quad-ref q :line-height))))
 
 (define (convert-break-quad q)
   ;; this is verbose & ugly because `struct-copy` is a macro
@@ -202,7 +214,7 @@
                           (hash-ref! attrs :font-size default-font-size)
                           attrs)]
    [elems #:parent quad (list cased-str)]
-   [size #:parent quad (make-size-promise q cased-str)]))
+   [size #:parent quad (make-size-promise-for-string q cased-str)]))
 
 (define (generic->typed-quad q)
   ;; replaces quads representing certain things
@@ -262,7 +274,7 @@
   (and (pair? (quad-elems q))
        (member (unsafe-car (quad-elems q)) softies)))
 
-(define (consolidate-runs pcs ending-q)
+(define (consolidate-runs pcs)
   (let loop ([runs empty][pcs pcs])
     (match pcs
       [(cons (? string-quad? strq) rest)
@@ -279,8 +291,7 @@
          (quad-copy q:string
                     [attrs (quad-attrs strq)]
                     [elems (merge-adjacent-strings (apply append (map quad-elems run-pcs)))]
-                    [size (delay (pt (+ (sum-x run-pcs) tracking-adjustment)
-                                     (pt-y (size strq))))]))
+                    [size (delay (pt (sum-x run-pcs) (pt-y (size strq))))]))
        (loop (cons new-run runs) rest)]
       [(cons first rest) (loop (cons first runs) rest)]
       [_ (reverse runs)])))
@@ -299,7 +310,7 @@
      (append head
              (list (quad-update! last-q
                                  [elems (list str+hyphen)]
-                                 [size (make-size-promise last-q str+hyphen)])))]
+                                 [size (make-size-promise-for-string last-q str+hyphen)])))]
     [_ qs]))
 
 
@@ -312,63 +323,71 @@
 
 (define (space-quad? q) (equal? (quad-elems q) (list " ")))
 
-(define (fill-line-wrap qs ending-q line-q)
+(define (hang-punctuation nonspacess)
+  (match nonspacess
+    [(list sublists ... (list prev-qs ... last-q))
+     #:when (pair? (quad-elems last-q))
+     (match (regexp-match #rx"[.,:;’-]$" (car (quad-elems last-q)))
+       [#false nonspacess]
+       [last-char-str
+        (define hanger-q (quad-copy last-q
+                                    [elems null]
+                                    [size (let ([p (make-size-promise-for-string last-q (car last-char-str))])
+                                            (delay
+                                              (match-define (list x y) (force p))
+                                              (pt (- x) y)))]))
+        (define last-sublist (append prev-qs (list last-q hanger-q)))
+        (append sublists (list last-sublist))])]
+    [_ nonspacess]))
+
+(define (sum-sum-x qss)
+  (for/sum ([qs (in-list qss)])
+           (sum-x qs)))
+
+(define (tracking-adjustment q)
+  (match q
+    [(? string-quad?) (/ (quad-ref q :font-tracking 0) 2.0)]
+    [_ 0]))
+
+(define (fill-line-wrap qs q-after line-prototype)
+  ;; happens during the finish of a line wrap, before consolidation of runs
   (unless (pair? qs)
     (raise-argument-error 'fill-line-wrap "nonempty list of quads" qs))
-  ;; happens before consolidation of runs
-  (define align-value (quad-ref (car qs) (if ending-q :line-align :line-align-last) "left"))
+
+  (match-define (and (cons q-first other-qs) (list _ ... q-last)) qs)
+  (define last-line-in-paragraph? (not q-after))
+  (define align-value (quad-ref q-first (if last-line-in-paragraph? :line-align-last :line-align) "left"))
   
   ;; words may still be in hyphenated fragments
   ;; (though soft hyphens would have been removed)
   ;; so group them (but no need to consolidate — that happens elsewhere)
-  (define-values (word-space-sublists word-sublists) (partition* space-quad? qs))
-  (match (length word-sublists)
+  (define-values (spacess nonspacess) (partition* space-quad? qs))
+  (match (length nonspacess)
     [1 #:when (equal? align-value "justify") qs] ; can't justify single word
-    [word-count
-     (match-define (list line-width line-height) (quad-size line-q))
-     (define hung-word-sublists
-       (match word-sublists
-         [(list sublists ... (list prev-qs ... last-q))
-          #:when (pair? (quad-elems last-q))
-          (define last-char-str (regexp-match #rx"[.,:;’-]$" (car (quad-elems last-q))))
-          (match last-char-str
-            [#false word-sublists]
-            [_ (define hanger-q (quad-copy last-q
-                                           [elems null]
-                                           [size (let ([p (make-size-promise last-q (car last-char-str))])
-                                                   (delay
-                                                     (match-define (list x y) (force p))
-                                                     (pt (- x) y)))]))
-               (define last-sublist (append prev-qs (list last-q hanger-q)))
-               (append sublists (list last-sublist))])]
-         [_ word-sublists]))
-     (define word-width (for/sum ([qs (in-list hung-word-sublists)])
-                                 (+  (sum-x qs)
-                                     (match qs
-                                       [(list (? string-quad? sq))
-                                        ;; strings need tracking adjustment
-                                        (define tracking-val (quad-ref sq :font-tracking 0))
-                                        (define word-str (car (quad-elems sq)))
-                                        (* (sub1 (string-length word-str)) tracking-val)]
-                                       [_ 0]))))
-     (define word-space-width (for/sum ([qs (in-list word-space-sublists)])
-                                       (sum-x qs)))
-     (define empty-hspace (- line-width
-                             (quad-ref (car qs) :inset-left 0)
-                             word-width
-                             (quad-ref (car qs) :inset-right 0)))
-     (define line-overfull? (negative? (- empty-hspace word-space-width)))
-
+    [nonspacess-count
+     (match-define (list line-prototype-width line-prototype-height) (quad-size line-prototype))
+     (define hung-nonspacess (hang-punctuation nonspacess))
+     (define left-tracking-adjustment (tracking-adjustment q-first))
+     (define right-tracking-adjustment (tracking-adjustment q-last))
+     (define nonspace-total-width
+       (- (sum-sum-x hung-nonspacess) left-tracking-adjustment right-tracking-adjustment))
+     (define space-total-width (sum-sum-x spacess))
+     (define empty-hspace (- line-prototype-width
+                             (quad-ref q-first :inset-left 0)
+                             nonspace-total-width
+                             (quad-ref q-first :inset-right 0)))
+     
      (cond
        [(or (equal? align-value "justify")
-            ;; force justification upon overfull lines
-            (and line-overfull? (> word-count 1)))
-        (define justified-space-width (/ empty-hspace (sub1 word-count)))
-        (apply append (add-between hung-word-sublists (list (make-quad
-                                                             #:from 'bo
-                                                             #:to 'bi
-                                                             #:draw-end q:string-draw-end
-                                                             #:size (pt justified-space-width line-height)))))]
+            (let ([line-overfull? (negative? (- empty-hspace space-total-width))])
+              ;; force justification upon overfull lines
+              (and line-overfull? (> nonspacess-count 1))))
+        (define justified-space-width (/ empty-hspace (sub1 nonspacess-count)))
+        (apply append (add-between hung-nonspacess (list (make-quad
+                                                          #:from 'bo
+                                                          #:to 'bi
+                                                          #:draw-end q:string-draw-end
+                                                          #:size (pt justified-space-width line-prototype-height)))))]
        [else
         (define space-multiplier (match align-value
                                    ["left" 0]
@@ -378,19 +397,20 @@
                                    [(or "right" "inner" "outer") 1]))
         ;; subtact space-width because that appears between words
         ;; we only care about redistributing the space on the ends
-        (define end-hspace (- empty-hspace word-space-width))
+        (define end-hspace (- empty-hspace space-total-width))
         ;; make filler a leading quad, not a parent / grouping quad,
         ;; so that elements can still be reached by consolidate-runs
         (define fq (make-quad #:type filler-quad
                               #:id 'line-filler
-                              #:from-parent (quad-from-parent (car qs))
+                              #:from-parent (quad-from-parent q-first)
                               #:from 'bo
                               #:to 'bi
+                              #:shift (pt (- left-tracking-adjustment) 0)
                               #:size (pt (* end-hspace space-multiplier) 0)
-                              #:attrs (quad-attrs (car qs))))
+                              #:attrs (quad-attrs q-first)))
         (list* fq
-               (quad-update! (car qs) [from-parent #f])
-               (cdr qs))])]))
+               (quad-update! q-first [from-parent #f])
+               other-qs)])]))
 
 (define-quad offsetter-quad quad)
 
@@ -398,7 +418,7 @@
   (match-define (list left top) (quad-origin dq))
   (match-define (list right bottom) (size dq))
   (save doc)
-  (translate doc left (+ top (/ bottom 2)))
+  (translate doc left (+ top (/ bottom 2.0)))
   (move-to doc 0 0)
   (line-to doc right 0)
   (line-width doc 0.5)
@@ -408,43 +428,45 @@
 (define (make-hr-quad line-q)
   (quad-copy line-q [draw-start hr-draw]))
 
-(define ((line-wrap-finish line-q) pcs-in opening-q ending-q idx)
+(define ((line-wrap-finish line-prototype-q default-block-id) wrap-qs q-before q-after idx)
   ;; we curry line-q so that the wrap size can be communicated to this operation
   ;; remove unused soft hyphens so they don't affect final shaping
-  (define pcs-printing (for/list ([pc (in-list pcs-in)]
-                                  #:unless (equal? (quad-elems pc) '("\u00AD")))
-                                 pc))
+  (define wrap-qs-printing (for/list ([wq (in-list wrap-qs)]
+                                      #:unless (equal? (quad-elems wq) '("\u00AD")))
+                                     wq))
   (define new-lines
     (cond
-      [(empty? pcs-printing) null]
-      [(hr-break-quad? ending-q) (list (make-hr-quad line-q))]
+      [(empty? wrap-qs-printing) null]
+      [(hr-break-quad? q-after) (list (make-hr-quad line-prototype-q))]
       [else
        ;; render hyphen first so that all printable characters are available for size-dependent ops.
-       (define pcs-with-hyphen (render-hyphen pcs-printing ending-q))
+       (define pcs-with-hyphen (render-hyphen wrap-qs-printing q-after))
        ;; fill wrap so that consolidate-runs works properly
        ;; (justified lines won't be totally consolidated)
-       (define pcs (fill-line-wrap pcs-with-hyphen ending-q line-q))
-       (match (consolidate-runs pcs ending-q)
-         [(? pair? elems)
-          (define elem (unsafe-car elems))
-          (match-define (list line-width line-height) (quad-size line-q))
-          (define new-size
-            (let ([line-heights
-                   (filter-map
-                    (λ (q) (or (quad-ref q :line-height) (pt-y (size q))))
-                    pcs)])
-              (pt line-width (if (empty? line-heights)
-                                 line-height
-                                 (apply max line-heights)))))
+       (define pcs (fill-line-wrap pcs-with-hyphen q-after line-prototype-q))
+       (match (consolidate-runs pcs)
+         [(and (cons elem-first _) elems)
+          (match-define (list line-width line-height) (quad-size line-prototype-q))
           (list
            (quad-copy
-            line-q
+            line-prototype-q
             ;; move block attrs up, so they are visible in col wrap
-            [attrs (copy-block-attrs (quad-attrs elem)
-                                     (hash-copy (quad-attrs line-q)))]
+            [attrs (let ([h (copy-block-attrs (quad-attrs elem-first) (hash-copy (quad-attrs line-prototype-q)))])
+                     ;; we want every group of lines in a paragraph to have a block id
+                     ;; so that it will be wrapped as a block later.
+                     ;; we only set this if there is no value for :display.
+                     (hash-ref! h :display default-block-id)
+                     ;; move the line-align-last into the line-align slot
+                     ;; so subsequent operations don't have to care about last-ness.
+                     (define last-line? (not q-after))
+                     (when last-line?
+                       (hash-set! h :line-align (hash-ref h :line-align-last "left")))
+                     h)]
             ;; line width is static
             ;; line height is the max 'line-height value or the natural height of q:line
-            [size new-size]
+            [size (pt line-width (match (filter-map (λ (q) (or (quad-ref q :line-height) (pt-y (size q)))) pcs)
+                                   [(? null?) line-height]
+                                   [line-heights (apply max line-heights)]))]
             ;; handle list indexes. drop new quad into line to hold list index
             ;; could also use this for line numbers
             [elems
@@ -454,35 +476,34 @@
              ;; this is safe because line has already been filled.
              (append
               ;; only put bullet into line if we're at the first line of the list item
-              (match (and (eq? idx 1) (quad-ref elem :list-index))
+              (match (and (eq? idx 1) (quad-ref elem-first :list-index))
                 [#false null]
                 [bullet
                  (define bq (quad-copy q:string ;; copy q:string to get draw routine
                                        ;; borrow attrs from elem
-                                       [attrs (quad-attrs elem)]
+                                       [attrs (quad-attrs elem-first)]
                                        ;; use bullet as elems
                                        [elems (list (if (number? bullet) (format "~a." bullet) bullet))]
                                        ;; size doesn't matter because nothing refers to this quad
                                        ;; just for debugging box
-                                       [size (pt 15 (pt-y (size line-q)))]))
+                                       [size (pt 15 (pt-y (size line-prototype-q)))]))
                  (from-parent (list bq) 'sw)])
               (from-parent
-               (match (quad-ref elem :inset-left 0)
+               (match (quad-ref elem-first :inset-left 0)
                  [0 elems]
-                 [inset-val
-                  (cons (make-quad
-                         #:draw-end q:string-draw-end
-                         #:to 'sw
-                         #:size (pt inset-val 5)
-                         #:type offsetter-quad)
-                        elems)]) 'sw))]))]
+                 [inset-val (cons (make-quad
+                                   #:draw-end q:string-draw-end
+                                   #:to 'sw
+                                   #:size (pt inset-val 5)
+                                   #:type offsetter-quad)
+                                  elems)]) 'sw))]))]
          [_ null])]))
   (define maybe-first-line (and (pair? new-lines) (car new-lines)))
-  (append (match opening-q
+  (append (match q-before
             [#false (list (make-paragraph-spacer maybe-first-line :space-before 0))] ; paragraph break
             [_ null])
           new-lines
-          (match ending-q
+          (match q-after
             [(? column-break-quad? column-break) (list column-break)] ; hard column (or section or page) break
             [#false (list (make-paragraph-spacer maybe-first-line :space-after (* default-line-height 0.6)))] ; paragraph break
             [_ null]))) ; hard line break
@@ -517,6 +538,7 @@
      (define res
        (apply append
               (for/list ([para-qs (in-list para-qss)])
+                        (define block-id (gensym))
                         (match para-qs
                           [(? break-quad? bq) (list bq)]
                           [(cons pq _)
@@ -531,7 +553,7 @@
                                             [_ #false])
                                  #:hard-break line-break-quad?
                                  #:soft-break soft-break-for-line?
-                                 #:finish-wrap (line-wrap-finish line-q))]))))
+                                 #:finish-wrap (line-wrap-finish line-q block-id))]))))
      res]
     [_ null]))
 
@@ -719,20 +741,21 @@
   (when (draw-debug-block?)
     (draw-debug q doc "#6c6" "#9c9")))
 
-(define/match (lines->block lines)
-  [((cons line _))
-   (q #:from 'sw
-      #:to 'nw
-      #:elems (from-parent lines 'nw)
-      #:id 'block
-      #:attrs (quad-attrs line)
-      #:size (delay (pt (pt-x (size line)) ; 
-                        (+ (sum-y lines)
-                           (quad-ref line :inset-top 0)
-                           (quad-ref line :inset-bottom 0))))
-      #:shift-elems (pt 0 (quad-ref line :inset-top 0))
-      #:draw-start (block-draw-start line)
-      #:draw-end (block-draw-end line))])
+(define (lines->block lines)
+  (match lines
+    [(cons line _)
+     (q #:from 'sw
+        #:to 'nw
+        #:elems (from-parent lines 'nw)
+        #:id 'block
+        #:attrs (quad-attrs line)
+        #:size (delay (pt (pt-x (size line)) ; 
+                          (+ (sum-y lines)
+                             (quad-ref line :inset-top 0)
+                             (quad-ref line :inset-bottom 0))))
+        #:shift-elems (pt 0 (quad-ref line :inset-top 0))
+        #:draw-start (block-draw-start line)
+        #:draw-end (block-draw-end line))]))
 
 (define/match (from-parent qs [where #f])
   ;; doesn't change any positioning. doesn't depend on state. can happen anytime.
@@ -811,19 +834,21 @@ https://github.com/mbutterick/typesetter/blob/882ec681ad1fa6eaee6287e53bc4320d96
                            (quad-update! fn-line
                                          [from 'nw]
                                          [to 'sw])) 'sw))
-  (quad-update! (car cols)
-                [elems (append (quad-elems (car cols)) reversed-fn-lines)])
+  (when (pair? cols)
+    (quad-update! (car cols)
+                  [elems (append (quad-elems (car cols)) reversed-fn-lines)]))
   (define col-spacer (quad-copy q:column-spacer [size (pt column-gap (and 'arbitrary-irrelevant-value 100))]))
   (add-between cols col-spacer))
 
 (verbose-quad-printing? #t)
-(define ((page-wrap-finish make-page-quad path) cols q0 q page-idx)
+(define ((page-wrap-finish make-page-quad path) cols q-before q-after page-idx)
   (define page-quad (make-page-quad (+ (section-pages-used) page-idx)))
-  ;; get attrs from cols if we can, otherwise try q or q0
+  ;; get attrs from cols if we can, otherwise try q-after or q-before
   (define q-for-attrs (cond
                         [(pair? cols) (car cols)]
-                        [q]
-                        [q0]))
+                        [q-after]
+                        [q-before]
+                        [else (raise-argument-error 'page-wrap-finish "quad with attrs" (list cols q-after q-before))]))
   (define elems
     (append
      (match (quad-ref q-for-attrs :footer-display #true)

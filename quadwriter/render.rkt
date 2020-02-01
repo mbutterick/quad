@@ -153,6 +153,7 @@
     (qexpr->quad (list 'q (list->attrs
                            :font-family default-font-family
                            :font-size (number->string default-font-size)
+                           :font-features default-font-features
                            :line-height (number->string (floor (* default-line-height-multiplier default-font-size)))) qexpr)))
   (setup-font-path-table! base-dir)
   (let* ([qs (atomize q
@@ -328,13 +329,14 @@
   (for* ([(page page-idx) (in-indexed (for*/list ([section (in-list (quad-elems doc))]
                                                   [page (in-list (quad-elems section))])
                                                  page))]
+        ;; all inner / outer lines are initially filled as if they were right-aligned
+         [zero-filler-side (in-value (if (odd? (add1 page-idx)) "inner" "outer"))]
          [col (in-list (quad-elems page))]
          [block (in-list (quad-elems col))]
          [line (in-list (quad-elems block))])
-        ;; all inner / outer lines are initially filled as if they were right-aligned
-        (define zero-filler-side (if (odd? (add1 page-idx)) "inner" "outer"))
         (when (equal? zero-filler-side (quad-ref line :line-align))
           (match (quad-elems line)
+            ;; collapse the filler quad by setting size to 0
             [(cons (? filler-quad? fq) _) (set-quad-size! fq (pt 0 0))]
             [_ (void)])))
   doc)
