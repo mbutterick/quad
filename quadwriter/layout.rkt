@@ -596,16 +596,16 @@
     (define idx (add1 idx0))
     ;; always catch last line of block in this case
     ;; so later cases are guaranteed to have earlier lines.
+    (define keep-first (quad-ref ln :keep-first-lines))
+    (define keep-last (quad-ref ln :keep-last-lines))
     (unless (eq? idx group-len)
       (when (or
-             ;; if we have :keep-all we can skip :keep-first and :keep-last cases
-             (quad-ref ln :keep-all-lines)
+             ;; if we have keep all we can skip :keep-first and :keep-last cases
+             (or (equal? keep-first "all") (equal? keep-last "all"))
              ;; to keep n lines, we only paint the first n - 1
              ;; (because each nobr line sticks to the next)
-             (let ([keep-first (quad-ref ln :keep-first-lines)])
-               (and (number? keep-first) (< idx keep-first)))
-             (let ([keep-last (quad-ref ln :keep-last-lines)])
-               (and (number? keep-last) (< (- group-len keep-last) idx))))
+             (and (number? keep-first) (< idx keep-first))
+             (and (number? keep-last) (< (- group-len keep-last) idx)))
         (make-nobreak! ln)))
     (cons ln reversed-lines)))
 

@@ -575,11 +575,10 @@ Vertical space added around a block. Value is a @tech{dimension string}.
 }
 
 @deftogether[(@defthing[#:kind "attribute" keep-first-lines symbol?]
-              @defthing[#:kind "attribute" keep-last-lines symbol?]
-              @defthing[#:kind "attribute" keep-all-lines symbol?])]{
-How many lines of the quad are kept together near a page break. @racket[keep-first-lines] sets the minimum number of lines that appear before a page break; @racket[keep-last-lines] sets the minimum number that appear after. In both cases, they take a non-negative integer string as a value.
+              @defthing[#:kind "attribute" keep-last-lines symbol?])]{
+How many lines of the quad are kept together near a page break. @racket[keep-first-lines] sets the minimum number of lines that appear before a page break; @racket[keep-last-lines] sets the minimum number that appear after. In both cases, they take a non-negative integer string as a value, or @racket["all"]. 
 
-@racket[keep-all-lines] keeps all the lines of a quad on the same page. Activated only when value is @racket["true"]. Be careful with this option — it's possible to make a single quad that is longer than one page, in which case @racketmodname[quadwriter] will ignore the setting to prevent an impossible situation.
+If the value (of one or both attributes) is @racket["all"], then all the lines of the quad are kept the same page. Be careful with this option — it's possible to make a single quad that is longer than one page, in which case @racketmodname[quadwriter] will ignore the setting to prevent an impossible situation.
 }
 
 @defthing[#:kind "attribute" keep-with-next symbol?]{

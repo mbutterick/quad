@@ -68,7 +68,7 @@
                   :inset-bottom "8"
                   :inset-left "30"
                   :inset-right "30"
-                  :keep-all-lines "yes")
+                  :keep-first-lines "all")
                  attrs) exprs))
 
 (define id (default-tag-function 'id))
