@@ -123,9 +123,9 @@
                              complete-every-path!
                              resolve-font-path!
                              resolve-font-size!
+                             ;; we resolve font tracking & line height after font size
+                             ;; because they can be denoted relative to font size
                              resolve-font-tracking!
-                             ;; we resolve line height after font size
-                             ;; because line height might be dependent
                              resolve-line-height! 
                              parse-font-features!))])
        (proc attrs)))

@@ -34,7 +34,7 @@
   (qexpr (list->attrs
           :line-height "false"
           :image-height "150"
-          :line-align-last "center" ; need `last` because img is a block-level element.
+          :line-align "center" ; need `last` because img is a block-level element.
           :image-file (second (assq 'src attrs))
           :image-alt (second (assq 'alt attrs))
           :display "block") exprs))

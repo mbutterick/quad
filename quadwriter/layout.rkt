@@ -349,14 +349,13 @@
     [(? string-quad?) (/ (quad-ref q :font-tracking 0) 2.0)]
     [_ 0]))
 
-(define (fill-line-wrap qs q-after line-prototype)
+(define (fill-line-wrap qs line-prototype last-line-in-paragraph?)
   ;; happens during the finish of a line wrap, before consolidation of runs
   (unless (pair? qs)
     (raise-argument-error 'fill-line-wrap "nonempty list of quads" qs))
 
   (match-define (and (cons q-first other-qs) (list _ ... q-last)) qs)
-  (define last-line-in-paragraph? (not q-after))
-  (define align-value (quad-ref q-first (if last-line-in-paragraph? :line-align-last :line-align) "left"))
+  (define align-value (quad-ref q-first :line-align "left"))
   
   ;; words may still be in hyphenated fragments
   ;; (though soft hyphens would have been removed)
@@ -388,11 +387,15 @@
                   #:attrs (quad-attrs q-first)))
      
      (cond
-       [(or (equal? align-value "justify")
-            (let ([line-overfull? (negative? (- empty-hspace space-total-width))])
-              ;; force justification upon overfull lines,
-              ;; which amounts to shrinking the word spaces till the line fits
-              (and line-overfull? (> nonspacess-count 1))))
+       [(or
+         (and (equal? align-value "justify") (or (not last-line-in-paragraph?)
+                                                 ;; don't justify the last line in a paragraph
+                                                 ;; unless empty space is less than 17% of width (an arbitrary visual threshold)
+                                                 (< (/ empty-hspace line-prototype-width 1.0) .17)))
+         (let ([line-overfull? (negative? (- empty-hspace space-total-width))])
+           ;; force justification upon overfull lines,
+           ;; which amounts to shrinking the word spaces till the line fits
+           (and line-overfull? (> nonspacess-count 1))))
         (define justified-space-width (/ empty-hspace (sub1 nonspacess-count)))
         (cons (make-left-edge-filler)
               (apply append (add-between hung-nonspacess (list (make-quad
@@ -402,11 +405,12 @@
                                                                 #:size (pt justified-space-width line-prototype-height))))))]
        [else
         (define space-multiplier (match align-value
-                                   ["left" 0]
                                    ["center" 0.5]
                                    ;; fill inner & outer as if they were right,
                                    ;; they will be corrected later, when pagination is known.
-                                   [(or "right" "inner" "outer") 1]))
+                                   [(or "right" "inner" "outer") 1]
+                                   ;; "left" and "justify" are handled here
+                                   [_ 0]))
         ;; subtact space-width because that appears between words
         ;; we only care about redistributing the space on the ends
         (define end-hspace (- empty-hspace space-total-width))
@@ -447,7 +451,8 @@
        (define pcs-with-hyphen (render-hyphen wrap-qs-printing q-after))
        ;; fill wrap so that consolidate-runs works properly
        ;; (justified lines won't be totally consolidated)
-       (define pcs (fill-line-wrap pcs-with-hyphen q-after line-prototype-q))
+       (define last-line-in-paragraph? (not q-after))
+       (define pcs (fill-line-wrap pcs-with-hyphen line-prototype-q last-line-in-paragraph?))
        (match (consolidate-runs pcs)
          [(and (cons elem-first _) elems)
           (match-define (list line-width line-height) (quad-size line-prototype-q))
@@ -460,11 +465,6 @@
                      ;; so that it will be wrapped as a block later.
                      ;; we only set this if there is no value for :display.
                      (hash-ref! h :display default-block-id)
-                     ;; move the line-align-last into the line-align slot
-                     ;; so subsequent operations don't have to care about last-ness.
-                     (define last-line? (not q-after))
-                     (when last-line?
-                       (hash-set! h :line-align (hash-ref h :line-align-last "left")))
                      h)]
             ;; line width is static
             ;; line height is the max 'line-height value or the natural height of q:line

@@ -149,7 +149,6 @@ Naming guidelines
                            keep-with-next
 
                            line-align
-                           line-align-last ; separate from line-align because last line is usually short
 
                            first-line-indent
 
