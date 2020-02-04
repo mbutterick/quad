@@ -20,7 +20,7 @@
     [(? string? str)
      (match (regexp-match #px"^(-?[0-9\\.]+)\\s*([a-z]+)$"  (string-downcase str))
        [#false str] ; a string other than a dimension string, so leave it
-       [(list _ num-string unit)
+       [(list str num-string unit)
         ((match unit
            [(regexp #rx"(pt|point)(s)?$") values] ; points
            [(regexp #rx"in(ch(es)?)?$") in->pts] ; inches
@@ -29,7 +29,7 @@
            [(regexp #rx"ems?$") (if em-resolution-attrs
                                     (λ (num) (* (hash-ref em-resolution-attrs :font-size) num))
                                     ;; if we don't have attrs for resolving the em string, we leave it alone
-                                    (λ (num) (format "~aem" num)))] ; em
+                                    (λ (num) str))] ; em
            [_ (raise-argument-error 'parse-dimension "dimension string" str)]) (string->number num-string))])]))
 
 (define (copy-block-attrs source-hash dest-hash)
@@ -147,7 +147,6 @@ Naming guidelines
                       
                            keep-first-lines
                            keep-last-lines
-                           keep-all-lines
 
                            keep-with-next
 
