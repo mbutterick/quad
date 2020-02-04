@@ -141,11 +141,11 @@
   (append min-origin max-outer-pt))
 
 (define (attach-to from-q from-pt to-q to-pt)
-  (quad-update! to-q
-                [from-parent from-pt]
-                [to to-pt])
-  (quad-update! from-q
-                [elems (cons to-q (quad-elems from-q))]))
+  (struct-copy quad from-q
+               [elems (cons (struct-copy quad to-q
+                                         [from-parent from-pt]
+                                         [to to-pt])
+                            (quad-elems from-q))]))
 
 (module+ test
   (require rackunit)
