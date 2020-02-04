@@ -376,18 +376,30 @@
                              (quad-ref q-first :inset-left 0)
                              nonspace-total-width
                              (quad-ref q-first :inset-right 0)))
+
+     (define (make-left-edge-filler [width 0])
+       (make-quad #:type filler-quad
+                  #:id 'line-filler
+                  #:from-parent (quad-from-parent q-first)
+                  #:from 'bo
+                  #:to 'bi
+                  #:shift (pt (- left-tracking-adjustment) 0)
+                  #:size (pt width 0)
+                  #:attrs (quad-attrs q-first)))
      
      (cond
        [(or (equal? align-value "justify")
             (let ([line-overfull? (negative? (- empty-hspace space-total-width))])
-              ;; force justification upon overfull lines
+              ;; force justification upon overfull lines,
+              ;; which amounts to shrinking the word spaces till the line fits
               (and line-overfull? (> nonspacess-count 1))))
         (define justified-space-width (/ empty-hspace (sub1 nonspacess-count)))
-        (apply append (add-between hung-nonspacess (list (make-quad
-                                                          #:from 'bo
-                                                          #:to 'bi
-                                                          #:draw-end q:string-draw-end
-                                                          #:size (pt justified-space-width line-prototype-height)))))]
+        (cons (make-left-edge-filler)
+              (apply append (add-between hung-nonspacess (list (make-quad
+                                                                #:from 'bo
+                                                                #:to 'bi
+                                                                #:draw-end q:string-draw-end
+                                                                #:size (pt justified-space-width line-prototype-height))))))]
        [else
         (define space-multiplier (match align-value
                                    ["left" 0]
@@ -400,15 +412,7 @@
         (define end-hspace (- empty-hspace space-total-width))
         ;; make filler a leading quad, not a parent / grouping quad,
         ;; so that elements can still be reached by consolidate-runs
-        (define fq (make-quad #:type filler-quad
-                              #:id 'line-filler
-                              #:from-parent (quad-from-parent q-first)
-                              #:from 'bo
-                              #:to 'bi
-                              #:shift (pt (- left-tracking-adjustment) 0)
-                              #:size (pt (* end-hspace space-multiplier) 0)
-                              #:attrs (quad-attrs q-first)))
-        (list* fq
+        (list* (make-left-edge-filler (* end-hspace space-multiplier))
                (quad-update! q-first [from-parent #f])
                other-qs)])]))
 
