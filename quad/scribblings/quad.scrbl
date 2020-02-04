@@ -818,14 +818,14 @@ How does a quad know which anchor points to use? Each quad specifies a @deftech{
 A key benefit of the anchor-point system is that it gets rid of notions of ``horizontal'', ``vertical'', ``up'', ``down'', etc. Quads flow in whatever direction is implied by their anchor points.
 
 @examples[#:label #f #:eval my-eval
-(define q1 (make-quad #:size '(25 25)))
-(define q2 (make-quad #:size '(15 15)))
+(define parent (make-quad #:size '(25 25)))
+(define child (make-quad #:size '(15 15)))
 
-(quad->pict (position (attach-to q1 'e q2 'w)))
-(quad->pict (position (attach-to q1 'nw q2 'se)))
-(quad->pict (position (attach-to q1 'w q2 'e)))
-(quad->pict (position (attach-to q1 's q2 'n)))
-(quad->pict (position (attach-to q1 'e q2 'n)))
+(quad->pict (position (attach-to parent 'e child 'w)))
+(quad->pict (position (attach-to parent 'nw child 'se)))
+(quad->pict (position (attach-to parent 'w child 'e)))
+(quad->pict (position (attach-to parent 's child 'n)))
+(quad->pict (position (attach-to parent 'e child 'n)))
 ]
 
 
