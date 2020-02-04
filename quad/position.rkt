@@ -10,7 +10,7 @@
 
 (define (sum-base qs which)
   (for/sum ([q (in-list qs)])
-    (which (size q))))
+           (which (size q))))
 (define (sum-y qs) (sum-base qs pt-y))
 (define (sum-x qs) (sum-base qs pt-x))
 
@@ -143,7 +143,9 @@
 (define (attach-to from-q from-pt to-q to-pt)
   (quad-update! to-q
                 [from-parent from-pt]
-                [to to-pt]))
+                [to to-pt])
+  (quad-update! from-q
+                [elems (cons to-q (quad-elems from-q))]))
 
 (module+ test
   (require rackunit)

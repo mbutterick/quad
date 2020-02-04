@@ -25,3 +25,8 @@
        (map (λ (qe) (loop qe (add1 idx))) (quad-elems q))))
    (* scaling-factor (+ (- xmax xmin) (* stroke-width 2) (* margin 2)))
    (* scaling-factor (+ (- ymax ymin) (* stroke-width 2) (* margin 2)))))
+
+(module+ main
+  (define q1 (make-quad #:size '(25 25)))
+  (define q2 (make-quad #:size '(15 15)))
+  (quad->pict (position (attach-to q1 'e q2 'w))))
