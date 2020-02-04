@@ -790,9 +790,7 @@ As mentioned above, The @racket[quad] library itself knows as little as it can a
 
 The eponymous @racket[quad] is a structure type that represents a rectangular layout area. This rectangle is used for layout purposes only. It is not enforced during the rendering phase. Meaning, once positioned, a quad's drawing function can access this rectangle, but does not need to stay within it.
 
-Each quad has nested @deftech{elements}, which is a (possibly empty) list of subquads. Given a certain element, the quad containing it is called its @deftech{parent} quad.
-
-Quads can be freely nested. There are no rules about what kind of quad can be nested in another.
+Each quad has nested @deftech{elements}, which is a (possibly empty) list of subquads. Given a certain element, the quad containing it is called its @deftech{parent} quad. There are no restrictions on what kind of quad can be nested in another.
 
 
 @subsection{Wrapping}
@@ -805,11 +803,9 @@ The heart of Quad's layout logic is its system of @deftech{anchor points}. A qua
 
 Each quad has a set of 11 anchor points on its perimeter. 
 
-Eight points are named for the compass directions: @racket['n] (= top center) @racket['e] (= right center) @racket['s] (= bottom center) @racket['w] (= left ceter) @racket['ne] (= upper right) @racket['se] (= lower right) @racket['sw] (= lower left) @racket['nw] (= upper left). 
+Eight points are named for the compass directions: @racket['n] (= top center) @racket['e] (= right center) @racket['s] (= bottom center) @racket['w] (= left ceter) @racket['ne] (= upper right) @racket['se] (= lower right) @racket['sw] (= lower left) @racket['nw] (= upper left). The center of the quad is @racket['c]. 
 
-The center of the quad is @racket['c]. 
-
-The other two anchor points are @racket['baseline-in] and @racket['baseline-out] or just @racket['bi] and @racket['bo]. These points are also on the quad perimeter. They allow quads containing type to be aligned according to adjacent baselines. The exact location of these points depends on the direction of the script. For instance, in left-to-right languages, @racket['baseline-in] is on the left edge, and @racket['baseline-out] is on the right. The vertical position of these points depends on the font associated with the quad. If no font is specified, the @racket['bi] and @racket['bo] points are vertically positioned at the southern edge.
+The other two anchor points are @racket['baseline-in] and @racket['baseline-out] (or just @racket['bi] and @racket['bo]). These points are also on the quad perimeter. They allow quads containing typeset text to be aligned according to adjacent baselines. The exact location of these points depends on the direction of the script and the @link["https://docs.microsoft.com/en-us/typography/opentype/spec/hhea"]{internal @racket[ascender] value} of the font. For instance, in left-to-right languages, @racket['baseline-in] is on the left edge, and @racket['baseline-out] is on the right. The vertical position of these points depends on the font associated with the quad. If no font is specified, the @racket['baseline-in] and @racket['baseline-out] anchors are vertically aligned with the southern edge. In that case, again supposing a left-to-right language, they would occupy the same positions as @racket['sw] and @racket['se].
 
 By default, each subquad will ultimately be positioned relative to the immediately preceding subquad (or, if it's the first subquad, the parent). Optionally, a subquad can attach to the parent. 
 
