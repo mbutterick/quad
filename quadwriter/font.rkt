@@ -87,20 +87,23 @@
    (string-suffix? pstr suffix)
    (string->number (string-trim pstr suffix))))
 
+(define (parse-em str)
+  (parse-adjustment str "em"))
+
 (define (parse-percentage pstr)
   (match (parse-adjustment pstr "%")
     [#false #false]
     [res (/ res 100.0)]))
 
 (define (parse-percentage-or-em str)
-  (or (parse-percentage str) (parse-adjustment str "em")))
+  (or (parse-percentage str) (parse-em str)))
 
 (define (resolve-font-size! attrs)
   ;; convert font-size attributes into a simple font size
   ;; we stashed the previous size in private key 'font-size-previous
   (define prev-font-size-key 'font-size-previous)
   (define val (hash-ref attrs :font-size default-font-size))
-  (define adjustment (parse-percentage-or-em val))
+  (define adjustment (parse-em val))
   ;; if our value represents an adjustment, we apply the adjustment to the previous value
   ;; otherwise we use our value directly
   (define base-size (if adjustment (hash-ref attrs prev-font-size-key default-font-size) val))
@@ -112,13 +115,20 @@
   (hash-set! attrs prev-font-size-key base-size-adjusted))
 
 (define ((make-updater-based-on-font-size attrs) val)
-  (define adjustment (parse-percentage-or-em val))
-  (define base-height (if adjustment (hash-ref attrs :font-size) val))
-  (and base-height (* base-height (or adjustment 1))))
+  (define em-adjustment (parse-em val))
+  (define base-height (if em-adjustment (hash-ref attrs :font-size) val))
+  (and base-height (* base-height (or em-adjustment 1))))
+
+(define (resolve-em attrs key)
+  (match (hash-ref attrs key #f)
+    [#false (void)]
+    [val
+     (define updater (make-updater-based-on-font-size attrs))
+     (hash-set! attrs key (updater val))]))
 
 (define (resolve-line-height! attrs)
   ;; convert line-height attributes into a simple line height
-  (hash-update! attrs :line-height (make-updater-based-on-font-size attrs) default-line-height))
+  (resolve-em attrs :line-height))
 
 (define (resolve-font-tracking! attrs)
-  (hash-update! attrs :font-tracking (make-updater-based-on-font-size attrs) 0))
+  (resolve-em attrs :font-tracking))

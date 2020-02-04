@@ -25,7 +25,7 @@
     [_ (qexpr (append (list->attrs
                        :keep-first-lines "2"
                        :keep-last-lines "3"
-                       :font-size "100%"
+                       :font-size "1em"
                        :hyphenate "true"
                        :display (symbol->string (gensym)))
                       attrs) exprs)]))
@@ -77,7 +77,7 @@
 (define-tag-function (strong attrs exprs)
   (qexpr (append (list->attrs
                   :font-bold "true"
-                  :font-size "100%")
+                  :font-size "1em")
                  attrs) exprs))
 
 (define b strong)
@@ -91,7 +91,7 @@
   (qexpr (append
           (list->attrs
            :font-italic "true"
-           :font-size "100%") attrs) exprs))
+           :font-size "1em") attrs) exprs))
 
 (define i em)
 
