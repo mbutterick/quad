@@ -455,7 +455,7 @@ A section is a contiguous series of pages. Each section has its own @secref{Sect
 
 These are the attributes that can be used inside a @tech{Q-expression} passed to @racketmodname[quadwriter]. Inside a Q-expression, every attribute is a @tech[#:doc '(lib "scribblings/guide/guide.scrbl")]{symbol}, and every attribute value is a @tech[#:doc '(lib "scribblings/guide/guide.scrbl")]{string}.
 
-A @deftech{dimension string} represents a distance in the plane. If unitless, it is treated as points (where 1 point = 1/72 of an inch). If the number has @racket[in], @racket[cm], or @racket[mm] as a suffix, it is treated as inches, centimeters, or millimeters respectively.
+A @deftech{dimension string} represents a distance in the plane. If unitless, it is treated as points (where 1 point = 1/72 of an inch). If the number has @racket[in], @racket[cm], or @racket[mm] as a suffix, it is treated as inches, centimeters, or millimeters respectively. If the number has @racket[em] as a suffix, it is treated as an em measurement, which is a multiple of the current font size.
 
 @subsubsection{Document-level attributes}
 
@@ -627,7 +627,7 @@ Sets the display type. Value is a string. Supply @racket["block"] as a value of 
 }
 
 @defthing[#:kind "attribute" font-size symbol?]{
-Sets the point size for text. Value is a @tech{dimension string} or an em size (like @racket["1.2em"]). If an em size is provided, the font size is the size of the parent multiplied by the em.
+Sets the point size for text. Value is a @tech{dimension string}.
 }
 
 @defthing[#:kind "attribute" font-family symbol?]{
@@ -654,7 +654,7 @@ Sets OpenType layout features. @racket[font-features] takes a @deftech{feature s
  
 
 @defthing[#:kind "attribute" font-tracking symbol?]{
-Space between characters. Value is a @tech{dimension string} or an em size (like @racket["0.15em"]). If an em size is provided, the font tracking is the current font size multiplied by the em.
+Space between characters. Value is a @tech{dimension string}.
 }
 
 @defthing[#:kind "attribute" font-baseline-shift symbol?]{
@@ -667,7 +667,7 @@ Case transformation of string. Possibilities are @racket["uppercase"], @racket["
 
 
 @defthing[#:kind "attribute" line-height symbol?]{
-Sets the distance between baselines. Value is a @tech{dimension string} or an em size (like @racket["1.2em"]). If an em size is provided, the line height is the current font size multiplied by em.
+Sets the distance between baselines. Value is a @tech{dimension string}.
 }
 
 TK: OT feature attributes, bullet attributes

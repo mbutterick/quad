@@ -80,29 +80,19 @@
     (define this-italic (hash-ref! attrs :font-italic #false))
     (hash-set! attrs :font-path (font-attrs->path this-font-family this-bold this-italic))))
 
-(define (parse-adjustment pstr suffix)
+(define (parse-em pstr)
+  (define em-suffix "em")
   (and
    pstr
    (string? pstr)
-   (string-suffix? pstr suffix)
-   (string->number (string-trim pstr suffix))))
-
-(define (parse-em str)
-  (parse-adjustment str "em"))
-
-(define (parse-percentage pstr)
-  (match (parse-adjustment pstr "%")
-    [#false #false]
-    [res (/ res 100.0)]))
-
-(define (parse-percentage-or-em str)
-  (or (parse-percentage str) (parse-em str)))
+   (string-suffix? pstr em-suffix)
+   (string->number (string-trim pstr em-suffix))))
 
 (define (resolve-font-size! attrs)
   ;; convert font-size attributes into a simple font size
   ;; we stashed the previous size in private key 'font-size-previous
   (define prev-font-size-key 'font-size-previous)
-  (define val (hash-ref attrs :font-size default-font-size))
+  (define val (parse-dimension (hash-ref attrs :font-size default-font-size)))
   (define adjustment (parse-em val))
   ;; if our value represents an adjustment, we apply the adjustment to the previous value
   ;; otherwise we use our value directly
@@ -113,22 +103,3 @@
   ;; of font-size (but font-size-previous will persist)
   (hash-set! attrs :font-size base-size-adjusted)
   (hash-set! attrs prev-font-size-key base-size-adjusted))
-
-(define ((make-updater-based-on-font-size attrs) val)
-  (define em-adjustment (parse-em val))
-  (define base-height (if em-adjustment (hash-ref attrs :font-size) val))
-  (and base-height (* base-height (or em-adjustment 1))))
-
-(define (resolve-em attrs key)
-  (match (hash-ref attrs key #f)
-    [#false (void)]
-    [val
-     (define updater (make-updater-based-on-font-size attrs))
-     (hash-set! attrs key (updater val))]))
-
-(define (resolve-line-height! attrs)
-  ;; convert line-height attributes into a simple line height
-  (resolve-em attrs :line-height))
-
-(define (resolve-font-tracking! attrs)
-  (resolve-em attrs :font-tracking))

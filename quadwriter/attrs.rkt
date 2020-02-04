@@ -13,7 +13,7 @@
 (define (in->pts x) (* 72 x))
 (define (mm->cm x) (/ x 10.0))
 
-(define (parse-dimension x)
+(define (parse-dimension x [em-resolution-attrs #false])
   (match x
     [#false #false]
     [(? number? num) num]
@@ -26,7 +26,10 @@
            [(regexp #rx"in(ch(es)?)?$") in->pts] ; inches
            [(regexp #rx"cms?$") (compose1 in->pts cm->in)] ; cm
            [(regexp #rx"mms?$") (compose1 in->pts cm->in mm->cm)] ; mm
-           [(regexp #rx"ems?$") (λ (num) (format "~aem" num))] ; em
+           [(regexp #rx"ems?$") (if em-resolution-attrs
+                                    (λ (num) (* (hash-ref em-resolution-attrs :font-size) num))
+                                    ;; if we don't have attrs for resolving the em string, we leave it alone
+                                    (λ (num) (format "~aem" num)))] ; em
            [_ (raise-argument-error 'parse-dimension "dimension string" str)]) (string->number num-string))])]))
 
 (define (copy-block-attrs source-hash dest-hash)

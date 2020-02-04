@@ -94,7 +94,7 @@
   ;; we parse them into the equivalent measurement in points.
   (for ([k (in-hash-keys attrs)]
         #:when (takes-dimension-string? k))
-       (hash-update! attrs k parse-dimension))
+       (hash-update! attrs k (λ (val) (parse-dimension val attrs))))
   attrs)
 
 (define (downcase-values! attrs)
@@ -119,14 +119,12 @@
 (define (handle-cascading-attrs attrs)
   ;; various housekeeping on attributes as they are propagated downward during atomization.
   (for ([proc (in-list (list downcase-values!
-                             parse-dimension-strings!
                              complete-every-path!
                              resolve-font-path!
                              resolve-font-size!
-                             ;; we resolve font tracking & line height after font size
-                             ;; because they can be denoted relative to font size
-                             resolve-font-tracking!
-                             resolve-line-height! 
+                             ;; we resolve dimension strings after font size
+                             ;; because they can be denoted relative to em size
+                             parse-dimension-strings!
                              parse-font-features!))])
        (proc attrs)))
 
@@ -329,7 +327,7 @@
   (for* ([(page page-idx) (in-indexed (for*/list ([section (in-list (quad-elems doc))]
                                                   [page (in-list (quad-elems section))])
                                                  page))]
-        ;; all inner / outer lines are initially filled as if they were right-aligned
+         ;; all inner / outer lines are initially filled as if they were right-aligned
          [zero-filler-side (in-value (if (odd? (add1 page-idx)) "inner" "outer"))]
          [col (in-list (quad-elems page))]
          [block (in-list (quad-elems col))]
