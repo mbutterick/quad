@@ -13,11 +13,10 @@
 ;; should we allow quads within a qexpr? I say yes
 (define permissive-qexprs (make-parameter #t))
 
-(define (valid-tag? tag) (and (memq tag '(q quad)) #t))
+(define (valid-tag? tag) (symbol? tag))
 
 (define (qexpr? x)
   ;; a qexpr is like an xexpr, but more lenient in some ways (possibly allows quads)
-  ;; and less in others (only allows 'q or 'quad as tag names, only allows strings or qexprs as elements)
   ;; attrs are open-ended
   (match x
     [(cons (? valid-tag?) rest)
@@ -34,7 +33,7 @@
   (check-true (qexpr? "Hello world"))
   (check-true (qexpr? '(q "Hello world")))
   (check-true (qexpr? '(quad "Hello world")))
-  (check-false (qexpr? '(div "Hello world")))
+  (check-true (qexpr? '(div "Hello world")))
   (check-false (qexpr? '(q #\H)))
   (check-false (qexpr? '(quad #\H)))
   (check-false (qexpr? '(span #\H)))
