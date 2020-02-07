@@ -657,6 +657,7 @@
      #:attrs attrs
      #:from-parent 'sw
      #:to 'nw
+     #:elems (or null (hash-ref (current-named-quads) "foo"))
      #:shift (pt 0 (* 1.5 default-line-height))
      #:printable #true
      #:draw-start (λ (q doc)

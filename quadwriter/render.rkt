@@ -135,6 +135,13 @@
   ;; so if we invoke that style first, we will get a page break.
   (dropf qs break-quad?))
 
+(define (extract-defined-quads qs)
+  (define (get-define-val q) (quad-ref q 'define))
+  (define-values (dqs not-dqs) (partition get-define-val qs))
+  (for ([dq-group (in-list (group-by get-define-val dqs))])
+       (hash-set! (current-named-quads) (get-define-val (car dq-group)) dq-group))
+  not-dqs)
+
 (define default-line-height-multiplier 1.42)
 (define (setup-qs qx-arg base-dir)
   ;; convert our input Q-expression into a useful form.
@@ -164,6 +171,7 @@
          [qs (time-log hyphenate (apply append (map handle-hyphenate qs)))]
          [qs (map generic->typed-quad qs)]
          [qs (drop-leading-breaks qs)]
+         [qs (extract-defined-quads qs)]
          [qs (insert-first-line-indents qs)])
     qs))
 
@@ -388,7 +396,8 @@
                  ;; a lot of operations need to look at pages used so it's easier to
                  ;; make it a parameter than endlessly pass it around as an argument.
                  [section-pages-used 0]
-                 [verbose-quad-printing? #false]) ; for ease of debugging; not mandatory
+                 [verbose-quad-printing? #false]
+                 [current-named-quads (make-hash)]) ; for ease of debugging; not mandatory
     (define qs (time-log setup-qs (setup-qs qx-arg base-dir)))
     (setup-pdf-metadata! qs (current-pdf))
     ;; all the heavy lifting happens inside `make-sections`

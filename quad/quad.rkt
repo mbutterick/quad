@@ -94,9 +94,9 @@
 (define-syntax-rule (quad-copy QID [K V] ...)
   (struct-copy quad QID [K V] ...))
 
-(struct quad-attr (key default-val) #:transparent)
+#;(struct quad-attr (key default-val) #:transparent)
 
-(define (make-quad-attr key [default-val #f])
+#;(define (make-quad-attr key [default-val #f])
   (quad-attr key default-val))
 
 (define (quad-ref q key-arg [default-val-arg #f])
