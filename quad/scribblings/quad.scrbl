@@ -825,7 +825,7 @@ A key benefit of the anchor-point system is that it gets rid of notions of ``hor
 ]
 
 
-``Wait a minute — why is the new quad specifying @emph{both} anchor points? Shouldn't the from anchor be specified by the previous quad?'' It could, but it would make the layout system less flexible, because all the subquads hanging onto a certain quad would have to emanate from a single point. This way, every subquad can attach to its neighbor (or the parent) in whatever way it prefers.
+``Wait a minute — why is the child quad specifying @emph{both} anchor points? Shouldn't the @racket[from] anchor be specified by the parent quad?'' It could, but it would make the layout system less flexible, because all the child quads hanging onto a certain parent quad would have to emanate from a single point. This way, every child quad can attach to its parent (or its neighbor) in whatever way it prefers.
 
 
 @subsection[#:tag "quad-rendering"]{Rendering}
