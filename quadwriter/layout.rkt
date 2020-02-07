@@ -153,22 +153,32 @@
 (module+ test
   (check-equal? (quad-ref (convert-break-quad (qexpr->quad '(q ((break "page") (foo "bar"))))) 'foo) "bar"))
 
+(define-quad draw-quad quad)
+(define q:draw (q #:type draw-quad
+                  #:from 'bo
+                  #:to 'bi
+                  #:id 'str
+                  #:printable q:string-printable?
+                  #:draw q:string-draw
+                  #:draw-end q:string-draw-end))
+
 (define (convert-draw-quad q)
-  (quad-update! q
-                [draw (λ (q doc)
-                        (save doc)
-                        (match (quad-ref q :draw)
-                          ["line" 
-                           (move-to doc (quad-ref q :x1) (quad-ref q :y1))
-                           (line-to doc (quad-ref q :x2) (quad-ref q :y2))
-                           (stroke doc "black")]
-                          ["text" (move-to doc 0 0)
-                                  (q:string-draw q doc
-                                                 #:origin (pt (quad-ref q :x 0) (quad-ref q :y 0))
-                                                 #:text (quad-ref q :text))]
-                          [_ (void)])
-                        (restore doc))]
-                [size (pt 0 0)]))
+  (struct-copy draw-quad q:draw
+               [attrs #:parent quad (quad-attrs q)]
+               [draw #:parent quad (λ (q doc)
+                       (save doc)
+                       (match (quad-ref q :draw)
+                         ["line" 
+                          (move-to doc (quad-ref q :x1) (quad-ref q :y1))
+                          (line-to doc (quad-ref q :x2) (quad-ref q :y2))
+                          (stroke doc "black")]
+                         ["text" (move-to doc 0 0)
+                                 (q:string-draw q doc
+                                                #:origin (pt (quad-ref q :x 0) (quad-ref q :y 0))
+                                                #:text (quad-ref q :text))]
+                         [_ (void)])
+                       (restore doc))]
+               [size #:parent quad (pt 0 0)]))
 
 (define (convert-image-quad q)
   (define path-string (quad-ref q :image-file))

@@ -171,7 +171,7 @@
          [qs (time-log hyphenate (apply append (map handle-hyphenate qs)))]
          [qs (map generic->typed-quad qs)]
          [qs (drop-leading-breaks qs)]
-         [qs (extract-defined-quads qs)]
+         #;[qs (extract-defined-quads qs)]
          [qs (insert-first-line-indents qs)])
     qs))
 
@@ -263,10 +263,19 @@
                [size (pt line-wrap-size printable-height)]))
   (time-log page-wrap (page-wrap column-qs printable-width page-quad-prototype)))
 
-(define (make-sections qs)
+(define (apply-doc-repeaters secs repeaters)
+  secs)
+
+(define (make-sections all-qs)
+  (define-values (doc-repeaters nonrepeating-qs)
+    (partition  (λ (q) (member (quad-ref q :page-repeat) '("all" "left" "right" "first" "rest"))) all-qs))
   (for/fold ([sections-acc null]
-             #:result (reverse sections-acc))
-            ([qs (in-list (filter-split qs section-break-quad?))])
+             #:result (apply-doc-repeaters (reverse sections-acc) doc-repeaters))
+            ([all-section-qs (in-list (filter-split nonrepeating-qs section-break-quad?))])
+    
+    (define-values (section-repeaters qs)
+      (partition  (λ (q) (member (quad-ref q :page-repeat) '("section" "section all" "section left" "section right" "section first" "section rest"))) all-section-qs))
+    
     ;; section properties
     (match-define (list page-width page-height) (parse-page-size (and (pair? qs) (car qs))))
     (match-define (list left-margin top-margin right-margin bottom-margin)
@@ -292,13 +301,36 @@
     (when insert-blank-page?
       (section-pages-used (add1 (section-pages-used))))
     
-    (define section-pages (make-pages column-qs
-                                      left-margin
-                                      top-margin
-                                      gutter-margin
-                                      line-wrap-size
-                                      printable-width
-                                      printable-height))
+    (define section-pages-without-repeaters (make-pages column-qs
+                                                        left-margin
+                                                        top-margin
+                                                        gutter-margin
+                                                        line-wrap-size
+                                                        printable-width
+                                                        printable-height))
+
+    ;; put in quads that repeat within the section
+    (define section-pages
+      (for/list ([page (in-list section-pages-without-repeaters)]
+                 [page-num (in-naturals 1)]
+                 [page-side (in-cycle ((if (eq? section-starting-side 'left) values reverse) '(left right)))])
+                ;; the first page of the section is 1,
+                ;; so all the odd pages are the same side as the starting side
+                ;; and even pages are the opposite side
+                (define section-repeaters-for-this-page
+                  (for/list ([repeater (in-list section-repeaters)]
+                             #:when (let* ([val (quad-ref repeater :page-repeat)]
+                                           [sym (string->symbol (string-trim val #px"section\\s"))])
+                                      (memq sym (list*
+                                                 (if (= page-num 1) 'first 'rest)
+                                                 page-side
+                                                 '(section all)))))
+                            repeater))
+                (cond
+                  [(null? section-repeaters-for-this-page) page]
+                  [else
+                   (quad-copy page
+                              [elems (append section-repeaters-for-this-page (quad-elems page))])])))
         
     (begin0
       (cond

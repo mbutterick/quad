@@ -179,6 +179,8 @@ Naming guidelines
                            footer-display
                            footer-text
 
+                           page-repeat
+
                            fn-ref
                            fn-text
                            fn-text-start))
