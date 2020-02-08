@@ -166,9 +166,12 @@
                                               (quad-origin q)))
                      (match (quad-ref q :draw)
                        ["line"
-                        (move-to doc (quad-ref q :x1 0) (quad-ref q :y1 0))
-                        (line-to doc (quad-ref q :x2 0) (quad-ref q :y2 0))
-                        (stroke doc "black")]
+                        (define x0 (quad-ref q :x 0))
+                        (define y0 (quad-ref q :y 0))
+                        (move-to doc x0 y0)
+                        (line-to doc (quad-ref q :x2 x0) (quad-ref q :y2 y0))
+                        (line-width doc (quad-ref q :width 1))
+                        (stroke doc (quad-ref q :color "black"))]
                        ["text" (move-to doc 0 0)
                                (q:string-draw q doc
                                               #:origin (pt (quad-ref q :x 0) (quad-ref q :y 0))

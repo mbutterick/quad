@@ -101,11 +101,10 @@ Naming guidelines
                height
                position
                text
+               color
                x
                y
-               x1
                x2
-               y1
                y2))
   
 
@@ -219,16 +218,16 @@ Naming guidelines
                      :line-height
                      :x
                      :y
-                     :x1
                      :x2
-                     :y1
-                     :y2)) #true))
+                     :y2
+                     :width)) #true))
 
 (define (has-case-sensitive-value? k)
   (and (memq k (list :pdf-title
                      :pdf-subject
                      :pdf-author
-                     :pdf-keywords)) #true))
+                     :pdf-keywords
+                     :text)) #true))
 
 (define (takes-path? k)
   (and (memq k (list :image-file)) #true))
