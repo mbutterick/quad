@@ -17,9 +17,9 @@
 
          (define draw-debug? (make-parameter #true))
          (define draw-debug-line? (make-parameter #true))
-         (define draw-debug-block? (make-parameter #true))
+         (define draw-debug-block? (make-parameter #false))
          (define draw-debug-string? (make-parameter #true))
-         (define draw-debug-image? (make-parameter #true))
+         (define draw-debug-image? (make-parameter #false))
 
          (define debug-page-width (make-parameter 400))
          (define debug-page-height (make-parameter 400))

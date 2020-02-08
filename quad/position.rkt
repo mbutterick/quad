@@ -92,7 +92,7 @@
   ;; recursively calculates coordinates for quad & subquads
   ;; need to position before recurring, so subquads have accurate reference point
   (define positioned-q
-    (quad-copy q
+    (quad-copy quad q
                  [origin (let* ([ref-pt (cond
                                           [(quad? ref-src)
                                            (anchor->global-point ref-src (or (quad-from-parent q) (quad-from q)))]
@@ -107,7 +107,7 @@
     ;; for purposes of positioning the elements, we want to also bake in the `shift-elements` value
     ;; but we don't want this origin to be permanent on the parent.
     ;; akin to `push` a graphics state and then `pop` afterwards.
-    (let ([parent-q (quad-copy positioned-q
+    (let ([parent-q (quad-copy quad positioned-q
                                  [origin (pt+ (quad-origin positioned-q) (quad-shift-elems positioned-q))]
                                  [shift-elems (pt 0 0)])])
       ;; can't use for/list here because previous quads provide context for later ones

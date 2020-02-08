@@ -112,8 +112,6 @@
 
 (define-syntax (quad-copy stx)
   (syntax-case stx ()
-    [(_ ID [K V] ...)
-     #'(quad-copy quad ID [K V] ...)]
     [(_ QUAD-TYPE ID [K V] ...)
      (if (free-identifier=? #'quad #'QUAD-TYPE)
          #'(struct-copy QUAD-TYPE ID

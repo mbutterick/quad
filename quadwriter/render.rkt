@@ -246,7 +246,7 @@
   (values line-qs fn-line-qs))
 
 (define (make-columns line-qs fn-line-qs line-wrap-size printable-height column-gap)
-  (define col-quad-prototype (quad-copy quad q:column
+  (define col-quad-prototype (quad-copy column-quad q:column
                                         [size (pt line-wrap-size printable-height)]))
   (time-log column-wrap (column-wrap line-qs fn-line-qs printable-height column-gap col-quad-prototype)))
 
@@ -276,10 +276,9 @@
          (for/list ([repeater (in-list repeaters)]
                     #:when (let* ([val (quad-ref repeater :page-repeat)]
                                   [sym (string->symbol val)])
-                             (memq sym (list
-                                        (if (= page-num 1) 'first 'rest)
-                                        page-side
-                                        'all))))
+                             (or (eq? sym 'all)
+                                 (eq? sym page-side)
+                                 (eq? sym (if (= page-num 1) 'first 'rest)))))
                    repeater))
        (when (pair? repeaters-for-this-page)
          (set-quad-elems! page (append repeaters-for-this-page (quad-elems page)))))
@@ -337,16 +336,16 @@
                   (for/list ([repeater (in-list section-repeaters)]
                              #:when (let* ([val (quad-ref repeater :page-repeat)]
                                            [sym (string->symbol (string-trim val #px"section\\s"))])
-                                      (memq sym (list*
-                                                 (if (= page-num 1) 'first 'rest)
-                                                 page-side
-                                                 '(section all)))))
+                                      (or (eq? sym 'section)
+                                          (eq? sym 'all)
+                                          (eq? sym page-side)
+                                          (eq? sym (if (= page-num 1) 'first 'rest)))))
                             repeater))
                 (cond
                   [(null? section-repeaters-for-this-page) page]
                   [else
                    (quad-copy page-quad page
-                                [elems (append section-repeaters-for-this-page (quad-elems page))])])))
+                              [elems (append section-repeaters-for-this-page (quad-elems page))])])))
         
     (begin0
       (cond
@@ -358,11 +357,11 @@
             ;; blank page goes at beginning of current section
             (define page-from-current-section (car section-pages))
             (define blank-page (quad-copy page-quad page-from-current-section [elems null]))
-            (define new-section (quad-copy quad q:section [elems (cons blank-page section-pages)]))
+            (define new-section (quad-copy section-quad q:section [elems (cons blank-page section-pages)]))
             (cons new-section sections-acc)]
            [_ ;; must be 'right
             ;; blank page goes at end of previous section (if it exists)
-            (define new-section (quad-copy quad q:section [elems section-pages]))
+            (define new-section (quad-copy section-quad q:section [elems section-pages]))
             (match sections-acc
               [(cons previous-section other-sections)
                (define previous-section-pages (quad-elems previous-section))
@@ -374,7 +373,7 @@
                                [elems (append previous-section-pages (list blank-page))]))
                (list* new-section updated-previous-section other-sections)]
               [_ (list new-section)])])]
-        [else (define new-section (quad-copy q:section [elems section-pages]) )
+        [else (define new-section (quad-copy section-quad q:section [elems section-pages]) )
               (cons new-section sections-acc)])
       (section-pages-used (+ (section-pages-used) (length section-pages))))))
 
@@ -383,11 +382,15 @@
   (for* ([(page page-idx) (in-indexed (for*/list ([section (in-list (quad-elems doc))]
                                                   [page (in-list (quad-elems section))])
                                                  page))]
+         #:when (page-quad? page)
          ;; all inner / outer lines are initially filled as if they were right-aligned
          [zero-filler-side (in-value (if (odd? (add1 page-idx)) "inner" "outer"))]
          [col (in-list (quad-elems page))]
+         #:when (column-quad? col)
          [block (in-list (quad-elems col))]
-         [line (in-list (quad-elems block))])
+         #:when (block-quad? block)
+         [line (in-list (quad-elems block))]
+         #:when (line-quad? line))
         (when (equal? zero-filler-side (quad-ref line :line-align))
           (match (quad-elems line)
             ;; collapse the filler quad by setting size to 0

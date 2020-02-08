@@ -230,7 +230,8 @@
                       [else convert-string-quad]))
   (converter q))
 
-(define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"] [stroke-width 0.5])
+(define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"] . _)
+  (define stroke-width 0.5)
   (when (draw-debug?)
     (save doc)
     ;; draw layout box
@@ -248,27 +249,29 @@
     (restore doc)))
 
 
-
-(define q:line (q #:size (pt 0 default-line-height)
-                  #:from 'sw
-                  #:to 'nw
-                  #:printable #true
-                  #:id 'line
-                  #:draw-start (if draw-debug-line? draw-debug void)))
+(define-quad line-quad quad)
+(define q:line (make-quad
+                #:type line-quad
+                #:size (pt 0 default-line-height)
+                #:from 'sw
+                #:to 'nw
+                #:printable #true
+                #:id 'line
+                #:draw-start (if draw-debug-line? draw-debug void)))
 
 (define-quad line-spacer-quad line-break-quad)
 
 (define only-prints-in-middle (λ (q sig) (not (memq sig '(start end)))))
 (define (make-paragraph-spacer maybe-first-line-q key default-val)
   (define arbitrary-width 20)
-  (q #:type line-spacer-quad
-     #:size (pt arbitrary-width (cond
-                                  [(and maybe-first-line-q (quad-ref maybe-first-line-q key))]
-                                  [else default-val]))
-     #:from 'sw
-     #:to 'nw
-     #:printable only-prints-in-middle
-     #:draw-start (if (draw-debug-line?) draw-debug void)))
+  (make-quad #:type line-spacer-quad
+             #:size (pt arbitrary-width (cond
+                                          [(and maybe-first-line-q (quad-ref maybe-first-line-q key))]
+                                          [else default-val]))
+             #:from 'sw
+             #:to 'nw
+             #:printable only-prints-in-middle
+             #:draw-start (if (draw-debug-line?) draw-debug void)))
 
 (define softies (map string '(#\space #\- #\u00AD)))
 
@@ -436,7 +439,7 @@
   (restore doc))
 
 (define (make-hr-quad line-q)
-  (quad-copy line-q [draw-start hr-draw]))
+  (quad-copy line-quad line-q [draw-start hr-draw]))
 
 (define ((line-wrap-finish line-prototype-q default-block-id) wrap-qs q-before q-after idx)
   ;; we curry line-q so that the wrap size can be communicated to this operation
@@ -459,7 +462,7 @@
          [(and (cons elem-first _) elems)
           (match-define (list line-width line-height) (quad-size line-prototype-q))
           (list
-           (quad-copy line-prototype-q
+           (quad-copy line-quad line-prototype-q
                       ;; move block attrs up, so they are visible in col wrap
                       [attrs (let ([h (copy-block-attrs (quad-attrs elem-first) (hash-copy (quad-attrs line-prototype-q)))])
                                ;; we want every group of lines in a paragraph to have a block id
@@ -519,7 +522,7 @@
     (raise-argument-error 'line-wrap "positive number" wrap-size))
   (match qs
     [(cons q _)
-     (define line-q (quad-copy q:line [size (pt wrap-size (quad-ref q :line-height default-line-height))]))
+     (define line-q (quad-copy line-quad q:line [size (pt wrap-size (quad-ref q :line-height default-line-height))]))
      (define permitted-justify-overfill
        (match (quad-ref q :line-align)
          ;; allow justified lines to go wider,
@@ -654,17 +657,17 @@
                               :font-family "text")
                   (resolve-font-path! attrs)
                   attrs))
-  (q #:size (pt 50 default-line-height)
-     #:attrs attrs
-     #:from-parent 'sw
-     #:to 'nw
-     #:elems (or null (hash-ref (current-named-quads) "foo"))
-     #:shift (pt 0 (* 1.5 default-line-height))
-     #:printable #true
-     #:draw-start (λ (q doc)
-                    (when draw-debug-line?
-                      (draw-debug q doc "goldenrod" "goldenrod"))
-                    (draw-page-footer q doc))))
+  (make-quad #:size (pt 50 default-line-height)
+             #:attrs attrs
+             #:from-parent 'sw
+             #:to 'nw
+             #:elems (or null (hash-ref (current-named-quads) "foo"))
+             #:shift (pt 0 (* 1.5 default-line-height))
+             #:printable #true
+             #:draw-start (λ (q doc)
+                            (when draw-debug-line?
+                              (draw-debug q doc "goldenrod" "goldenrod"))
+                            (draw-page-footer q doc))))
 
 (define-quad column-quad quad)
 (define q:column (make-quad
@@ -757,21 +760,24 @@
   (when (draw-debug-block?)
     (draw-debug q doc "#6c6" "#9c9")))
 
+(define-quad block-quad quad)
 (define (lines->block lines)
   (match lines
     [(cons line _)
-     (q #:from 'sw
-        #:to 'nw
-        #:elems (from-parent lines 'nw)
-        #:id 'block
-        #:attrs (quad-attrs line)
-        #:size (delay (pt (pt-x (size line)) ; 
-                          (+ (sum-y lines)
-                             (quad-ref line :inset-top 0)
-                             (quad-ref line :inset-bottom 0))))
-        #:shift-elems (pt 0 (quad-ref line :inset-top 0))
-        #:draw-start (block-draw-start line)
-        #:draw-end (block-draw-end line))]))
+     (make-quad
+      #:type block-quad
+      #:from 'sw
+      #:to 'nw
+      #:elems (from-parent lines 'nw)
+      #:id 'block
+      #:attrs (quad-attrs line)
+      #:size (delay (pt (pt-x (size line)) ; 
+                        (+ (sum-y lines)
+                           (quad-ref line :inset-top 0)
+                           (quad-ref line :inset-bottom 0))))
+      #:shift-elems (pt 0 (quad-ref line :inset-top 0))
+      #:draw-start (block-draw-start line)
+      #:draw-end (block-draw-end line))]))
 
 (define/match (from-parent qs [where #f])
   ;; doesn't change any positioning. doesn't depend on state. can happen anytime.
@@ -792,7 +798,7 @@
   (append
    (match lns
      [(cons line _)
-      (list (quad-copy col-quad
+      (list (quad-copy column-quad col-quad
                        ;; move block attrs up, so they are visible in page wrap
                        [attrs (copy-block-attrs (quad-attrs line)
                                                 (hash-copy (quad-attrs col-quad)))]
@@ -807,7 +813,7 @@ constraint wrapping example
 https://github.com/mbutterick/typesetter/blob/882ec681ad1fa6eaee6287e53bc4320d9656046b/pdf/directory-require.rkt#L51
 |#
 ;; 
-(define (column-wrap lines fn-lines vertical-height column-gap [column-quad q:column])
+(define (column-wrap lines fn-lines vertical-height column-gap [col-quad-proto q:column])
   (unless (positive? vertical-height)
     (raise-argument-error 'column-wrap "positive number" vertical-height))
   
@@ -824,7 +830,7 @@ https://github.com/mbutterick/typesetter/blob/882ec681ad1fa6eaee6287e53bc4320d96
                      #:distance (λ (q dist-so-far wrap-qs)
                                   ;; do trial block insertions
                                   (sum-y (insert-blocks (reverse wrap-qs))))                     
-                     #:finish-wrap (column-wrap-finish column-quad)
+                     #:finish-wrap (column-wrap-finish col-quad-proto)
                      #:footnote-qs fn-lines
                      #:footnote-leftover-proc (λ (ymax leftover-qs fn-qs)
                                                 (let loop ([ymax ymax][leftover-qs leftover-qs][fn-qs fn-qs])
