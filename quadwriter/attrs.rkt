@@ -102,6 +102,7 @@ Naming guidelines
                position
                text
                color
+               stroke
                x
                y
                x2

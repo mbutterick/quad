@@ -150,11 +150,7 @@
 (define-quad draw-quad quad)
 (define q:draw (q #:type draw-quad
                   #:from 'bo
-                  #:to 'bi
-                  #:id 'str
-                  #:printable q:string-printable?
-                  #:draw q:string-draw
-                  #:draw-end q:string-draw-end))
+                  #:to 'bi))
 
 (define (convert-draw-quad q)
   (quad-copy draw-quad q:draw
@@ -170,7 +166,7 @@
                         (define y0 (quad-ref q :y 0))
                         (move-to doc x0 y0)
                         (line-to doc (quad-ref q :x2 x0) (quad-ref q :y2 y0))
-                        (line-width doc (quad-ref q :width 1))
+                        (line-width doc (quad-ref q :stroke 1))
                         (stroke doc (quad-ref q :color "black"))]
                        ["text" (move-to doc 0 0)
                                (q:string-draw q doc
