@@ -95,7 +95,10 @@ Naming guidelines
                pdf-keywords
 
                break
+
                draw
+               width
+               height
                position
                text
                x

@@ -161,10 +161,13 @@
              [attrs (quad-attrs q)]
              [draw (λ (q doc)
                      (save doc)
+                     (apply translate doc (if (equal? (quad-ref q :position) "absolute")
+                                              (list 0 0)
+                                              (quad-origin q)))
                      (match (quad-ref q :draw)
-                       ["line" 
-                        (move-to doc (quad-ref q :x1) (quad-ref q :y1))
-                        (line-to doc (quad-ref q :x2) (quad-ref q :y2))
+                       ["line"
+                        (move-to doc (quad-ref q :x1 0) (quad-ref q :y1 0))
+                        (line-to doc (quad-ref q :x2 0) (quad-ref q :y2 0))
                         (stroke doc "black")]
                        ["text" (move-to doc 0 0)
                                (q:string-draw q doc
@@ -172,7 +175,7 @@
                                               #:text (quad-ref q :text))]
                        [_ (void)])
                      (restore doc))]
-             [size (pt 0 0)]))
+             [size (pt (quad-ref q :width 0) (quad-ref q :height 0))])) 
 
 (define (convert-image-quad q)
   (define path-string (quad-ref q :image-file))
@@ -354,10 +357,13 @@
     [(? string-quad?) (/ (quad-ref q :font-tracking 0) 2.0)]
     [_ 0]))
 
-(define (fill-line-wrap qs line-prototype last-line-in-paragraph?)
+(define (fill-line-wrap all-qs line-prototype last-line-in-paragraph?)
   ;; happens during the finish of a line wrap, before consolidation of runs
-  (unless (pair? qs)
-    (raise-argument-error 'fill-line-wrap "nonempty list of quads" qs))
+  (unless (pair? all-qs)
+    (raise-argument-error 'fill-line-wrap "nonempty list of quads" all-qs))
+
+  ;; remove absolute position quads because they don't affect line layout
+  (define-values (absolute-qs qs) (partition (λ (q) (equal? (quad-ref q :position) "absolute")) all-qs))
 
   (match-define (and (cons q-first other-qs) (list _ ... q-last)) qs)
   (define align-value (quad-ref q-first :line-align "left"))
@@ -423,7 +429,8 @@
         ;; so that elements can still be reached by consolidate-runs
         (list* (make-left-edge-filler (* end-hspace space-multiplier))
                (quad-update! q-first [from-parent #f])
-               other-qs)])]))
+               ;; ok to put back absolute quads at end, because it doesn't affect their layout
+               (append other-qs absolute-qs))])]))
 
 (define-quad offsetter-quad quad)
 
@@ -565,7 +572,7 @@
      res]
     [_ null]))
 
-(module+ test
+#;(module+ test
   (line-wrap (list (make-quad "foo" #:type string-quad)
                    (make-quad #:type column-break-quad)
                    (make-quad "foo2" #:type string-quad) ) 10 #t)
