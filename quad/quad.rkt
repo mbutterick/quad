@@ -94,21 +94,32 @@
 #;(struct quad-attr (key default-val) #:transparent)
 
 #;(define (make-quad-attr key [default-val #f])
-  (quad-attr key default-val))
+    (quad-attr key default-val))
 
 (define (quad-ref q key-arg [default-val-arg #f])
   (define key (match key-arg
                 #;[(quad-attr key _) key]
                 [_ key-arg]))
   (define default-val #;(cond
-                        [default-val-arg]
-                        [(quad-attr? key-arg) (quad-attr-default-val key-arg)]
-                        [else #false]) default-val-arg)
+                          [default-val-arg]
+                          [(quad-attr? key-arg) (quad-attr-default-val key-arg)]
+                          [else #false]) default-val-arg)
   (hash-ref (quad-attrs q) key default-val))
 
 (define (quad-set! q key val)
   (hash-set! (quad-attrs q) key val)
   q)
+
+(define-syntax (quad-copy stx)
+  (syntax-case stx ()
+    [(_ ID [K V] ...)
+     #'(quad-copy quad ID [K V] ...)]
+    [(_ QUAD-TYPE ID [K V] ...)
+     (if (free-identifier=? #'quad #'QUAD-TYPE)
+         #'(struct-copy QUAD-TYPE ID
+                        [K V] ...)
+         #'(struct-copy QUAD-TYPE ID
+                        [K #:parent quad V] ...))]))
 
 (define-syntax (quad-update! stx)
   (syntax-case stx ()
