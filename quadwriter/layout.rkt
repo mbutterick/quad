@@ -166,18 +166,18 @@
   (struct-copy draw-quad q:draw
                [attrs #:parent quad (quad-attrs q)]
                [draw #:parent quad (λ (q doc)
-                       (save doc)
-                       (match (quad-ref q :draw)
-                         ["line" 
-                          (move-to doc (quad-ref q :x1) (quad-ref q :y1))
-                          (line-to doc (quad-ref q :x2) (quad-ref q :y2))
-                          (stroke doc "black")]
-                         ["text" (move-to doc 0 0)
-                                 (q:string-draw q doc
-                                                #:origin (pt (quad-ref q :x 0) (quad-ref q :y 0))
-                                                #:text (quad-ref q :text))]
-                         [_ (void)])
-                       (restore doc))]
+                                     (save doc)
+                                     (match (quad-ref q :draw)
+                                       ["line" 
+                                        (move-to doc (quad-ref q :x1) (quad-ref q :y1))
+                                        (line-to doc (quad-ref q :x2) (quad-ref q :y2))
+                                        (stroke doc "black")]
+                                       ["text" (move-to doc 0 0)
+                                               (q:string-draw q doc
+                                                              #:origin (pt (quad-ref q :x 0) (quad-ref q :y 0))
+                                                              #:text (quad-ref q :text))]
+                                       [_ (void)])
+                                     (restore doc))]
                [size #:parent quad (pt 0 0)]))
 
 (define (convert-image-quad q)
@@ -298,10 +298,10 @@
        (define tracking-adjustment
          (* (sub1 (length run-pcs)) (quad-ref (car run-pcs) :font-tracking 0)))
        (define new-run
-         (quad-copy q:string
-                    [attrs (quad-attrs strq)]
-                    [elems (merge-adjacent-strings (apply append (map quad-elems run-pcs)))]
-                    [size (delay (pt (sum-x run-pcs) (pt-y (size strq))))]))
+         (struct-copy string-quad q:string
+                      [attrs #:parent quad (quad-attrs strq)]
+                      [elems #:parent quad (merge-adjacent-strings (apply append (map quad-elems run-pcs)))]
+                      [size #:parent quad (delay (pt (sum-x run-pcs) (pt-y (size strq))))]))
        (loop (cons new-run runs) rest)]
       [(cons first rest) (loop (cons first runs) rest)]
       [_ (reverse runs)])))
@@ -340,12 +340,13 @@
      (match (regexp-match #rx"[.,:;’-]$" (car (quad-elems last-q)))
        [#false nonspacess]
        [last-char-str
-        (define hanger-q (quad-copy last-q
-                                    [elems null]
-                                    [size (let ([p (make-size-promise-for-string last-q (car last-char-str))])
-                                            (delay
-                                              (match-define (list x y) (force p))
-                                              (pt (- x) y)))]))
+        (define hanger-q (struct-copy string-quad last-q
+                                      [elems #:parent quad null]
+                                      [size #:parent quad
+                                            (let ([p (make-size-promise-for-string last-q (car last-char-str))])
+                                              (delay
+                                                (match-define (list x y) (force p))
+                                                (pt (- x) y)))]))
         (define last-sublist (append prev-qs (list last-q hanger-q)))
         (append sublists (list last-sublist))])]
     [_ nonspacess]))
@@ -444,7 +445,7 @@
   (restore doc))
 
 (define (make-hr-quad line-q)
-  (quad-copy line-q [draw-start hr-draw]))
+  (struct-copy quad line-q [draw-start hr-draw]))
 
 (define ((line-wrap-finish line-prototype-q default-block-id) wrap-qs q-before q-after idx)
   ;; we curry line-q so that the wrap size can be communicated to this operation
@@ -467,7 +468,7 @@
          [(and (cons elem-first _) elems)
           (match-define (list line-width line-height) (quad-size line-prototype-q))
           (list
-           (quad-copy
+           (struct-copy quad
             line-prototype-q
             ;; move block attrs up, so they are visible in col wrap
             [attrs (let ([h (copy-block-attrs (quad-attrs elem-first) (hash-copy (quad-attrs line-prototype-q)))])
@@ -493,14 +494,14 @@
               (match (and (eq? idx 1) (quad-ref elem-first :list-index))
                 [#false null]
                 [bullet
-                 (define bq (quad-copy q:string ;; copy q:string to get draw routine
+                 (define bq (struct-copy string-quad q:string ;; copy q:string to get draw routine
                                        ;; borrow attrs from elem
-                                       [attrs (quad-attrs elem-first)]
+                                       [attrs #:parent quad (quad-attrs elem-first)]
                                        ;; use bullet as elems
-                                       [elems (list (if (number? bullet) (format "~a." bullet) bullet))]
+                                       [elems #:parent quad (list (if (number? bullet) (format "~a." bullet) bullet))]
                                        ;; size doesn't matter because nothing refers to this quad
                                        ;; just for debugging box
-                                       [size (pt 15 (pt-y (size line-prototype-q)))]))
+                                       [size #:parent quad (pt 15 (pt-y (size line-prototype-q)))]))
                  (from-parent (list bq) 'sw)])
               (from-parent
                (match (quad-ref elem-first :inset-left 0)
@@ -528,7 +529,7 @@
     (raise-argument-error 'line-wrap "positive number" wrap-size))
   (match qs
     [(cons q _)
-     (define line-q (quad-copy q:line [size (pt wrap-size (quad-ref q :line-height default-line-height))]))
+     (define line-q (struct-copy quad q:line [size (pt wrap-size (quad-ref q :line-height default-line-height))]))
      (define permitted-justify-overfill
        (match (quad-ref q :line-align)
          ;; allow justified lines to go wider,
@@ -686,7 +687,9 @@
                            #:to 'nw
                            #:printable only-prints-in-middle))
 
+(define-quad page-quad quad)
 (define q:page (q
+                #:type page-quad
                 #:id 'page
                 #:from-parent 'nw
                 #:draw-start page-draw-start))
@@ -791,7 +794,7 @@
   (append
    (match lns
      [(cons line _)
-      (list (quad-copy col-quad
+      (list (struct-copy quad col-quad
                        ;; move block attrs up, so they are visible in page wrap
                        [attrs (copy-block-attrs (quad-attrs line)
                                                 (hash-copy (quad-attrs col-quad)))]
@@ -852,12 +855,12 @@ https://github.com/mbutterick/typesetter/blob/882ec681ad1fa6eaee6287e53bc4320d96
   (when (pair? cols)
     (quad-update! (car cols)
                   [elems (append (quad-elems (car cols)) reversed-fn-lines)]))
-  (define col-spacer (quad-copy q:column-spacer [size (pt column-gap (and 'arbitrary-irrelevant-value 100))]))
+  (define col-spacer (struct-copy quad q:column-spacer [size (pt column-gap (and 'arbitrary-irrelevant-value 100))]))
   (add-between cols col-spacer))
 
 (verbose-quad-printing? #t)
 (define ((page-wrap-finish make-page-quad path) cols q-before q-after page-idx)
-  (define page-quad (make-page-quad (+ (section-pages-used) page-idx)))
+  (define pq (make-page-quad (+ (section-pages-used) page-idx)))
   ;; get attrs from cols if we can, otherwise try q-after or q-before
   (define q-for-attrs (cond
                         [(pair? cols) (car cols)]
@@ -870,12 +873,12 @@ https://github.com/mbutterick/typesetter/blob/882ec681ad1fa6eaee6287e53bc4320d96
        [(or #false "none") null]
        [_ (list (make-footer-quad q-for-attrs page-idx path))])
      (from-parent cols 'nw)))
-  (list (quad-copy page-quad
-                   [elems elems]
-                   [attrs (copy-block-attrs (cond
-                                              [q-for-attrs => quad-attrs]
-                                              [else (hash)])
-                                            (hash-copy (quad-attrs page-quad)))])))
+  (list (struct-copy page-quad pq
+                     [elems #:parent quad elems]
+                     [attrs #:parent quad (copy-block-attrs (cond
+                                                              [q-for-attrs => quad-attrs]
+                                                              [else (hash)])
+                                                            (hash-copy (quad-attrs pq)))])))
 
 (define (page-wrap qs width [make-page-quad (λ (x) q:page)])
   (unless (positive? width)

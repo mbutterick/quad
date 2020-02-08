@@ -378,28 +378,28 @@
 (module+ test
   (define q-zero (q #:size (pt 0 0)))
   (define q-one (q #:size (pt 1 1) #:printable #t))
-  (define x (quad-copy q-one [elems '(#\x)]))
-  (define zwx (quad-copy q-zero
+  (define x (struct-copy quad q-one [elems '(#\x)]))
+  (define zwx (struct-copy quad q-zero
                          [printable (λ _ #t)]
                          [elems '(#\z)]))
-  (define hyph (quad-copy q-one [elems '(#\-)]))
-  (define shy (quad-copy q-one
+  (define hyph (struct-copy quad q-one [elems '(#\-)]))
+  (define shy (struct-copy quad q-one
                          [printable (λ (q [sig #f])
                                       (case sig
                                         [(end) #t]
                                         [else #f]))]
                          [elems '(#\-)]))
-  (define a (quad-copy q-one [elems '(#\a)]))
-  (define b (quad-copy q-one [elems '(#\b)]))
-  (define c (quad-copy q-one [elems '(#\c)]))
-  (define d (quad-copy q-one [elems '(#\d)]))
-  (define sp (quad-copy q-one
+  (define a (struct-copy quad q-one [elems '(#\a)]))
+  (define b (struct-copy quad q-one [elems '(#\b)]))
+  (define c (struct-copy quad q-one [elems '(#\c)]))
+  (define d (struct-copy quad q-one [elems '(#\d)]))
+  (define sp (struct-copy quad q-one
                         [printable (λ (q [sig #f])
                                      (case sig
                                        [(start end) #f]
                                        [else #t]))]
                         [elems '(#\space)]))
-  (define lbr (quad-copy q-one
+  (define lbr (struct-copy quad q-one
                          [printable (λ _ #f)]
                          [elems '(#\newline)]))
 
@@ -418,8 +418,8 @@
      (for/list ([x (in-list (linewrap (for/list ([c (in-string str)])
                                                 (define atom (q c))
                                                 (if (equal? (quad-elems atom) '(#\space))
-                                                    (quad-copy sp)
-                                                    (quad-copy q-one
+                                                    (struct-copy quad sp)
+                                                    (struct-copy quad q-one
                                                                [attrs (quad-attrs atom)]
                                                                [elems (quad-elems atom)]))) int debug
                                                                                             #:nicely nicely?))]

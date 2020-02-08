@@ -91,9 +91,6 @@
    (define (hash-proc h recur) (equal-hash-code h))
    (define (hash2-proc h recur) (equal-secondary-hash-code h))])
 
-(define-syntax-rule (quad-copy QID [K V] ...)
-  (struct-copy quad QID [K V] ...))
-
 #;(struct quad-attr (key default-val) #:transparent)
 
 #;(define (make-quad-attr key [default-val #f])

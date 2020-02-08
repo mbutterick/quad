@@ -6,6 +6,7 @@
          racket/sequence
          racket/list
          racket/dict
+         racket/generator
          pitfall
          quad
          hyphenate
@@ -45,7 +46,7 @@
                                             #:min-left-length 3
                                             #:min-right-length 3))]
                  [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
-                (quad-copy q [elems (list substr)]))]
+                (struct-copy quad q [elems (list substr)]))]
     [else (list q)]))
 
 
@@ -245,8 +246,8 @@
   (values line-qs fn-line-qs))
 
 (define (make-columns line-qs fn-line-qs line-wrap-size printable-height column-gap)
-  (define col-quad-prototype (quad-copy q:column
-                                        [size (pt line-wrap-size printable-height)]))
+  (define col-quad-prototype (struct-copy quad q:column
+                                          [size (pt line-wrap-size printable-height)]))
   (time-log column-wrap (column-wrap line-qs fn-line-qs printable-height column-gap col-quad-prototype)))
 
 (define (make-pages column-qs
@@ -258,12 +259,30 @@
                     printable-height)
   (define (page-quad-prototype page-count)
     (define left-shift (+ left-margin (if (odd? page-count) gutter-margin 0)))
-    (quad-copy q:page
-               [shift (pt left-shift top-margin)]
-               [size (pt line-wrap-size printable-height)]))
+    (struct-copy page-quad q:page
+                 [shift #:parent quad (pt left-shift top-margin)]
+                 [size #:parent quad (pt line-wrap-size printable-height)]))
   (time-log page-wrap (page-wrap column-qs printable-width page-quad-prototype)))
 
+
 (define (apply-doc-repeaters secs repeaters)
+  (for ([page (in-list (for*/list ([sec (in-list secs)]
+                                   [elem (in-list (quad-elems sec))]
+                                   #:when (page-quad? elem))
+                                  elem))]
+        [page-num (in-naturals 1)]
+        [page-side (in-cycle '(right left))])
+       (define repeaters-for-this-page
+         (for/list ([repeater (in-list repeaters)]
+                    #:when (let* ([val (quad-ref repeater :page-repeat)]
+                                  [sym (string->symbol val)])
+                             (memq sym (list
+                                        (if (= page-num 1) 'first 'rest)
+                                        page-side
+                                        'all))))
+                   repeater))
+       (when (pair? repeaters-for-this-page)
+         (set-quad-elems! page (append repeaters-for-this-page (quad-elems page)))))
   secs)
 
 (define (make-sections all-qs)
@@ -313,10 +332,7 @@
     (define section-pages
       (for/list ([page (in-list section-pages-without-repeaters)]
                  [page-num (in-naturals 1)]
-                 [page-side (in-cycle ((if (eq? section-starting-side 'left) values reverse) '(left right)))])
-                ;; the first page of the section is 1,
-                ;; so all the odd pages are the same side as the starting side
-                ;; and even pages are the opposite side
+                 [page-side (in-cycle ((if (eq? section-starting-side 'right) values reverse) '(right left)))])
                 (define section-repeaters-for-this-page
                   (for/list ([repeater (in-list section-repeaters)]
                              #:when (let* ([val (quad-ref repeater :page-repeat)]
@@ -329,8 +345,8 @@
                 (cond
                   [(null? section-repeaters-for-this-page) page]
                   [else
-                   (quad-copy page
-                              [elems (append section-repeaters-for-this-page (quad-elems page))])])))
+                   (struct-copy page-quad page
+                                [elems #:parent quad (append section-repeaters-for-this-page (quad-elems page))])])))
         
     (begin0
       (cond
@@ -341,24 +357,24 @@
            ['left
             ;; blank page goes at beginning of current section
             (define page-from-current-section (car section-pages))
-            (define blank-page (quad-copy page-from-current-section [elems null]))
-            (define new-section (quad-copy q:section [elems (cons blank-page section-pages)]))
+            (define blank-page (struct-copy page-quad page-from-current-section [elems #:parent quad null]))
+            (define new-section (struct-copy quad q:section [elems (cons blank-page section-pages)]))
             (cons new-section sections-acc)]
            [_ ;; must be 'right
             ;; blank page goes at end of previous section (if it exists)
-            (define new-section (quad-copy q:section [elems section-pages]))
+            (define new-section (struct-copy quad q:section [elems section-pages]))
             (match sections-acc
               [(cons previous-section other-sections)
                (define previous-section-pages (quad-elems previous-section))
                ;; we know previous section has pages because we ignore empty sections
                (define page-from-previous-section (car previous-section-pages))
-               (define blank-page (quad-copy page-from-previous-section [elems null]))
+               (define blank-page (struct-copy page-quad page-from-previous-section [elems #:parent quad null]))
                (define updated-previous-section
                  (quad-update! previous-section
                                [elems (append previous-section-pages (list blank-page))]))
                (list* new-section updated-previous-section other-sections)]
               [_ (list new-section)])])]
-        [else (define new-section (quad-copy q:section [elems section-pages]) )
+        [else (define new-section (struct-copy quad q:section [elems section-pages]) )
               (cons new-section sections-acc)])
       (section-pages-used (+ (section-pages-used) (length section-pages))))))
 
@@ -434,7 +450,7 @@
     (setup-pdf-metadata! qs (current-pdf))
     ;; all the heavy lifting happens inside `make-sections`
     ;; which calls out to `make-pages`, `make-columns`, and so on.
-    (define doc (correct-line-alignment (quad-copy q:doc [elems (make-sections qs)])))
+    (define doc (correct-line-alignment (struct-copy quad q:doc [elems (make-sections qs)])))
     ;; call `position` and `draw` separately so we can print a timer for each
     (define positioned-doc (time-log position (position doc)))
     ;; drawing implies that a PDF is written to disk

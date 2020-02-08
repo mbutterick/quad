@@ -92,24 +92,24 @@
   ;; recursively calculates coordinates for quad & subquads
   ;; need to position before recurring, so subquads have accurate reference point
   (define positioned-q
-    (quad-copy q
-               [origin (let* ([ref-pt (cond
-                                        [(quad? ref-src)
-                                         (anchor->global-point ref-src (or (quad-from-parent q) (quad-from q)))]
-                                        [ref-src] ; for passing explicit points in testing
-                                        [else (pt 0 0)])]
-                              [this-origin (pt- ref-pt (to-point q))]
-                              [shifted-origin (pt+ this-origin (quad-shift q))])
-                         shifted-origin)]
-               ;; set shift to zero because it's baked into new origin value
-               [shift (pt 0 0)]))
+    (struct-copy quad q
+                 [origin (let* ([ref-pt (cond
+                                          [(quad? ref-src)
+                                           (anchor->global-point ref-src (or (quad-from-parent q) (quad-from q)))]
+                                          [ref-src] ; for passing explicit points in testing
+                                          [else (pt 0 0)])]
+                                [this-origin (pt- ref-pt (to-point q))]
+                                [shifted-origin (pt+ this-origin (quad-shift q))])
+                           shifted-origin)]
+                 ;; set shift to zero because it's baked into new origin value
+                 [shift (pt 0 0)]))
   (define positioned-elems
     ;; for purposes of positioning the elements, we want to also bake in the `shift-elements` value
     ;; but we don't want this origin to be permanent on the parent.
     ;; akin to `push` a graphics state and then `pop` afterwards.
-    (let ([parent-q (quad-copy positioned-q
-                               [origin (pt+ (quad-origin positioned-q) (quad-shift-elems positioned-q))]
-                               [shift-elems (pt 0 0)])])
+    (let ([parent-q (struct-copy quad positioned-q
+                                 [origin (pt+ (quad-origin positioned-q) (quad-shift-elems positioned-q))]
+                                 [shift-elems (pt 0 0)])])
       ;; can't use for/list here because previous quads provide context for later ones
       (let loop ([prev-elems null] [elems (quad-elems parent-q)])
         (match elems
@@ -128,7 +128,7 @@
     [(list ∆x ∆y) (sqrt (+ (expt ∆x 2) (expt ∆y 2)))]))
 
 (define (flatten-quad q)
-  (cons (quad-copy q [elems null])
+  (cons (struct-copy quad q [elems null])
         (apply append (map flatten-quad (quad-elems q)))))
 
 (define (bounding-box . qs-in)
