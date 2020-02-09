@@ -120,7 +120,7 @@
       [(? list? xs) (map loop xs)]
       [_ x])))
 
-(define (get-info in mod line col pos)
+(define (get-info-texty in mod line col pos)
   ;; DrRacket caches source file information per session,
   ;; so we can do the same to avoid multiple searches for the command char.
   (define command-char-cache (make-hash))
@@ -147,3 +147,5 @@
             line-start-pos))
          (- first-vis-pos line-start-pos))]      
       [else default])))
+
+(define (get-info-rackety in mod line col pos) (λ (key default) default))

@@ -11,6 +11,7 @@
 (module reader racket/base
   (require "lang-helper.rkt" pollen/decode)
   (provide read-syntax get-info)
+  (define get-info get-info-texty)
   (define read-syntax
     (make-read-syntax 'quadwriter/markup
                       (λ (path-string ip)
