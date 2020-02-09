@@ -379,23 +379,21 @@
 
 (define (correct-line-alignment doc)
   ;; correct lines with inner / outer alignment
-  (for* ([(page page-idx) (in-indexed (for*/list ([section (in-list (quad-elems doc))]
-                                                  [page (in-list (quad-elems section))])
-                                                 page))]
-         #:when (page-quad? page)
-         ;; all inner / outer lines are initially filled as if they were right-aligned
-         [zero-filler-side (in-value (if (odd? (add1 page-idx)) "inner" "outer"))]
-         [col (in-list (quad-elems page))]
-         #:when (column-quad? col)
-         [block (in-list (quad-elems col))]
-         #:when (block-quad? block)
-         [line (in-list (quad-elems block))]
-         #:when (line-quad? line))
-        (when (equal? zero-filler-side (quad-ref line :line-align))
-          (match (quad-elems line)
-            ;; collapse the filler quad by setting size to 0
-            [(cons (? filler-quad? fq) _) (set-quad-size! fq (pt 0 0))]
-            [_ (void)])))
+  ;; all inner / outer lines are initially filled as if they were right-aligned
+  ;; on odd (right-hand) pages, inner becomes 0 (and on left-hand, outer becomes 0)
+  (for* ([section (in-list (quad-elems doc))]
+         [(page page-idx) (in-indexed (quad-elems section))]
+         #:when (page-quad? page))
+        (define right-side? (odd? (add1 page-idx)))
+        (define zero-filler-side (if right-side? "inner" "outer"))
+        (let loop ([x page])
+          (cond
+            [(and (line-quad? x)
+                  (equal? zero-filler-side (quad-ref x :line-align))
+                  (filler-quad? (car (quad-elems x))))
+             ;; collapse the filler quad by setting size to 0
+             (set-quad-size! (car (quad-elems x)) (pt 0 0))]
+            [(quad? x) (for-each loop (quad-elems x))])))
   doc)
 
 (define/contract (render-pdf qx-arg
