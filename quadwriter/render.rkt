@@ -27,7 +27,8 @@
          "section.rkt"
          "doc.rkt"
          "column.rkt"
-         "keep.rkt")
+         "keep.rkt"
+         "debug.rkt")
 (provide (all-defined-out))
 
 

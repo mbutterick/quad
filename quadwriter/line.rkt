@@ -6,8 +6,7 @@
          "font.rkt"
          "string.rkt"
          "attrs.rkt"
-         quad/position
-         quad/quad
+         quad/base
          quad/wrap
          sugar/list
          pitfall
@@ -56,7 +55,6 @@
 
 
 (define (space-quad? q) (equal? (quad-elems q) (list " ")))
-
 
 (define (hang-punctuation nonspacess)
   (match nonspacess
@@ -160,16 +158,6 @@
                ;; ok to put back absolute quads at end, because it doesn't affect their layout
                (append other-qs absolute-qs))])]))
 
-(define/match (from-parent qs [where #f])
-  ;; doesn't change any positioning. doesn't depend on state. can happen anytime.
-  ;; can be repeated without damage.
-  [((? null?) _) null]
-  [((cons q rest) where)
-   (quad-update! q [from-parent (or where (quad-from q))])
-   (cons q rest)])
-
-
-(define only-prints-in-middle (λ (q sig) (not (memq sig '(start end)))))
 (define (make-paragraph-spacer maybe-first-line-q key default-val)
   (define arbitrary-width 20)
   (make-quad #:type line-spacer-quad

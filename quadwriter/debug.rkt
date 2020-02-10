@@ -1,9 +1,45 @@
 #lang debug racket
-(require "param.rkt"
-         pitfall
+(require pitfall
          quad/position
          quad/quad)
 (provide (all-defined-out))
+
+(define-for-syntax debug-mode #false)
+
+(define-syntax (go stx)
+  (datum->syntax stx
+                 (cond
+                   [debug-mode
+                    '(begin
+                       (define draw-debug? (make-parameter #true))
+                       (define draw-debug-line? (make-parameter #true))
+                       (define draw-debug-block? (make-parameter #false))
+                       (define draw-debug-string? (make-parameter #true))
+                       (define draw-debug-image? (make-parameter #false))
+
+                       (define debug-page-width (make-parameter 400))
+                       (define debug-page-height (make-parameter 400))
+                       (define debug-x-margin (make-parameter 50))
+                       (define debug-y-margin (make-parameter 50))
+                       (define debug-column-count (make-parameter 1))
+                       (define debug-column-gap (make-parameter 36)))]
+                   [else
+                    '(begin
+                       (define draw-debug? (make-parameter #false))
+                       (define draw-debug-line? (make-parameter #true))
+                       (define draw-debug-block? (make-parameter #true))
+                       (define draw-debug-string? (make-parameter #true))
+                       (define draw-debug-image? (make-parameter #true))
+
+                       (define debug-page-width (make-parameter #f))
+                       (define debug-page-height (make-parameter #f))
+                       (define debug-x-margin (make-parameter #f))
+                       (define debug-y-margin (make-parameter #f))
+                       (define debug-column-count (make-parameter #f))
+                       (define debug-column-gap (make-parameter #f)))])))
+
+
+(go)
 
 
 (define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"] . _)

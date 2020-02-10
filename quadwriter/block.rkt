@@ -4,10 +4,7 @@
          "log.rkt"
          "debug.rkt"
          "struct.rkt"
-         "line.rkt"
-         quad/quad
-         quad/util
-         quad/position
+         quad/base
          pitfall)
 (provide (all-defined-out))
 

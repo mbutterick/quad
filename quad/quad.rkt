@@ -201,6 +201,16 @@
   
 (define q make-quad)
 
+(define only-prints-in-middle (λ (q sig) (not (memq sig '(start end)))))
+
+(define/match (from-parent qs [where #f])
+  ;; doesn't change any positioning. doesn't depend on state. can happen anytime.
+  ;; can be repeated without damage.
+  [((? null?) _) null]
+  [((cons q rest) where)
+   (quad-update! q [from-parent (or where (quad-from q))])
+   (cons q rest)])
+
 (module+ test
   (require racket/port)
   (define q1 (q #f #\H #\e #\l #\o))
