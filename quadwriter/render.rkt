@@ -6,7 +6,6 @@
          racket/sequence
          racket/list
          racket/dict
-         racket/generator
          pitfall
          quad
          hyphenate
@@ -16,8 +15,19 @@
          "attrs.rkt"
          "param.rkt"
          "font.rkt"
-         "layout.rkt"
-         "log.rkt")
+         "struct.rkt"
+         "break.rkt"
+         "draw.rkt"
+         "string.rkt"
+         "image.rkt"
+         "log.rkt"
+         "line.rkt"
+         "page.rkt"
+         "para.rkt"
+         "section.rkt"
+         "doc.rkt"
+         "column.rkt"
+         "keep.rkt")
 (provide (all-defined-out))
 
 
@@ -135,6 +145,19 @@
   ;; we might, for instance, have a first-level heading style that is specified with page break before.
   ;; so if we invoke that style first, we will get a page break.
   (dropf qs break-quad?))
+
+
+(define (generic->typed-quad q)
+  ;; replaces quads representing certain things
+  ;; with special typed quads representing those things.
+  ;; Because typed quads have their own predicates,
+  ;; it's faster to find them in wrapping operations
+  (define converter (cond
+                      [(quad-ref q :break) convert-break-quad]
+                      [(quad-ref q :draw) convert-draw-quad]
+                      [(quad-ref q :image-file) convert-image-quad]
+                      [else convert-string-quad]))
+  (converter q))
 
 (define (extract-defined-quads qs)
   (define (get-define-val q) (quad-ref q 'define))

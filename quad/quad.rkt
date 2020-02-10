@@ -191,6 +191,7 @@
 
 (define-syntax (define-quad stx)
   (syntax-case stx ()
+    [(M ID) #'(M ID quad)]
     [(_ ID SUPER)
      (with-syntax ([MAKE-ID (format-id #'ID "make-~a" (syntax-e #'ID))])
        #'(begin
