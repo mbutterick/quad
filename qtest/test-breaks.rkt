@@ -4,37 +4,37 @@
 
 "Page 1 Column 1 Line 1"
 
-(q ((break "line")))
+(line-break)
 
 "Page 1 Column 1 Line 2"
 
-(q ((break "column")))
+(column-break)
 
-(q ((break "para")))
+(para-break)
 
 "Page 1 Column 2 Line 1"
 
-(q ((break "line")))
+(line-break)
 
 "Page 1 Column 2 Line 2"
 
-(q ((break "page")))
+(page-break)
 
 
 "Page 2 Column 1 Line 1"
 
-(q ((break "line")))
+(line-break)
 
-(q ((break "column")))
+(column-break)
 
-(q ((break "page")))
+(page-break)
 
 
 "Page 3 Column 1 Line 1"
 
-(q ((break "page")))
+(page-break)
 
-(q ((break "page")))
+(page-break)
 
 "Page 5 Column 1 Line 1"
 

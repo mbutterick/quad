@@ -4,19 +4,19 @@
 
 "Section 1 Page 1 on right"
 
-(q ((break "section")))
+(section-break)
 
 (q ((page-width "5in")(page-height "5in")(page-side-start "right")) "Section 2 Page 1 on right"
 
-(q ((break "page")))
+(page-break)
 
 "Section 2 Page 2 on left")
 
-(q ((break "section")))
+(section-break)
 
 (q ((page-width "5in")(page-height "5in")(page-side-start "left")) "Section 3 Page 1 on left"
 
-(q ((break "page")))
+(page-break)
 
 "Section 3 Page 2 on right")
 
