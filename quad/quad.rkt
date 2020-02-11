@@ -47,7 +47,11 @@
 ;; keep this param here so you don't have to import quad/param to get it
 (define verbose-quad-printing? (make-parameter #f))
 
-(struct quad (attrs ; key-value pairs, arbitrary
+(struct quad (
+              ;; WARNING
+              ;; atomize procedure depends on attrs & elems
+              ;; being first two fields of struct.
+              attrs ; key-value pairs, arbitrary
               elems ; subquads or text
               ;; size is a two-dim pt
               size ; outer size of quad for layout (though not necessarily the bounding box for drawing)
@@ -70,15 +74,14 @@
               draw-start ; func called at the beginning of every draw event (for setup ops)
               draw ; func called in the middle of every daw event
               draw-end ; func called at the end of every draw event (for teardown ops)
-              id
-              )
+              tag) ; from q-expr, maybe
   #:mutable
   #:transparent
   #:property prop:custom-write
   (λ (q p w?) (display
                (format "<~a-~a~a~a>"
+                       (quad-tag q)
                        (object-name q)
-                       (quad-id q)
                        (if (verbose-quad-printing?)
                            (string-join (map ~v (flatten (hash->list (quad-attrs q))))
                                         " " #:before-first "(" #:after-last ")")
@@ -148,10 +151,10 @@
 
 ;; todo: convert immutable hashes to mutable on input?
 (define (make-quad
+         #:tag [tag #false]
          #:type [type quad]
          #:attrs [attrs (make-hasheq)]
          #:elems [elems null]
-         #:id [id #f]
          #:size [size '(0 0)]
          #:from-parent [from-parent #false]
          #:from [from 'ne]
@@ -186,8 +189,8 @@
                         draw-start
                         draw
                         draw-end))
-          (define id-syn (string->symbol (if id (~a id) (~r (eq-hash-code args) #:base 36))))
-          (apply type (append args (list id-syn)))]))
+          (apply type (append args
+                              (list (or tag (string->symbol (~r (eq-hash-code args) #:base 36))))))]))
 
 (define-syntax (define-quad stx)
   (syntax-case stx ()

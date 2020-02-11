@@ -153,12 +153,11 @@
   ;; with special typed quads representing those things.
   ;; Because typed quads have their own predicates,
   ;; it's faster to find them in wrapping operations
-  (define converter (cond
-                      [(quad-ref q :break) convert-break-quad]
-                      [(quad-ref q :draw) convert-draw-quad]
-                      [(quad-ref q :image-file) convert-image-quad]
-                      [else convert-string-quad]))
-  (converter q))
+  (cond
+    [(convert-break-quad q)]
+    [(convert-draw-quad q)]
+    [(quad-ref q :image-file) (convert-image-quad q)]
+    [else (convert-string-quad q)]))
 
 (define (extract-defined-quads qs)
   (define (get-define-val q) (quad-ref q 'define))

@@ -75,7 +75,7 @@
     (raise-argument-error 'qexpr->quad "qexpr" x))
   (let loop ([x x])
     (match x
-      [(cons (? valid-tag?) rest)
+      [(cons (? valid-tag? tag) rest)
        (match rest
          [(list (? txexpr-attrs? attrs) (? qexpr? elems) ...)
           (define mheq (make-hasheq)) ; want mutable hash
@@ -88,9 +88,12 @@
                                 [(equal? v "false") #false]
                                 [(string->number v)]
                                 [else v])))
-          (q #:attrs mheq #:elems (map loop elems))]
+          (make-quad #:tag tag
+                     #:attrs mheq
+                     #:elems (map loop elems))]
          [(list (? qexpr? elems) ...)
-          (q #:elems (map loop elems))])]
+          (make-quad #:tag tag
+                     #:elems (map loop elems))])]
       [_ x])))
 
 (module+ test

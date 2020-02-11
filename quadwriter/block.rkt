@@ -84,7 +84,7 @@
       #:from 'sw
       #:to 'nw
       #:elems (from-parent lines 'nw)
-      #:id 'block
+      #:tag 'block
       #:attrs (quad-attrs line)
       #:size (delay (pt (pt-x (size line)) ; 
                         (+ (sum-y lines)

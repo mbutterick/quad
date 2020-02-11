@@ -96,7 +96,7 @@
 (define q:string (q #:type string-quad
                     #:from 'bo
                     #:to 'bi
-                    #:id 'str
+                    #:tag 'str
                     #:printable q:string-printable?
                     #:draw q:string-draw
                     #:draw-end q:string-draw-end))

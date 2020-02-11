@@ -7,7 +7,6 @@
          "string.rkt"
          "attrs.rkt"
          quad/base
-         quad/wrap
          sugar/list
          pitfall
          racket/unsafe/ops)
@@ -33,7 +32,7 @@
                 #:from 'sw
                 #:to 'nw
                 #:printable #true
-                #:id 'line
+                #:tag 'line
                 #:draw-start (if draw-debug-line? draw-debug void)))
 
 (define (render-hyphen qs ending-q)
@@ -115,7 +114,7 @@
 
      (define (make-left-edge-filler [width 0])
        (make-quad #:type filler-quad
-                  #:id 'line-filler
+                  #:tag 'line-filler
                   #:from-parent (quad-from-parent q-first)
                   #:from 'bo
                   #:to 'bi

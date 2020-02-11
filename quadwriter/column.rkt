@@ -2,13 +2,12 @@
 (require "attrs.rkt"
          "struct.rkt"
          "block.rkt"
-         quad/base
-         quad/wrap)
+         quad/base)
 (provide (all-defined-out))
 
 (define q:column (make-quad
                   #:type column-quad
-                  #:id 'col
+                  #:tag 'col
                   #:from 'ne
                   #:to 'nw))
 

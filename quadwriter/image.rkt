@@ -51,7 +51,7 @@
 (define q:image (q #:type image-quad
                    #:from 'bo
                    #:to 'bi
-                   #:id 'image
+                   #:tag 'image
                    #:printable #true
                    #:draw q:image-draw
                    #:draw-end q:image-draw-end))

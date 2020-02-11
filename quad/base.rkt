@@ -4,9 +4,11 @@
   "quad.rkt"
   "position.rkt"
   "param.rkt"
-  "util.rkt")
+  "util.rkt"
+  "wrap.rkt")
 
 (provide (all-from-out "quad.rkt"
                        "position.rkt"
                        "param.rkt"
-                       "util.rkt"))
+                       "util.rkt"
+                       "wrap.rkt"))

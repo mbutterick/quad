@@ -4,4 +4,4 @@
 (provide (all-defined-out))
 
 (define q:section (make-quad #:type section-quad
-                             #:id 'section))
+                             #:tag 'section))

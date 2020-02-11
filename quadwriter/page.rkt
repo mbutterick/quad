@@ -4,10 +4,7 @@
          "param.rkt"
          "debug.rkt"
          "font.rkt"
-         "line.rkt"
-         quad/position
-         quad/quad
-         quad/wrap
+         quad/base
          racket/date
          pitfall)
 (provide (all-defined-out))
@@ -25,7 +22,7 @@
 
 (define q:page (make-quad
                 #:type page-quad
-                #:id 'page
+                #:tag 'page
                 #:from-parent 'nw
                 #:draw-start page-draw-start))
 
