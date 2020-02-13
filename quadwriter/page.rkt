@@ -4,6 +4,7 @@
          "param.rkt"
          "debug.rkt"
          "font.rkt"
+         "string.rkt"
          quad/base
          racket/date
          pitfall)
@@ -44,14 +45,15 @@
 
 (define (draw-page-footer q doc)
   (match-define (list x y) (quad-origin q))
-  (font-size doc (* .8 default-font-size))
+  (font-size doc (quad-ref q :font-size))
   (font doc (path->string (quad-ref q font-path-key default-font-face)))
   (fill-color doc default-font-color)
-  (text doc (or (quad-ref q :footer-text)
-                (format "~a · ~a at ~a" (quad-ref q :page-number 0)
-                        (if (quadwriter-test-mode) "test" (quad-ref q :doc-title "untitled"))
-                        (date->string (if (quadwriter-test-mode) (seconds->date 0 #f) (current-date)) #t)))
-        x y))
+  (define str (or (quad-ref q :footer-text)
+                  (format "~a · ~a at ~a" (quad-ref q :page-number 0)
+                          (if (quadwriter-test-mode) "test" (quad-ref q :doc-title "untitled"))
+                          (date->string (if (quadwriter-test-mode) (seconds->date 0 #f) (current-date)) #t))))
+  (text doc str x y)
+  #;(set-quad-size! q (make-size-promise-for-string q str)))
 
 (define (make-footer-quad col-q page-idx path)
   (define-values (dir name _) (split-path (path-replace-extension path #"")))
@@ -60,6 +62,8 @@
                               :footer-text (quad-ref col-q :footer-text)
                               :page-number (+ (quad-ref col-q :page-number-start (add1 (section-pages-used))) (sub1 page-idx))
                               :doc-title (string-titlecase (path->string name))
+                              :font-size (* 0.8 (quad-ref col-q :font-size default-font-size))
+                              :line-height (quad-ref col-q :line-height default-line-height)
                               :font-family "text")
                   (resolve-font-path! attrs)
                   attrs))
@@ -67,13 +71,13 @@
              #:attrs attrs
              #:from-parent 'sw
              #:to 'nw
-             #:elems (or null (hash-ref (current-named-quads) "foo"))
+             #:elems null
              #:shift (pt 0 (* 1.5 default-line-height))
              #:printable #true
-             #:draw-start (λ (q doc)
-                            (when draw-debug-line?
-                              (draw-debug q doc "goldenrod" "goldenrod"))
-                            (draw-page-footer q doc))))
+             #:draw draw-page-footer
+             #:draw-end (λ (q doc)
+                          (when draw-debug-line?
+                            (draw-debug q doc "goldenrod" "goldenrod")))))
 
 (define ((page-wrap-finish make-page-quad path) cols q-before q-after page-idx)
   (define pq (make-page-quad (+ (section-pages-used) page-idx)))

@@ -99,12 +99,17 @@ Naming guidelines
                draw
                width
                height
-               position
-               text
+               anchor-parent
+               anchor-from
+               anchor-from-parent
+               anchor-to
+               string
                color
                stroke
                x
                y
+               x1 ;; x & y are the top-left pos of the bounding box.
+               y1 ;; x1 & y1 are the starting points of a line
                x2
                y2))
   
@@ -228,7 +233,7 @@ Naming guidelines
                      :pdf-subject
                      :pdf-author
                      :pdf-keywords
-                     :text)) #true))
+                     :string)) #true))
 
 (define (takes-path? k)
   (and (memq k (list :image-file)) #true))

@@ -87,8 +87,8 @@
   (unless (pair? all-qs)
     (raise-argument-error 'fill-line-wrap "nonempty list of quads" all-qs))
 
-  ;; remove absolute position quads because they don't affect line layout
-  (define-values (absolute-qs qs) (partition (λ (q) (equal? (quad-ref q :position) "absolute")) all-qs))
+  ;; remove anchored quads because they don't affect line layout
+  (define-values (absolute-qs qs) (partition (λ (q) (quad-ref q :anchor-parent)) all-qs))
 
   (match-define (and (cons q-first other-qs) (list _ ... q-last)) qs)
   (define align-value (quad-ref q-first :line-align "left"))

@@ -159,7 +159,7 @@
     [(quad-ref q :image-file) (convert-image-quad q)]
     [else (convert-string-quad q)]))
 
-(define (extract-defined-quads qs)
+#;(define (extract-defined-quads qs)
   (define (get-define-val q) (quad-ref q 'define))
   (define-values (dqs not-dqs) (partition get-define-val qs))
   (for ([dq-group (in-list (group-by get-define-val dqs))])
@@ -469,7 +469,7 @@
                  ;; make it a parameter than endlessly pass it around as an argument.
                  [section-pages-used 0]
                  [verbose-quad-printing? #false]
-                 [current-named-quads (make-hash)]) ; for ease of debugging; not mandatory
+                 #;[current-named-quads (make-hash)]) ; for ease of debugging; not mandatory
     (define qs (time-log setup-qs (setup-qs qx-arg base-dir)))
     (setup-pdf-metadata! qs (current-pdf))
     ;; all the heavy lifting happens inside `make-sections`
