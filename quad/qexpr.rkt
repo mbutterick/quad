@@ -40,7 +40,7 @@
   (check-true (qexpr? '(quad "Hello world")))
   (check-true (qexpr? `(quad "Hello " ,(q "world")))))
 
-(define (quad-name q) (string->symbol (string-trim (symbol->string (object-name q)) "$")))
+(define (quad-qexpr-name q) (string->symbol (string-trim (symbol->string (object-name q)) "$")))
 
 (define (qexpr #:clean-attrs? [clean-attrs? #f]
                #:name [name 'q]
@@ -67,7 +67,7 @@
 (define (quad->qexpr q)
   (let loop ([x q])
     (cond
-      [(quad? x) (apply qexpr #:name (quad-name x) #:clean-attrs? #t (hash->qattrs (quad-attrs x)) (map loop (quad-elems x)))]
+      [(quad? x) (apply qexpr #:name (quad-qexpr-name x) #:clean-attrs? #t (hash->qattrs (quad-attrs x)) (map loop (quad-elems x)))]
       [else x])))
 
 (define (qexpr->quad x)

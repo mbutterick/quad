@@ -74,6 +74,7 @@
               draw-start ; func called at the beginning of every draw event (for setup ops)
               draw ; func called in the middle of every daw event
               draw-end ; func called at the end of every draw event (for teardown ops)
+              name ; for anchor resolution
               tag) ; from q-expr, maybe
   #:mutable
   #:transparent
@@ -166,6 +167,7 @@
          #:draw-start [draw-start void]
          #:draw [draw default-draw]
          #:draw-end [draw-end void]
+         #:name [name #f]
          . args)
   (unless (andmap (λ (x) (not (pair? x))) elems)
     (raise-argument-error 'make-quad "elements that are not lists" elems))
@@ -188,7 +190,8 @@
                         printable
                         draw-start
                         draw
-                        draw-end))
+                        draw-end
+                        name))
           (apply type (append args
                               (list (or tag (string->symbol (~r (eq-hash-code args) #:base 36))))))]))
 
