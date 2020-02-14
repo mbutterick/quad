@@ -3,7 +3,9 @@
 (provide (all-defined-out))
 
 (define (make-linear-index q)
-  (cons q (append-map make-linear-index (quad-elems q))))
+  (if (quad? q)
+      (cons q (append-map make-linear-index (quad-elems q)))
+      null))
 
 (define (string->pred str)
   (match str
@@ -16,13 +18,13 @@
 
 (define (parse-query str)
   (for/list ([piece (in-list (string-split str ":"))])
-    (match (regexp-match #px"^(.*)\\[(.*?)\\]$" piece)
-      [#false (cons (string->pred piece) #false)]
-      [(list all name arg) (cons (string->pred name) (or (string->number arg)
-                                                         (string->symbol arg)))])))
+            (match (regexp-match #px"^(.*)\\[(.*?)\\]$" piece)
+              [#false (cons (string->pred piece) #false)]
+              [(list all name arg) (cons (string->pred name) (or (string->number arg)
+                                                                 (string->symbol arg)))])))
 
-(define (query q query-str)
-  (for/fold ([qs (make-linear-index q)]
+(define (query qs query-str)
+  (for/fold ([qs qs]
              #:result (and qs (car qs)))
             ([query-piece (in-list (parse-query query-str))])
     (match-define (cons pred count) query-piece)
@@ -41,12 +43,12 @@
   (define-syntax-rule (factory type proc)
     (make-quad #:type type
                #:elems (for/list ([i (in-range 3)])
-                         (set! counter (add1 counter))
-                         (define new-q (proc))
-                         (quad-update! new-q
-                                       [tag (format "~a[~a]-~a" 'proc counter (gensym))])
-                         (hash-set! (quad-attrs new-q) 'count counter)
-                         new-q)))
+                                 (set! counter (add1 counter))
+                                 (define new-q (proc))
+                                 (quad-update! new-q
+                                               [tag (format "~a[~a]-~a" 'proc counter (gensym))])
+                                 (hash-set! (quad-attrs new-q) 'count counter)
+                                 new-q)))
 
   (define (line) (make-quad #:type line-quad))
   (define (block) (factory block-quad line))
