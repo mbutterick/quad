@@ -128,8 +128,9 @@
     [(list ∆x ∆y) (sqrt (+ (expt ∆x 2) (expt ∆y 2)))]))
 
 (define (flatten-quad q)
-  (cons (struct-copy quad q [elems null])
-        (apply append (map flatten-quad (quad-elems q)))))
+  (define elems (quad-elems q))
+  (cons (quad-update! q [elems null])
+        (apply append (map flatten-quad elems))))
 
 (define (bounding-box . qs-in)
   ;; size of box that holds q and all subqs, based on reported origin and size
