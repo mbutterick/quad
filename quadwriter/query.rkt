@@ -1,8 +1,6 @@
 #lang debug racket
 (require quad/base "struct.rkt")
 
-(verbose-quad-printing? #t)
-
 (define-syntax-rule (factory type proc)
   (make-quad #:type type
              #:elems (for/list ([i (in-range 2)])
@@ -31,9 +29,12 @@
               [(list all name arg) (cons (string->pred name) (or (string->number arg)
                                                                  (string->symbol arg)))])))
 
+(define (make-linear-index q)
+  (cons q (append-map make-linear-index (quad-elems q))))
+
 (define (query q query-str)
   (define query-assocs (parse-query-str query-str))
-  (for/fold ([qs (flatten-quad q)]
+  (for/fold ([qs (make-linear-index q)]
              #:result (and qs (car qs)))
             ([qa (in-list query-assocs)])
     (match-define (cons pred count) qa)
@@ -46,4 +47,4 @@
                [else (loop (cdr maybe-tail) seen)]))))))
           
 
-(query doc "sec[2]:pg[1]")
+(query doc "sec[2]:pg[1]:ln[3]")
