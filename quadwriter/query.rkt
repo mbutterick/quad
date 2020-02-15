@@ -32,50 +32,48 @@
       [(list _ name arg) (cons (hash-ref preds (string->key name))
                                (or (string->number arg) (string->symbol arg)))])))
 
+(define (find-inclusive vec pred start-arg end-arg [count 1])
+  ;; search from lidx to ridx inclusive
+  (define-values (start end step)
+    (cond
+      ;; if lidx is bigger, search backward
+      [(> start-arg end-arg) (values start-arg (sub1 end-arg) -1)]
+      [else (values start-arg (add1 end-arg) 1)]))
+  (for/fold ([start-1 (sub1 start)]) ; sub1 for reason below
+            ([seen (in-range count)]
+             #:break (not start-1))
+    ;; add 1 so on next iteration, we can find next matcher
+    ;; and won't re-find this one immediately
+    (for/first ([idx (in-range (add1 start-1) end step)]
+                #:when (pred (vector-ref vec idx)))
+      idx)))
+
 (define (query quad-or-index query-str [starting-q #false])
   (define vec (match quad-or-index
                 [(? quad? q) (make-query-index q)]
                 [idx idx]))
-  (define (next-occurrence-between pred lidx ridx)
-    (cond
-      [(or (not lidx) (not ridx)) ridx]
-      ;; we are searching between, so add 1 to left idx
-      [(for/first ([idx (in-range (add1 lidx) ridx)]
-                   #:when (pred (vector-ref vec idx)))
-         idx)]
-      [else (vector-length vec)]))
   (for/fold ([vidx 0]
-             [maxidx (vector-length vec)]
+             [maxidx (sub1 (vector-length vec))]
              #:result (and vidx (vector-ref vec vidx)))
             ([query-piece (in-list (parse-query query-str))]
              #:break (not vidx))
     (match-define (cons pred count) query-piece)
     (define res-idx
       (match count
-        [(or (== 'this eq?) (== 'last eq?))
-         ;; find a starting point, then search backward
-         (for/first ([vidx (in-range (if (eq? count 'this)
-                                         ;; start at querying quad
-                                         (vector-memq starting-q vec)
-                                         ;; start at end 
-                                         (sub1 maxidx)) -1 -1)]
-                     #:when (pred (vector-ref vec vidx)))
-           vidx)]
-        [(== 'prev eq?) (error 'unimplemented)]
-        [(== 'next eq?) (error 'unimplemented)]
-        [count
-         (for/fold ([vidx vidx]
-                    ;; sub 1 because return values add 1
-                    ;; and final result should be location of matching quad
-                    #:result (and vidx (sub1 vidx)))
-                   ([seen (in-range count)]
-                    #:break (not vidx))
-           (for/first ([vidx (in-range vidx maxidx)]
-                       #:when (pred (vector-ref vec vidx)))
-             ;; add 1 so on next iteration, we can find next matcher
-             ;; and won't re-find this one immediately
-             (add1 vidx)))]))
-    (values res-idx (next-occurrence-between pred res-idx maxidx))))
+        [(== 'this eq?) ; start at querying quad, then search backward
+         (find-inclusive vec pred (sub1 (vector-memq starting-q vec)) 0)]
+        [(== 'last eq?) ; search backward from end
+         (find-inclusive vec pred maxidx 0)]
+        [(== 'prev eq?) (find-inclusive vec pred (sub1 (vector-memq starting-q vec)) 0 2)]
+        [(== 'next eq?) (find-inclusive vec pred (add1 (vector-memq starting-q vec)) maxidx)]
+        [count (find-inclusive vec pred vidx maxidx count)]))
+    (define next-maxidx
+      (cond
+        [(not res-idx) maxidx]
+        ;; try searching for next occurence after this one, up to max.
+        [(find-inclusive vec pred (add1 res-idx) maxidx)]
+        [else maxidx]))
+    (values res-idx next-maxidx)))
           
 (module+ test
   (require rackunit)
@@ -99,9 +97,15 @@
 
   (define (count q) (and q (quad-ref q 'count)))
   (define doc (factory doc-quad sec))
-
-  (check-eq? (query doc "page[this]" (query doc "line[2]")) (query doc "page[1]"))
+  
   (check-equal? (count (query doc "sec[2]")) 242)
   (check-false (query doc "sec[102]:line[1]"))
   (check-equal? (count (query doc "sec[2]:pg[1]")) 162)
-  (check-equal? (count (query doc "sec[2]:pg[1]:ln[3]")) 128))
+  (check-equal? (count (query doc "sec[2]:pg[1]:ln[3]")) 128)
+  (check-eq? (query doc "page[this]" (query doc "line[2]")) (query doc "page[1]"))
+  (check-equal? (count (query doc "page[this]:line[last]" (query doc "line[2]"))) 41)
+  
+
+  (check-equal? (count (query doc "sec[2]")) (count (query doc "sec[next]" (query doc "sec[1]"))))
+  (check-equal? (count (query doc "sec[1]")) (count (query doc "sec[prev]" (query doc "sec[2]"))))
+  )
