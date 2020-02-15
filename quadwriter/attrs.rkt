@@ -189,6 +189,8 @@ Naming guidelines
 
                            page-repeat
 
+                           draw-debug
+
                            fn-ref
                            fn-text
                            fn-text-start))

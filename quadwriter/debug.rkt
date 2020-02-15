@@ -1,7 +1,8 @@
 #lang debug racket
 (require pitfall
          quad/position
-         quad/quad)
+         quad/quad
+         "attrs.rkt")
 (provide (all-defined-out))
 
 (define-for-syntax debug-mode #false)
@@ -26,7 +27,7 @@
                        (define debug-column-gap (make-parameter 36)))]
                    [else
                     '(begin
-                       (define draw-debug? (make-parameter #true))
+                       (define draw-debug? (make-parameter #false))
                        (define draw-debug-line? (make-parameter #true))
                        (define draw-debug-block? (make-parameter #true))
                        (define draw-debug-string? (make-parameter #true))
@@ -46,7 +47,7 @@
 
 (define (draw-debug q doc [fill-color "#f99"] [stroke-color "#fcc"] . _)
   (define stroke-width 0.5)
-  (when (draw-debug?)
+  (when (or (draw-debug?) (quad-ref q :draw-debug))
     (save doc)
     ;; draw layout box
     (line-width doc stroke-width)
