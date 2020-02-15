@@ -39,12 +39,12 @@
       ;; if lidx is bigger, search backward
       [(> start-arg end-arg) (values start-arg (sub1 end-arg) -1)]
       [else (values start-arg (add1 end-arg) 1)]))
-  (for/fold ([start-1 (sub1 start)]) ; sub1 for reason below
+  (for/fold ([start-adjusted (- start step)]) ; remove step for reason below
             ([seen (in-range count)]
-             #:break (not start-1))
-    ;; add 1 so on next iteration, we can find next matcher
-    ;; and won't re-find this one immediately
-    (for/first ([idx (in-range (add1 start-1) end step)]
+             #:break (not start-adjusted))
+    ;; add step so we find next matcher
+    ;; and won't re-find the last one immediately
+    (for/first ([idx (in-range (+ start-adjusted step) end step)]
                 #:when (pred (vector-ref vec idx)))
       idx)))
 
@@ -61,11 +61,11 @@
     (define res-idx
       (match count
         [(== 'this eq?) ; start at querying quad, then search backward
-         (find-inclusive vec pred (sub1 (vector-memq starting-q vec)) 0)]
+         (find-inclusive vec pred (vector-memq starting-q vec) 0)]
         [(== 'last eq?) ; search backward from end
          (find-inclusive vec pred maxidx 0)]
-        [(== 'prev eq?) (find-inclusive vec pred (sub1 (vector-memq starting-q vec)) 0 2)]
-        [(== 'next eq?) (find-inclusive vec pred (add1 (vector-memq starting-q vec)) maxidx)]
+        [(== 'prev eq?) (find-inclusive vec pred (vector-memq starting-q vec) 0 2)]
+        [(== 'next eq?) (find-inclusive vec pred ((if (pred starting-q) add1 values) (vector-memq starting-q vec)) maxidx)]
         [count (find-inclusive vec pred vidx maxidx count)]))
     (define next-maxidx
       (cond
@@ -104,8 +104,13 @@
   (check-equal? (count (query doc "sec[2]:pg[1]:ln[3]")) 128)
   (check-eq? (query doc "page[this]" (query doc "line[2]")) (query doc "page[1]"))
   (check-equal? (count (query doc "page[this]:line[last]" (query doc "line[2]"))) 41)
-  
+ 
+  (check-equal? (count (query doc "sec[next]" (query doc "sec[1]"))) (count (query doc "sec[2]")) )
+  (check-equal? (count (query doc "sec[prev]" (query doc "sec[2]"))) (count (query doc "sec[1]")))
 
-  (check-equal? (count (query doc "sec[2]")) (count (query doc "sec[next]" (query doc "sec[1]"))))
-  (check-equal? (count (query doc "sec[1]")) (count (query doc "sec[prev]" (query doc "sec[2]"))))
+  (check-equal? (count (query doc "page[prev]" (query doc "page[2]:line[1]")))
+                (count (query doc "page[1]")))
+  (check-equal? (count (query doc "page[next]" (query doc "page[2]:line[1]")))
+                (count (query doc "page[3]")))
+  
   )
