@@ -43,19 +43,21 @@
                 [idx idx]))
   (for/fold ([vidx 0]
              #:result (and vidx (vector-ref vec vidx)))
-            ([query-piece (in-list (parse-query query-str))])
+            ([query-piece (in-list (parse-query query-str))]
+             #:break (not vidx))
     (match query-piece
       [(cons pred 'this)
        ;; resolve `this` by finding the querying quad, and searching backward
-       (for/first ([vi (in-range (vector-memq starting-q vec) -1 -1)]
-                   #:when (pred (vector-ref vec vi)))
-         vi)]
+       (for/first ([vidx (in-range (vector-memq starting-q vec) -1 -1)]
+                   #:when (pred (vector-ref vec vidx)))
+         vidx)]
       [(cons pred count)
        (for/fold ([vidx vidx]
                   ;; sub 1 because return values add 1
                   ;; and final result should be location of matching quad
-                  #:result (sub1 vidx))
-                 ([seen (in-range count)])
+                  #:result (and vidx (sub1 vidx)))
+                 ([seen (in-range count)]
+                  #:break (not vidx))
          (for/first ([vidx (in-range vidx (vector-length vec))]
                      #:when (pred (vector-ref vec vidx)))
            ;; add 1 so on next iteration, we can find next matcher
@@ -82,10 +84,11 @@
   (define (page) (factory page-quad col))
   (define (sec) (factory section-quad page))
 
-  (define (count q) (quad-ref q 'count))
+  (define (count q) (and q (quad-ref q 'count)))
   (define doc (factory doc-quad sec))
 
   (check-eq? (query doc "page[this]" (query doc "line[2]")) (query doc "page[1]"))
   (check-equal? (count (query doc "sec[2]")) 242)
+  (check-false (query doc "sec[102]:line[1]"))
   (check-equal? (count (query doc "sec[2]:pg[1]")) 162)
   (check-equal? (count (query doc "sec[2]:pg[1]:ln[3]")) 128))
