@@ -48,33 +48,33 @@
                 #:when (pred (vector-ref vec idx)))
       idx)))
 
-(define (query quad-or-index query-str [starting-q #false])
+(define (query quad-or-index query-str [query-q #false])
   (define vec (match quad-or-index
                 [(? quad? q) (make-query-index q)]
                 [idx idx]))
-  (for/fold ([vidx 0]
+  (for/fold ([this-idx (if query-q (vector-memq query-q vec) 0)]
              [maxidx (sub1 (vector-length vec))]
-             #:result (and vidx (vector-ref vec vidx)))
+             #:result (and this-idx (vector-ref vec this-idx)))
             ([query-piece (in-list (parse-query query-str))]
-             #:break (not vidx))
+             #:break (not this-idx))
     (match-define (cons pred subscript) query-piece)
     (define (find start end count) (find-inclusive vec pred start end count))
     (define res-idx
       (let loop ([subscript subscript])
         (match subscript
           [(== 'this eq?) ; start at querying quad, then search 1 back
-           (find (vector-memq starting-q vec) 0 1)]
+           (find this-idx 0 1)]
           [(== 'last eq?) (loop -1)]
-          [(== 'prev eq?) ; search 2 back. same algo if starting-q is pred or not.
-           (find (vector-memq starting-q vec) 0 2)]
-          [(== 'next eq?) ; search 1 ahead, but if starting-q is also pred, search 2 ahead
-           (find (vector-memq starting-q vec) maxidx (if (pred starting-q) 2 1))]
+          [(== 'prev eq?) ; search 2 back. same algo if current q is pred or not.
+           (find this-idx 0 2)]
+          [(== 'next eq?) ; search 1 ahead, but if current q is also pred, search 2 ahead
+           (find this-idx maxidx (if (pred (vector-ref vec this-idx)) 2 1))]
           [(? number? count)
            (cond
              [(negative? count) ; search backward from end
-              (find maxidx vidx (abs count))]
+              (find maxidx this-idx (abs count))]
              [else ; seach forward
-              (find vidx maxidx count)])]
+              (find this-idx maxidx count)])]
           [_ #false])))
     (define next-maxidx
       (cond
@@ -124,5 +124,11 @@
 
   (check-equal? (count (query doc "page[next]" (query doc "page[2]:line[1]")))
                 (count (query doc "page[3]")))
+
+  (check-equal? (count (query doc "page[next]:page[next]" (query doc "page[1]:line[1]")))
+                (count (query doc "page[3]")))
+
+    (check-equal? (count (query doc "page[next]:page[this]:page[prev]" (query doc "page[1]:line[1]")))
+                (count (query doc "page[1]")))
   
   )
