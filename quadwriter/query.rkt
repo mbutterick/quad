@@ -43,6 +43,7 @@
     (match query-piece
       [(cons pred 'this)
        ;; find the querying quad, and from there search backward
+       ;; todo: `this` should also cut down the domain of searching
        (for/first ([vidx (in-range (vector-memq starting-q vec) -1 -1)]
                    #:when (pred (vector-ref vec vidx)))
          vidx)]
