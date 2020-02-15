@@ -9,7 +9,7 @@
                                   (loop elem))))))
   (list->vector qs))
 
-(define (string->key str #:this [this? #false])
+(define (string->key str)
   (match str
     ["doc" 'doc]
     [(or "section" "sec" "s") 'section]
@@ -29,13 +29,8 @@
   (for/list ([piece (in-list (string-split str ":"))])
     (match (regexp-match #px"^(.*)\\[(.*?)\\]$" piece)
       [#false (cons (string->key piece) #false)]
-      [(list _ name arg) (cons (hash-ref preds (string->key name)) (or (string->number arg)
-                                                                       (string->symbol arg)))])))
-
-(define (vector-memf proc vec)
-  (for/first ([idx (in-range (vector-length vec))]
-              #:when (proc (vector-ref vec idx)))
-    idx))
+      [(list _ name arg) (cons (hash-ref preds (string->key name))
+                               (or (string->number arg) (string->symbol arg)))])))
 
 (define (query quad-or-index query-str [starting-q #false])
   (define vec (match quad-or-index
@@ -47,10 +42,13 @@
              #:break (not vidx))
     (match query-piece
       [(cons pred 'this)
-       ;; resolve `this` by finding the querying quad, and searching backward
+       ;; find the querying quad, and from there search backward
        (for/first ([vidx (in-range (vector-memq starting-q vec) -1 -1)]
                    #:when (pred (vector-ref vec vidx)))
          vidx)]
+      [(cons pred 'last) (error 'unimplemented)]
+      [(cons pred 'prev) (error 'unimplemented)]
+      [(cons pred 'next) (error 'unimplemented)]
       [(cons pred count)
        (for/fold ([vidx vidx]
                   ;; sub 1 because return values add 1
