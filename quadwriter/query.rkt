@@ -2,16 +2,12 @@
 (require quad/base "struct.rkt" "param.rkt")
 (provide (all-defined-out))
 
-;; we want to construct a query index once with reversed variant
-;; so we don't have to keep generating it
-(struct query-index (forward reverse) #:transparent)
-
 (define (make-query-index q)
   (define qs (let loop ([q q])
                (cons q (append* (for/list ([elem (in-list (quad-elems q))]
                                            #:when (quad? elem))
                                   (loop elem))))))
-  (query-index qs (reverse qs)))
+  (list->vector qs))
 
 (define (string->key str #:this [this? #false])
   (match str
@@ -36,32 +32,35 @@
       [(list _ name arg) (cons (hash-ref preds (string->key name)) (or (string->number arg)
                                                                        (string->symbol arg)))])))
 
-(define (query quad-or-index query-str [querying-q #false])
-  (define qi (match quad-or-index
-               [(? quad? q) (make-query-index q)]
-               [idx idx]))
-  (define vec (list->vector (query-index-forward qi)))
+(define (vector-memf proc vec)
+  (for/first ([idx (in-range (vector-length vec))]
+              #:when (proc (vector-ref vec idx)))
+    idx))
+
+(define (query quad-or-index query-str [starting-q #false])
+  (define vec (match quad-or-index
+                [(? quad? q) (make-query-index q)]
+                [idx idx]))
   (for/fold ([vidx 0]
              #:result (and vidx (vector-ref vec vidx)))
             ([query-piece (in-list (parse-query query-str))])
     (match query-piece
       [(cons pred 'this)
        ;; resolve `this` by finding the querying quad, and searching backward
-       (define this-thing (findf pred (memq querying-q (query-index-reverse qi))))
-       ;; once we have this-thing, locate it in the forward index and keep going
-       (memq this-thing (query-index-forward qi))]
+       (for/first ([vi (in-range (vector-memq starting-q vec) -1 -1)]
+                   #:when (pred (vector-ref vec vi)))
+         vi)]
       [(cons pred count)
-       (let loop ([vidx vidx][seen 0])
-         (define idx (for*/first ([vi (in-range vidx (vector-length vec))]
-                                  [val (in-value (vector-ref vec vi))]
-                                  #:when (pred val))
-                       vi))
-                                        
-         (and idx
-              (let ([seen (add1 seen)])
-                (cond
-                  [(= seen count) idx]
-                  [else (loop (add1 idx) seen)]))))])))
+       (for/fold ([vidx vidx]
+                  ;; sub 1 because return values add 1
+                  ;; and final result should be location of matching quad
+                  #:result (sub1 vidx))
+                 ([seen (in-range count)])
+         (for/first ([vidx (in-range vidx (vector-length vec))]
+                     #:when (pred (vector-ref vec vidx)))
+           ;; add 1 so on next iteration, we can find next matcher
+           ;; and won't re-find this one immediately
+           (add1 vidx)))])))
           
 (module+ test
   (require rackunit)
@@ -86,6 +85,7 @@
   (define (count q) (quad-ref q 'count))
   (define doc (factory doc-quad sec))
 
+  (check-eq? (query doc "page[this]" (query doc "line[2]")) (query doc "page[1]"))
   (check-equal? (count (query doc "sec[2]")) 242)
   (check-equal? (count (query doc "sec[2]:pg[1]")) 162)
   (check-equal? (count (query doc "sec[2]:pg[1]:ln[3]")) 128))
