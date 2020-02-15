@@ -69,10 +69,12 @@
            (find (vector-memq starting-q vec) 0 2)]
           [(== 'next eq?) ; search 1 ahead, but if starting-q is also pred, search 2 ahead
            (find (vector-memq starting-q vec) maxidx (if (pred starting-q) 2 1))]
-          [(? negative? count) ; search backward from end
-           (find maxidx vidx (abs count))]
-          [(? positive? count) ; seach forward
-           (find vidx maxidx count)]
+          [(? number? count)
+           (cond
+             [(negative? count) ; search backward from end
+              (find maxidx vidx (abs count))]
+             [else ; seach forward
+              (find vidx maxidx count)])]
           [_ #false])))
     (define next-maxidx
       (cond

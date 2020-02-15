@@ -40,11 +40,13 @@
                 [elems (quad-elems q)]
                 [tag (quad-tag q)]
                 [attrs (quad-attrs q)]
-                [size (match (quad-tag q)
-                        [(== 'text eq?) (make-size-promise-for-string q (quad-ref q :string ""))]
-                        [(== 'line eq?) (pt (abs (- (quad-ref q :x1) (quad-ref q :x2)))
-                                            (abs (- (quad-ref q :y1) (quad-ref q :y2))))]
-                        [_ (pt (quad-ref q :width 0) (quad-ref q :height 0))])]
+                [size (if (quad-ref q :anchor-parent)
+                          (pt 0 0)
+                          (match (quad-tag q)
+                            [(== 'text eq?) (make-size-promise-for-string q (quad-ref q :string ""))]
+                            [(== 'line eq?) (pt (abs (- (quad-ref q :x1) (quad-ref q :x2)))
+                                                (abs (- (quad-ref q :y1) (quad-ref q :y2))))]
+                            [_ (pt (quad-ref q :width 0) (quad-ref q :height 0))]))]
                 [draw-end (λ (q doc)
                             (when (draw-debug-draw?)
                               (draw-debug q doc "red" "red")))]                
