@@ -58,7 +58,7 @@
                                             #:min-left-length 3
                                             #:min-right-length 3))]
                  [substr (in-list (regexp-match* (regexp (string hyphen-char)) hstr #:gap-select? #t))])
-       (struct-copy quad q [elems (list substr)]))]
+                (struct-copy quad q [elems (list substr)]))]
     [else (list q)]))
 
 
@@ -67,12 +67,12 @@
   (unless (even? (length pcs))
     (raise-argument-error 'string->feature-list "even number of tags and values" pcs))
   (for/list ([kv (in-slice 2 pcs)])
-    (cons (match (first kv)
-            [(? string? k) (string->bytes/utf-8 k)]
-            [k (raise-argument-error 'string->feature-list "string" k)])
-          (match (string->number (second kv))
-            [(? number? num) num]
-            [v (raise-argument-error 'string->feature-list "number string" v)]))))
+            (cons (match (first kv)
+                    [(? string? k) (string->bytes/utf-8 k)]
+                    [k (raise-argument-error 'string->feature-list "string" k)])
+                  (match (string->number (second kv))
+                    [(? number? num) num]
+                    [v (raise-argument-error 'string->feature-list "number string" v)]))))
 
 (define (parse-font-features! attrs)
   ;; `font-features` are OpenType font feature specifiers.
@@ -107,7 +107,7 @@
   ;; we parse them into the equivalent measurement in points.
   (for ([k (in-hash-keys attrs)]
         #:when (takes-dimension-string? k))
-    (hash-update! attrs k (λ (val) (parse-dimension val attrs))))
+       (hash-update! attrs k (λ (val) (parse-dimension val attrs))))
   attrs)
 
 (define (downcase-values! attrs)
@@ -115,9 +115,9 @@
   ;; so we can check them more easily later.
   (for ([k (in-hash-keys attrs)]
         #:unless (has-case-sensitive-value? k))
-    (hash-update! attrs k (λ (val) (match val
-                                     [(? string? str) (string-downcase str)]
-                                     [_ val]))))
+       (hash-update! attrs k (λ (val) (match val
+                                        [(? string? str) (string-downcase str)]
+                                        [_ val]))))
   attrs)
 
 (define (complete-every-path! attrs)
@@ -126,7 +126,7 @@
   ;; relies on `current-directory` being parameterized to source file's dir
   (for ([k (in-hash-keys attrs)]
         #:when (takes-path? k))
-    (hash-update! attrs k (compose1 path->string path->complete-path)))
+       (hash-update! attrs k (compose1 path->string path->complete-path)))
   attrs)
 
 (define (handle-cascading-attrs attrs)
@@ -139,7 +139,7 @@
                              ;; because they can be denoted relative to em size
                              parse-dimension-strings!
                              parse-font-features!))])
-    (proc attrs)))
+       (proc attrs)))
 
 (define (drop-leading-breaks qs)
   ;; any leading breaks are pointless at the start of the doc, so drop them.
@@ -164,7 +164,7 @@
     (define (get-define-val q) (quad-ref q 'define))
     (define-values (dqs not-dqs) (partition get-define-val qs))
     (for ([dq-group (in-list (group-by get-define-val dqs))])
-      (hash-set! (current-named-quads) (get-define-val (car dq-group)) dq-group))
+         (hash-set! (current-named-quads) (get-define-val (car dq-group)) dq-group))
     not-dqs)
 
 (define default-line-height-multiplier 1.42)
@@ -257,9 +257,9 @@
                                            (cons :pdf-keywords 'Keywords)))]
                  [str (in-value (and (pair? qs) (quad-ref (car qs) k)))]
                  #:when str)
-       (cons pdf-k str))))
+                (cons pdf-k str))))
   (for ([(k v) (in-dict kv-dict)])
-    (hash-set! (pdf-info pdf) k v)))
+       (hash-set! (pdf-info pdf) k v)))
 
 (define (footnote-flow? q) (equal? (quad-ref q 'flow) "footnote"))
 
@@ -293,19 +293,19 @@
   (for ([page (in-list (for*/list ([sec (in-list secs)]
                                    [elem (in-list (quad-elems sec))]
                                    #:when (page-quad? elem))
-                         elem))]
+                                  elem))]
         [page-num (in-naturals 1)]
         [page-side (in-cycle '(right left))])
-    (define repeaters-for-this-page
-      (for/list ([repeater (in-list repeaters)]
-                 #:when (let* ([val (quad-ref repeater :page-repeat)]
-                               [sym (string->symbol val)])
-                          (or (eq? sym 'all)
-                              (eq? sym page-side)
-                              (eq? sym (if (= page-num 1) 'first 'rest)))))
-        repeater))
-    (when (pair? repeaters-for-this-page)
-      (set-quad-elems! page (append repeaters-for-this-page (quad-elems page)))))
+       (define repeaters-for-this-page
+         (for/list ([repeater (in-list repeaters)]
+                    #:when (let* ([val (quad-ref repeater :page-repeat)]
+                                  [sym (string->symbol val)])
+                             (or (eq? sym 'all)
+                                 (eq? sym page-side)
+                                 (eq? sym (if (= page-num 1) 'first 'rest)))))
+                   repeater))
+       (when (pair? repeaters-for-this-page)
+         (set-quad-elems! page (append repeaters-for-this-page (quad-elems page)))))
   secs)
 
 (define (make-sections all-qs)
@@ -356,20 +356,20 @@
       (for/list ([page (in-list section-pages-without-repeaters)]
                  [page-num (in-naturals 1)]
                  [page-side (in-cycle ((if (eq? section-starting-side 'right) values reverse) '(right left)))])
-        (define section-repeaters-for-this-page
-          (for/list ([repeater (in-list section-repeaters)]
-                     #:when (let* ([val (quad-ref repeater :page-repeat)]
-                                   [sym (string->symbol (string-trim val #px"section\\s"))])
-                              (or (eq? sym 'section)
-                                  (eq? sym 'all)
-                                  (eq? sym page-side)
-                                  (eq? sym (if (= page-num 1) 'first 'rest)))))
-            repeater))
-        (cond
-          [(null? section-repeaters-for-this-page) page]
-          [else
-           (quad-copy page-quad page
-                      [elems (append section-repeaters-for-this-page (quad-elems page))])])))
+                (define section-repeaters-for-this-page
+                  (for/list ([repeater (in-list section-repeaters)]
+                             #:when (let* ([val (quad-ref repeater :page-repeat)]
+                                           [sym (string->symbol (string-trim val #px"section\\s"))])
+                                      (or (eq? sym 'section)
+                                          (eq? sym 'all)
+                                          (eq? sym page-side)
+                                          (eq? sym (if (= page-num 1) 'first 'rest)))))
+                            repeater))
+                (cond
+                  [(null? section-repeaters-for-this-page) page]
+                  [else
+                   (quad-copy page-quad page
+                              [elems (append section-repeaters-for-this-page (quad-elems page))])])))
         
     (begin0
       (cond
@@ -401,8 +401,12 @@
               (cons new-section sections-acc)])
       (section-pages-used (+ (section-pages-used) (length section-pages))))))
 
+(define (wants-parent? x) (and (quad? x) (quad-ref x :anchor-parent)))
 (define (resolve-parents doc)
-  (define (wants-parent? x) (and (quad? x) (quad-ref x :anchor-parent)))
+  ;; we make our index now so that it includes the quads that want parents
+  ;; so if we come across `this` as a subscript, we can resolve it
+  ;; by reference to the parent-wanting quad
+  (define qi (make-query-index doc))
   ;; extract the quads that want parents
   (define parent-wanter-acc null)
   (let loop ([x doc])
@@ -415,13 +419,14 @@
                  (map loop others)]
       [_ x]))
   ;; then put them where they want to go
-  (define linearized-qs (make-linear-index doc))
+  ;; if the query has no result, then the quad doesn't get replaced (ie. disappears)
+  ;; which seems like the right outcome.
   (for* ([wp (in-list parent-wanter-acc)]
          [query-str (in-value (quad-ref wp :anchor-parent))]
          #:when query-str
-         [parent (in-value (query linearized-qs query-str))]
+         [parent (in-value (query qi query-str wp))]
          #:when parent)
-    (quad-update! parent [elems (append (quad-elems parent) (list wp))]))
+        (quad-update! parent [elems (append (quad-elems parent) (list wp))]))
   doc)
 
 (define (correct-line-alignment doc)
@@ -431,16 +436,16 @@
   (for* ([section (in-list (quad-elems doc))]
          [(page page-idx) (in-indexed (quad-elems section))]
          #:when (page-quad? page))
-    (define right-side? (odd? (add1 page-idx)))
-    (define zero-filler-side (if right-side? "inner" "outer"))
-    (let loop ([x page])
-      (cond
-        [(and (line-quad? x)
-              (equal? zero-filler-side (quad-ref x :line-align))
-              (filler-quad? (car (quad-elems x))))
-         ;; collapse the filler quad by setting size to 0
-         (set-quad-size! (car (quad-elems x)) (pt 0 0))]
-        [(quad? x) (for-each loop (quad-elems x))])))
+        (define right-side? (odd? (add1 page-idx)))
+        (define zero-filler-side (if right-side? "inner" "outer"))
+        (let loop ([x page])
+          (cond
+            [(and (line-quad? x)
+                  (equal? zero-filler-side (quad-ref x :line-align))
+                  (filler-quad? (car (quad-elems x))))
+             ;; collapse the filler quad by setting size to 0
+             (set-quad-size! (car (quad-elems x)) (pt 0 0))]
+            [(quad? x) (for-each loop (quad-elems x))])))
   doc)
 
 (define/contract (render-pdf qx-arg

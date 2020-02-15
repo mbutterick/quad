@@ -2,10 +2,16 @@
 (require quad/base "struct.rkt" "param.rkt")
 (provide (all-defined-out))
 
-(define (make-linear-index q)
-  (cons q (append* (for/list ([elem (in-list (quad-elems q))]
-                              #:when (quad? elem))
-                             (make-linear-index elem)))))
+;; we want to construct a query index once with reversed variant
+;; so we don't have to keep generating it
+(struct query-index (forward reverse) #:transparent)
+
+(define (make-query-index q)
+  (define qs (let loop ([q q])
+               (cons q (append* (for/list ([elem (in-list (quad-elems q))]
+                                           #:when (quad? elem))
+                                          (loop elem))))))
+  (query-index qs (reverse qs)))
 
 (define (string->key str #:this [this? #false])
   (match str
@@ -23,36 +29,34 @@
                       'block block-quad?
                       'line line-quad?))
 
-(define quad-params (hasheq 'doc current-doc
-                      'section current-section
-                      'page current-page
-                      'column current-column
-                      'block current-block
-                      'line current-line))
-
 (define (parse-query str)
   (for/list ([piece (in-list (string-split str ":"))])
             (match (regexp-match #px"^(.*)\\[(.*?)\\]$" piece)
               [#false (cons (string->key piece) #false)]
-              [(list _ name "this") (cons (let ([quad-param-val ((hash-ref quad-params (string->key name)))])
-                                            (λ (q) (eq? q quad-param-val))) 1)]
               [(list _ name arg) (cons (hash-ref preds (string->key name)) (or (string->number arg)
                                                                                (string->symbol arg)))])))
 
-(define (query quad-or-index query-str)
-  (for/fold ([qs (match quad-or-index
-                   [(? quad? q) (make-linear-index q)]
-                   [idx idx])]
+(define (query quad-or-index query-str [querying-q #false])
+  (define qi (match quad-or-index
+               [(? quad? q) (make-query-index q)]
+               [idx idx]))
+  (for/fold ([qs (query-index-forward qi)]
              #:result (and qs (car qs)))
             ([query-piece (in-list (parse-query query-str))])
-    (match-define (cons pred count) query-piece)
-    (let loop ([qs qs][seen 0])
-      (define maybe-tail (memf pred qs))
-      (and maybe-tail
-           (let ([seen (add1 seen)])
-             (cond
-               [(= seen count) maybe-tail]
-               [else (loop (cdr maybe-tail) seen)]))))))
+    (match query-piece
+      [(cons pred 'this)
+       ;; resolve `this` by finding the querying quad, and searching backward
+       (define this-thing (findf pred (memq querying-q (query-index-reverse qi))))
+       ;; once we have this-thing, locate it in the forward index and keep going
+       (memq this-thing (query-index-forward qi))]
+      [(cons pred count)
+       (let loop ([qs qs][seen 0])
+         (define maybe-tail (memf pred qs))
+         (and maybe-tail
+              (let ([seen (add1 seen)])
+                (cond
+                  [(= seen count) maybe-tail]
+                  [else (loop (cdr maybe-tail) seen)]))))])))
           
 (module+ test
   (require rackunit)

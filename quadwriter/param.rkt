@@ -1,11 +1,6 @@
 #lang debug racket
 (provide (all-defined-out))
 (define current-doc (make-parameter #false))
-(define current-section (make-parameter #false))
-(define current-page (make-parameter #false))
-(define current-column (make-parameter #false))
-(define current-block (make-parameter #false))
-(define current-line (make-parameter #false))
 
 (define current-pdf (make-parameter #false))
 (define current-line-wrap (make-parameter #f)) ; because kp is slow and maybe we want to disable for "draft" mode
