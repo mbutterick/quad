@@ -291,6 +291,15 @@
                                        (quad-ref pq :inset-right 0))
                                     permitted-justify-overfill)
                                  debug
+                                 
+                                 ;; during wrap, anchored qs are treated as having distance 0
+                                 ;; so they can staty in right place, so that relative queries will work.
+                                 ;; but they won't affect where lines break
+                                 #:distance (λ (q last-dist wrap-qs)
+                                                  (+ last-dist (cond
+                                                                 [(quad-ref q :anchor-parent) 0]
+                                                                 [(printable? q) (distance q)]
+                                                                 [else 0])))
                                  #:nicely (match (or (current-line-wrap) (quad-ref pq :line-wrap))
                                             [(or "best" "kp") #true]
                                             [_ #false])
