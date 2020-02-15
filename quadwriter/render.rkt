@@ -403,6 +403,7 @@
 
 (define (resolve-parents doc)
   (define (wants-parent? x) (and (quad? x) (quad-ref x :anchor-parent)))
+  ;; extract the quads that want parents
   (define parent-wanter-acc null)
   (let loop ([x doc])
     (match x
@@ -413,6 +414,7 @@
                    (quad-update! x [elems others]))
                  (map loop others)]
       [_ x]))
+  ;; then put them where they want to go
   (define linearized-qs (make-linear-index doc))
   (for* ([wp (in-list parent-wanter-acc)]
          [query-str (in-value (quad-ref wp :anchor-parent))]

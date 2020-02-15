@@ -26,7 +26,7 @@
                        (define debug-column-gap (make-parameter 36)))]
                    [else
                     '(begin
-                       (define draw-debug? (make-parameter #true))
+                       (define draw-debug? (make-parameter #false))
                        (define draw-debug-line? (make-parameter #true))
                        (define draw-debug-block? (make-parameter #true))
                        (define draw-debug-string? (make-parameter #true))
