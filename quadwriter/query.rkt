@@ -36,32 +36,46 @@
   (define vec (match quad-or-index
                 [(? quad? q) (make-query-index q)]
                 [idx idx]))
+  (define (next-occurrence-between pred lidx ridx)
+    (cond
+      [(or (not lidx) (not ridx)) ridx]
+      ;; we are searching between, so add 1 to left idx
+      [(for/first ([idx (in-range (add1 lidx) ridx)]
+                   #:when (pred (vector-ref vec idx)))
+         idx)]
+      [else (vector-length vec)]))
   (for/fold ([vidx 0]
+             [maxidx (vector-length vec)]
              #:result (and vidx (vector-ref vec vidx)))
             ([query-piece (in-list (parse-query query-str))]
              #:break (not vidx))
-    (match query-piece
-      [(cons pred 'this)
-       ;; find the querying quad, and from there search backward
-       ;; todo: `this` should also cut down the domain of searching
-       (for/first ([vidx (in-range (vector-memq starting-q vec) -1 -1)]
-                   #:when (pred (vector-ref vec vidx)))
-         vidx)]
-      [(cons pred 'last) (error 'unimplemented)]
-      [(cons pred 'prev) (error 'unimplemented)]
-      [(cons pred 'next) (error 'unimplemented)]
-      [(cons pred count)
-       (for/fold ([vidx vidx]
-                  ;; sub 1 because return values add 1
-                  ;; and final result should be location of matching quad
-                  #:result (and vidx (sub1 vidx)))
-                 ([seen (in-range count)]
-                  #:break (not vidx))
-         (for/first ([vidx (in-range vidx (vector-length vec))]
+    (match-define (cons pred count) query-piece)
+    (define res-idx
+      (match count
+        [(or (== 'this eq?) (== 'last eq?))
+         ;; find a starting point, then search backward
+         (for/first ([vidx (in-range (if (eq? count 'this)
+                                         ;; start at querying quad
+                                         (vector-memq starting-q vec)
+                                         ;; start at end 
+                                         (sub1 maxidx)) -1 -1)]
                      #:when (pred (vector-ref vec vidx)))
-           ;; add 1 so on next iteration, we can find next matcher
-           ;; and won't re-find this one immediately
-           (add1 vidx)))])))
+           vidx)]
+        [(== 'prev eq?) (error 'unimplemented)]
+        [(== 'next eq?) (error 'unimplemented)]
+        [count
+         (for/fold ([vidx vidx]
+                    ;; sub 1 because return values add 1
+                    ;; and final result should be location of matching quad
+                    #:result (and vidx (sub1 vidx)))
+                   ([seen (in-range count)]
+                    #:break (not vidx))
+           (for/first ([vidx (in-range vidx maxidx)]
+                       #:when (pred (vector-ref vec vidx)))
+             ;; add 1 so on next iteration, we can find next matcher
+             ;; and won't re-find this one immediately
+             (add1 vidx)))]))
+    (values res-idx (next-occurrence-between pred res-idx maxidx))))
           
 (module+ test
   (require rackunit)
