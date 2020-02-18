@@ -187,7 +187,11 @@ Naming guidelines
                            footer-display
                            footer-text
 
-                           page-repeat
+                           ;; we want this distinct from anchor-parent
+                           ;; because the two directives may overlap / contradict.
+                           ;; for instance: repeat on every page,
+                           ;; a quad that prints on the previous page on the second line.
+                           repeat
 
                            draw-debug
 

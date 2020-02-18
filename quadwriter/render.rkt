@@ -289,34 +289,11 @@
   (time-log page-wrap (page-wrap column-qs printable-width page-quad-prototype)))
 
 
-(define (append-doc-repeaters secs repeaters)
-  (for ([page (in-list (for*/list ([sec (in-list secs)]
-                                   [elem (in-list (quad-elems sec))]
-                                   #:when (page-quad? elem))
-                                  elem))]
-        [page-num (in-naturals 1)]
-        [page-side (in-cycle '(right left))])
-       (define repeaters-for-this-page
-         (for/list ([repeater (in-list repeaters)]
-                    #:when (let* ([val (quad-ref repeater :page-repeat)]
-                                  [sym (string->symbol val)])
-                             (or (eq? sym 'all)
-                                 (eq? sym page-side)
-                                 (eq? sym (if (= page-num 1) 'first 'rest)))))
-                   repeater))
-       (when (pair? repeaters-for-this-page)
-         (set-quad-elems! page (append repeaters-for-this-page (quad-elems page)))))
-  secs)
-
 (define (make-sections all-qs)
-  (define-values (doc-repeaters nonrepeating-qs)
-    (partition  (λ (q) (member (quad-ref q :page-repeat) '("all" "left" "right" "first" "rest"))) all-qs))
+  
   (for/fold ([sections-acc null]
-             #:result (append-doc-repeaters (reverse sections-acc) doc-repeaters))
-            ([all-section-qs (in-list (filter-split nonrepeating-qs section-break-quad?))])
-    
-    (define-values (section-repeaters qs)
-      (partition  (λ (q) (member (quad-ref q :page-repeat) '("section" "section all" "section left" "section right" "section first" "section rest"))) all-section-qs))
+             #:result (reverse sections-acc))
+            ([qs (in-list (filter-split all-qs section-break-quad?))])
     
     ;; section properties
     (match-define (list page-width page-height) (parse-page-size (and (pair? qs) (car qs))))
@@ -343,33 +320,13 @@
     (when insert-blank-page?
       (section-pages-used (add1 (section-pages-used))))
     
-    (define section-pages-without-repeaters (make-pages column-qs
-                                                        left-margin
-                                                        top-margin
-                                                        gutter-margin
-                                                        line-wrap-size
-                                                        printable-width
-                                                        printable-height))
-
-    ;; put in quads that repeat within the section
-    (define section-pages
-      (for/list ([page (in-list section-pages-without-repeaters)]
-                 [page-num (in-naturals 1)]
-                 [page-side (in-cycle ((if (eq? section-starting-side 'right) values reverse) '(right left)))])
-                (define section-repeaters-for-this-page
-                  (for/list ([repeater (in-list section-repeaters)]
-                             #:when (let* ([val (quad-ref repeater :page-repeat)]
-                                           [sym (string->symbol (string-trim val #px"section\\s"))])
-                                      (or (eq? sym 'section)
-                                          (eq? sym 'all)
-                                          (eq? sym page-side)
-                                          (eq? sym (if (= page-num 1) 'first 'rest)))))
-                            repeater))
-                (cond
-                  [(null? section-repeaters-for-this-page) page]
-                  [else
-                   (quad-copy page-quad page
-                              [elems (append section-repeaters-for-this-page (quad-elems page))])])))
+    (define section-pages (make-pages column-qs
+                                      left-margin
+                                      top-margin
+                                      gutter-margin
+                                      line-wrap-size
+                                      printable-width
+                                      printable-height))
         
     (begin0
       (cond
@@ -400,6 +357,32 @@
         [else (define new-section (quad-copy section-quad q:section [elems section-pages]) )
               (cons new-section sections-acc)])
       (section-pages-used (+ (section-pages-used) (length section-pages))))))
+
+(define (wants-repeat? x) (and (quad? x) (quad-ref x :repeat)))
+(define (resolve-repeaters doc)
+  (define qi (make-query-index doc))
+  ;; extract the quads that want repeats
+  (define repeat-wanter-acc null)
+  (let loop ([x doc])
+    (match x
+      [(? quad?) (define-values (repeat-wanters others)
+                   (partition wants-repeat? (quad-elems x)))
+                 (when (pair? repeat-wanters)
+                   (set! repeat-wanter-acc (append repeat-wanter-acc repeat-wanters))
+                   (quad-update! x [elems others]))
+                 (map loop others)]
+      [_ x]))
+  ;; then put them where they want to go
+  ;; if the query has no result, then the quad doesn't get replaced (ie. disappears)
+  ;; which seems like the right outcome.
+  (for* ([rq (in-list repeat-wanter-acc)]
+         [query-str (in-value (quad-ref rq :repeat))]
+         #:when query-str
+         [query-matches (in-value (query qi query-str rq))]
+         #:when query-matches
+         [query-match (in-list query-matches)])
+        (quad-update! query-match [elems (append (quad-elems query-match) (list (quad-copy quad rq)))]))
+  doc)
 
 (define (wants-parent? x) (and (quad? x) (quad-ref x :anchor-parent)))
 (define (resolve-parents doc)
@@ -503,8 +486,10 @@
     (setup-pdf-metadata! qs (current-pdf))
     ;; all the heavy lifting happens inside `make-sections`
     ;; which calls out to `make-pages`, `make-columns`, and so on.
+   
     (define doc (let ([doc (quad-update! q:doc [elems (make-sections qs)])])
                   (time-log prep-doc (let* ([doc (correct-line-alignment doc)]
+                                            [doc (resolve-repeaters doc)]
                                             [doc (resolve-parents doc)])
                                        doc))))
     ;; call `position` and `draw` separately so we can print a timer for each
