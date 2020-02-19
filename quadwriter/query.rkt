@@ -73,7 +73,7 @@
       ;; try searching for next occurence after this one, up to max.
       [(find (add1 res-idx) maxidx 1)]
       [else maxidx]))
-  (values res-idx next-maxidx))
+  (cons res-idx next-maxidx))
 
 (define (multiquery? x) (memq x '(* all)))
 
@@ -83,13 +83,25 @@
                 [idx idx]))
   (define query-pieces (parse-query query-str))
   (define multi-mode? (ormap multiquery? (map cdr query-pieces)))
-  (for/fold ([idx (if query-idx (vector-memq query-idx vec) 0)]
-             [maxidx (sub1 (vector-length vec))]
-             #:result (and idx (vector-ref vec idx)))
+  (for/fold ([subtrees (cond
+                         [(null? query-pieces) null] ; nothing to find so bail out
+                         ;; set up initial subtree
+                         [else (list (cons (if query-idx (vector-memq query-idx vec) 0)
+                                           (sub1 (vector-length vec))))])]
+             #:result (cond
+                        [(null? subtrees) #false]
+                        [else (match (for/list ([(idx _) (in-dict subtrees)])
+                                               (vector-ref vec idx))
+                                [vals #:when multi-mode? vals]
+                                [(list val) val]
+                                [_ (error 'should-never-have-multi-vals-in-single-mode)])]))
             ([query-piece (in-list query-pieces)]
-             #:break (not idx))
-    (match query-piece
-      [(cons pred subscript) (query-one vec pred subscript idx maxidx)])))
+             #:break (null? subtrees))
+    (match-define (cons pred subscript) query-piece)
+    (for*/list ([(idx maxidx) (in-dict subtrees)]
+                [idx-pair (in-value (query-one vec pred subscript idx maxidx))]
+                #:when (car idx-pair))
+               idx-pair)))
           
 (module+ test
   (require rackunit)
@@ -137,5 +149,4 @@
 
   (check-equal? (count (query doc "page[next]:page[this]:page[prev]" (query doc "page[1]:line[1]")))
                 (count (query doc "page[1]")))
-  
   )
