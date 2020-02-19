@@ -30,7 +30,10 @@
             (match (regexp-match #px"^(.*)\\[(.*?)\\]$" piece)
               [#false (cons (string->key piece) #false)]
               [(list _ name arg) (cons (hash-ref preds (string->key name))
-                                       (or (string->number arg) (string->symbol arg)))])))
+                                       (cond
+                                         [(string-contains? arg "..") (map string->number (string-split arg ".."))]
+                                         [(string->number arg)]
+                                         [else (string->symbol arg)]))])))
 
 (define (find-inclusive vec pred start-arg end-arg [count 1])
   ;; search from lidx to ridx inclusive
@@ -67,7 +70,6 @@
           (find this-idx maxidx count)])]
       [_ #false])))
 
-(define (multiquery? x) (memq x '(* all)))
 
 (define (query quad-or-index query-str [query-q #false])
   (define vec (match quad-or-index
@@ -80,25 +82,42 @@
        ;; initial subtree is whole tree
        ;; each subtree is a pair of start idx (initial node) + end idx (boundary of subtree)
        (let loop ([subtrees (list (cons (if query-q (vector-memq query-q vec) 0) (sub1 (vector-length vec))))]
-                  [query-pieces all-query-pieces])
+                  [query-pieces all-query-pieces]
+                  [multimode-query-seen? #false])
          (cond
            ;; if subtrees are null, we have eliminated all searchable domains
            [(null? subtrees) #false]
            [(null? query-pieces)
-            ;; multi mode means one of the query subscripts is a wildcard
-            (define multi-mode? (for/or ([(_ subscript) (in-dict all-query-pieces)])
-                                        (multiquery? subscript)))
             (match (for/list ([(idx _) (in-dict subtrees)])
                              (vector-ref vec idx))
-              [vals #:when multi-mode? vals] ; in multi mode, return list
+              [vals #:when multimode-query-seen? vals] ; in multi mode, return list
               [(list val) val] ; otherwise return single value
               [_ (error 'should-never-have-multiple-vals-in-single-mode)])]
            [else
             (match-define (cons (cons pred subscript) other-query-pieces) query-pieces)
+            (define maybe-multimode-proc (match subscript
+                                           [(or (== 'all eq?) (== '* eq?)) values]
+                                           [(== 'rest eq?) cdr]
+                                           [(or (== 'even eq?) (== 'odd eq?))
+                                            (λ (xs)
+                                              (define proc (if (eq? subscript 'even) even? odd?))
+                                              (for/list ([(x idx) (in-indexed xs)]
+                                                         #:when (proc (add1 idx)))
+                                                        x))]
+                                           [(list larg rarg)
+                                            (λ (xs)
+                                              (define len (length xs))
+                                              (define lo (+ larg (if (negative? larg) (add1 len) 0)))
+                                              (define hi (min len (+ rarg (if (negative? rarg) (add1 len) 0))))
+                                              (define cmp (if (< lo hi) <= >=))
+                                              (for/list ([(x idx) (in-indexed xs)]
+                                                         #:when (cmp lo (add1 idx) hi))
+                                                        x))]
+                                           [_ #false]))
             (define finish-proc
+              ;; don't need to calculate end-idxs if we're at the end of the query
               (if (null? other-query-pieces)
-                  ;; don't need to calculate end-idxs if we're at the end of the query
-                  (λ (idx end-idx) 'ignored-value)
+                  void
                   (λ (idx end-idx) (cond ;; otherwise calculate new end-idx
                                      [(not idx) end-idx]
                                      ;; try searching for next occurence after this one, up to max.
@@ -106,15 +125,16 @@
                                      [else end-idx]))))
             (loop
              (for*/list ([(start-idx end-idx) (in-dict subtrees)]
-                         [idx (cond
-                                [(multiquery? subscript)
-                                 (in-list (for/list ([idx (in-range start-idx (add1 end-idx))]
-                                                     #:when (pred (vector-ref vec idx)))
-                                                    idx))]
-                                [else (in-value (query-one vec pred subscript start-idx end-idx))])]
+                         [idx (match maybe-multimode-proc
+                                [#false (in-value (query-one vec pred subscript start-idx end-idx))]
+                                [proc
+                                 (in-list (proc (for*/list ([idx (in-range start-idx (add1 end-idx))]
+                                                            #:when (pred (vector-ref vec idx)))
+                                                           idx)))])]
                          #:when idx)
                         (cons idx (finish-proc idx end-idx)))
-             other-query-pieces)]))))
+             other-query-pieces
+             (or maybe-multimode-proc multimode-query-seen?))]))))
           
 (module+ test
   (require rackunit)
@@ -168,5 +188,17 @@
   (check-equal? (map count (query doc "sec[*]:page[1]")) '(41 162 283))
   (check-equal? (map count (query doc "sec[2]:page[1]:line[*]"))
                 '(126 127 128 130 131 132 134 135 136 139 140 141 143 144 145 147 148 149 152 153 154 156 157 158 160 161 162))
-  
+
+  (check-equal? (map count (query doc "sec[rest]")) '(242 363))
+  (check-equal? (map count (query doc "sec[1..2]")) '(121 242))
+  (check-equal? (map count (query doc "sec[2..3]")) '(242 363))
+  (check-equal? (map count (query doc "sec[1..3]")) '(121 242 363))
+  (check-equal? (map count (query doc "sec[1..4]")) '(121 242 363))
+  (check-equal? (map count (query doc "sec[4..1]")) '(121 242 363))
+  (check-equal? (map count (query doc "sec[1..-1]")) '(121 242 363))
+  (check-equal? (map count (query doc "sec[-3..-1]")) '(121 242 363))
+  (check-equal? (map count (query doc "sec[-1..-3]")) '(121 242 363))
+  (check-equal? (map count (query doc "sec[1..-2]")) '(121 242))
+  (check-equal? (map count (query doc "sec[odd]")) '(121 363))
+  (check-equal? (map count (query doc "sec[even]")) '(242))
   )
