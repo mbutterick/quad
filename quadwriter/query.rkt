@@ -50,58 +50,59 @@
 
 (define (query-one vec pred subscript this-idx maxidx)
   (define (find start end count) (find-inclusive vec pred start end count))
-  (define res-idx
-    (let loop ([subscript subscript])
-      (match subscript
-        [(== 'this eq?) ; start at querying quad, then search 1 back
-         (find this-idx 0 1)]
-        [(== 'last eq?) (loop -1)]
-        [(== 'prev eq?) ; search 2 back. same algo if current q is pred or not.
-         (find this-idx 0 2)]
-        [(== 'next eq?) ; search 1 ahead, but if current q is also pred, search 2 ahead
-         (find this-idx maxidx (if (pred (vector-ref vec this-idx)) 2 1))]
-        [(? number? count)
-         (cond
-           [(negative? count) ; search backward from end
-            (find maxidx this-idx (abs count))]
-           [else ; seach forward
-            (find this-idx maxidx count)])]
-        [_ #false])))
-  (define next-maxidx
-    (cond
-      [(not res-idx) maxidx]
-      ;; try searching for next occurence after this one, up to max.
-      [(find (add1 res-idx) maxidx 1)]
-      [else maxidx]))
-  (cons res-idx next-maxidx))
+  (let loop ([subscript subscript])
+    (match subscript
+      [(== 'this eq?) ; start at querying quad, then search 1 back
+       (find this-idx 0 1)]
+      [(== 'last eq?) (loop -1)]
+      [(== 'prev eq?) ; search 2 back. same algo if current q is pred or not.
+       (find this-idx 0 2)]
+      [(== 'next eq?) ; search 1 ahead, but if current q is also pred, search 2 ahead
+       (find this-idx maxidx (if (pred (vector-ref vec this-idx)) 2 1))]
+      [(? number? count)
+       (cond
+         [(negative? count) ; search backward from end
+          (find maxidx this-idx (abs count))]
+         [else ; seach forward
+          (find this-idx maxidx count)])]
+      [_ #false])))
 
 (define (multiquery? x) (memq x '(* all)))
 
-(define (query quad-or-index query-str [query-idx #false])
+(define (query quad-or-index query-str [query-q #false])
   (define vec (match quad-or-index
                 [(? quad? q) (make-query-index q)]
                 [idx idx]))
+  (when query-q (unless (quad? query-q)
+                  (raise-argument-error 'query "quad" query-q)))
   (define query-pieces (parse-query query-str))
-  (define multi-mode? (ormap multiquery? (map cdr query-pieces)))
-  (for/fold ([subtrees (cond
-                         [(null? query-pieces) null] ; nothing to find so bail out
-                         ;; set up initial subtree
-                         [else (list (cons (if query-idx (vector-memq query-idx vec) 0)
-                                           (sub1 (vector-length vec))))])]
-             #:result (cond
-                        [(null? subtrees) #false]
-                        [else (match (for/list ([(idx _) (in-dict subtrees)])
-                                               (vector-ref vec idx))
-                                [vals #:when multi-mode? vals]
-                                [(list val) val]
-                                [_ (error 'should-never-have-multi-vals-in-single-mode)])]))
-            ([query-piece (in-list query-pieces)]
-             #:break (null? subtrees))
-    (match-define (cons pred subscript) query-piece)
-    (for*/list ([(idx maxidx) (in-dict subtrees)]
-                [idx-pair (in-value (query-one vec pred subscript idx maxidx))]
-                #:when (car idx-pair))
-               idx-pair)))
+  (and (pair? query-pieces)
+       ;; initial subtree is whole tree
+       (for/fold ([subtrees (list (cons (if query-q (vector-memq query-q vec) 0) (sub1 (vector-length vec))))]
+                  #:result (and (pair? subtrees)
+                                ;; multi mode means one of the query subscripts is a wildcard
+                                (let ([multi-mode? (for/or ([(_ subscript) (in-dict query-pieces)])
+                                                           (multiquery? subscript))])
+                                  (match (for/list ([(idx _) (in-dict subtrees)])
+                                                   (vector-ref vec idx))
+                                    [vals #:when multi-mode? vals] ; in multi mode, return list
+                                    [(list val) val] ; otherwise return single value
+                                    [_ (error 'should-never-have-multiple-vals-in-single-mode)]))))
+                 ([(pred subscript) (in-dict query-pieces)]
+                  #:break (null? subtrees)) ; if subtrees are null, we have eliminated all searchable domains
+         (for*/list ([(start-idx end-idx) (in-dict subtrees)]
+                     [idx (cond
+                            [(multiquery? subscript)
+                             (in-list (for/list ([idx (in-range start-idx (add1 end-idx))]
+                                                 #:when (pred (vector-ref vec idx)))
+                                                idx))]
+                            [else (in-value (query-one vec pred subscript start-idx end-idx))])]
+                     #:when idx)
+                    (cons idx (cond ;; calculate new end-idx
+                                [(not idx) end-idx]
+                                ;; try searching for next occurence after this one, up to max.
+                                [(find-inclusive vec pred (add1 idx) end-idx 1)]
+                                [else end-idx]))))))
           
 (module+ test
   (require rackunit)
@@ -149,4 +150,9 @@
 
   (check-equal? (count (query doc "page[next]:page[this]:page[prev]" (query doc "page[1]:line[1]")))
                 (count (query doc "page[1]")))
+
+
+  (query doc "sec[*]")
+  (query doc "sec[*]:page[1]")
+  (query doc "sec[*]:page[1]:line[*]")
   )
