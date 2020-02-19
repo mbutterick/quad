@@ -75,34 +75,46 @@
                 [idx idx]))
   (when query-q (unless (quad? query-q)
                   (raise-argument-error 'query "quad" query-q)))
-  (define query-pieces (parse-query query-str))
-  (and (pair? query-pieces)
+  (define all-query-pieces (parse-query query-str))
+  (and (pair? all-query-pieces)
        ;; initial subtree is whole tree
-       (for/fold ([subtrees (list (cons (if query-q (vector-memq query-q vec) 0) (sub1 (vector-length vec))))]
-                  #:result (and (pair? subtrees)
-                                ;; multi mode means one of the query subscripts is a wildcard
-                                (let ([multi-mode? (for/or ([(_ subscript) (in-dict query-pieces)])
-                                                           (multiquery? subscript))])
-                                  (match (for/list ([(idx _) (in-dict subtrees)])
-                                                   (vector-ref vec idx))
-                                    [vals #:when multi-mode? vals] ; in multi mode, return list
-                                    [(list val) val] ; otherwise return single value
-                                    [_ (error 'should-never-have-multiple-vals-in-single-mode)]))))
-                 ([(pred subscript) (in-dict query-pieces)]
-                  #:break (null? subtrees)) ; if subtrees are null, we have eliminated all searchable domains
-         (for*/list ([(start-idx end-idx) (in-dict subtrees)]
-                     [idx (cond
-                            [(multiquery? subscript)
-                             (in-list (for/list ([idx (in-range start-idx (add1 end-idx))]
-                                                 #:when (pred (vector-ref vec idx)))
-                                                idx))]
-                            [else (in-value (query-one vec pred subscript start-idx end-idx))])]
-                     #:when idx)
-                    (cons idx (cond ;; calculate new end-idx
-                                [(not idx) end-idx]
-                                ;; try searching for next occurence after this one, up to max.
-                                [(find-inclusive vec pred (add1 idx) end-idx 1)]
-                                [else end-idx]))))))
+       ;; each subtree is a pair of start idx (initial node) + end idx (boundary of subtree)
+       (let loop ([subtrees (list (cons (if query-q (vector-memq query-q vec) 0) (sub1 (vector-length vec))))]
+                  [query-pieces all-query-pieces])
+         (cond
+           ;; if subtrees are null, we have eliminated all searchable domains
+           [(null? subtrees) #false]
+           [(null? query-pieces)
+            ;; multi mode means one of the query subscripts is a wildcard
+            (define multi-mode? (for/or ([(_ subscript) (in-dict all-query-pieces)])
+                                        (multiquery? subscript)))
+            (match (for/list ([(idx _) (in-dict subtrees)])
+                             (vector-ref vec idx))
+              [vals #:when multi-mode? vals] ; in multi mode, return list
+              [(list val) val] ; otherwise return single value
+              [_ (error 'should-never-have-multiple-vals-in-single-mode)])]
+           [else
+            (match-define (cons (cons pred subscript) other-query-pieces) query-pieces)
+            (define finish-proc
+              (if (null? other-query-pieces)
+                  ;; don't need to calculate end-idxs if we're at the end of the query
+                  (λ (idx end-idx) 'ignored-value)
+                  (λ (idx end-idx) (cond ;; otherwise calculate new end-idx
+                                     [(not idx) end-idx]
+                                     ;; try searching for next occurence after this one, up to max.
+                                     [(find-inclusive vec pred (add1 idx) end-idx 1)]
+                                     [else end-idx]))))
+            (loop
+             (for*/list ([(start-idx end-idx) (in-dict subtrees)]
+                         [idx (cond
+                                [(multiquery? subscript)
+                                 (in-list (for/list ([idx (in-range start-idx (add1 end-idx))]
+                                                     #:when (pred (vector-ref vec idx)))
+                                                    idx))]
+                                [else (in-value (query-one vec pred subscript start-idx end-idx))])]
+                         #:when idx)
+                        (cons idx (finish-proc idx end-idx)))
+             other-query-pieces)]))))
           
 (module+ test
   (require rackunit)
@@ -152,7 +164,7 @@
                 (count (query doc "page[1]")))
 
 
-  (query doc "sec[*]")
-  (query doc "sec[*]:page[1]")
-  (query doc "sec[*]:page[1]:line[*]")
+  (andmap section-quad? (query doc "sec[*]"))
+  (andmap page-quad? (query doc "sec[*]:page[1]"))
+  (andmap line-quad? (query doc "sec[*]:page[1]:line[*]"))
   )
