@@ -164,7 +164,9 @@
                 (count (query doc "page[1]")))
 
 
-  (andmap section-quad? (query doc "sec[*]"))
-  (andmap page-quad? (query doc "sec[*]:page[1]"))
-  (andmap line-quad? (query doc "sec[*]:page[1]:line[*]"))
+  (check-equal? (map count (query doc "sec[*]")) '(121 242 363))
+  (check-equal? (map count (query doc "sec[*]:page[1]")) '(41 162 283))
+  (check-equal? (map count (query doc "sec[2]:page[1]:line[*]"))
+                '(126 127 128 130 131 132 134 135 136 139 140 141 143 144 145 147 148 149 152 153 154 156 157 158 160 161 162))
+  
   )
