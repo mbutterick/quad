@@ -457,8 +457,9 @@
                                       [else (current-directory)])])
                      (match maybe-dir
                        [(? directory-exists? dir) dir]
-                       [_ (define-values (dir name _) (split-path maybe-dir))
-                          dir])))
+                       [(app path->complete-path cp)
+                        (define-values (dir name _) (split-path cp))
+                        dir])))
   
   (unless (directory-exists? base-dir)
     (raise-argument-error 'render-pdf "existing directory" base-dir))
