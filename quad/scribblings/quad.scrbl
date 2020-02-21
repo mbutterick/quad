@@ -812,7 +812,7 @@ Used for code. Default is a monospaced font.
 }
 
 @defthing[#:kind "font directory" blockquote path-string?]{
-Used for blockquote boxes. Defaults is a sans serif font.
+Used for blockquote boxes. Default is a sans serif font.
 }
 
 
