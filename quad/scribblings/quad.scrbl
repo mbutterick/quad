@@ -450,6 +450,24 @@ The @tech{Q-expression} @racketresult['#,section-break]. Used to denote the star
 A section is a contiguous series of pages. Each section has its own @secref{Section-level_attributes}. A document without any explicit section breaks still has one section (that includes all the pages).
 }
 
+@subsection{Drawing quads}
+
+@defmodule[quadwriter/draw]
+
+@deftech{Drawing quads} can be used to put arbitrary text or shapes in the document, either in the midst of the text flow, or at arbitrary locations. Drawing quads can be used to implement headers and footers, line numbers, title pages, and so on.
+
+@defthing[line qexpr?]{
+Draws a line. Four attributes are required: @racket[x1] and @racket[y1] (which determine the starting point) and @racket[x2] and @racket[y2] (which determine the ending point). Each of these values is a @tech{dimension string}. These distances are interpreted as relative to the upper left corner of the quad.
+
+Optional attributes are @racket[stroke] (a @tech{dimension string} that controls the thickness of the line) and @racket[color] (a a @tech{hex color} string or @tech{named color} string that controls the color of the line).
+}
+
+@defthing[text qexpr?]{
+Draws a single text string without line wrapping. One attribute is required: @racket[string], which is the string to be drawn. 
+
+A text-drawing quad will also inherit the current @secref["Font_attributes"], which can also be set separately.
+}
+
 
 @subsection{Attributes}
 
@@ -619,11 +637,27 @@ Specify a quad with an image (either @racket{.png} or @racket{.jpeg}). @racket[i
 @racket[image-height] and @racket[image-width] are optional sizing values, each of which is a @tech{dimension string}. If neither @racket[image-height] nor @racket[image-width] are provided, the image is displayed at ``full size'' (meaning one pixel = one point, or 72 dpi). If both @racket[image-height] and @racket[image-width] are provided, the image is displayed at exactly that size. If only @racket[image-height] or @racket[image-width] is provided, the image is scaled by the proportion implied by the value. That is, if @racket[image-height] is @racket{50} and the image is 200 pixels high by 100 pixels wide, then the image will be displayed 50 pixels high by 25 pixels wide.
 }
 
-@subsubsection{Other attributes}
+@subsubsection{Positioning attributes}
 
-@defthing[#:kind "attribute" display symbol?]{
-Sets the display type. Value is a string. Supply @racket["block"] as a value of this attribute to make the quad behave as a block-level element.
+
+@defthing[#:kind "attribute" repeat symbol?]{
+Moves the quad from its existing position and repeats it within the document according to the attribute value, which is a @tech{query string} like @racket["section[this]:page[*]"]. This attribute is resolved before @racket[parent], so a parent value like @racket["page[this]:line[first]"] will refer to the first line on the page that the quad has landed on as a result of the repeat operation.
 }
+
+@defthing[#:kind "attribute" parent symbol?]{
+Moves the quad from its existing position in the layout into a new parent quad. Value is a @tech{query string} like @racket["page[this]:line[2]"].
+}
+
+@defthing[#:kind "attribute" anchor-from-parent symbol?]{
+Forces the quad to attach to its parent using the designated anchor on the parent. Value is an @tech{anchor string}. See @secref["Layout_model"] for an explanation of the anchoring system.
+}
+
+@defthing[#:kind "attribute" anchor-to symbol?]{
+Forces the current quad to attach to its antecedent using the designated anchor on the current quad. Value is an @tech{anchor string}. See @secref["Layout_model"] for an explanation of the anchoring system.
+}
+
+@subsubsection{Font attributes}
+
 
 @defthing[#:kind "attribute" font-size symbol?]{
 Sets the point size for text. Value is a @tech{dimension string}.
@@ -664,12 +698,58 @@ Vertical offset of font baseline (positive values move the baseline up, negative
 Case transformation of string. Possibilities are @racket["uppercase"], @racket["lowercase"], or @racket["capitalize"] (= first letter of each word is uppercase, the rest is lowercase).
 }
 
+@subsubsection{Other attributes}
+
+@defthing[#:kind "attribute" display symbol?]{
+Sets the display type. Value is a string. Supply @racket["block"] as a value of this attribute to make the quad behave as a block-level element.
+}
+
 
 @defthing[#:kind "attribute" line-height symbol?]{
 Sets the distance between baselines. Value is a @tech{dimension string}.
 }
 
+@defthing[#:kind "attribute" draw-debug symbol?]{
+Controls whether debug boxes are drawn. Value can be @racket["false"] (default) or @racket["true"].
+}
+
 TK: OT feature attributes, bullet attributes
+
+@subsection{Query strings}
+
+Certain quad attributes (like @racket[repeat] and @racket[parent]) accept a @deftech{query string} as a value. A query string lets us refer to quads that will eventually exist in the layout (like lines, pages, and sections) while we're still in the markup.
+
+A query string consists of query pieces chained together with colons @litchar{:} in between. Each query piece has a target and a subscript.
+
+A @deftech{query target} can be @racket[doc], @racket[section], @racket[page], @racket[column], @racket[block], or @racket[line], referring to the corresponding layout entities.
+
+A @deftech{query subscript} follows the query target in square brackets. Some subscripts refer to single quads; some refer to multiples. If any query piece contains a subscript that refers to multiple quads, then the result of the whole query will be a list of quads, or @racket[#false] if no matches were found. Similarly, if no subscript refers to multiple quads, then the result of the whole query will be a single quad, or @racket[#false] if no match is found.
+
+Possible query subscripts are:
+
+@itemlist[
+
+@item{@racket[this]: refers to the current target, relative to the location of the quad in the layout. So @racket["page[this]"] means the current page, and @racket["section[this]"] means the current section.}
+
+@item{@racket[prev] and @racket[next]: respectively refer to the previous or next target, relative to the location of the quad in the layout. So @racket["page[prev]"] means the page before the current page, and @racket["section[next]"] means the section after the current one.}
+
+@item{a positive integer, which is interpreted as the nth item (counting from 1) within the previous quad in the query. So the second page of the document would be @racket["doc[this]:page[2]"].}
+
+@item{a negative integer, which is interpreted as the nth item (counting from the end) within the previous quad in the query. So the next-to-last page of the current section would be @racket["section[this]:page[-2]"].}
+
+@item{@racket[i..j], where @racket[i] and @racket[j] are positive or negative integers, with the meanings given above. The @racket[..] in between means the range of items from the ith to the jth, inclusive. So the second through fourth pages of the previous section would be @racket["section[prev]:page[2..4]"].}
+
+@item{@racket[first] and @racket[last], which are the same as @racket[1] and @racket[-1], respectively.}
+
+@item{@racket[all] or @racket[*], which refers to all matching items. So all the pages in the previous section would be @racket["section[prev]:pages[all]"] or @racket["section[prev]:pages[*]"]. All the lines on the third page of every section would be @racket["section[*]:page[3]:line[*]"].}
+
+@item{@racket[rest], which refers to all items after the first. So all the pages in the document that do not fall on the first page of a section would be @racket["section[*]:page[rest]"].}
+
+@item{@racket[odd] or @racket[even], which respectively refer to all the items with an odd or even numerical subscript. So if a page has five lines, @racket["page[this]:line[odd]"] would refer to the first, third, and fifth, and @racket["page[this]:line[even]"] to the second and fourth.}
+
+]
+
+TK: querying quads by name, and @racket[left] and @racket[right]
 
 
 @subsection{Rendering}
@@ -724,7 +804,7 @@ Used for all body text. Default is a serif font.
 }
 
 @defthing[#:kind "font directory" heading path-string?]{
-Used for headings. Default is a sans serif font..
+Used for headings. Default is a sans serif font.
 }
 
 @defthing[#:kind "font directory" code path-string?]{
@@ -797,14 +877,16 @@ Each quad has nested @deftech{elements}, which is a (possibly empty) list of sub
 
 Wrapping is a optional phase where lists of quads are broken into sublists of a certain size. In @racketmodname[quadwriter], the list of words is wrapped to produce a list of lines of a certain horizontal width. In turn, the list of lines is wrapped to produce a list of pages of a certain vertical height.
 
-@subsection{Layout}
+@subsection{Layout model}
 
-The heart of Quad's layout logic is its system of @deftech{anchor points}. A quad is positioned in a layout by aligning its anchor point to an anchor point on the previous quad.
+The heart of Quad's layout model is its system of @deftech{anchor points}. A quad is positioned in a layout by aligning its anchor point to an anchor point on the previous quad.
 
 Each quad has a set of 11 anchor points on its perimeter. 
 
 Eight points are named for the compass directions: @racket['n] (= top center) @racket['e] (= right center) @racket['s] (= bottom center) @racket['w] (= left center) @racket['ne] (= upper right) @racket['se] (= lower right) @racket['sw] (= lower left) @racket['nw] (= upper left). The center of the quad is @racket['c]. 
 
+(As an attribute value, these compass directions become @deftech{anchor strings}: @racket["n"] or @racket["e"] or @racket["bi"] and so on.)
+ 
 The other two anchor points are @racket['baseline-in] and @racket['baseline-out] (or just @racket['bi] and @racket['bo]). These points are also on the quad perimeter. They allow quads containing typeset text to be aligned according to adjacent baselines. The exact location of these points depends on the direction of the script and the @link["https://docs.microsoft.com/en-us/typography/opentype/spec/hhea"]{internal @racket[ascender] value} of the font. For instance, in left-to-right languages, @racket['baseline-in] is on the left edge, and @racket['baseline-out] is on the right. The vertical position of these points depends on the font associated with the quad. If no font is specified, the @racket['baseline-in] and @racket['baseline-out] anchors are vertically aligned with the southern edge. In that case, again supposing a left-to-right language, they would occupy the same positions as @racket['sw] and @racket['se].
 
 By default, each subquad will ultimately be positioned relative to the immediately preceding subquad (or, if it's the first subquad, the parent). Optionally, a subquad can attach to the parent. 

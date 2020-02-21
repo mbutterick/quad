@@ -99,7 +99,7 @@ Naming guidelines
                draw
                width
                height
-               anchor-parent
+               parent
                anchor-from
                anchor-from-parent
                anchor-to
@@ -230,8 +230,11 @@ Naming guidelines
                      :line-height
                      :x
                      :y
+                     :x1
                      :x2
+                     :y1
                      :y2
+                     :stroke
                      :width)) #true))
 
 (define (has-case-sensitive-value? k)

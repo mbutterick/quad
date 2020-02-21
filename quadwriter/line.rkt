@@ -88,7 +88,7 @@
     (raise-argument-error 'fill-line-wrap "nonempty list of quads" all-qs))
 
   ;; remove anchored quads because they don't affect line layout
-  (define-values (absolute-qs qs) (partition (λ (q) (quad-ref q :anchor-parent)) all-qs))
+  (define-values (absolute-qs qs) (partition (λ (q) (quad-ref q :parent)) all-qs))
 
   (match qs
     [(? null?) absolute-qs]
@@ -298,7 +298,7 @@
                                    ;; but they won't affect where lines break
                                    #:distance (λ (q last-dist wrap-qs)
                                                 (+ last-dist (cond
-                                                               [(quad-ref q :anchor-parent) 0]
+                                                               [(quad-ref q :parent) 0]
                                                                [(printable? q) (distance q)]
                                                                [else 0])))
                                    #:nicely (match (or (current-line-wrap) (quad-ref pq :line-wrap))

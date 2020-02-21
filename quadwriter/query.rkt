@@ -70,6 +70,28 @@
           (find this-idx maxidx count)])]
       [_ #false])))
 
+(define ((filtered-xs pred) xs)
+  (for/list ([(x idx) (in-indexed xs)]
+             #:when (pred (add1 idx)))
+            x))
+
+(define (subscript->multimode-proc subscript)
+  (match subscript
+    [(or (== 'all eq?) (== '* eq?)) values]
+    [(== 'rest eq?) cdr]
+    [(== 'even eq?) (filtered-xs even?)]
+    [(== 'odd eq?) (filtered-xs odd?)]
+    [(list larg rarg)
+     (λ (xs)
+       (define len (length xs))
+       (define lo (+ larg (if (negative? larg) (add1 len) 0)))
+       (define hi (min len (+ rarg (if (negative? rarg) (add1 len) 0))))
+       (define cmp (if (< lo hi) <= >=))
+       (for/list ([(x idx) (in-indexed xs)]
+                  #:when (cmp lo (add1 idx) hi))
+                 x))]
+    [_ #false]))
+
 
 (define (query quad-or-index query-str [query-q #false])
   (define vec (match quad-or-index
@@ -95,25 +117,7 @@
               [_ (error 'should-never-have-multiple-vals-in-single-mode)])]
            [else
             (match-define (cons (cons pred subscript) other-query-pieces) query-pieces)
-            (define maybe-multimode-proc (match subscript
-                                           [(or (== 'all eq?) (== '* eq?)) values]
-                                           [(== 'rest eq?) cdr]
-                                           [(or (== 'even eq?) (== 'odd eq?))
-                                            (λ (xs)
-                                              (define proc (if (eq? subscript 'even) even? odd?))
-                                              (for/list ([(x idx) (in-indexed xs)]
-                                                         #:when (proc (add1 idx)))
-                                                        x))]
-                                           [(list larg rarg)
-                                            (λ (xs)
-                                              (define len (length xs))
-                                              (define lo (+ larg (if (negative? larg) (add1 len) 0)))
-                                              (define hi (min len (+ rarg (if (negative? rarg) (add1 len) 0))))
-                                              (define cmp (if (< lo hi) <= >=))
-                                              (for/list ([(x idx) (in-indexed xs)]
-                                                         #:when (cmp lo (add1 idx) hi))
-                                                        x))]
-                                           [_ #false]))
+            (define maybe-multimode-proc (subscript->multimode-proc subscript))
             (define finish-proc
               ;; don't need to calculate end-idxs if we're at the end of the query
               (if (null? other-query-pieces)

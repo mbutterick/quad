@@ -378,13 +378,13 @@
   (for* ([rq (in-list repeat-wanter-acc)]
          [query-str (in-value (quad-ref rq :repeat))]
          #:when query-str
-         [query-matches (in-value (query qi query-str rq))]
+         [query-matches (in-value (query qi (string-append "doc[this]:" query-str) rq))]
          #:when query-matches
          [query-match (in-list query-matches)])
         (quad-update! query-match [elems (append (quad-elems query-match) (list (quad-copy quad rq)))]))
   doc)
 
-(define (wants-parent? x) (and (quad? x) (quad-ref x :anchor-parent)))
+(define (wants-parent? x) (and (quad? x) (quad-ref x :parent)))
 (define (resolve-parents doc)
   ;; we make our index now so that it includes the quads that want parents
   ;; so if we come across `this` as a subscript, we can resolve it
@@ -405,7 +405,7 @@
   ;; if the query has no result, then the quad doesn't get replaced (ie. disappears)
   ;; which seems like the right outcome.
   (for* ([wp (in-list parent-wanter-acc)]
-         [query-str (in-value (quad-ref wp :anchor-parent))]
+         [query-str (in-value (quad-ref wp :parent))]
          #:when query-str
          [parent (in-value (query qi query-str wp))]
          #:when parent)

@@ -18,7 +18,7 @@
   (match-define (list page-width page-height) (parse-page-size q))
   (add-page doc page-width page-height)
   (scale doc (zoom-factor) (zoom-factor))
-  (draw-debug q doc "aliceblue" "aliceblue" 3))
+  (draw-debug q doc "purple" "purple" 1))
 
 
 (define q:page (make-quad
