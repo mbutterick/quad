@@ -835,7 +835,7 @@ Fallback only. Used for other glyphs not present in the currently selected font.
 
 @subsection{Colors}
 
-A @deftech{hex color} is a case-insensitive string of six hex digits prefixed with @litchar{#}, such as @racket["#fe456a"] or @racket["#cc6633"]. The pairs of digits represent the red, green, and blue components of the color respectively, each pair taking on hex values between 0 (@racket["00"]) and 255 (@racket[ff]), inclusive. As optional shorthand, a three-digit hex color such as @racket["#c63"] is equivalent to @racket["#cc6633"].
+A @deftech{hex color} is a case-insensitive string of six hex digits prefixed with @litchar{#}, such as @racket["#fe456a"] or @racket["#cc6633"]. The pairs of digits represent the red, green, and blue components of the color respectively, each pair taking on hex values between 0 (@racket["00"]) and 255 (@racket["ff"]), inclusive. As optional shorthand, a three-digit hex color such as @racket["#c63"] is equivalent to @racket["#cc6633"].
 
 A @deftech{named color} is a hex color with a pre-existing name.
 
