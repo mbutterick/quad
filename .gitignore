@@ -28,5 +28,6 @@ quad/scribblings/scribble-common.js
 quad/scribblings/scribble.css
 quad/scribblings/pict*.png
 quad/scribblings/mb.css
+quad/doc
 *.pdf
 !*tester.pdf
