@@ -76,6 +76,7 @@
      ;; whereas PDF drawing only puts tracking between the glyphs.
      (text doc str (+ x (/ tracking 2.0)) (- y (quad-ref q :font-baseline-shift 0))
            #:tracking tracking
+           #:underline (quad-ref q :font-underline)
            #:bg (quad-ref q :bg)
            #:features (quad-ref q :font-features default-font-features)
            #:link (quad-ref q :link))]))

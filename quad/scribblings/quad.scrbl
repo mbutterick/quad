@@ -679,6 +679,10 @@ Whether the quad has bold styling applied. Activated only when value is @racket[
 Whether the quad has italic styling applied. Activated only when value is @racket["true"]. 
 }
 
+@defthing[#:kind "attribute" font-underline symbol?]{
+Whether the quad has an underline applied. Activated only when value is @racket["true"]. 
+}
+
 @defthing[#:kind "attribute" font-features symbol?]{
 Sets OpenType layout features. @racket[font-features] takes a @deftech{feature string}, which is an alternating list of OT feature tags and values, separated by white space. For instance, @racket{liga 0 smcp 1} would deactivate the ligature feature and activate the small-cap feature. If the feature string is prefixed with @racket["+"], rather than replacing the current feature settings, it amends the features that would otherwise apply.
 

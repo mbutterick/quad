@@ -75,6 +75,7 @@ Naming guidelines
                font-features-adjust
                font-italic
                font-bold
+               font-underline
                font-tracking
                font-baseline-shift
                font-case
