@@ -884,10 +884,11 @@ The heart of Quad's layout model is its system of @deftech{anchor points}. A qua
 Each quad has a set of 11 anchor points on its perimeter. 
 
 Eight points are named for the compass directions: @racket['n] (= top center) @racket['e] (= right center) @racket['s] (= bottom center) @racket['w] (= left center) @racket['ne] (= upper right) @racket['se] (= lower right) @racket['sw] (= lower left) @racket['nw] (= upper left). The center of the quad is @racket['c]. 
-
-(As an attribute value, these compass directions become @deftech{anchor strings}: @racket["n"] or @racket["e"] or @racket["bi"] and so on.)
  
 The other two anchor points are @racket['baseline-in] and @racket['baseline-out] (or just @racket['bi] and @racket['bo]). These points are also on the quad perimeter. They allow quads containing typeset text to be aligned according to adjacent baselines. The exact location of these points depends on the direction of the script and the @link["https://docs.microsoft.com/en-us/typography/opentype/spec/hhea"]{internal @racket[ascender] value} of the font. For instance, in left-to-right languages, @racket['baseline-in] is on the left edge, and @racket['baseline-out] is on the right. The vertical position of these points depends on the font associated with the quad. If no font is specified, the @racket['baseline-in] and @racket['baseline-out] anchors are vertically aligned with the southern edge. In that case, again supposing a left-to-right language, they would occupy the same positions as @racket['sw] and @racket['se].
+
+(As an attribute value, these anchor points become @deftech{anchor strings}: @racket["n"] or @racket["e"] or @racket["bi"] and so on.)
+
 
 By default, each subquad will ultimately be positioned relative to the immediately preceding subquad (or, if it's the first subquad, the parent). Optionally, a subquad can attach to the parent. 
 
