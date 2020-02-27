@@ -39,6 +39,13 @@ Docs
 http://docs.racket-lang.org/quad
 
 
+Questions
+---
+
+Can be posted on the @link["https://github.com/mbutterick/pollen-users/"]{@tt{pollen-users} discussion area.} 
+
+
+
 License
 ---
 

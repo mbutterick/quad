@@ -938,6 +938,10 @@ Some things I personally plan to use Quad for:
 
 ]
 
+@subsection{Getting more help}
+
+Questions about Quad and Quadwriter can be posted on the @link["https://github.com/mbutterick/pollen-users/"]{@tt{pollen-users} discussion area.} 
+
 
 @subsection{Why is it called Quad?}
 
