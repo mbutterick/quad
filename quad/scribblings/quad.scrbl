@@ -118,7 +118,7 @@ Next, on the REPL enter this:
 You will see the actual input to Quadwriter, which is called a @tech{Q-expression}:
 
 @repl-output{
-'(q () (q ((page-margin-left "120") (page-margin-top "80") (page-margin-bottom "120") (font-family "text") (line-height "17")) (q ((keep-first-lines "2") (keep-last-lines "3") (font-size "100%") (character-tracking "0") (hyphenate "true") (display "g49598")) "Brennan and Dale like fancy sauce.")))
+'(q () (q ((page-margin-left "120") (page-margin-top "80") (page-margin-bottom "120") (font-family "text") (line-height "17")) (q ((keep-first-lines "2") (keep-last-lines "3") (font-size "1em") (character-tracking "0") (hyphenate "true") (display "g49598")) "Brennan and Dale like fancy sauce.")))
 }
 
 In the demos that follow, the input language will change slightly. But the PDF will be rendered the same way (by running the source file) and you can always look at @racket[doc] or use @racket[view-output].
