@@ -26,7 +26,6 @@
                        :keep-first-lines "2"
                        :keep-last-lines "3"
                        :font-size "1em"
-                       :hyphenate "true"
                        :display (symbol->string (gensym)))
                       attrs) exprs)]))
 

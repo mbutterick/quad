@@ -184,6 +184,7 @@
                            :font-family default-font-family
                            :font-size (number->string default-font-size)
                            :font-features default-font-features
+                           :hyphenate "true"
                            :line-height (number->string (floor (* default-line-height-multiplier default-font-size)))) qexpr)))
   (setup-font-path-table! base-dir)
   (let* ([qs (atomize q
