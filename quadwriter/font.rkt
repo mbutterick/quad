@@ -3,6 +3,7 @@
          racket/string
          racket/path
          racket/match
+         fontland/font-path
          "attrs.rkt")
 (provide (all-defined-out))
 
@@ -58,16 +59,33 @@
 
 (define (font-attrs->path font-family bold italic)
   ;; find the font-path corresponding to a certain family name and style.
-  (define key (cons (string-downcase font-family)
-                    (cond
-                      [(and bold italic) 'bi]
-                      [bold 'b]
-                      [italic 'i]
-                      [else 'r])))
-  (define regular-key (cons font-family 'r))
+  (define (make-key font-family [bold #f] [italic #f])
+    (cons (string-downcase font-family)
+          (cond
+            [(and bold italic) 'bi]
+            [bold 'b]
+            [italic 'i]
+            [else 'r])))
+  (define key (make-key font-family bold italic))
+  (define regular-key (make-key font-family))
   (cond
     [(hash-ref font-paths key #false)]
     [(hash-ref font-paths regular-key #false)]
+    ;; if it's not already in font paths, it might be a system font
+    ;; we use `family->path` to try to resolve the ribbi styles
+    ;; if the font is a system font, we will end up with paths.
+    ;; if it's not, we will end up with #false for those entries in `font-paths`,
+    ;; and fall through to the default font.
+    [(let ()
+       (unless (hash-has-key? font-paths regular-key)
+         (for* ([bold (in-list (list #false #true))]
+                [italic (in-list (list #false #true))])
+               (hash-set! font-paths
+                          (make-key font-family bold italic)
+                          (family->path font-family #:bold bold #:italic italic))))
+       (cond
+         [(hash-ref font-paths key #false)]
+         [else (hash-ref font-paths regular-key #false)]))]
     [else default-font-face]))
 
 (define (resolve-font-path! attrs)

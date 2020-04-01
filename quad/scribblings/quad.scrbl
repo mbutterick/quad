@@ -780,7 +780,7 @@ The optional @racket[compress?] argument controls whether data inside the result
 
 A design goal of Quadwriter is to treat document layout as the result of a program. Along those lines, fonts are handled differently than usual. When you use a word processor, you choose from whatever fonts might be installed on your system. 
 
-Quadwriter, by contrast, relies only on fonts that are @emph{in the same directory} as your other project source files. This is a feature: it means that everything  necessary to render the document travels together in the same directory. You can re-render it anywhere with identical results. You never have the problem — still with us after 35 years of desktop word processing — that ``oh, you need to install such-and-such font in your system before it will work.'' Bah!
+Quadwriter, by contrast, prefers to rely on fonts that are @emph{in the same directory} as your other project source files. This is a feature: it means that everything necessary to render the document can travel together in the same directory. You can re-render it anywhere with identical results. You never have the problem — still with us after 35 years of desktop word processing — that ``oh, you need to install such-and-such font in your system before it will work.'' Bah!
 
 Quadwriter supports the usual TrueType (@racket[.ttf]) and OpenType (@racket[.otf]) font files. It also supports WOFF files (@racket[.woff]). To add fonts to your Quadwriter experience:
 
@@ -836,6 +836,11 @@ Fallback only. Used for math symbols not present in the currently selected font.
 @defthing[#:kind "font directory" fallback path-string?]{
 Fallback only. Used for other glyphs not present in the currently selected font.
 }
+
+@subsubsection{System fonts}
+
+Yes, if you're feeling lazy, you can use the name of a system font family in any field that takes a family name, and Quad will comply. But if you do this, bear in mind that your document will no longer necessarily be portable between systems, because it depends on a certain font already being available on that system. I include this option because I can imagine plenty of uses for Quad where ease outweighs portability. In which case, have at it. 
+
 
 @subsection{Colors}
 
