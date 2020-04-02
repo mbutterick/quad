@@ -12,8 +12,7 @@
                "txexpr"
                "markdown"
                "pict-lib"
-               "csp"
-                     "debug"))
+               "debug"))
 (define build-deps '("draw-lib"
                      "draw-doc"
                      "racket-doc"
