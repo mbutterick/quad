@@ -89,7 +89,7 @@
                         [else (raise-argument-error 'page-wrap-finish "quad with attrs" (list cols q-after q-before))]))
   (define elems
     (append
-     (match (quad-ref q-for-attrs :footer-display #true)
+     (match (quad-ref q-for-attrs :footer-display #false)
        [(or #false "none") null]
        [_ (list (make-footer-quad q-for-attrs page-idx path))])
      (from-parent cols 'nw)))

@@ -541,7 +541,7 @@ Columns per page. @racket[column-count] is a positive integer; @racket[column-ga
 }
 
 @defthing[#:kind "attribute" footer-display symbol?]{
-Whether footer is displayed. Default is @racket["true"]. Footer is suppressed if this value is @racket["none"] or @racket["false"].
+Whether footer is displayed. Default is @racket["false"]. Footer is suppressed if this value is @racket["none"] or @racket["false"].
 }
 
 @defthing[#:kind "attribute" footer-text symbol?]{
