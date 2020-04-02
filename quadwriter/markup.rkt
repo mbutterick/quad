@@ -15,4 +15,6 @@
   (define read-syntax
     (make-read-syntax 'quadwriter/markup
                       (λ (path-string ip)
-                        (detect-paragraphs (syntax->datum (quad-at-reader path-string ip)))))))
+                        (decode-paragraphs
+                         (syntax->datum (quad-at-reader path-string ip))
+                         #:force? #true)))))
