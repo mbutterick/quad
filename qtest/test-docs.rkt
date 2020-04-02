@@ -1,6 +1,7 @@
 #lang quadwriter/markdown
 
 #:line-wrap "best"
+#:footer-display "true"
 
 # Hyphenate
 

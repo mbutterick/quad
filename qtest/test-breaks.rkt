@@ -1,5 +1,7 @@
 #lang quadwriter
 
+#:footer-display "true"
+
 '(q ((page-height "6in")(column-count "2"))
 
 "Page 1 Column 1 Line 1"

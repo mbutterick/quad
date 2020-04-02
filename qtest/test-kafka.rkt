@@ -8,6 +8,7 @@
 #:line-align-last inner
 #:line-height "19pt"
 #:font-size "13pt"
+#:footer-display "true"
 
 # Metamorphosis
 
