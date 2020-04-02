@@ -843,7 +843,7 @@ Yes, if you're feeling lazy, you can use the name of a built-in system font fami
 
 If you do this, bear in mind that your source file will no longer necessarily be portable between systems, because it depends on a certain font already being available on that system. ("Portable" referring to one's ability to run the source file on a different machine and get an equivalent result.) I include this option because I can imagine plenty of uses for Quad where ease outweighs portability. In which case, have at it. 
 
-When I say "portable" I mean the source file only. Once you generate a PDF from the source file, the PDF itself will always be portable. Regardless of whether you invoke a system font or project font in your source file, the font will be embedded within the PDF. The PDF will then display correctly on any platform, with the correct fonts.
+When I say ``portable'' I mean the source file only. Once you generate a PDF from the source file, the PDF itself will always be portable. Regardless of whether you invoke a system font or project font in your source file, the font will be embedded within the PDF. The PDF will then display correctly on any platform, with the correct fonts.
 
 
 @subsection{Colors}
