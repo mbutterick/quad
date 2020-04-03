@@ -23,7 +23,7 @@
        [#false str] ; a string other than a dimension string, so leave it
        [(list str num-string-left unit num-string-right)
         ((match unit
-           [(regexp #rx"(pt|point)(s)?$") values] ; points
+           [(regexp #rx"(pt|point)(s)?$") (λ (num _) num)] ; points
            [(regexp #rx"(p|pica)(s)?") picas->pts] ; picas
            [(regexp #rx"in(ch(es)?)?$") in->pts] ; inches
            [(regexp #rx"cms?$") (compose1 in->pts cm->in)] ; cm
