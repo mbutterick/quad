@@ -7,7 +7,7 @@
 
 (define (list->attrs . kvs)
   (for/list ([kv (in-slice 2 kvs)])
-    kv))
+            kv))
 
 (define (pica->pts prefix [suffix #false])
   ;; both pieces of measurement are either positive or negative
@@ -84,17 +84,17 @@
 (define (copy-block-attrs source-hash dest-hash)
   (define new-hash (make-hasheq))
   (for ([(k v) (in-hash dest-hash)])
-    (hash-set! new-hash k v))
+       (hash-set! new-hash k v))
   (for ([(k v) (in-hash source-hash)]
         #:when (memq k block-attrs))
-    (hash-set! new-hash k v))
+       (hash-set! new-hash k v))
   new-hash)
 
 (define-syntax (define-attrs stx)
   (syntax-case stx ()
     [(_ (ATTR-NAME ...))
      (with-syntax ([(ATTR-ID ...) (for/list ([attr-id (in-list (syntax->list #'(ATTR-NAME ...)))])
-                                    (format-id stx ":~a" (syntax-e attr-id)))])
+                                            (format-id stx ":~a" (syntax-e attr-id)))])
        #'(begin
            (define ATTR-ID 'ATTR-NAME) ...))]
     [(_ ID (ATTR-NAME ...))
@@ -128,6 +128,7 @@ Naming guidelines
                font-tracking
                font-baseline-shift
                font-case
+                           
                bg
                link
                href
@@ -138,6 +139,8 @@ Naming guidelines
                no-pbr
                page-number
                doc-title
+
+               output-path
 
                pdf-title
                pdf-subject
@@ -293,7 +296,8 @@ Naming guidelines
                      :pdf-author
                      :pdf-keywords
                      :string
-                     :footer-text)) #true))
+                     :footer-text
+                     :output-path)) #true))
 
 (define (takes-path? k)
   (and (memq k (list :image-file)) #true))
