@@ -57,15 +57,18 @@
 
 (define (make-footer-quad col-q page-idx path)
   (define-values (dir name _) (split-path (path-replace-extension path #"")))
-  (define attrs (let ([attrs (make-hasheq)])
+  (define attrs (let ([attrs (make-hasheq)]
+                      [cltq (current-top-level-quad)])
                   (hash-set*! attrs
                               :footer-text (quad-ref col-q :footer-text)
                               :page-number (+ (quad-ref col-q :page-number-start (add1 (section-pages-used))) (sub1 page-idx))
                               :doc-title (string-titlecase (path->string name))
-                              :font-size (* 0.8 (quad-ref col-q :font-size default-font-size))
-                              :line-height (quad-ref col-q :line-height default-line-height)
-                              :font-family "text")
-                  (resolve-font-path! attrs)
+                              ;; we get font & line-height from cltq
+                              ;; because these are not block attrs
+                              ;; so they are not propagated upward from col-q
+                              :font-size (* 0.8 (quad-ref cltq :font-size))
+                              :line-height (quad-ref cltq :line-height)
+                              :font-path (quad-ref cltq :font-path))
                   attrs))
   (make-quad #:size (pt 50 default-line-height)
              #:attrs attrs
