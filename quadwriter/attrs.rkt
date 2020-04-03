@@ -9,7 +9,7 @@
   (for/list ([kv (in-slice 2 kvs)])
     kv))
 
-(define (pica->pts prefix suffix)
+(define (pica->pts prefix [suffix #false])
   ;; both pieces of measurement are either positive or negative
   ((if (negative? prefix) - +) (+ (* (abs prefix) 12) (or suffix 0))))
 (define (cm->in x) (/ x 2.54))
@@ -17,28 +17,37 @@
 (define (mm->cm x) (/ x 10.0))
 
 (define (parse-dimension x [em-resolution-attrs #false])
+  (define pica-pat (regexp "^(p|pica)(s)?$"))
+  (define (unit->converter-proc unit)
+    (match unit
+      [(regexp #rx"^(pt|point)(s)?$") values] ; points
+      [(regexp pica-pat) pica->pts] ; pica (no pts)
+      [(regexp #rx"^inch(es)?|in(s)?$") in->pts] ; inches
+      [(regexp #rx"^cm(s)?$") (compose1 in->pts cm->in)] ; cm
+      [(regexp #rx"^mm(s)?$") (compose1 in->pts cm->in mm->cm)] ; mm
+      [(regexp #rx"^em(s)?$")
+       #:when em-resolution-attrs
+       ;; if we don't have attrs for resolving the em string, we ignore it
+       (λ (num) (* (hash-ref em-resolution-attrs :font-size) num))]
+      [_ #false]))
   (define parsed-thing
     (match x
       [#false #false]
       [(? number? num) num]
       [(? string? str)
        (match (regexp-match #px"^(-?[0-9\\.]+)\\s*([a-z]+)([0-9\\.]+)?$" (string-downcase str))
-         [(list str num-prefix unit #false)
-          (define converter-proc
-            (match unit
-              [(regexp #rx"^(pt|point)(s)?$") values] ; points
-              [(regexp #rx"^inch(es)?|in(s)?$") in->pts] ; inches
-              [(regexp #rx"^cm(s)?$") (compose1 in->pts cm->in)] ; cm
-              [(regexp #rx"^mm(s)?$") (compose1 in->pts cm->in mm->cm)] ; mm
-              [(regexp #rx"^em(s)?$")
-               #:when em-resolution-attrs
-               ;; if we don't have attrs for resolving the em string, we ignore it
-               (λ (num) (* (hash-ref em-resolution-attrs :font-size) num))]
-              [_ (λ (num) str)]))
-          (converter-proc (string->number num-prefix))]
-         [(list str num-prefix unit num-suffix)
-          #:when (regexp-match #rx"^(p|pica)(s)?$" unit)
-          (pica->pts (string->number num-prefix) (string->number num-suffix))]
+         [(list str
+                (app string->number num)
+                (app unit->converter-proc converter-proc)
+                #false) ; prefix measurement (suffix is #false)
+          #:when (and converter-proc num)
+          (converter-proc num)]
+         [(list str
+                (app string->number prefix-num)
+                (and (regexp pica-pat) unit)
+                (app string->number suffix-num))
+          #:when (and prefix-num suffix-num) ; prefix + suffix measurement (only pica + point)
+          (pica->pts prefix-num suffix-num)]
          [_ str])]))
   (match parsed-thing
     [(and (? integer?) (? inexact?)) (inexact->exact parsed-thing)]
@@ -48,6 +57,7 @@
   (require rackunit)
   (check-equal? (parse-dimension "Foobar") "Foobar")
   (check-equal? (parse-dimension "72plink") "72plink")
+  (check-equal? (parse-dimension "7..2pt") "7..2pt")
   (check-equal? (parse-dimension "72pt") 72)
   (check-equal? (parse-dimension "72.5pts") 72.5)
   (check-equal? (parse-dimension "-72point") -72)
@@ -67,6 +77,7 @@
   (check-equal? (parse-dimension "-25.4ems") "-25.4ems")
   (check-equal? (parse-dimension "6pica3") 75)
   (check-equal? (parse-dimension "6.5picas3.5") 81.5)
+  (check-equal? (parse-dimension "12p") 144)
   (check-equal? (parse-dimension "-6p3") -75)
   (check-equal? (parse-dimension "-6.5ps3.5") -81.5))
 
