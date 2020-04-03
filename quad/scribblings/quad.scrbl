@@ -473,7 +473,7 @@ A text-drawing quad will also inherit the current @secref["Font_attributes"], wh
 
 These are the attributes that can be used inside a @tech{Q-expression} passed to @racketmodname[quadwriter]. Inside a Q-expression, every attribute is a @tech[#:doc '(lib "scribblings/guide/guide.scrbl")]{symbol}, and every attribute value is a @tech[#:doc '(lib "scribblings/guide/guide.scrbl")]{string}.
 
-A @deftech{dimension string} represents a distance in the plane. If unitless, it is treated as points (where 1 point = 1/72 of an inch). If the number has @racket[in], @racket[cm], or @racket[mm] as a suffix, it is treated as inches, centimeters, or millimeters respectively. If the number has @racket[em] as a suffix, it is treated as an em measurement, which is a multiple of the current font size.
+A @deftech{dimension string} represents a distance in the plane. If unitless, it is treated as points (where 1 point = 1/72 of an inch). If the number has @racket[in], @racket[cm], or @racket[mm] as a suffix, it is treated as inches, centimeters, or millimeters respectively. If the number has @racket[p] or @racket[pica] as a suffix or infix, it is treated as a pica / point measurement. A pica is 12 points, so @racket[12p] is 72 points, and @racket[3p9] is 45 points. If the number has @racket[em] as a suffix, it is treated as an em measurement, which is a multiple of the current font size.
 
 @subsubsection{Document-level attributes}
 

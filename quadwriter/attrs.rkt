@@ -9,28 +9,30 @@
   (for/list ([kv (in-slice 2 kvs)])
     kv))
 
-(define (cm->in x) (/ x 2.54))
-(define (in->pts x) (* 72 x))
-(define (mm->cm x) (/ x 10.0))
+(define (picas->pts left right) (+ (* left 12) (or right 0)))
+(define (cm->in x _) (/ x 2.54))
+(define (in->pts x _) (* 72 x))
+(define (mm->cm x _) (/ x 10.0))
 
 (define (parse-dimension x [em-resolution-attrs #false])
   (match x
     [#false #false]
     [(? number? num) num]
     [(? string? str)
-     (match (regexp-match #px"^(-?[0-9\\.]+)\\s*([a-z]+)$"  (string-downcase str))
+     (match (regexp-match #px"^(-?[0-9\\.]+)\\s*([a-z]+)([0-9\\.]*)$"  (string-downcase str))
        [#false str] ; a string other than a dimension string, so leave it
-       [(list str num-string unit)
+       [(list str num-string-left unit num-string-right)
         ((match unit
            [(regexp #rx"(pt|point)(s)?$") values] ; points
+           [(regexp #rx"(p|pica)(s)?") picas->pts] ; picas
            [(regexp #rx"in(ch(es)?)?$") in->pts] ; inches
            [(regexp #rx"cms?$") (compose1 in->pts cm->in)] ; cm
            [(regexp #rx"mms?$") (compose1 in->pts cm->in mm->cm)] ; mm
            [(regexp #rx"ems?$") (if em-resolution-attrs
-                                    (λ (num) (* (hash-ref em-resolution-attrs :font-size) num))
+                                    (λ (num _) (* (hash-ref em-resolution-attrs :font-size) num))
                                     ;; if we don't have attrs for resolving the em string, we leave it alone
-                                    (λ (num) str))] ; em
-           [_ (raise-argument-error 'parse-dimension "dimension string" str)]) (string->number num-string))])]))
+                                    (λ (num _) str))] ; em
+           [_ (raise-argument-error 'parse-dimension "dimension string" str)]) (string->number num-string-left)                                               (string->number num-string-right))])]))
 
 (define (copy-block-attrs source-hash dest-hash)
   (define new-hash (make-hasheq))
@@ -243,7 +245,8 @@ Naming guidelines
                      :pdf-subject
                      :pdf-author
                      :pdf-keywords
-                     :string)) #true))
+                     :string
+                     :footer-text)) #true))
 
 (define (takes-path? k)
   (and (memq k (list :image-file)) #true))
