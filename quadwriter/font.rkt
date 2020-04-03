@@ -13,7 +13,7 @@
 (define default-font-size 12)
 (define default-line-height 16)
 (define default-font-color "black")
-(define default-font-features "tnum 1")
+(define default-font-features "")
 
 (define font-paths (make-hash))
 
