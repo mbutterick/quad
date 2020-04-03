@@ -99,6 +99,7 @@
 (define (heading-base font-size inset-top attrs exprs)
   (qexpr (append (list->attrs
                   :font-family "heading"
+                  :font-features "tnum 1"
                   :first-line-indent "0"
                   :display "block"
                   :font-size (number->string font-size)
