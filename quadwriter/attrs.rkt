@@ -9,30 +9,66 @@
   (for/list ([kv (in-slice 2 kvs)])
     kv))
 
-(define (picas->pts left right) (+ (* left 12) (or right 0)))
-(define (cm->in x _) (/ x 2.54))
-(define (in->pts x _) (* 72 x))
-(define (mm->cm x _) (/ x 10.0))
+(define (pica->pts prefix suffix)
+  ;; both pieces of measurement are either positive or negative
+  ((if (negative? prefix) - +) (+ (* (abs prefix) 12) (or suffix 0))))
+(define (cm->in x) (/ x 2.54))
+(define (in->pts x) (* 72 x))
+(define (mm->cm x) (/ x 10.0))
 
 (define (parse-dimension x [em-resolution-attrs #false])
-  (match x
-    [#false #false]
-    [(? number? num) num]
-    [(? string? str)
-     (match (regexp-match #px"^(-?[0-9\\.]+)\\s*([a-z]+)([0-9\\.]*)$"  (string-downcase str))
-       [#false str] ; a string other than a dimension string, so leave it
-       [(list str num-string-left unit num-string-right)
-        ((match unit
-           [(regexp #rx"(pt|point)(s)?$") (λ (num _) num)] ; points
-           [(regexp #rx"(p|pica)(s)?") picas->pts] ; picas
-           [(regexp #rx"in(ch(es)?)?$") in->pts] ; inches
-           [(regexp #rx"cms?$") (compose1 in->pts cm->in)] ; cm
-           [(regexp #rx"mms?$") (compose1 in->pts cm->in mm->cm)] ; mm
-           [(regexp #rx"ems?$") (if em-resolution-attrs
-                                    (λ (num _) (* (hash-ref em-resolution-attrs :font-size) num))
-                                    ;; if we don't have attrs for resolving the em string, we leave it alone
-                                    (λ (num _) str))] ; em
-           [_ (raise-argument-error 'parse-dimension "dimension string" str)]) (string->number num-string-left)                                               (string->number num-string-right))])]))
+  (define parsed-thing
+    (match x
+      [#false #false]
+      [(? number? num) num]
+      [(? string? str)
+       (match (regexp-match #px"^(-?[0-9\\.]+)\\s*([a-z]+)([0-9\\.]+)?$" (string-downcase str))
+         [(list str num-prefix unit #false)
+          (define converter-proc
+            (match unit
+              [(regexp #rx"^(pt|point)(s)?$") values] ; points
+              [(regexp #rx"^inch(es)?|in(s)?$") in->pts] ; inches
+              [(regexp #rx"^cm(s)?$") (compose1 in->pts cm->in)] ; cm
+              [(regexp #rx"^mm(s)?$") (compose1 in->pts cm->in mm->cm)] ; mm
+              [(regexp #rx"^em(s)?$")
+               #:when em-resolution-attrs
+               ;; if we don't have attrs for resolving the em string, we ignore it
+               (λ (num) (* (hash-ref em-resolution-attrs :font-size) num))]
+              [_ (λ (num) str)]))
+          (converter-proc (string->number num-prefix))]
+         [(list str num-prefix unit num-suffix)
+          #:when (regexp-match #rx"^(p|pica)(s)?$" unit)
+          (pica->pts (string->number num-prefix) (string->number num-suffix))]
+         [_ str])]))
+  (match parsed-thing
+    [(and (? integer?) (? inexact?)) (inexact->exact parsed-thing)]
+    [_ parsed-thing]))
+
+(module+ test
+  (require rackunit)
+  (check-equal? (parse-dimension "Foobar") "Foobar")
+  (check-equal? (parse-dimension "72plink") "72plink")
+  (check-equal? (parse-dimension "72pt") 72)
+  (check-equal? (parse-dimension "72.5pts") 72.5)
+  (check-equal? (parse-dimension "-72point") -72)
+  (check-equal? (parse-dimension "-72.5points") -72.5)
+  (check-equal? (parse-dimension "72.5points3") "72.5points3")
+  (check-equal? (parse-dimension "2in") 144)
+  (check-equal? (parse-dimension "-2ins") -144)
+  (check-equal? (parse-dimension "2.5inch") 180)
+  (check-equal? (parse-dimension "-2.5inches") -180)
+  (check-equal? (parse-dimension "2.54cm") (parse-dimension "1in"))
+  (check-equal? (parse-dimension "-2.54cms") (parse-dimension "-1in"))
+  (check-equal? (parse-dimension "25.4mm") (parse-dimension "1in"))
+  (check-equal? (parse-dimension "-25.4mms") (parse-dimension "-1in"))
+  (check-equal? (parse-dimension "2.5em" (hash :font-size 12)) 30)
+  (check-equal? (parse-dimension "-2.5em" (hash :font-size 12)) -30)
+  (check-equal? (parse-dimension "25.4em") "25.4em")
+  (check-equal? (parse-dimension "-25.4ems") "-25.4ems")
+  (check-equal? (parse-dimension "6pica3") 75)
+  (check-equal? (parse-dimension "6.5picas3.5") 81.5)
+  (check-equal? (parse-dimension "-6p3") -75)
+  (check-equal? (parse-dimension "-6.5ps3.5") -81.5))
 
 (define (copy-block-attrs source-hash dest-hash)
   (define new-hash (make-hasheq))
