@@ -19,10 +19,10 @@
       (command-line #:program "fontproof"
                     #:argv (current-command-line-arguments)
                     #:once-each
-                    [("--page") page-size-arg "page size" (set! page-size page-size-arg)]
+                    [("-p" "--page") page-size-arg "page size" (set! page-size page-size-arg)]
                     [("-o" "--output") output-file-path-arg "output file path" (set! output-file-path output-file-path-arg)]
-                    [("--size") font-sizes-arg "font sizes" (set! font-sizes font-sizes-arg)]
-                    [("--leading") line-heights-arg "font size" (set! line-heights line-heights-arg)]
+                    [("-s" "--size") font-sizes-arg "font sizes" (set! font-sizes font-sizes-arg)]
+                    [("-l" "--line") line-heights-arg "line heights" (set! line-heights line-heights-arg)]
                     #:args families
                     families))
     (for ([family (in-list families)])
