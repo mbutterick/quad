@@ -63,6 +63,6 @@
                  'page-margin-left "12p"
                  'page-margin-right "12p"
                  'font-family family-name
-                 'footer-display "true"
-                 'line-wrap "best"))
+                 'hyphenate "false"
+                 'footer-display "true"))
     (render-pdf doc output-file-path)))
