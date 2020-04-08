@@ -4,6 +4,7 @@
          racket/string
          racket/match
          racket/list
+         racket/path
          txexpr 
          "quad.rkt")
 (provide (all-defined-out))
@@ -62,7 +63,7 @@
 
 (define (hash->qattrs attr-hash)
   (for/list ([(k v) (in-dict (hash->list attr-hash))])
-    (list k (format "~a" v))))
+            (list k (format "~a" v))))
 
 (define (quad->qexpr q)
   (let loop ([x q])
@@ -80,14 +81,14 @@
          [(list (? txexpr-attrs? attrs) (? qexpr? elems) ...)
           (define mheq (make-hasheq)) ; want mutable hash
           (for ([kv (in-list attrs)])
-            (match-define (list k v) kv)
-            ;; coerce number strings to actual numbers
-            ;; this misbehaves on a list index like "1." which becomes 1.0
-            (hash-set! mheq k (cond
-                                [(equal? v "true") #true]
-                                [(equal? v "false") #false]
-                                [(string->number v)]
-                                [else v])))
+               (match-define (list k v) kv)
+               ;; coerce number strings to actual numbers
+               ;; this misbehaves on a list index like "1." which becomes 1.0
+               (hash-set! mheq k (cond
+                                   [(equal? v "true") #true]
+                                   [(equal? v "false") #false]
+                                   [(string->number v)]
+                                   [else v])))
           (make-quad #:tag tag
                      #:attrs mheq
                      #:elems (map loop elems))]
@@ -101,6 +102,21 @@
    (quad=?
     (qexpr->quad  `(q ((font "charter") (fontsize "12")) (q "Foo bar") ,(make-quad "zzz") (q "Zim Zam")))
     (q (hasheq 'font "charter" 'fontsize 12) (q "Foo bar") (q "zzz") (q "Zim Zam")))))
+
+(define qml-extension #".qml")
+(define (qml-path? x)
+  (and (or (path-string? x) (path-for-some-system? x))
+       (for/or ([ext (in-list (list qml-extension
+                                    (string->bytes/utf-8
+                                     (string-upcase
+                                      (bytes->string/utf-8 qml-extension)))))])
+               (path-has-extension? x ext))))
+
+(module+ test
+  (check-true (qml-path? "foo.qml"))
+  (check-true (qml-path? "foo.QML"))
+  (check-false (qml-path? "foo.QmL"))
+  (check-false (qml-path? "foo.qmla")))
 
 (define (qml->qexpr x)
   (parameterize ([permissive-xexprs #t]
