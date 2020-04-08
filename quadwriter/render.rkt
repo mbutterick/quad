@@ -178,13 +178,15 @@
                         #:txexpr-proc smart-quotes)])
       (match qx
         [(list tag attrs elements ...)
-         ;; we insert a dummy element "◊" (irrelevant what it is)
+         ;; we insert a dummy element "."
+         ;; (could be anything, but we want to use something obvious
+         ;; so we don't trigger a fallback font)
          ;; to get a sample of the global attrs
          ;; which we will strip off after atomization
          ;; but keep the attrs around in case anyone needs to use them
          ;; for instance, quads added to the layout like footers
          ;; won't have another way of getting this
-      (list* tag attrs (cons "◊" elements))])))
+      (list* tag attrs (cons "." elements))])))
   
   ;; apply some default styling attributes.
   ;; These will only be used if the underlying q-expression hasn't specified its own values,
