@@ -56,7 +56,7 @@
      #:args families
      families))
   (match families
-    [(? null?) (raise-user-error "No font to proof. Exiting.")]
+    [(? null?) (raise-user-error "no font to proof; exiting")]
     [_ (for ([family (in-list families)])
             (make-proof family
                         (or doc (match (current-input-port)

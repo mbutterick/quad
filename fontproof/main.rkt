@@ -39,8 +39,8 @@
        (define output-file-path (path-replace-extension qml-ps #".pdf"))
        (values doc output-file-path)]
       [font-name-arg
-       (unless sample-text
-         (raise-user-error "Nothing to proof. Exiting."))
+       (unless (and sample-text (non-empty-string? sample-text))
+         (raise-user-error "nothing to proof; exiting"))
        (define-values (initial-font-family initial-font-bold initial-font-italic)
          (let ([bi-suffix-pat #px"\\s*((?i:bold))?\\s*((?i:italic))?$"])
            (match-define (list suffix bold? italic?) (regexp-match bi-suffix-pat font-name-arg))
@@ -69,8 +69,7 @@
                             [font-italic (in-list italic-variants)]
                             [line-height (in-list line-heights)])
                            (attr-set*
-                            (list
-                             'q sample-text)
+                            (txexpr* 'q null sample-text)
                             'font-size font-size
                             'font-italic (boolean->string font-italic)
                             'font-bold (boolean->string font-bold)
