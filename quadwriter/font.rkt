@@ -89,7 +89,7 @@
 
 (define (font-path-string? x)
   (and (path-string? x)
-       (member (path-get-extension (string->path x)) '(#".otf" #".ttf" #".woff"))
+       (member (path-get-extension (string->path x)) font-file-extensions)
        #true))
 
 (module+ test
