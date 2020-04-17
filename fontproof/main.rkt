@@ -23,6 +23,17 @@
 
 (define (boolean->string bool) (if bool "true" "false"))
 
+(define font-file-extensions '(#".otf" #".ttf" #".woff"))
+(define (font-path-string? x)
+  (and (path-string? x)
+       (member (path-get-extension (string->path x)) font-file-extensions)
+       #true))
+
+(define (resolve-family-bold-italic font-name-arg)
+  (define bi-suffix-pat #px"\\s*((?i:bold))?\\s*((?i:italic))?$")
+  (match-define (list suffix bold? italic?) (regexp-match bi-suffix-pat font-name-arg))
+  (values (string-trim font-name-arg suffix #:left? #false) bold? italic?))
+
 (define (make-proof font-or-qml [sample-text #f]
                     #:bold [make-bold #false]
                     #:italic [make-italic #false]
@@ -40,14 +51,11 @@
        (values doc output-file-path)]
       [font-name-arg
        (unless (and sample-text (non-empty-string? sample-text))
-         (raise-user-error "nothing to proof; exiting"))
+         (raise-user-error "no text to proof; exiting"))
        (define-values (initial-font-family initial-font-bold initial-font-italic)
          (match font-name-arg
-           [(? path-string? ps) (values (path->string (path->complete-path ps)) #f #f)]
-           [_ 
-            (let ([bi-suffix-pat #px"\\s*((?i:bold))?\\s*((?i:italic))?$"])
-              (match-define (list suffix bold? italic?) (regexp-match bi-suffix-pat font-name-arg))
-              (values (string-trim font-name-arg suffix #:left? #false) bold? italic?))]))
+           [(? font-path-string? ps) (values (path->string (path->complete-path ps)) #f #f)]
+           [_ (resolve-family-bold-italic font-name-arg)]))
        (log-fontproof-info (format "generating proof for ~a" font-name-arg))
        (define page-size (or page-size-arg "letter"))
        (define font-sizes (string-split (or font-sizes-arg "12 10.5 9")))

@@ -1,5 +1,6 @@
 #lang debug racket
 (require racket/logging
+         racket/match
          "main.rkt")
 
 (module+ raco
@@ -25,6 +26,7 @@
   (define output-qml? #false)
   (define make-bold? #false)
   (define make-italic? #false)
+  (define query-mode? #false)
   (define families
     (command-line
      #:program "fontproof"
@@ -53,26 +55,40 @@
                          (set! make-italic? #true)]
      [("-q" "--qml")  "output QML file"
                       (set! output-qml? #true)]
+     [("--query")  "resolve each family name and font path and show status"
+                   (set! query-mode? #true)]
      #:args font-family-names-or-font-paths
      font-family-names-or-font-paths))
   (match families
-    [(? null?) (raise-user-error "no font to proof; exiting")]
+    [(? null?) (raise-user-error "no fonts to proof; exiting")]
     [_ (for ([family (in-list families)])
-            (make-proof family
-                        (or doc (match (current-input-port)
-                                  ;; pull text out of stdin, if any
-                                  ;; use `terminal-port?` to distinguish piped input from tty input
-                                  [(not (? terminal-port?))
-                                   (string-join (for/list ([t (in-port read)])
-                                                          (format "~a" t)) " ")]
-                                  [_ #false]))
-                        #:page-size page-size
-                        #:bold make-bold?
-                        #:italic make-italic?
-                        #:font-sizes font-sizes
-                        #:line-heights line-heights
-                        #:output-file-path output-file-path
-                        #:replace replace
-                        #:qml output-qml?))]))
+            (cond
+              [query-mode?
+               (define status
+                 (match family
+                   [(? font-path-string? ps)
+                    (format (if (file-exists? ps) "found at ~v" "not found at ~v") (path->string (path->complete-path ps)))]
+                   [_ (match-define-values (trimmed-family bold? italic?) (resolve-family-bold-italic family))
+                      (match ((dynamic-require 'fontland/font-path 'family->path) trimmed-family #:bold bold? #:italic italic?)
+                        [#false "not found among installed fonts"]
+                        [pth (format "found installed at ~v" pth)])]))
+               (log-info (format "family ~v ~a" family status))]
+              [else
+               (make-proof family
+                           (or doc (match (current-input-port)
+                                     ;; pull text out of stdin, if any
+                                     ;; use `terminal-port?` to distinguish piped input from tty input
+                                     [(not (? terminal-port?))
+                                      (string-join (for/list ([t (in-port read)])
+                                                             (format "~a" t)) " ")]
+                                     [_ #false]))
+                           #:page-size page-size
+                           #:bold make-bold?
+                           #:italic make-italic?
+                           #:font-sizes font-sizes
+                           #:line-heights line-heights
+                           #:output-file-path output-file-path
+                           #:replace replace
+                           #:qml output-qml?)]))]))
 
 
