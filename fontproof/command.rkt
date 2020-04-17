@@ -47,14 +47,14 @@
      [("-l" "--leading") line-heights-arg
                          "line height"
                          (set! line-heights line-heights-arg)]
-     [("-b" "--bold") "also generate bold proof"
+     [("-b" "--bold") "also generate bold proof (only works with family name)"
                       (set! make-bold? #true)]
-     [("-i" "--italic")  "also generate italic proof"
+     [("-i" "--italic")  "also generate italic proof (only works with family name)"
                          (set! make-italic? #true)]
      [("-q" "--qml")  "output QML file"
                       (set! output-qml? #true)]
-     #:args families
-     families))
+     #:args font-family-names-or-font-paths
+     font-family-names-or-font-paths))
   (match families
     [(? null?) (raise-user-error "no font to proof; exiting")]
     [_ (for ([family (in-list families)])

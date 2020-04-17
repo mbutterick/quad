@@ -41,21 +41,21 @@
          #:when (directory-exists? font-family-subdir)
          [font-path (in-directory font-family-subdir)]
          #:when (member (path-get-extension font-path) font-file-extensions))
-    (match-define (list font-path-string family-name)
-      (for/list ([x (list font-path font-family-subdir)])
-        (path->string (find-relative-path fonts-dir x))))
-    (define path-parts (for/list ([part (in-list (explode-path (string->path (string-downcase font-path-string))))])
-                         (path->string part)))
-    (define key
-      (cons (string-downcase family-name)
-            (cond
-              [(member "bold-italic" path-parts) 'bi]
-              [(member "bold" path-parts) 'b]
-              [(member "italic" path-parts) 'i]
-              [else 'r])))
-    ;; only set value if there's not one there already.
-    ;; this means that we only use the first eligible font we find.
-    (hash-ref! font-paths key font-path)))
+        (match-define (list font-path-string family-name)
+          (for/list ([x (list font-path font-family-subdir)])
+                    (path->string (find-relative-path fonts-dir x))))
+        (define path-parts (for/list ([part (in-list (explode-path (string->path (string-downcase font-path-string))))])
+                                     (path->string part)))
+        (define key
+          (cons (string-downcase family-name)
+                (cond
+                  [(member "bold-italic" path-parts) 'bi]
+                  [(member "bold" path-parts) 'b]
+                  [(member "italic" path-parts) 'i]
+                  [else 'r])))
+        ;; only set value if there's not one there already.
+        ;; this means that we only use the first eligible font we find.
+        (hash-ref! font-paths key font-path)))
 
 (define (make-key font-family [bold #f] [italic #f])
   (cons (string-downcase font-family)
@@ -77,9 +77,9 @@
   (unless (hash-has-key? font-paths regular-key)
     (for* ([bold (in-list (list #false #true))]
            [italic (in-list (list #false #true))])
-      (hash-set! font-paths
-                 (make-key font-family bold italic)
-                 (family->path font-family #:bold bold #:italic italic))))
+          (hash-set! font-paths
+                     (make-key font-family bold italic)
+                     (family->path font-family #:bold bold #:italic italic))))
   (cond
     [(hash-ref font-paths (make-key font-family bold italic) #false)]
     ;; try regular style if style-specific key isn't there for b i or bi
@@ -87,15 +87,32 @@
     ;; otherwise use default
     [else default-font-face]))
 
+(define (font-path-string? x)
+  (and (path-string? x)
+       (member (path-get-extension (string->path x)) '(#".otf" #".ttf" #".woff"))
+       #true))
+
+(module+ test
+  (require rackunit)
+  (check-true (font-path-string? "foo.woff"))
+  (check-true (font-path-string? "foo.otf"))
+  (check-true (font-path-string? "foo.ttf"))
+  (check-false (font-path-string? "foo.woffy"))
+  (check-false (font-path-string? "foo")))
+  
+
 (define (resolve-font-path! attrs)
   ;; convert references to a font family and style to an font path on disk
   ;; we trust it exists because we used `setup-font-path-table!` earlier,
   ;; but if not, fallback fonts will kick in, on the idea that a missing font shouldn't stop the show
   (define this-font-family (hash-ref! attrs :font-family default-font-family))
-  (unless (complete-path? this-font-family)
-    (define this-bold (hash-ref! attrs :font-bold #false))
-    (define this-italic (hash-ref! attrs :font-italic #false))
-    (hash-set! attrs :font-path (font-attrs->path this-font-family this-bold this-italic))))
+  (hash-set! attrs :font-path 
+             (match this-font-family
+               [(? font-path-string? ps) (path->complete-path ps)]
+               [_
+                (define this-bold (hash-ref! attrs :font-bold #false))
+                (define this-italic (hash-ref! attrs :font-italic #false))
+                (font-attrs->path this-font-family this-bold this-italic)])))
 
 (define (parse-em pstr)
   (define em-suffix "em")

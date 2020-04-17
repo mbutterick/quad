@@ -42,9 +42,12 @@
        (unless (and sample-text (non-empty-string? sample-text))
          (raise-user-error "nothing to proof; exiting"))
        (define-values (initial-font-family initial-font-bold initial-font-italic)
-         (let ([bi-suffix-pat #px"\\s*((?i:bold))?\\s*((?i:italic))?$"])
-           (match-define (list suffix bold? italic?) (regexp-match bi-suffix-pat font-name-arg))
-           (values (string-trim font-name-arg suffix #:left? #false) bold? italic?)))
+         (match font-name-arg
+           [(? path-string? ps) (values (path->string (path->complete-path ps)) #f #f)]
+           [_ 
+            (let ([bi-suffix-pat #px"\\s*((?i:bold))?\\s*((?i:italic))?$"])
+              (match-define (list suffix bold? italic?) (regexp-match bi-suffix-pat font-name-arg))
+              (values (string-trim font-name-arg suffix #:left? #false) bold? italic?))]))
        (log-fontproof-info (format "generating proof for ~a" font-name-arg))
        (define page-size (or page-size-arg "letter"))
        (define font-sizes (string-split (or font-sizes-arg "12 10.5 9")))
