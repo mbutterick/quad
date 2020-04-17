@@ -1,7 +1,7 @@
 #lang info
 (define collection 'multi)
 (define deps '("at-exp-lib"
-               "base"
+               ["base" #:version "7.1"]
                "beautiful-racket-lib"
                "fontland"
                "hyphenate"
