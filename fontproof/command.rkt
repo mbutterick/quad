@@ -71,7 +71,7 @@
                    [_ (match-define-values (trimmed-family bold? italic?) (resolve-family-bold-italic family))
                       (match ((dynamic-require 'fontland/font-path 'family->path) trimmed-family #:bold bold? #:italic italic?)
                         [#false "not found among installed fonts"]
-                        [pth (format "found installed at ~v" pth)])]))
+                        [(app path->string ps) (format "found installed at ~v" ps)])]))
                (log-info (format "family ~v ~a" family status))]
               [else
                (make-proof family
