@@ -31,27 +31,27 @@
      #:argv (current-command-line-arguments)
      #:once-each
      [("-p" "--page") page-size-arg
-                      "page size"
+                      "page size (e.g., letter, A4)"
                       (set! page-size page-size-arg)]
-     [("-r" "--replace") "replace existing"
+     [("-r" "--replace") "replace existing proof with same name"
                          (set! replace #true)]
      [("-d" "--doc") doc-arg
-                     "sample text"
+                     "source for sample text"
                      (set! doc doc-arg)]
      [("-o" "--output") output-file-path-arg
                         "output file path"
                         (set! output-file-path output-file-path-arg)]
      [("-s" "--size") font-sizes-arg
-                      "font sizes"
+                      "font sizes to proof"
                       (set! font-sizes font-sizes-arg)]
      [("-l" "--leading") line-heights-arg
-                         "font size"
+                         "line height"
                          (set! line-heights line-heights-arg)]
      [("-b" "--bold") "also generate bold proof"
                       (set! make-bold? #true)]
      [("-i" "--italic")  "also generate italic proof"
                          (set! make-italic? #true)]
-     [("-q" "--qml")  "output QML"
+     [("-q" "--qml")  "output QML file"
                       (set! output-qml? #true)]
      #:args families
      families))
