@@ -18,4 +18,4 @@
                      "draw-doc"
                      "racket-doc"
                      "scribble-lib"))
-(define update-implies '("fontland" "pitfall"))
+(define update-implies '("fontland" "pitfall" "words"))
