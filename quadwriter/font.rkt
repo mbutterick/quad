@@ -83,7 +83,7 @@
   (cond
     [(hash-ref font-paths (make-key font-family bold italic) #false)]
     ;; try regular style if style-specific key isn't there for b i or bi
-    [(or bold italic (hash-ref font-paths regular-key #false))]
+    [(and (or bold italic) (hash-ref font-paths regular-key #false))]
     ;; otherwise use default
     [else default-font-face]))
 
