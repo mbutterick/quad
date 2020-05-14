@@ -8,6 +8,7 @@
          racket/dict
          pitfall
          quad
+         (only-in txexpr txexpr) ; matcher
          hyphenate
          pollen/decode
          sugar/coerce
@@ -177,7 +178,7 @@
                         #:string-proc (compose1 smart-ellipses smart-dashes)
                         #:txexpr-proc smart-quotes)])
       (match qx
-        [(list tag attrs elements ...)
+        [(txexpr tag attrs elements)
          ;; we insert a dummy element "."
          ;; (could be anything, but we want to use something obvious
          ;; so we don't trigger a fallback font)
