@@ -7,7 +7,12 @@
          (all-from-out "tags.rkt")
          q)
 
-(make-module-begin (λ (exprs) (doc-proc (decode-paragraphs exprs #:force? #true))))
+(make-module-begin
+ (λ (exprs)
+   (doc-proc
+    (decode-paragraphs exprs
+                       #:force? #true
+                       #:linebreak-proc (λ (x) (decode-linebreaks x '(line-break)))))))
 
 (module reader racket/base
   (require "lang-helper.rkt")
