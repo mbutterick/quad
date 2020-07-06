@@ -8,11 +8,7 @@
          q)
 
 (make-module-begin
- (λ (exprs)
-   (doc-proc
-    (decode-paragraphs exprs
-                       #:force? #true
-                       #:linebreak-proc (λ (x) (decode-linebreaks x '(line-break)))))))
+ (λ (exprs) (doc-proc (decode-paragraphs exprs #:force? #true))))
 
 (module reader racket/base
   (require "lang-helper.rkt")
