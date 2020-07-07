@@ -284,6 +284,20 @@ And they love to code
 
 And again, use the resulting @tech{Q-expression} in @racket[doc] as the source for a new @racket[quadwriter] program, which will result in the same PDF.
 
+It is also possible to mix @code{#lang quadwriter/markup} and @tech{Q-expressions}, allowing us to escape to lower-level @tech{Q-expressions} when needed.
+
+@codeblock|{
+#lang quadwriter/markup
+
+◊h1{A nice image}
+
+Check out this ◊b{nice} image:
+
+◊q[#:line-height "false" #:image-width "400" #:line-align "center"
+   #:image-file "nice-image.png" #:image-alt "A nice image"
+   #:display "block"]{}
+}|
+
 @subsection{Setting section-level attributes}
 
 Even if you're using a @racketmodname[quadwriter] dialect, you can still set section-level formatting attributes for the document. For instance, suppose we wanted to make our original @racketmodname[quadwriter/markdown] example 24 points and red, and put the PDF on wide tabloid (17in × 11in) paper. We can add these section-level attributes to the beginning of our source file as keyword arguments:
