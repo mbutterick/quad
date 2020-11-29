@@ -183,13 +183,13 @@ This is the first part of the @tech{Q-expression} that the source file produces 
 
 @margin-note{Mac OS note: I have no connection to the @link["https://skim-app.sourceforge.io/"]{Skim PDF reader}, but it has an auto-refresh feature that monitors a PDF for changes. This cooperates nicely with Quadwriter during editing sessions: you can have a window on the PDF that updates automatically when you recompile the source file (say, in DrRacket).}
 
-@subsection{Quadwriter & markup}
+@subsection{Quadwriter & HTML}
 
-Suppose Markdown is just not your thing. You prefer to enter your markup the old-fashioned way — by hand. I hear you. So let's switch to the @racket[quadwriter/markup] dialect. First we try our simple test:
+Suppose Markdown is just not your thing. You prefer to enter your HTML-style markup the old-fashioned way — by hand. I hear you. So let's switch to the @racket[quadwriter/html] dialect. First we try our simple test:
 
 @fileblock["test.rkt"
 @codeblock|{
-#lang quadwriter/markup
+#lang quadwriter/html
 Brennan and Dale like fancy sauce.
 }|
 ]
@@ -200,7 +200,7 @@ But if we want to reproduce the result of the Markdown notation, this time we us
 
 @fileblock["test.rkt"
 @codeblock|{
-#lang quadwriter/markup
+#lang quadwriter/html
 ◊h1{Did you know?}
 
 ◊strong{Brennan} and ◊strong{Dale} like:
@@ -220,7 +220,7 @@ And they love to code
 
 The special @litchar{◊} character is called a @deftech{lozenge}. It introduces markup tags. @link["https://docs.racket-lang.org/pollen/pollen-command-syntax.html#%28part._the-lozenge%29"]{Instructions for typing it}, but for now it suffices to copy & paste, or use the @onscreen{Insert Command Char} button in the DrRacket toolbar.
 
-Under the hood, the @racketmodname[quadwriter/markdown] dialect is converting the Markdown surface notation into markup tags that look like this. So the @racket[quadwriter/markup] dialect just lets us start with those tags. 
+Under the hood, the @racketmodname[quadwriter/markdown] dialect is converting the Markdown surface notation into markup tags that look like this. So the @racket[quadwriter/html] dialect just lets us start with those tags. 
 
 Curious characters can prove that this is so by again typing at the REPL:
 
@@ -232,7 +232,7 @@ This @tech{Q-expression} is exactly the same as the one that resulted with the @
 
 @subsection{Quadwriter & Q-expressions}
 
-@racketmodname[quadwriter/markdown] showed high-level notation (= a generous way of describing Markdown) that generated a @tech{Q-expression}. Then @racketmodname[quadwriter/markup] showed a mid-level notation that generated another (identical) @tech{Q-expression}.
+@racketmodname[quadwriter/markdown] showed high-level notation (= a generous way of describing Markdown) that generated a @tech{Q-expression}. Then @racketmodname[quadwriter/html] showed a mid-level notation that generated another (identical) @tech{Q-expression}.
 
 If we wish, we can also skip the notational foofaraw and just write @tech{Q-expressions} directly in our source file. We do this with the basic @racketmodname[quadwriter] language. 
 
@@ -240,7 +240,7 @@ Recall our very first example:
 
 @fileblock["test.rkt"
 @codeblock|{
-#lang quadwriter/markup
+#lang quadwriter/html
 Brennan and Dale like fancy sauce.
 }|
 ]
@@ -284,10 +284,10 @@ And they love to code
 
 And again, use the resulting @tech{Q-expression} in @racket[doc] as the source for a new @racket[quadwriter] program, which will result in the same PDF.
 
-It is also possible to mix @code{#lang quadwriter/markup} and @tech{Q-expressions}, allowing us to escape to lower-level @tech{Q-expressions} when needed.
+It is also possible to mix @code{#lang quadwriter/html} and @tech{Q-expressions}, allowing us to escape to lower-level @tech{Q-expressions} when needed.
 
 @codeblock|{
-#lang quadwriter/markup
+#lang quadwriter/html
 
 ◊h1{A nice image}
 
@@ -317,7 +317,7 @@ Brennan and Dale like fancy sauce.
 
 Any of the @secref{Markup} attributes documented below can be used as keyword arguments. The syntax follows the pattern above: one attribute + value pair per line, with the attribute prefixed with @litchar{#:} to make it a keyword, followed by the value.
 
-This keyword syntax works in the @racketmodname[quadwriter], @racketmodname[quadwriter/markdown], and @racketmodname[quadwriter/markup] languages. The idea is to make it easy to adjust the default layout behavior without going outside the source file.
+This keyword syntax works in the @racketmodname[quadwriter], @racketmodname[quadwriter/markdown], and @racketmodname[quadwriter/html] languages. The idea is to make it easy to adjust the default layout behavior without going outside the source file.
 
 
 @subsection{Invoking Quadwriter as a library}
@@ -402,7 +402,7 @@ Or, you can aim somewhere in between. Like everything else in Racket, you can de
 
 @defmodulelang*/no-declare[(quadwriter
 quadwriter/markdown
-quadwriter/markup)]
+quadwriter/html)]
 
 @declare-exporting[quadwriter]
 
