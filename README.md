@@ -1,4 +1,4 @@
-Quad [![Build Status](https://travis-ci.org/mbutterick/quad.svg?branch=master)](https://travis-ci.org/mbutterick/quad)
+Quad ![Build Status](https://github.com/mbutterick/quad/workflows/CI/badge.svg)
 ----
 
 A work-in-progress document processor written in [Racket](http://racket-lang.org). 
