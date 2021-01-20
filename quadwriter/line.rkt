@@ -75,12 +75,18 @@
 
 (define (sum-sum-x qss)
   (for/sum ([qs (in-list qss)])
-           (sum-x qs)))
+    (sum-x qs)))
 
 (define (tracking-adjustment q)
   (match q
     [(? string-quad?) (/ (quad-ref q :font-tracking 0) 2.0)]
     [_ 0]))
+
+(define (line-height-from-qs qs)
+  ;; line height is the max 'line-height value or the natural height of q:line
+  (match (filter-map (λ (q) (or (quad-ref q :line-height) (pt-y (size q)))) qs)
+    [(? null?) #false]
+    [line-heights (apply max line-heights)]))
 
 (define (fill-line-wrap all-qs line-prototype last-line-in-paragraph?)
   ;; happens during the finish of a line wrap, before consolidation of runs
@@ -134,12 +140,12 @@
               ;; which amounts to shrinking the word spaces till the line fits
               (and line-overfull? (> nonspacess-count 1))))
            (define justified-space-width (/ empty-hspace (sub1 nonspacess-count)))
-           (cons (make-left-edge-filler)
-                 (apply append (add-between hung-nonspacess (list (make-quad
-                                                                   #:from 'bo
-                                                                   #:to 'bi
-                                                                   #:draw-end q:string-draw-end
-                                                                   #:size (pt justified-space-width line-prototype-height))))))]
+           (define justified-spacer (make-quad
+                                     #:from 'bo
+                                     #:to 'bi
+                                     #:draw-end q:string-draw-end
+                                     #:size (pt justified-space-width (or (line-height-from-qs (append* hung-nonspacess)) line-prototype-height))))
+           (cons (make-left-edge-filler) (apply append (add-between hung-nonspacess (list justified-spacer))))]
           [else
            (define space-multiplier (match align-value
                                       ["center" 0.5]
@@ -175,7 +181,7 @@
   ;; remove unused soft hyphens so they don't affect final shaping
   (define wrap-qs-printing (for/list ([wq (in-list wrap-qs)]
                                       #:unless (equal? (quad-elems wq) '("\u00AD")))
-                                     wq))
+                             wq))
   (define new-lines
     (cond
       [(empty? wrap-qs-printing) null]
@@ -200,10 +206,7 @@
                                (hash-ref! h :display default-block-id)
                                h)]
                       ;; line width is static
-                      ;; line height is the max 'line-height value or the natural height of q:line
-                      [size (pt line-width (match (filter-map (λ (q) (or (quad-ref q :line-height) (pt-y (size q)))) pcs)
-                                             [(? null?) line-height]
-                                             [line-heights (apply max line-heights)]))]
+                      [size (pt line-width (or (line-height-from-qs pcs) line-height))]
                       ;; handle list indexes. drop new quad into line to hold list index
                       ;; could also use this for line numbers
                       [elems
@@ -283,34 +286,34 @@
      (define res
        (apply append
               (for/list ([para-qs (in-list para-qss)])
-                        (define block-id (gensym))
-                        (match para-qs
-                          [(? break-quad? bq) (list bq)]
-                          [(cons pq _)
-                           (define line-q-for-this-paragraph
-                             (quad-copy line-quad
-                                        q:line
-                                        [size (pt wrap-size (quad-ref pq :line-height default-line-height))]))
-                           (wrap para-qs
-                                 (* (- wrap-size
-                                       (quad-ref pq :inset-left 0)
-                                       (quad-ref pq :inset-right 0))
-                                    (permitted-justify-overfill pq))
-                                 debug
-                                 ;; during wrap, anchored qs are treated as having distance 0
-                                 ;; so they can staty in right place, so that relative queries will work.
-                                 ;; but they won't affect where lines break
-                                 #:distance (λ (q last-dist wrap-qs)
-                                              (+ last-dist (cond
-                                                             [(quad-ref q :parent) 0]
-                                                             [(printable? q) (distance q)]
-                                                             [else 0])))
-                                 #:nicely (match (or (current-line-wrap) (quad-ref pq :line-wrap))
-                                            [(or "best" "kp") #true]
-                                            [_ #false])
-                                 #:hard-break line-break-quad?
-                                 #:soft-break soft-break-for-line?
-                                 #:finish-wrap (line-wrap-finish line-q-for-this-paragraph block-id))]))))
+                (define block-id (gensym))
+                (match para-qs
+                  [(? break-quad? bq) (list bq)]
+                  [(cons pq _)
+                   (define line-q-for-this-paragraph
+                     (quad-copy line-quad
+                                q:line
+                                [size (pt wrap-size (quad-ref pq :line-height default-line-height))]))
+                   (wrap para-qs
+                         (* (- wrap-size
+                               (quad-ref pq :inset-left 0)
+                               (quad-ref pq :inset-right 0))
+                            (permitted-justify-overfill pq))
+                         debug
+                         ;; during wrap, anchored qs are treated as having distance 0
+                         ;; so they can staty in right place, so that relative queries will work.
+                         ;; but they won't affect where lines break
+                         #:distance (λ (q last-dist wrap-qs)
+                                      (+ last-dist (cond
+                                                     [(quad-ref q :parent) 0]
+                                                     [(printable? q) (distance q)]
+                                                     [else 0])))
+                         #:nicely (match (or (current-line-wrap) (quad-ref pq :line-wrap))
+                                    [(or "best" "kp") #true]
+                                    [_ #false])
+                         #:hard-break line-break-quad?
+                         #:soft-break soft-break-for-line?
+                         #:finish-wrap (line-wrap-finish line-q-for-this-paragraph block-id))]))))
      res]
     [_ null]))
 
