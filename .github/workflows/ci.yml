@@ -33,3 +33,6 @@ jobs:
 
     - name: Run the tests
       run: xvfb-run raco test -j 4 -p quad
+
+    - name: Run the qtests
+      run: xvfb-run racket -l qtest/all
