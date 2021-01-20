@@ -259,7 +259,7 @@
     ;; this makes justified paragraphs more even, becuase
     ;; some lines are a little tight, as opposed to all of them being loose
     ;; this has to be based on a certain quad, not set globally for the line-wrap operation,
-    ;; because different paragraphs might have different alignment settings.
+    ;; because different lines might have different alignment settings.
     ["justify" 1.04]
     [_ 1]))
 
@@ -268,7 +268,6 @@
     (raise-argument-error 'line-wrap "positive number" wrap-size))
   (match qs
     [(cons q _)
-     (define line-q (quad-copy line-quad q:line [size (pt wrap-size (quad-ref q :line-height default-line-height))]))
      ;; group lines into sublists separated by para-breaks, but then omit the para-breaks themselves
      ;; because they've served their purpose (leave the others, to be expressed later)
      ;; however, leave line-breaks in, because they will be handled by wrap.
@@ -288,6 +287,10 @@
                         (match para-qs
                           [(? break-quad? bq) (list bq)]
                           [(cons pq _)
+                           (define line-q-for-this-paragraph
+                             (quad-copy line-quad
+                                        q:line
+                                        [size (pt wrap-size (quad-ref pq :line-height default-line-height))]))
                            (wrap para-qs
                                  (* (- wrap-size
                                        (quad-ref pq :inset-left 0)
@@ -307,7 +310,7 @@
                                             [_ #false])
                                  #:hard-break line-break-quad?
                                  #:soft-break soft-break-for-line?
-                                 #:finish-wrap (line-wrap-finish line-q block-id))]))))
+                                 #:finish-wrap (line-wrap-finish line-q-for-this-paragraph block-id))]))))
      res]
     [_ null]))
 
