@@ -158,156 +158,156 @@
                   ;; ok to put back absolute quads at end, because it doesn't affect their layout
                   (append other-qs absolute-qs))])])]))
 
-  (define (make-paragraph-spacer maybe-first-line-q key default-val)
-    (define arbitrary-width 20)
-    (make-quad #:type line-spacer-quad
-               #:size (pt arbitrary-width (cond
-                                            [(and maybe-first-line-q (quad-ref maybe-first-line-q key))]
-                                            [else default-val]))
-               #:from 'sw
-               #:to 'nw
-               #:printable only-prints-in-middle
-               #:draw-start (if (draw-debug-line?) draw-debug void)))
+(define (make-paragraph-spacer maybe-first-line-q key default-val)
+  (define arbitrary-width 20)
+  (make-quad #:type line-spacer-quad
+             #:size (pt arbitrary-width (cond
+                                          [(and maybe-first-line-q (quad-ref maybe-first-line-q key))]
+                                          [else default-val]))
+             #:from 'sw
+             #:to 'nw
+             #:printable only-prints-in-middle
+             #:draw-start (if (draw-debug-line?) draw-debug void)))
 
 
-  (define ((line-wrap-finish line-prototype-q default-block-id) wrap-qs q-before q-after idx)
-    ;; we curry line-q so that the wrap size can be communicated to this operation
-    ;; remove unused soft hyphens so they don't affect final shaping
-    (define wrap-qs-printing (for/list ([wq (in-list wrap-qs)]
-                                        #:unless (equal? (quad-elems wq) '("\u00AD")))
-                                       wq))
-    (define new-lines
-      (cond
-        [(empty? wrap-qs-printing) null]
-        [(hr-break-quad? q-after) (list (make-hr-quad line-prototype-q))]
-        [else
-         ;; render hyphen first so that all printable characters are available for size-dependent ops.
-         (define pcs-with-hyphen (render-hyphen wrap-qs-printing q-after))
-         ;; fill wrap so that consolidate-runs works properly
-         ;; (justified lines won't be totally consolidated)
-         (define last-line-in-paragraph? (not q-after))
-         (define pcs (fill-line-wrap pcs-with-hyphen line-prototype-q last-line-in-paragraph?))
-         (match (consolidate-runs pcs)
-           [(and (cons elem-first _) elems)
-            (match-define (list line-width line-height) (quad-size line-prototype-q))
-            (list
-             (quad-copy line-quad line-prototype-q
-                        ;; move block attrs up, so they are visible in col wrap
-                        [attrs (let ([h (copy-block-attrs (quad-attrs elem-first) (hash-copy (quad-attrs line-prototype-q)))])
-                                 ;; we want every group of lines in a paragraph to have a block id
-                                 ;; so that it will be wrapped as a block later.
-                                 ;; we only set this if there is no value for :display.
-                                 (hash-ref! h :display default-block-id)
-                                 h)]
-                        ;; line width is static
-                        ;; line height is the max 'line-height value or the natural height of q:line
-                        [size (pt line-width (match (filter-map (λ (q) (or (quad-ref q :line-height) (pt-y (size q)))) pcs)
-                                               [(? null?) line-height]
-                                               [line-heights (apply max line-heights)]))]
-                        ;; handle list indexes. drop new quad into line to hold list index
-                        ;; could also use this for line numbers
-                        [elems
-                         ;; we assume here that a list item has already had extra inset-left
-                         ;; with room for a bullet
-                         ;; which we just insert at the front.
-                         ;; this is safe because line has already been filled.
-                         (append
-                          ;; only put bullet into line if we're at the first line of the list item
-                          (match (and (eq? idx 1) (quad-ref elem-first :list-index))
-                            [#false null]
-                            [bullet
-                             (define bq (quad-copy string-quad q:string ;; copy q:string to get draw routine
-                                                   ;; borrow attrs from elem
-                                                   [attrs (quad-attrs elem-first)]
-                                                   ;; use bullet as elems
-                                                   [elems (list (if (number? bullet) (format "~a." bullet) bullet))]
-                                                   ;; size doesn't matter because nothing refers to this quad
-                                                   ;; just for debugging box
-                                                   [size (pt 15 (pt-y (size line-prototype-q)))]))
-                             (from-parent (list bq) 'sw)])
-                          (from-parent
-                           (match (quad-ref elem-first :inset-left 0)
-                             [0 elems]
-                             [inset-val (cons (make-quad
-                                               #:draw-end q:string-draw-end
-                                               #:to 'sw
-                                               #:size (pt inset-val 5)
-                                               #:type offsetter-quad)
-                                              elems)]) 'sw))]))]
-           [_ null])]))
-    (define maybe-first-line (and (pair? new-lines) (car new-lines)))
-    (append (match q-before
-              [#false (list (make-paragraph-spacer maybe-first-line :space-before 0))] ; paragraph break
-              [_ null])
-            new-lines
-            (match q-after
-              [(? column-break-quad? column-break) (list column-break)] ; hard column (or section or page) break
-              [#false (list (make-paragraph-spacer maybe-first-line :space-after (* default-line-height 0.6)))] ; paragraph break
-              [_ null]))) ; hard line break
+(define ((line-wrap-finish line-prototype-q default-block-id) wrap-qs q-before q-after idx)
+  ;; we curry line-q so that the wrap size can be communicated to this operation
+  ;; remove unused soft hyphens so they don't affect final shaping
+  (define wrap-qs-printing (for/list ([wq (in-list wrap-qs)]
+                                      #:unless (equal? (quad-elems wq) '("\u00AD")))
+                                     wq))
+  (define new-lines
+    (cond
+      [(empty? wrap-qs-printing) null]
+      [(hr-break-quad? q-after) (list (make-hr-quad line-prototype-q))]
+      [else
+       ;; render hyphen first so that all printable characters are available for size-dependent ops.
+       (define pcs-with-hyphen (render-hyphen wrap-qs-printing q-after))
+       ;; fill wrap so that consolidate-runs works properly
+       ;; (justified lines won't be totally consolidated)
+       (define last-line-in-paragraph? (not q-after))
+       (define pcs (fill-line-wrap pcs-with-hyphen line-prototype-q last-line-in-paragraph?))
+       (match (consolidate-runs pcs)
+         [(and (cons elem-first _) elems)
+          (match-define (list line-width line-height) (quad-size line-prototype-q))
+          (list
+           (quad-copy line-quad line-prototype-q
+                      ;; move block attrs up, so they are visible in col wrap
+                      [attrs (let ([h (copy-block-attrs (quad-attrs elem-first) (hash-copy (quad-attrs line-prototype-q)))])
+                               ;; we want every group of lines in a paragraph to have a block id
+                               ;; so that it will be wrapped as a block later.
+                               ;; we only set this if there is no value for :display.
+                               (hash-ref! h :display default-block-id)
+                               h)]
+                      ;; line width is static
+                      ;; line height is the max 'line-height value or the natural height of q:line
+                      [size (pt line-width (match (filter-map (λ (q) (or (quad-ref q :line-height) (pt-y (size q)))) pcs)
+                                             [(? null?) line-height]
+                                             [line-heights (apply max line-heights)]))]
+                      ;; handle list indexes. drop new quad into line to hold list index
+                      ;; could also use this for line numbers
+                      [elems
+                       ;; we assume here that a list item has already had extra inset-left
+                       ;; with room for a bullet
+                       ;; which we just insert at the front.
+                       ;; this is safe because line has already been filled.
+                       (append
+                        ;; only put bullet into line if we're at the first line of the list item
+                        (match (and (eq? idx 1) (quad-ref elem-first :list-index))
+                          [#false null]
+                          [bullet
+                           (define bq (quad-copy string-quad q:string ;; copy q:string to get draw routine
+                                                 ;; borrow attrs from elem
+                                                 [attrs (quad-attrs elem-first)]
+                                                 ;; use bullet as elems
+                                                 [elems (list (if (number? bullet) (format "~a." bullet) bullet))]
+                                                 ;; size doesn't matter because nothing refers to this quad
+                                                 ;; just for debugging box
+                                                 [size (pt 15 (pt-y (size line-prototype-q)))]))
+                           (from-parent (list bq) 'sw)])
+                        (from-parent
+                         (match (quad-ref elem-first :inset-left 0)
+                           [0 elems]
+                           [inset-val (cons (make-quad
+                                             #:draw-end q:string-draw-end
+                                             #:to 'sw
+                                             #:size (pt inset-val 5)
+                                             #:type offsetter-quad)
+                                            elems)]) 'sw))]))]
+         [_ null])]))
+  (define maybe-first-line (and (pair? new-lines) (car new-lines)))
+  (append (match q-before
+            [#false (list (make-paragraph-spacer maybe-first-line :space-before 0))] ; paragraph break
+            [_ null])
+          new-lines
+          (match q-after
+            [(? column-break-quad? column-break) (list column-break)] ; hard column (or section or page) break
+            [#false (list (make-paragraph-spacer maybe-first-line :space-after (* default-line-height 0.6)))] ; paragraph break
+            [_ null]))) ; hard line break
                        
 
-  (define softies (map string '(#\space #\- #\u00AD)))
+(define softies (map string '(#\space #\- #\u00AD)))
 
-  (define (soft-break-for-line? q)
-    (and (pair? (quad-elems q))
-         (member (unsafe-car (quad-elems q)) softies)))
+(define (soft-break-for-line? q)
+  (and (pair? (quad-elems q))
+       (member (unsafe-car (quad-elems q)) softies)))
 
+(define (permitted-justify-overfill q)
+  (match (quad-ref q :line-align)
+    ;; allow justified lines to go wider,
+    ;; and then fill-wrap will tighten thes word spaces
+    ;; this makes justified paragraphs more even, becuase
+    ;; some lines are a little tight, as opposed to all of them being loose
+    ;; this has to be based on a certain quad, not set globally for the line-wrap operation,
+    ;; because different paragraphs might have different alignment settings.
+    ["justify" 1.04]
+    [_ 1]))
 
-  (define (line-wrap qs wrap-size [debug #false])
-    (unless (positive? wrap-size)
-      (raise-argument-error 'line-wrap "positive number" wrap-size))
-    (match qs
-      [(cons q _)
-       (define line-q (quad-copy line-quad q:line [size (pt wrap-size (quad-ref q :line-height default-line-height))]))
-       (define permitted-justify-overfill
-         (match (quad-ref q :line-align)
-           ;; allow justified lines to go wider,
-           ;; and then fill-wrap will tighten thes word spaces
-           ;; this makes justified paragraphs more even, becuase
-           ;; some lines are a little tight, as opposed to all of them being loose
-           ["justify" 1.04]
-           [_ 1]))
-       ;; group lines into sublists separated by para-breaks, but then omit the para-breaks themselves
-       ;; because they've served their purpose (leave the others, to be expressed later)
-       ;; however, leave line-breaks in, because they will be handled by wrap.
-       (define para-qss (let loop ([qs qs][acc null])
-                          (match qs
-                            [(? null?) (reverse acc)]
-                            [(cons (? para-break-quad?) rest)
-                             (loop rest acc)]
-                            [(cons (? column-break-quad? bq) rest)
-                             (loop rest (cons bq acc))]
-                            [(list* (and (not (? para-break-quad?)) nbqs) ... rest)
-                             (loop rest (cons nbqs acc))])))
-       (define res
-         (apply append
-                (for/list ([para-qs (in-list para-qss)])
-                          (define block-id (gensym))
-                          (match para-qs
-                            [(? break-quad? bq) (list bq)]
-                            [(cons pq _)
-                             (wrap para-qs
-                                   (* (- wrap-size
-                                         (quad-ref pq :inset-left 0)
-                                         (quad-ref pq :inset-right 0))
-                                      permitted-justify-overfill)
-                                   debug
-                                 
-                                   ;; during wrap, anchored qs are treated as having distance 0
-                                   ;; so they can staty in right place, so that relative queries will work.
-                                   ;; but they won't affect where lines break
-                                   #:distance (λ (q last-dist wrap-qs)
-                                                (+ last-dist (cond
-                                                               [(quad-ref q :parent) 0]
-                                                               [(printable? q) (distance q)]
-                                                               [else 0])))
-                                   #:nicely (match (or (current-line-wrap) (quad-ref pq :line-wrap))
-                                              [(or "best" "kp") #true]
-                                              [_ #false])
-                                   #:hard-break line-break-quad?
-                                   #:soft-break soft-break-for-line?
-                                   #:finish-wrap (line-wrap-finish line-q block-id))]))))
-       res]
-      [_ null]))
+(define (line-wrap qs wrap-size [debug #false])
+  (unless (positive? wrap-size)
+    (raise-argument-error 'line-wrap "positive number" wrap-size))
+  (match qs
+    [(cons q _)
+     (define line-q (quad-copy line-quad q:line [size (pt wrap-size (quad-ref q :line-height default-line-height))]))
+     ;; group lines into sublists separated by para-breaks, but then omit the para-breaks themselves
+     ;; because they've served their purpose (leave the others, to be expressed later)
+     ;; however, leave line-breaks in, because they will be handled by wrap.
+     (define para-qss (let loop ([qs qs][acc null])
+                        (match qs
+                          [(? null?) (reverse acc)]
+                          [(cons (? para-break-quad?) rest)
+                           (loop rest acc)]
+                          [(cons (? column-break-quad? bq) rest)
+                           (loop rest (cons bq acc))]
+                          [(list* (and (not (? para-break-quad?)) nbqs) ... rest)
+                           (loop rest (cons nbqs acc))])))
+     (define res
+       (apply append
+              (for/list ([para-qs (in-list para-qss)])
+                        (define block-id (gensym))
+                        (match para-qs
+                          [(? break-quad? bq) (list bq)]
+                          [(cons pq _)
+                           (wrap para-qs
+                                 (* (- wrap-size
+                                       (quad-ref pq :inset-left 0)
+                                       (quad-ref pq :inset-right 0))
+                                    (permitted-justify-overfill pq))
+                                 debug
+                                 ;; during wrap, anchored qs are treated as having distance 0
+                                 ;; so they can staty in right place, so that relative queries will work.
+                                 ;; but they won't affect where lines break
+                                 #:distance (λ (q last-dist wrap-qs)
+                                              (+ last-dist (cond
+                                                             [(quad-ref q :parent) 0]
+                                                             [(printable? q) (distance q)]
+                                                             [else 0])))
+                                 #:nicely (match (or (current-line-wrap) (quad-ref pq :line-wrap))
+                                            [(or "best" "kp") #true]
+                                            [_ #false])
+                                 #:hard-break line-break-quad?
+                                 #:soft-break soft-break-for-line?
+                                 #:finish-wrap (line-wrap-finish line-q block-id))]))))
+     res]
+    [_ null]))
 
-  
