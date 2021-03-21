@@ -296,6 +296,7 @@ Naming guidelines
                      :pdf-author
                      :pdf-keywords
                      :string
+                     :link
                      :font-family
                      :footer-text
                      :output-path)) #true))
