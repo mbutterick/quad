@@ -1,5 +1,5 @@
-Quad ![Build Status](https://github.com/mbutterick/quad/workflows/CI/badge.svg)
-----
+## Quad ![Build Status](https://github.com/mbutterick/quad/workflows/CI/badge.svg)
+
 
 A work-in-progress document processor written in [Racket](http://racket-lang.org). 
 
@@ -21,8 +21,7 @@ Quad, by contrast —
 * uses source files that are portable between Mac OS, Windows, and Linux
 * works with [Pollen](//pollenpub.com)
 
-Install
----
+## Install
 
 Using Racket 6.10+, install from the command line:
 
@@ -33,21 +32,17 @@ And update like so:
     raco pkg update --update-deps quad
 
 
-Docs
----
+## Docs
 
 http://docs.racket-lang.org/quad
 
 
-Questions
----
+## Questions
 
 Can be posted in the [`pollen-users` discussion area.](https://github.com/mbutterick/pollen-users/)
 
 
-
-License
----
+## License
 
 Code: MIT
 
@@ -57,4 +52,9 @@ Unicode Consortium documents: licensed under Unicode terms of use
 
 
 ![Quad](https://docs.racket-lang.org/quad/quads.png)
+
+
+## Project status
+
+Actively developed, though progress tends to go in bursts due to other commitments. Even when I’m not committing code to Quad, I am thinking about it.
 
