@@ -30,9 +30,12 @@ jobs:
 
     - name: Install package and its dependencies
       run: raco pkg install --auto --batch
+      
+    - name: Start virtual framebuffer
+      run: Xvfb "$DISPLAY" -screen 0 1280x1024x24 &
 
     - name: Run the tests
-      run: xvfb-run raco test -j 4 -p quad
+      run: raco test -j 4 -p quad
 
     - name: Run the qtests
-      run: xvfb-run racket -l qtest/all
+      run: racket -l qtest/all
