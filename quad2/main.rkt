@@ -41,20 +41,25 @@
       (error 'postcondition-failed))
     res))
 
-(define (has-position? q) (not (eq? ($quad-posn q) #false)))
-
 (struct $rect (x y width height) #:transparent #:mutable)
+
+(define (min-x rect) ($rect-x rect))
+(define (max-x rect) (+ (min-x rect) ($rect-width rect)))
+(define (min-y rect) ($rect-y rect))
+(define (max-y rect) (+ (min-y rect) ($rect-height rect)))
+
+(define/contract (rect-contains-posn? rect posn)
+  ($rect? $posn? . -> . boolean?)
+  (and (<= (min-x rect) ($posn-x posn) (max-x rect))
+       (<= (min-y rect) ($posn-y posn) (max-y rect))))
 
 (define/contract (rect-contains-rect? outer inner)
   ($rect? $rect? . -> . boolean?)
-  (define (min-x rect) ($rect-x rect))
-  (define (max-x rect) (+ (min-x rect) ($rect-width rect)))
-  (define (min-y rect) ($rect-y rect))
-  (define (max-y rect) (+ (min-y rect) ($rect-height rect)))
-  (and (<= (min-x outer) (min-x inner) (max-x inner) (max-x outer))
-       (<= (min-y outer) (min-y inner) (max-y inner) (max-y outer))))
+  (and (rect-contains-posn? outer ($posn (min-x inner) (min-y inner)))
+       (rect-contains-posn? outer ($posn (max-x inner) (max-y inner)))))
   
 
+(define (has-position? q) (not (eq? ($quad-posn q) #false)))
 (define-pass (layout qs)
   #:precondition (λ (qs) (andmap (λ (q) (not (has-position? q))) qs))
   #:postcondition (λ (qs) (andmap has-position? qs))
@@ -62,7 +67,7 @@
   (define (quad-fits? q posn)
     (define q-size (size q))
     (define quad-rect ($rect ($posn-x posn) ($posn-y posn)
-                                 ($posn-x q-size) ($posn-y q-size)))
+                             ($posn-x q-size) ($posn-y q-size)))
     (and (rect-contains-rect? frame quad-rect) posn))
   (for/fold ([posn ($posn 0 0)]
              #:result qs)
